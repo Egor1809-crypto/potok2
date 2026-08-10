@@ -1,0 +1,197 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { ArrowRight, CornerDownLeft, Search, X } from "lucide-react";
+
+import { IconButton } from "@/components/ui/button";
+import { cn } from "@/components/ui/utils";
+import { BRAND_NAME } from "@/config/brand";
+
+import { productRoutes, quickCreateRoutes } from "./navigation";
+import { containTabFocus } from "./focus-management";
+
+type CommandMenuProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+};
+
+const commandRoutes = [...quickCreateRoutes, ...productRoutes];
+
+export function CommandMenu({ open, onOpenChange }: CommandMenuProps) {
+  const router = useRouter();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const priorFocusRef = useRef<HTMLElement | null>(null);
+  const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        onOpenChange(!open);
+      }
+      if (open && event.key === "Escape") {
+        event.preventDefault();
+        onOpenChange(false);
+      }
+      if (open) containTabFocus(event, dialogRef.current);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onOpenChange, open]);
+
+  useEffect(() => {
+    if (!open) return;
+    priorFocusRef.current = document.activeElement as HTMLElement | null;
+    const frame = window.requestAnimationFrame(() => {
+      setQuery("");
+      inputRef.current?.focus();
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+      priorFocusRef.current?.focus();
+    };
+  }, [open]);
+
+  const results = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) return commandRoutes;
+    return commandRoutes.filter((route) =>
+      [route.label, route.description, ...(route.keywords ?? [])]
+        .join(" ")
+        .toLowerCase()
+        .includes(normalized),
+    );
+  }, [query]);
+
+  if (!open) return null;
+
+  const goToFirstResult = () => {
+    if (!results[0]) return;
+    router.push(results[0].href);
+    onOpenChange(false);
+  };
+
+  return (
+    <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="command-menu-title"
+      className="fixed inset-0 z-[90] flex items-start justify-center px-3 pt-[9vh] sm:px-6 sm:pt-[13vh]"
+    >
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-label="Close search"
+        onClick={() => onOpenChange(false)}
+        className="absolute inset-0 cursor-default bg-slate-950/30 backdrop-blur-[2px] motion-safe:animate-[mf-fade-in_150ms_ease-out]"
+      />
+      <div className="relative flex max-h-[72vh] w-full max-w-[620px] flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-[0_24px_80px_rgba(15,23,42,0.22)] motion-safe:animate-[mf-slide-up_180ms_cubic-bezier(0.2,0.8,0.2,1)]">
+        <h2 id="command-menu-title" className="sr-only">
+          Search {BRAND_NAME}
+        </h2>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            goToFirstResult();
+          }}
+          className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-4"
+        >
+          <Search aria-hidden="true" className="size-[18px] shrink-0 text-text-subtle" />
+          <label htmlFor="mailflow-command-search" className="sr-only">
+            Search pages and actions
+          </label>
+          <input
+            ref={inputRef}
+            id="mailflow-command-search"
+            type="search"
+            autoComplete="off"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search pages and actions…"
+            className="h-full min-w-0 flex-1 border-0 bg-transparent p-0 text-[15px] text-text-strong outline-none placeholder:text-text-subtle"
+          />
+          {query ? (
+            <IconButton
+              label="Clear search"
+              variant="ghost"
+              size="sm"
+              onClick={() => setQuery("")}
+            >
+              <X aria-hidden="true" className="size-3.5" />
+            </IconButton>
+          ) : (
+            <kbd className="hidden rounded-md border border-border bg-surface-subtle px-1.5 py-0.5 font-sans text-[10px] font-medium text-text-subtle sm:inline-flex">
+              ESC
+            </kbd>
+          )}
+        </form>
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-2">
+          <p className="px-2.5 pb-1.5 pt-1.5 text-[10px] font-semibold uppercase tracking-[0.13em] text-text-subtle">
+            {query ? `${results.length} results` : "Quick jump"}
+          </p>
+          {results.length ? (
+            <ul className="m-0 grid list-none gap-0.5 p-0">
+              {results.map((route, index) => {
+                const Icon = route.icon;
+                return (
+                  <li key={route.href}>
+                    <Link
+                      href={route.href}
+                      onClick={() => onOpenChange(false)}
+                      className="group flex items-center gap-3 rounded-xl px-2.5 py-2.5 outline-none transition hover:bg-surface-subtle focus-visible:bg-primary-subtle"
+                    >
+                      <span
+                        className={cn(
+                          "grid size-9 shrink-0 place-items-center rounded-[10px] border",
+                          index === 0 && !query
+                            ? "border-primary/15 bg-primary-subtle text-primary"
+                            : "border-border bg-surface text-text-muted",
+                        )}
+                      >
+                        <Icon aria-hidden="true" className="size-4" strokeWidth={1.8} />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[13px] font-medium text-text-strong">
+                          {route.label}
+                        </span>
+                        <span className="block truncate text-[11px] text-text-subtle">
+                          {route.description}
+                        </span>
+                      </span>
+                      <ArrowRight
+                        aria-hidden="true"
+                        className="size-4 -translate-x-1 text-text-subtle opacity-0 transition group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:opacity-100"
+                      />
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <div className="grid min-h-40 place-items-center px-6 text-center">
+              <div>
+                <p className="text-[13px] font-medium text-text-strong">No matches found</p>
+                <p className="mt-1 text-[12px] text-text-muted">
+                  Try a page name like Contacts or Analytics.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="flex h-10 shrink-0 items-center justify-between border-t border-border/70 bg-surface-subtle/70 px-3.5 text-[10px] text-text-subtle">
+          <span>Navigate with keyboard or pointer</span>
+          <span className="flex items-center gap-1">
+            <CornerDownLeft aria-hidden="true" className="size-3" />
+            Enter to open
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
