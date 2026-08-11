@@ -184,10 +184,10 @@ export function TablePagination({
           disabled={safePage <= 1}
           onClick={() => onPageChange(safePage - 1)}
         >
-          Previous
+          Назад
         </button>
         <span className="min-w-20 text-center tabular-nums">
-          {safePage} of {safePageCount}
+          {safePage} из {safePageCount}
         </span>
         <button
           type="button"
@@ -195,7 +195,7 @@ export function TablePagination({
           disabled={safePage >= safePageCount}
           onClick={() => onPageChange(safePage + 1)}
         >
-          Next
+          Вперёд
         </button>
       </div>
     </div>

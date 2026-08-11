@@ -48,11 +48,11 @@ export function Badge({
 export type StatusTone = "active" | "draft" | "scheduled" | "sending" | "error";
 
 const statusConfig: Record<StatusTone, { label: string; variant: BadgeVariant }> = {
-  active: { label: "Active", variant: "success" },
-  draft: { label: "Draft", variant: "neutral" },
-  scheduled: { label: "Scheduled", variant: "info" },
-  sending: { label: "Sending", variant: "accent" },
-  error: { label: "Action needed", variant: "danger" },
+  active: { label: "Активна", variant: "success" },
+  draft: { label: "Черновик", variant: "neutral" },
+  scheduled: { label: "Запланирована", variant: "info" },
+  sending: { label: "Отправляется", variant: "accent" },
+  error: { label: "Требуется действие", variant: "danger" },
 };
 
 export function StatusBadge({

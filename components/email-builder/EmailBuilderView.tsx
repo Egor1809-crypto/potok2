@@ -16,7 +16,7 @@ import type { EmailBlockType } from "@/types";
 import { ToastProvider, useToast } from "@/components/ui";
 import { cn } from "@/components/ui/utils";
 
-import { BlockLibrary } from "./BlockLibrary";
+import { BlockLibrary, blockLibrary } from "./BlockLibrary";
 import { BuilderTopbar, MobilePreviewToggle } from "./BuilderTopbar";
 import { EmailCanvas } from "./EmailCanvas";
 import { PropertiesPanel } from "./PropertiesPanel";
@@ -71,7 +71,7 @@ export function EmailBuilderView(props: EmailBuilderViewProps) {
     props.campaignName ??
     query.get("campaign") ??
     resolvedTemplate?.name ??
-    "Untitled campaign";
+    "Кампания без названия";
   const resolvedContinueHref =
     props.continueHref ??
     safeCampaignReturnPath(query.get("returnTo")) ??
@@ -93,7 +93,7 @@ export function EmailBuilderView(props: EmailBuilderViewProps) {
 
 function EmailBuilderWorkspace({
   templateId,
-  campaignName: initialCampaignName = "Legal Conference Invitation",
+  campaignName: initialCampaignName = "Приглашение на юридическую конференцию",
   continueHref = "/campaigns/new?step=sender",
 }: EmailBuilderViewProps) {
   const toast = useToast();
@@ -173,7 +173,8 @@ function EmailBuilderWorkspace({
     });
     setSelectedBlockId(block.id);
     setMobilePanel("canvas");
-    toast.success("Block added", `${type[0]?.toUpperCase()}${type.slice(1)} is ready to edit.`);
+    const blockLabel = blockLibrary.find((item) => item.type === type)?.label ?? "Блок";
+    toast.success("Блок добавлен", `${blockLabel} готов к редактированию.`);
   };
 
   const moveBlock = (blockId: string, direction: -1 | 1) => {
@@ -200,12 +201,12 @@ function EmailBuilderWorkspace({
       return { ...current, blocks };
     });
     setSelectedBlockId(duplicate.id);
-    toast.success("Block duplicated", "The copy was placed below the original.");
+    toast.success("Блок продублирован", "Копия размещена под исходным блоком.");
   };
 
   const deleteBlock = (blockId: string) => {
     if (document.blocks.length === 1) {
-      toast.warning("Keep one block", "An email needs at least one content block.");
+      toast.warning("Оставьте один блок", "В письме должен быть хотя бы один блок контента.");
       return;
     }
     const index = document.blocks.findIndex((block) => block.id === blockId);
@@ -216,7 +217,7 @@ function EmailBuilderWorkspace({
       blocks: current.blocks.filter((block) => block.id !== blockId),
     }));
     setSelectedBlockId(nextSelection);
-    toast.info("Block removed", "Use Undo if you change your mind.");
+    toast.info("Блок удалён", "Если передумаете, отмените действие.");
   };
 
   const undo = useCallback(() => {
@@ -243,7 +244,7 @@ function EmailBuilderWorkspace({
 
   const save = useCallback(() => {
     persistDraft();
-    toast.success("Draft saved", "Your email is saved in this demo workspace.");
+    toast.success("Черновик сохранён", "Письмо сохранено в этом демо-пространстве.");
   }, [persistDraft, toast]);
 
   const sendTest = () => {
@@ -252,8 +253,8 @@ function EmailBuilderWorkspace({
     const timer = window.setTimeout(() => {
       setSendingTest(false);
       toast.success(
-        "Test email sent",
-        "A personalized preview is on its way to egor@mailflow.example.",
+        "Тестовое письмо отправлено",
+        "Персонализированный предпросмотр отправлен на egor@mailflow.example.",
       );
     }, 850);
     timersRef.current.push(timer);
@@ -321,7 +322,7 @@ function EmailBuilderWorkspace({
               className="flex h-7 items-center gap-1.5 rounded-[7px] px-2 text-[10px] font-medium capitalize text-text-muted outline-none transition aria-pressed:bg-surface aria-pressed:text-primary aria-pressed:shadow-[var(--shadow-xs)] focus-visible:ring-2 focus-visible:ring-primary/30 sm:px-2.5"
             >
               <Icon aria-hidden="true" className="size-3" />
-              <span className="hidden min-[420px]:inline">{panel}</span>
+              <span className="hidden min-[420px]:inline">{panel === "blocks" ? "Блоки" : panel === "canvas" ? "Холст" : "Свойства"}</span>
             </button>
           ))}
         </div>

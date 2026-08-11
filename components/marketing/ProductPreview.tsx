@@ -12,11 +12,11 @@ import {
 import { BRAND_NAME } from "@/config/brand";
 
 const rows = [
-  { name: "Sofia Reynolds", initials: "SR", email: "sofia@northstar.legal", company: "Northstar Legal", role: "Managing Partner", tag: "VIP", tone: "bg-[#eeeaff] text-[#5c55d8]" },
-  { name: "Mikhail Orlov", initials: "MO", email: "m.orlov@orlovpartners.ru", company: "Orlov & Partners", role: "Senior Counsel", tag: "Moscow", tone: "bg-[#e8f6ff] text-[#2672a8]" },
-  { name: "Elena Vetrova", initials: "EV", email: "elena@prismadvisory.eu", company: "Prism Advisory", role: "Partner", tag: "Conference", tone: "bg-[#e9f8ef] text-[#2e7c4b]" },
-  { name: "Daniel Kim", initials: "DK", email: "daniel@kindelbridge.com", company: "Kindelbridge", role: "Legal Director", tag: "Warm", tone: "bg-[#fff5dc] text-[#936817]" },
-  { name: "Amelia Rhodes", initials: "AR", email: "amelia@arcfield.co", company: "Arcfield Group", role: "General Counsel", tag: "Partner", tone: "bg-[#f4ecff] text-[#7c4bb3]" },
+  { name: "София Рейнольдс", initials: "СР", email: "sofia@northstar.legal", company: "Нортстар Лигал", role: "Управляющий партнёр", tag: "Ключевой", tone: "bg-[#eeeaff] text-[#5c55d8]" },
+  { name: "Михаил Орлов", initials: "МО", email: "m.orlov@orlovpartners.ru", company: "Орлов и партнёры", role: "Старший юрист", tag: "Москва", tone: "bg-[#e8f6ff] text-[#2672a8]" },
+  { name: "Елена Ветрова", initials: "ЕВ", email: "elena@prismadvisory.eu", company: "Призма Консалтинг", role: "Партнёр", tag: "Конференция", tone: "bg-[#e9f8ef] text-[#2e7c4b]" },
+  { name: "Даниэль Ким", initials: "ДК", email: "daniel@kindelbridge.com", company: "Кинделбридж", role: "Юридический директор", tag: "Тёплый", tone: "bg-[#fff5dc] text-[#936817]" },
+  { name: "Амелия Роудс", initials: "АР", email: "amelia@arcfield.co", company: "Аркфилд Групп", role: "Главный юрист", tag: "Партнёр", tone: "bg-[#f4ecff] text-[#7c4bb3]" },
 ];
 
 export function ProductPreview() {
@@ -39,16 +39,16 @@ export function ProductPreview() {
                 <span className="text-[11px] font-semibold tracking-[.12em]">{BRAND_NAME}</span>
               </div>
               <button className="mb-3 flex w-full items-center justify-between rounded-lg border border-[#e5e5eb] bg-white px-2.5 py-2 text-left text-[10px] font-medium text-[#353744] shadow-sm">
-                Legal Team <ChevronDown size={12} />
+                Юридическая команда <ChevronDown size={12} />
               </button>
               <div className="space-y-0.5">
                 {[
-                  [LayoutDashboard, "Overview", false],
-                  [ContactRound, "Contacts", true],
-                  [UsersRound, "Companies", false],
-                  [Sparkles, "Segments", false],
-                  [Mail, "Campaigns", false],
-                  [BarChart3, "Analytics", false],
+                  [LayoutDashboard, "Обзор", false],
+                  [ContactRound, "Контакты", true],
+                  [UsersRound, "Компании", false],
+                  [Sparkles, "Сегменты", false],
+                  [Mail, "Кампании", false],
+                  [BarChart3, "Аналитика", false],
                 ].map(([Icon, label, active]) => {
                   const NavIcon = Icon as typeof LayoutDashboard;
                   return (
@@ -59,38 +59,38 @@ export function ProductPreview() {
                 })}
               </div>
               <div className="mt-[255px] flex items-center gap-2 border-t border-[#ececf1] px-1 pt-3">
-                <span className="grid size-7 place-items-center rounded-full bg-[#e9e6ff] text-[9px] font-semibold text-[#625cf6]">ES</span>
-                <div><p className="text-[10px] font-semibold">Egor S.</p><p className="text-[8px] text-[#9a9ca8]">Workspace admin</p></div>
+                <span className="grid size-7 place-items-center rounded-full bg-[#e9e6ff] text-[9px] font-semibold text-[#625cf6]">ЕС</span>
+                <div><p className="text-[10px] font-semibold">Егор С.</p><p className="text-[8px] text-[#9a9ca8]">Администратор</p></div>
               </div>
             </aside>
 
             <div className="min-w-0 flex-1">
               <div className="flex h-14 items-center justify-between border-b border-[#ececf1] px-4 sm:px-6">
-                <span className="text-xs font-semibold text-[#262734]">Contacts</span>
+                <span className="text-xs font-semibold text-[#262734]">Контакты</span>
                 <div className="flex items-center gap-2">
-                  <div className="hidden items-center gap-2 rounded-lg border border-[#e4e5eb] px-2.5 py-1.5 text-[9px] text-[#9698a5] sm:flex"><Search size={12} /> Search <kbd className="ml-5 rounded bg-[#f2f2f5] px-1 py-0.5">⌘ K</kbd></div>
-                  <span className="grid size-7 place-items-center rounded-full bg-[#20212d] text-[8px] font-semibold text-white">ES</span>
+                  <div className="hidden items-center gap-2 rounded-lg border border-[#e4e5eb] px-2.5 py-1.5 text-[9px] text-[#9698a5] sm:flex"><Search size={12} /> Поиск <kbd className="ml-5 rounded bg-[#f2f2f5] px-1 py-0.5">⌘ K</kbd></div>
+                  <span className="grid size-7 place-items-center rounded-full bg-[#20212d] text-[8px] font-semibold text-white">ЕС</span>
                 </div>
               </div>
 
               <div className="p-4 sm:p-6">
                 <div className="flex items-end justify-between">
-                  <div><p className="text-[9px] font-medium uppercase tracking-[.14em] text-[#9b9da9]">People</p><h3 className="mt-1 text-xl font-semibold tracking-[-.025em] text-[#20212c] sm:text-2xl">Contacts</h3><p className="mt-1 text-[10px] text-[#8b8d99]">24,821 people across your workspace</p></div>
-                  <button className="rounded-lg bg-[#625cf6] px-3 py-2 text-[9px] font-semibold text-white shadow-[0_5px_12px_rgba(98,92,246,.24)]">+ Add contact</button>
+                  <div><p className="text-[9px] font-medium uppercase tracking-[.14em] text-[#9b9da9]">Люди</p><h3 className="mt-1 text-xl font-semibold tracking-[-.025em] text-[#20212c] sm:text-2xl">Контакты</h3><p className="mt-1 text-[10px] text-[#8b8d99]">24 821 контакт в вашем пространстве</p></div>
+                  <button className="rounded-lg bg-[#625cf6] px-3 py-2 text-[9px] font-semibold text-white shadow-[0_5px_12px_rgba(98,92,246,.24)]">+ Добавить контакт</button>
                 </div>
                 <div className="mt-5 flex items-center justify-between border-b border-[#ececf1]">
-                  <div className="flex gap-4 text-[9px]"><span className="border-b-2 border-[#625cf6] pb-2.5 font-semibold text-[#343641]">All contacts</span><span className="pb-2.5 text-[#9294a0]">Partners</span><span className="hidden pb-2.5 text-[#9294a0] sm:inline">Lawyers</span><span className="hidden pb-2.5 text-[#9294a0] sm:inline">Conference 2026</span></div>
-                  <span className="mb-2.5 text-[9px] text-[#9294a0]">View 4</span>
+                  <div className="flex gap-4 text-[9px]"><span className="border-b-2 border-[#625cf6] pb-2.5 font-semibold text-[#343641]">Все контакты</span><span className="pb-2.5 text-[#9294a0]">Партнёры</span><span className="hidden pb-2.5 text-[#9294a0] sm:inline">Юристы</span><span className="hidden pb-2.5 text-[#9294a0] sm:inline">Конференция 2026</span></div>
+                  <span className="mb-2.5 text-[9px] text-[#9294a0]">4 вида</span>
                 </div>
                 <div className="mt-3 flex items-center gap-2">
-                  <div className="flex h-8 flex-1 items-center gap-2 rounded-lg border border-[#e4e5eb] px-2.5 text-[9px] text-[#9b9da9]"><Search size={12} /> Search contacts</div>
-                  <button className="h-8 rounded-lg border border-[#d9dbe3] bg-[#f8f7ff] px-3 text-[9px] font-semibold text-[#5e57dc]">Filter <span className="ml-1 rounded bg-[#625cf6] px-1.5 py-0.5 text-white">3</span></button>
-                  <button className="hidden h-8 rounded-lg border border-[#e4e5eb] px-3 text-[9px] text-[#555765] sm:block">Columns</button>
+                  <div className="flex h-8 flex-1 items-center gap-2 rounded-lg border border-[#e4e5eb] px-2.5 text-[9px] text-[#9b9da9]"><Search size={12} /> Поиск контактов</div>
+                  <button className="h-8 rounded-lg border border-[#d9dbe3] bg-[#f8f7ff] px-3 text-[9px] font-semibold text-[#5e57dc]">Фильтр <span className="ml-1 rounded bg-[#625cf6] px-1.5 py-0.5 text-white">3</span></button>
+                  <button className="hidden h-8 rounded-lg border border-[#e4e5eb] px-3 text-[9px] text-[#555765] sm:block">Столбцы</button>
                 </div>
 
                 <div className="mt-3 overflow-hidden rounded-xl border border-[#e6e7ec]">
                   <div className="grid grid-cols-[28px_1.5fr_1.2fr_.85fr_.65fr] items-center gap-2 bg-[#fafafb] px-3 py-2.5 text-[8px] font-semibold uppercase tracking-[.08em] text-[#9698a5] sm:grid-cols-[28px_1.6fr_1.3fr_1fr_.8fr]">
-                    <span className="size-3 rounded-[3px] border border-[#cfd1da]" /><span>Name</span><span>Company</span><span>Role</span><span>Tag</span>
+                    <span className="size-3 rounded-[3px] border border-[#cfd1da]" /><span>Имя</span><span>Компания</span><span>Роль</span><span>Тег</span>
                   </div>
                   {rows.map((row, index) => (
                     <div key={row.email} className="grid grid-cols-[28px_1.5fr_1.2fr_.85fr_.65fr] items-center gap-2 border-t border-[#efeff3] px-3 py-3 sm:grid-cols-[28px_1.6fr_1.3fr_1fr_.8fr]">
@@ -107,16 +107,16 @@ export function ProductPreview() {
       </div>
 
       <div className="absolute -bottom-10 right-0 z-10 hidden w-[330px] rounded-2xl border border-[#dedfe7] bg-white p-4 shadow-[0_24px_65px_rgba(32,33,50,.2)] lg:block xl:-right-9 xl:bottom-14">
-        <div className="flex items-center justify-between"><div><p className="text-[11px] font-semibold text-[#2a2b37]">Filter contacts</p><p className="mt-0.5 text-[9px] text-[#989aa6]">Match all of these conditions</p></div><span className="rounded-md bg-[#eeedff] px-2 py-1 text-[8px] font-semibold text-[#5b55da]">AND</span></div>
+        <div className="flex items-center justify-between"><div><p className="text-[11px] font-semibold text-[#2a2b37]">Фильтр контактов</p><p className="mt-0.5 text-[9px] text-[#989aa6]">Все условия должны совпасть</p></div><span className="rounded-md bg-[#eeedff] px-2 py-1 text-[8px] font-semibold text-[#5b55da]">И</span></div>
         <div className="mt-3 space-y-2">
-          {["Role · equals · Lawyer", "City · equals · Moscow", "Status · equals · Active"].map((filter) => <div key={filter} className="rounded-lg border border-[#e6e7ec] bg-[#fafafb] px-3 py-2 text-[9px] font-medium text-[#535562]">{filter}</div>)}
+          {["Роль · равно · Юрист", "Город · равно · Москва", "Статус · равно · Активен"].map((filter) => <div key={filter} className="rounded-lg border border-[#e6e7ec] bg-[#fafafb] px-3 py-2 text-[9px] font-medium text-[#535562]">{filter}</div>)}
         </div>
-        <div className="mt-4 flex items-center justify-between border-t border-[#ececf1] pt-3"><div><p className="text-[8px] text-[#9698a5]">Matching audience</p><p className="text-[15px] font-semibold text-[#262733]">843 contacts</p></div><button className="rounded-lg bg-[#625cf6] px-3 py-2 text-[9px] font-semibold text-white">Create campaign</button></div>
+        <div className="mt-4 flex items-center justify-between border-t border-[#ececf1] pt-3"><div><p className="text-[8px] text-[#9698a5]">Найдена аудитория</p><p className="text-[15px] font-semibold text-[#262733]">843 контакта</p></div><button className="rounded-lg bg-[#625cf6] px-3 py-2 text-[9px] font-semibold text-white">Создать кампанию</button></div>
       </div>
 
       <div className="absolute -left-5 bottom-12 hidden items-center gap-3 rounded-xl border border-[#dedfe7] bg-white p-3 pr-5 shadow-[0_18px_45px_rgba(32,33,50,.15)] xl:flex">
         <span className="grid size-9 place-items-center rounded-lg bg-[#eaf8ef] text-[#3f8c5b]"><BarChart3 size={17} /></span>
-        <div><p className="text-[8px] text-[#9395a1]">Delivery rate</p><p className="text-sm font-semibold text-[#282a36]">98.2% <span className="ml-1 text-[8px] text-[#3f9b61]">+2.4%</span></p></div>
+        <div><p className="text-[8px] text-[#9395a1]">Доставляемость</p><p className="text-sm font-semibold text-[#282a36]">98,2% <span className="ml-1 text-[8px] text-[#3f9b61]">+2,4%</span></p></div>
       </div>
     </div>
   );

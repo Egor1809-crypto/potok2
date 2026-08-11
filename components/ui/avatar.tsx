@@ -13,6 +13,12 @@ const sizeClasses: Record<AvatarSize, string> = {
   xl: "size-14 text-[16px]",
 };
 
+const statusLabels = {
+  online: "В сети",
+  away: "Отошёл",
+  offline: "Не в сети",
+} as const;
+
 export interface AvatarProps extends React.HTMLAttributes<HTMLSpanElement> {
   name: string;
   src?: string | null;
@@ -58,7 +64,7 @@ export function Avatar({
       )}
       {status && (
         <span
-          aria-label={status}
+          aria-label={statusLabels[status]}
           className={cn(
             "absolute right-0 bottom-0 size-[27%] min-h-2 min-w-2 rounded-full ring-2 ring-surface",
             status === "online" && "bg-success",

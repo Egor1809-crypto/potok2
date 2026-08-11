@@ -38,15 +38,20 @@ import {
   buttonVariants,
   cn,
 } from "@/components/ui";
+import {
+  campaignStatusLabels,
+  formatCampaignNumber,
+  formatCampaignPercent,
+} from "./campaignLabels";
 
 export type CampaignsTab = "all" | CampaignStatus;
 
 const tabs: { value: CampaignsTab; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "draft", label: "Drafts" },
-  { value: "scheduled", label: "Scheduled" },
-  { value: "sending", label: "Sending" },
-  { value: "completed", label: "Completed" },
+  { value: "all", label: "Все" },
+  { value: "draft", label: "Черновики" },
+  { value: "scheduled", label: "Запланированные" },
+  { value: "sending", label: "Отправляются" },
+  { value: "completed", label: "Завершённые" },
 ];
 
 const statusTone: Record<
@@ -59,13 +64,9 @@ const statusTone: Record<
   completed: "success",
 };
 
-function titleCase(value: string): string {
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
-
 function formatDate(value: string | null): string {
   if (!value) return "—";
-  return new Intl.DateTimeFormat("en", {
+  return new Intl.DateTimeFormat("ru-RU", {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -74,7 +75,7 @@ function formatDate(value: string | null): string {
 }
 
 function formatNumber(value: number): string {
-  return new Intl.NumberFormat("en").format(value);
+  return formatCampaignNumber(value);
 }
 
 export interface CampaignsViewProps {
@@ -146,25 +147,25 @@ export function CampaignsView({
   return (
     <div className="relative space-y-6">
       <PageHeader
-        eyebrow="Outreach"
-        title="Campaigns"
-        description="Create targeted sends, coordinate schedules and follow every conversation."
-        meta={`${items.length} campaigns`}
+        eyebrow="Коммуникации"
+        title="Кампании"
+        description="Создавайте адресные рассылки, управляйте расписанием и отслеживайте каждый диалог."
+        meta={`Кампаний: ${items.length}`}
         action={
           <Link href="/campaigns/new" className={buttonVariants({ variant: "primary" })}>
             <MailPlus aria-hidden="true" className="size-4" />
-            New campaign
+            Новая кампания
           </Link>
         }
       />
 
-      <section className="grid gap-3 sm:grid-cols-3" aria-label="Campaign summary">
+      <section className="grid gap-3 sm:grid-cols-3" aria-label="Сводка по кампаниям">
         <article className="card flex items-center gap-3.5 p-4">
           <span className="grid size-9 place-items-center rounded-[10px] bg-primary-subtle text-primary">
             <Send aria-hidden="true" className="size-4" />
           </span>
           <div>
-            <p className="m-0 text-[11px] text-text-muted">Delivered</p>
+            <p className="m-0 text-[11px] text-text-muted">Доставлено</p>
             <p className="mt-0.5 mb-0 text-[19px] font-semibold tracking-[-0.03em] text-text-strong">
               {formatNumber(delivered)}
             </p>
@@ -175,7 +176,7 @@ export function CampaignsView({
             <CalendarClock aria-hidden="true" className="size-4" />
           </span>
           <div>
-            <p className="m-0 text-[11px] text-text-muted">Scheduled & sending</p>
+            <p className="m-0 text-[11px] text-text-muted">Запланированы и отправляются</p>
             <p className="mt-0.5 mb-0 text-[19px] font-semibold tracking-[-0.03em] text-text-strong">
               {statusCounts.scheduled + statusCounts.sending}
             </p>
@@ -186,9 +187,9 @@ export function CampaignsView({
             <BarChart3 aria-hidden="true" className="size-4" />
           </span>
           <div>
-            <p className="m-0 text-[11px] text-text-muted">Average open rate</p>
+            <p className="m-0 text-[11px] text-text-muted">Средняя доля открытий</p>
             <p className="mt-0.5 mb-0 text-[19px] font-semibold tracking-[-0.03em] text-text-strong">
-              {averageOpenRate.toFixed(1)}%
+              {formatCampaignPercent(averageOpenRate)}
             </p>
           </div>
         </article>
@@ -221,8 +222,8 @@ export function CampaignsView({
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             onClear={() => setSearch("")}
-            placeholder="Search campaigns"
-            aria-label="Search campaigns"
+            placeholder="Поиск кампаний"
+            aria-label="Поиск кампаний"
             wrapperClassName="mb-3 w-full sm:w-64"
             className="h-9 min-h-9"
           />
@@ -233,17 +234,17 @@ export function CampaignsView({
             <Table className="min-w-[980px]">
               <TableHeader>
                 <TableRow>
-                  <TableHead>Campaign</TableHead>
-                  <TableHead>Audience</TableHead>
-                  <TableHead>Recipients</TableHead>
-                  <TableHead>Sent</TableHead>
-                  <TableHead>Open rate</TableHead>
-                  <TableHead>CTR</TableHead>
-                  <TableHead>Replies</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Кампания</TableHead>
+                  <TableHead>Аудитория</TableHead>
+                  <TableHead>Получатели</TableHead>
+                  <TableHead>Отправлено</TableHead>
+                  <TableHead>Открытия</TableHead>
+                  <TableHead>Переходы</TableHead>
+                  <TableHead>Ответы</TableHead>
+                  <TableHead>Создана</TableHead>
+                  <TableHead>Статус</TableHead>
                   <TableHead className="w-12">
-                    <span className="sr-only">Actions</span>
+                    <span className="sr-only">Действия</span>
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -282,12 +283,12 @@ export function CampaignsView({
                     </TableCell>
                     <TableCell className="tabular-nums">
                       {campaign.metrics.delivered > 0
-                        ? `${campaign.metrics.openRate.toFixed(1)}%`
+                        ? formatCampaignPercent(campaign.metrics.openRate)
                         : "—"}
                     </TableCell>
                     <TableCell className="tabular-nums">
                       {campaign.metrics.delivered > 0
-                        ? `${campaign.metrics.clickRate.toFixed(1)}%`
+                        ? formatCampaignPercent(campaign.metrics.clickRate)
                         : "—"}
                     </TableCell>
                     <TableCell className="tabular-nums">
@@ -300,12 +301,12 @@ export function CampaignsView({
                     </TableCell>
                     <TableCell>
                       <Badge variant={statusTone[campaign.status]} dot>
-                        {titleCase(campaign.status)}
+                        {campaignStatusLabels[campaign.status]}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       <IconButton
-                        label={`Actions for ${campaign.name}`}
+                        label={`Действия с кампанией «${campaign.name}»`}
                         variant="ghost"
                         size="sm"
                         onClick={() => setActionCampaign(campaign)}
@@ -321,32 +322,32 @@ export function CampaignsView({
         ) : (
           <EmptyState
             icon={<Send className="size-5" />}
-            title="No campaigns found"
+            title="Кампании не найдены"
             description={
               search
-                ? "Try another search or clear the current filters."
-                : `There are no ${activeTab} campaigns in this workspace yet.`
+                ? "Измените запрос или сбросьте текущие фильтры."
+                : "В этом рабочем пространстве пока нет кампаний с выбранным статусом."
             }
             action={
               search
-                ? { label: "Clear search", onClick: () => setSearch("") }
-                : { label: "Create campaign", onClick: () => window.location.assign("/campaigns/new") }
+                ? { label: "Очистить поиск", onClick: () => setSearch("") }
+                : { label: "Создать кампанию", onClick: () => window.location.assign("/campaigns/new") }
             }
           />
         )}
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-5 py-3 text-[11px] text-text-muted">
           <span>
-            Showing {filteredCampaigns.length} of {items.length} campaigns
+            Показано {filteredCampaigns.length} из {items.length} кампаний
           </span>
-          <span>Updated a few seconds ago</span>
+          <span>Обновлено несколько секунд назад</span>
         </div>
       </section>
 
       <Modal
         open={Boolean(actionCampaign)}
         onOpenChange={(open) => !open && setActionCampaign(null)}
-        title={actionCampaign?.name ?? "Campaign actions"}
-        description="Choose what you want to do with this campaign."
+        title={actionCampaign?.name ?? "Действия с кампанией"}
+        description="Выберите действие с этой кампанией."
         size="sm"
       >
         {actionCampaign && (
@@ -360,8 +361,8 @@ export function CampaignsView({
                   <BarChart3 aria-hidden="true" className="size-4" />
                 </span>
                 <span>
-                  <span className="block text-[12px] font-semibold text-text-strong">View campaign</span>
-                  <span className="mt-0.5 block text-[10px] text-text-muted">Performance and delivery detail</span>
+                  <span className="block text-[12px] font-semibold text-text-strong">Открыть кампанию</span>
+                  <span className="mt-0.5 block text-[10px] text-text-muted">Эффективность и подробности доставки</span>
                 </span>
               </span>
               <ArrowRight aria-hidden="true" className="size-4 text-text-subtle group-hover:text-primary" />
@@ -375,8 +376,8 @@ export function CampaignsView({
                   <Copy aria-hidden="true" className="size-4" />
                 </span>
                 <span>
-                  <span className="block text-[12px] font-semibold text-text-strong">Duplicate campaign</span>
-                  <span className="mt-0.5 block text-[10px] text-text-muted">Reuse the audience and content</span>
+                  <span className="block text-[12px] font-semibold text-text-strong">Дублировать кампанию</span>
+                  <span className="mt-0.5 block text-[10px] text-text-muted">Повторно использовать аудиторию и контент</span>
                 </span>
               </span>
               <ArrowRight aria-hidden="true" className="size-4 text-text-subtle group-hover:text-primary" />
@@ -394,13 +395,13 @@ export function CampaignsView({
               onClick={() => {
                 notify(
                   actionCampaign.status === "sending"
-                    ? "Sending paused in demo mode"
-                    : "Campaign queued in demo mode",
+                    ? "Отправка приостановлена в деморежиме"
+                    : "Кампания поставлена в очередь в деморежиме",
                 );
                 setActionCampaign(null);
               }}
             >
-              {actionCampaign.status === "sending" ? "Pause sending" : "Run demo action"}
+              {actionCampaign.status === "sending" ? "Приостановить отправку" : "Выполнить демо-действие"}
             </Button>
           </div>
         )}
@@ -411,7 +412,7 @@ export function CampaignsView({
           <ToastSurface
             tone="success"
             title={notice}
-            description="No external email was sent."
+            description="Внешние письма не отправлялись."
             onDismiss={() => setNotice(null)}
           />
         </div>

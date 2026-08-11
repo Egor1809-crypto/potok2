@@ -40,22 +40,23 @@ import {
 } from "@/data/selectors";
 import type { Campaign, EmailBlock, EmailTemplate } from "@/types";
 import { BRAND_NAME } from "@/config/brand";
+import { campaignStatusLabels } from "./campaignLabels";
 
 export type CampaignDetailViewProps = {
   campaignId?: string;
   campaign?: Campaign;
 };
 
-const numberFormatter = new Intl.NumberFormat("en-US");
+const numberFormatter = new Intl.NumberFormat("ru-RU");
 
-const dateFormatter = new Intl.DateTimeFormat("en-US", {
+const dateFormatter = new Intl.DateTimeFormat("ru-RU", {
   day: "numeric",
   month: "short",
   year: "numeric",
   timeZone: "UTC",
 });
 
-const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
+const dateTimeFormatter = new Intl.DateTimeFormat("ru-RU", {
   day: "numeric",
   month: "short",
   year: "numeric",
@@ -64,13 +65,6 @@ const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
   timeZone: "UTC",
   timeZoneName: "short",
 });
-
-const statusLabels: Record<Campaign["status"], string> = {
-  draft: "Draft",
-  scheduled: "Scheduled",
-  sending: "Sending",
-  completed: "Completed",
-};
 
 const statusTones: Record<Campaign["status"], StatusTone> = {
   draft: "draft",
@@ -84,15 +78,15 @@ function formatNumber(value: number) {
 }
 
 function formatPercent(value: number) {
-  return `${value.toFixed(1)}%`;
+  return `${value.toLocaleString("ru-RU", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 }
 
 function formatDate(value: string | null) {
-  return value ? dateFormatter.format(new Date(value)) : "Not set";
+  return value ? dateFormatter.format(new Date(value)) : "Не задано";
 }
 
 function formatDateTime(value: string | null) {
-  return value ? dateTimeFormatter.format(new Date(value)) : "Not set";
+  return value ? dateTimeFormatter.format(new Date(value)) : "Не задано";
 }
 
 /**
@@ -132,21 +126,21 @@ export function CampaignDetailView({
           aria-hidden="true"
           className="size-3.5 transition-transform group-hover:-translate-x-0.5"
         />
-        All campaigns
+        Все кампании
       </Link>
 
       <PageHeader
-        eyebrow="Campaign overview"
+        eyebrow="Обзор кампании"
         title={currentCampaign.name}
         meta={
           <StatusBadge
             status={statusTones[currentCampaign.status]}
-            label={statusLabels[currentCampaign.status]}
+            label={campaignStatusLabels[currentCampaign.status]}
           />
         }
         description={
           <span>
-            <span className="text-text-subtle">Subject:</span>{" "}
+            <span className="text-text-subtle">Тема:</span>{" "}
             <span className="font-medium text-text">{currentCampaign.subject}</span>
           </span>
         }
@@ -162,17 +156,17 @@ export function CampaignDetailView({
               id="campaign-performance-heading"
               className="m-0 text-[15px] font-semibold tracking-[-0.015em] text-text-strong"
             >
-              Performance
+              Эффективность
             </h2>
             <p className="mt-1 mb-0 text-[12px] text-text-muted">
               {hasPerformance
-                ? "A live view of delivery quality and audience engagement."
-                : "Reporting will populate as soon as the first messages are sent."}
+                ? "Актуальные данные о качестве доставки и вовлечённости аудитории."
+                : "Отчёт начнёт заполняться после отправки первых сообщений."}
             </p>
           </div>
           {currentCampaign.sentAt ? (
             <span className="text-[11px] text-text-subtle">
-              Sent {formatDateTime(currentCampaign.sentAt)}
+              Отправлено {formatDateTime(currentCampaign.sentAt)}
             </span>
           ) : null}
         </div>
@@ -187,7 +181,7 @@ export function CampaignDetailView({
       </section>
 
       <section
-        aria-label="Campaign content and configuration"
+        aria-label="Контент и настройки кампании"
         className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_360px]"
       >
         <ContentPreview campaign={currentCampaign} template={template} />
@@ -207,24 +201,24 @@ function CampaignActions({ campaign }: { campaign: Campaign }) {
   const analyticsHref = `/analytics?campaign=${encodeURIComponent(campaign.id)}&demoName=${encodeURIComponent(campaign.name)}`;
   const primaryAction = {
     draft: {
-      label: "Continue editing",
+      label: "Продолжить редактирование",
       href: `/campaigns/new?draft=${campaign.id}`,
       icon: <FileEdit aria-hidden="true" className="size-3.5" />,
     },
     scheduled: {
-      label: isDemoCampaign ? "View analytics" : "Review schedule",
+      label: isDemoCampaign ? "Открыть аналитику" : "Проверить расписание",
       href: isDemoCampaign ? analyticsHref : `/campaigns/new?campaign=${campaign.id}&step=review`,
       icon: isDemoCampaign
         ? <ArrowRight aria-hidden="true" className="size-3.5" />
         : <CalendarClock aria-hidden="true" className="size-3.5" />,
     },
     sending: {
-      label: "View live report",
+      label: "Открыть текущий отчёт",
       href: analyticsHref,
       icon: <ArrowRight aria-hidden="true" className="size-3.5" />,
     },
     completed: {
-      label: "View full report",
+      label: "Открыть полный отчёт",
       href: analyticsHref,
       icon: <ArrowRight aria-hidden="true" className="size-3.5" />,
     },
@@ -234,12 +228,12 @@ function CampaignActions({ campaign }: { campaign: Campaign }) {
     <>
       <Link
         href={isDemoCampaign
-          ? `/campaigns/new?count=${campaign.metrics.recipients}&name=${encodeURIComponent(`${campaign.name} copy`)}${campaign.templateId ? `&template=${encodeURIComponent(campaign.templateId)}` : ""}`
+          ? `/campaigns/new?count=${campaign.metrics.recipients}&name=${encodeURIComponent(`${campaign.name} — копия`)}${campaign.templateId ? `&template=${encodeURIComponent(campaign.templateId)}` : ""}`
           : `/campaigns/new?duplicate=${campaign.id}`}
         className="btn btn-secondary"
       >
         <Copy aria-hidden="true" className="size-3.5" />
-        Duplicate
+        Дублировать
       </Link>
       <Link href={primaryAction.href} className="btn btn-primary">
         {primaryAction.icon}
@@ -258,14 +252,14 @@ function CampaignStatusNotice({ campaign }: { campaign: Campaign }) {
       : 0;
 
     return (
-      <Alert tone="info" title="Campaign is sending now" className="items-center">
+      <Alert tone="info" title="Кампания отправляется" className="items-center">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-5">
           <p className="m-0 flex-1">
-            {formatNumber(campaign.metrics.sent)} of{" "}
-            {formatNumber(campaign.metrics.recipients)} recipients have been processed.
+            Обработано получателей: {formatNumber(campaign.metrics.sent)} из{" "}
+            {formatNumber(campaign.metrics.recipients)}.
           </p>
           <Progress
-            aria-label="Campaign send progress"
+            aria-label="Ход отправки кампании"
             value={campaign.metrics.sent}
             max={campaign.metrics.recipients}
             className="w-full min-w-48 sm:w-56"
@@ -281,18 +275,17 @@ function CampaignStatusNotice({ campaign }: { campaign: Campaign }) {
 
   if (campaign.status === "scheduled") {
     return (
-      <Alert tone="info" title="Ready and scheduled">
-        This campaign will begin sending to{" "}
-        <strong>{formatNumber(campaign.metrics.recipients)} recipients</strong> on{" "}
-        {formatDateTime(campaign.scheduledAt)}.
+      <Alert tone="info" title="Готова и запланирована">
+        Получателей: <strong>{formatNumber(campaign.metrics.recipients)}</strong>. Отправка
+        начнётся {formatDateTime(campaign.scheduledAt)}.
       </Alert>
     );
   }
 
   return (
-    <Alert tone="warning" title="Draft saved">
-      The audience and email content are preserved. Complete the review step when you
-      are ready to schedule or send.
+    <Alert tone="warning" title="Черновик сохранён">
+      Аудитория и контент письма сохранены. Когда будете готовы запланировать или начать
+      отправку, завершите этап проверки.
     </Alert>
   );
 }
@@ -303,31 +296,31 @@ function PerformanceSummary({ campaign }: { campaign: Campaign }) {
 
   const items = [
     {
-      label: "Audience",
+      label: "Аудитория",
       value: formatNumber(metrics.recipients),
-      change: metrics.sent > 0 ? `${formatNumber(metrics.sent)} sent` : "Ready",
+      change: metrics.sent > 0 ? `Отправлено: ${formatNumber(metrics.sent)}` : "Готово",
       icon: <UsersRound aria-hidden="true" className="size-4" />,
     },
     {
-      label: "Delivered",
+      label: "Доставлено",
       value: hasPerformance ? formatNumber(metrics.delivered) : "—",
       change: hasPerformance ? formatPercent(metrics.deliveryRate) : undefined,
       icon: <ShieldCheck aria-hidden="true" className="size-4" />,
     },
     {
-      label: "Opened",
+      label: "Открыто",
       value: hasPerformance ? formatNumber(metrics.opened) : "—",
       change: hasPerformance ? formatPercent(metrics.openRate) : undefined,
       icon: <MailCheck aria-hidden="true" className="size-4" />,
     },
     {
-      label: "Clicked",
+      label: "Переходы",
       value: hasPerformance ? formatNumber(metrics.clicked) : "—",
       change: hasPerformance ? formatPercent(metrics.clickRate) : undefined,
       icon: <MousePointerClick aria-hidden="true" className="size-4" />,
     },
     {
-      label: "Replies",
+      label: "Ответы",
       value: hasPerformance ? formatNumber(metrics.replies) : "—",
       change: hasPerformance ? formatPercent(metrics.replyRate) : undefined,
       icon: <Reply aria-hidden="true" className="size-4" />,
@@ -354,31 +347,31 @@ function PerformanceVisuals({ campaign }: { campaign: Campaign }) {
   const { metrics } = campaign;
   const stages = [
     {
-      label: "Sent",
+      label: "Отправлено",
       value: metrics.sent,
       rate: "100%",
       tone: "primary" as const,
     },
     {
-      label: "Delivered",
+      label: "Доставлено",
       value: metrics.delivered,
       rate: formatPercent(metrics.deliveryRate),
       tone: "success" as const,
     },
     {
-      label: "Opened",
+      label: "Открыто",
       value: metrics.opened,
       rate: formatPercent(metrics.openRate),
       tone: "primary" as const,
     },
     {
-      label: "Clicked",
+      label: "Переходы",
       value: metrics.clicked,
       rate: formatPercent(metrics.clickRate),
       tone: "primary" as const,
     },
     {
-      label: "Replied",
+      label: "Ответы",
       value: metrics.replies,
       rate: formatPercent(metrics.replyRate),
       tone: "success" as const,
@@ -396,9 +389,9 @@ function PerformanceVisuals({ campaign }: { campaign: Campaign }) {
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(300px,.65fr)]">
       <Card>
         <CardHeader className="border-b border-border pb-4">
-          <CardTitle>Engagement journey</CardTitle>
+          <CardTitle>Путь вовлечения</CardTitle>
           <CardDescription>
-            Conversion from each delivered message to a meaningful response.
+            Конверсия от доставленного письма до содержательного ответа.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -429,14 +422,14 @@ function PerformanceVisuals({ campaign }: { campaign: Campaign }) {
 
       <Card>
         <CardHeader className="border-b border-border pb-4">
-          <CardTitle>Delivery health</CardTitle>
-          <CardDescription>Inbox reach across processed messages.</CardDescription>
+          <CardTitle>Качество доставки</CardTitle>
+          <CardDescription>Попадание обработанных сообщений во входящие.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex justify-center py-2">
             <div
               role="img"
-              aria-label={`${formatPercent(metrics.deliveryRate)} delivery rate`}
+              aria-label={`Доля доставленных писем: ${formatPercent(metrics.deliveryRate)}`}
               className="grid size-40 place-items-center rounded-full"
               style={{ background: deliveryRing }}
             >
@@ -445,7 +438,7 @@ function PerformanceVisuals({ campaign }: { campaign: Campaign }) {
                   <p className="m-0 text-[27px] leading-none font-semibold tracking-[-0.04em] text-text-strong">
                     {formatPercent(metrics.deliveryRate)}
                   </p>
-                  <p className="mt-1.5 mb-0 text-[10px] text-text-muted">Delivered</p>
+                  <p className="mt-1.5 mb-0 text-[10px] text-text-muted">Доставлено</p>
                 </div>
               </div>
             </div>
@@ -453,24 +446,24 @@ function PerformanceVisuals({ campaign }: { campaign: Campaign }) {
 
           <div className="mt-5 grid grid-cols-3 gap-2">
             <DeliveryLegendItem
-              label="Delivered"
+              label="Доставлено"
               value={metrics.delivered}
               dotClassName="bg-success"
             />
             <DeliveryLegendItem
-              label="Bounced"
+              label="Возвраты"
               value={metrics.bounced}
               dotClassName="bg-danger"
             />
             <DeliveryLegendItem
-              label="Pending"
+              label="В ожидании"
               value={pending}
               dotClassName="bg-surface-inset ring-1 ring-border-strong"
             />
           </div>
 
           <div className="mt-4 flex items-center justify-between rounded-[10px] bg-surface-subtle px-3 py-2.5 text-[11px]">
-            <span className="text-text-muted">Unsubscribed</span>
+            <span className="text-text-muted">Отписались</span>
             <span className="font-semibold tabular-nums text-text-strong">
               {formatNumber(metrics.unsubscribed)}
             </span>
@@ -506,35 +499,35 @@ function PreSendPerformance({ campaign }: { campaign: Campaign }) {
   const isDraft = campaign.status === "draft";
   const Icon = isScheduled ? CalendarClock : isDraft ? FileEdit : Send;
   const title = isScheduled
-    ? "Everything is ready for launch"
+    ? "Всё готово к запуску"
     : isDraft
-      ? "Performance starts after you send"
-      : "No delivery events were recorded";
+      ? "Показатели появятся после отправки"
+      : "Событий доставки пока нет";
   const description = isScheduled
-    ? `${BRAND_NAME} will begin collecting delivery and engagement data after the scheduled send on ${formatDateTime(campaign.scheduledAt)}.`
+    ? `${BRAND_NAME} начнёт собирать данные о доставке и вовлечённости после запланированной отправки ${formatDateTime(campaign.scheduledAt)}.`
     : isDraft
-      ? "Finish reviewing the audience, content, and sender. This report will populate automatically after launch."
-      : "This campaign has no send activity to report yet. Review its setup before trying again.";
+      ? "Завершите проверку аудитории, контента и отправителя. После запуска отчёт заполнится автоматически."
+      : "По этой кампании пока нет данных об отправке. Проверьте настройки перед повторной попыткой.";
 
   const checks = [
     {
-      label: "Audience selected",
-      detail: `${formatNumber(campaign.metrics.recipients)} recipients`,
+      label: "Аудитория выбрана",
+      detail: `Получателей: ${formatNumber(campaign.metrics.recipients)}`,
       complete: campaign.metrics.recipients > 0,
     },
     {
-      label: "Email content ready",
-      detail: campaign.subject || "Subject needed",
+      label: "Контент письма готов",
+      detail: campaign.subject || "Нужно указать тему",
       complete: Boolean(campaign.subject),
     },
     {
-      label: "Sender configured",
-      detail: campaign.senderEmail || "Sender needed",
+      label: "Отправитель настроен",
+      detail: campaign.senderEmail || "Нужно указать отправителя",
       complete: Boolean(campaign.senderEmail),
     },
     {
-      label: isScheduled ? "Send time confirmed" : "Schedule or send",
-      detail: isScheduled ? formatDateTime(campaign.scheduledAt) : "Not scheduled",
+      label: isScheduled ? "Время отправки подтверждено" : "Запланировать или отправить",
+      detail: isScheduled ? formatDateTime(campaign.scheduledAt) : "Не запланировано",
       complete: Boolean(campaign.scheduledAt),
     },
   ];
@@ -560,7 +553,7 @@ function PreSendPerformance({ campaign }: { campaign: Campaign }) {
             }
             className="btn btn-secondary mt-5"
           >
-            {isDraft ? "Continue setup" : "Review campaign"}
+            {isDraft ? "Продолжить настройку" : "Проверить кампанию"}
             <ArrowRight aria-hidden="true" className="size-3.5" />
           </Link>
         </div>
@@ -569,15 +562,15 @@ function PreSendPerformance({ campaign }: { campaign: Campaign }) {
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="m-0 text-[13px] font-semibold text-text-strong">
-                Launch readiness
+                Готовность к запуску
               </p>
               <p className="mt-1 mb-0 text-[11px] text-text-muted">
-                {checks.filter((check) => check.complete).length} of {checks.length}{" "}
-                checks complete
+                {checks.filter((check) => check.complete).length} из {checks.length}{" "}
+                проверок выполнено
               </p>
             </div>
             <Badge variant={isScheduled ? "success" : "warning"} dot>
-              {isScheduled ? "Ready" : "In progress"}
+              {isScheduled ? "Готово" : "В процессе"}
             </Badge>
           </div>
           <div className="mt-5 space-y-1">
@@ -627,30 +620,30 @@ function ContentPreview({
     <Card className="min-w-0 overflow-hidden">
       <CardHeader className="flex-row items-start justify-between gap-4 border-b border-border pb-4">
         <div>
-          <CardTitle>Email content</CardTitle>
+          <CardTitle>Контент письма</CardTitle>
           <CardDescription>
-            A campaign snapshot using the selected content and personalization.
+            Предпросмотр кампании с выбранным контентом и персонализацией.
           </CardDescription>
         </div>
         <Badge variant={template ? "accent" : "neutral"}>
-          {template?.name ?? "Custom email"}
+          {template?.name ?? "Собственное письмо"}
         </Badge>
       </CardHeader>
       <CardContent className="bg-surface-subtle p-3 sm:p-5">
         <div className="overflow-hidden rounded-[12px] border border-border bg-surface shadow-[var(--shadow-sm)]">
           <div className="grid gap-2 border-b border-border bg-surface px-4 py-4 text-[11px] sm:grid-cols-[58px_1fr] sm:px-5">
-            <span className="text-text-subtle">From</span>
+            <span className="text-text-subtle">От</span>
             <span className="truncate font-medium text-text-strong">
               {campaign.senderName}{" "}
               <span className="font-normal text-text-muted">
                 &lt;{campaign.senderEmail}&gt;
               </span>
             </span>
-            <span className="text-text-subtle">To</span>
+            <span className="text-text-subtle">Кому</span>
             <span className="truncate text-text">
-              {campaign.audience} · {formatNumber(campaign.metrics.recipients)} contacts
+              {campaign.audience} · Контактов: {formatNumber(campaign.metrics.recipients)}
             </span>
-            <span className="text-text-subtle">Subject</span>
+            <span className="text-text-subtle">Тема</span>
             <span className="font-semibold text-text-strong">{campaign.subject}</span>
           </div>
 
@@ -681,7 +674,7 @@ function ContentPreview({
                   </h3>
                   <p className="mt-2 mb-0 text-[12px] leading-6 text-[#707582]">
                     {campaign.previewText ||
-                      "The body of this custom email is not available in this snapshot."}
+                      "Текст этого письма недоступен в текущем предпросмотре."}
                   </p>
                 </div>
               )}
@@ -690,7 +683,7 @@ function ContentPreview({
 
           <div className="flex items-center gap-2 border-t border-border px-4 py-3 text-[10px] text-text-muted sm:px-5">
             <Mail aria-hidden="true" className="size-3.5" />
-            <span className="truncate">Preview: {campaign.previewText}</span>
+            <span className="truncate">Предпросмотр: {campaign.previewText}</span>
           </div>
         </div>
       </CardContent>
@@ -775,10 +768,10 @@ function EmailPreviewBlock({
 
 function CampaignDetails({ campaign }: { campaign: Campaign }) {
   const rows = [
-    { label: "Owner", value: campaign.owner },
-    { label: "Created", value: formatDate(campaign.createdAt) },
+    { label: "Владелец", value: campaign.owner },
+    { label: "Создана", value: formatDate(campaign.createdAt) },
     {
-      label: campaign.sentAt ? "Sent" : "Scheduled",
+      label: campaign.sentAt ? "Отправлена" : "Запланирована",
       value: formatDateTime(campaign.sentAt ?? campaign.scheduledAt),
     },
   ];
@@ -786,14 +779,14 @@ function CampaignDetails({ campaign }: { campaign: Campaign }) {
   return (
     <Card>
       <CardHeader className="border-b border-border pb-4">
-        <CardTitle>Campaign details</CardTitle>
+        <CardTitle>Данные кампании</CardTitle>
       </CardHeader>
       <CardContent className="py-2">
         <div className="flex items-center justify-between gap-4 py-3">
-          <span className="text-[11px] text-text-muted">Status</span>
+          <span className="text-[11px] text-text-muted">Статус</span>
           <StatusBadge
             status={statusTones[campaign.status]}
-            label={statusLabels[campaign.status]}
+            label={campaignStatusLabels[campaign.status]}
           />
         </div>
         {rows.map((row) => (
@@ -830,18 +823,18 @@ function AudienceDetails({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="m-0 text-[10px] font-medium uppercase tracking-[0.08em] text-text-subtle">
-                  Audience
+                  Аудитория
                 </p>
                 <p className="mt-1 mb-0 truncate text-[13px] font-semibold text-text-strong">
                   {campaign.audience}
                 </p>
               </div>
               <Badge variant={segmentName ? "success" : "outline"}>
-                {segmentName ? "Dynamic" : "List"}
+                {segmentName ? "Динамическая" : "Список"}
               </Badge>
             </div>
             <p className="mt-2 mb-0 text-[11px] text-text-muted">
-              {formatNumber(campaign.metrics.recipients)} recipients
+              Получателей: {formatNumber(campaign.metrics.recipients)}
               {segmentName ? ` · ${segmentName}` : ""}
             </p>
             {campaign.segmentId ? (
@@ -849,7 +842,7 @@ function AudienceDetails({
                 href="/segments"
                 className="mt-3 inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:text-primary-hover"
               >
-                View segment
+                Открыть сегмент
                 <ArrowRight aria-hidden="true" className="size-3" />
               </Link>
             ) : null}
@@ -871,9 +864,9 @@ function SenderDetails({ campaign }: { campaign: Campaign }) {
               <p className="m-0 truncate text-[13px] font-semibold text-text-strong">
                 {campaign.senderName}
               </p>
-              <span title="Verified sender">
+              <span title="Проверенный отправитель">
                 <Check
-                  aria-label="Verified sender"
+                  aria-label="Проверенный отправитель"
                   className="size-3.5 rounded-full bg-success p-0.5 text-white"
                   strokeWidth={3}
                 />
@@ -886,7 +879,7 @@ function SenderDetails({ campaign }: { campaign: Campaign }) {
         </div>
         <div className="mt-4 flex items-center gap-2 rounded-[10px] bg-success-subtle px-3 py-2.5 text-[10px] text-success">
           <UserRound aria-hidden="true" className="size-3.5" />
-          Verified sender identity
+          Личность отправителя подтверждена
         </div>
       </CardContent>
     </Card>
@@ -904,7 +897,7 @@ function CampaignNotFound() {
           aria-hidden="true"
           className="size-3.5 transition-transform group-hover:-translate-x-0.5"
         />
-        All campaigns
+        Все кампании
       </Link>
       <Card>
         <CardContent className="flex min-h-[420px] flex-col items-center justify-center px-6 py-16 text-center">
@@ -912,14 +905,14 @@ function CampaignNotFound() {
             <SearchX aria-hidden="true" className="size-5" />
           </span>
           <h1 className="mt-5 mb-0 text-[20px] font-semibold tracking-[-0.025em] text-text-strong">
-            Campaign not found
+            Кампания не найдена
           </h1>
           <p className="mt-2 mb-0 max-w-sm text-[12px] leading-5 text-text-muted">
-            This campaign may have been removed, or the link may be out of date.
-            Your other campaigns are still available.
+            Возможно, кампания удалена или ссылка устарела. Остальные кампании
+            по-прежнему доступны.
           </p>
           <Link href="/campaigns" className="btn btn-primary mt-6">
-            Back to campaigns
+            Вернуться к кампаниям
             <ArrowRight aria-hidden="true" className="size-3.5" />
           </Link>
         </CardContent>

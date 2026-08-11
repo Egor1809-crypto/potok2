@@ -74,7 +74,7 @@ export function Progress({
 
 export function Spinner({
   className,
-  label = "Loading",
+  label = "Загрузка",
 }: {
   className?: string;
   label?: string;

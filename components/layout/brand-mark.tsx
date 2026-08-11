@@ -21,7 +21,7 @@ export function BrandMark({
   return (
     <Link
       href={href}
-      aria-label={`${BRAND_NAME} overview`}
+      aria-label={`${BRAND_NAME}: обзор`}
       className={cx(
         "inline-flex min-w-0 items-center gap-2.5 rounded-lg outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-surface",
         className,

@@ -3,16 +3,16 @@ import type { ImportJob } from "@/types";
 export const recentImports: ImportJob[] = [
   {
     id: "import-august-conference",
-    fileName: "conference_attendees_august.xlsx",
+    fileName: "участники_конференции_август.xlsx",
     source: "xlsx",
     status: "complete",
     progress: 100,
     mapping: [
       { sourceColumn: "ФИО", targetField: "fullName", sampleValue: "Иван Петров" },
-      { sourceColumn: "Email", targetField: "email", sampleValue: "ivan.petrov@lexbridge.example" },
-      { sourceColumn: "Компания", targetField: "companyName", sampleValue: "Lexbridge Legal" },
-      { sourceColumn: "Должность", targetField: "role", sampleValue: "Senior Partner" },
-      { sourceColumn: "Город", targetField: "city", sampleValue: "Moscow" },
+      { sourceColumn: "Эл. почта", targetField: "email", sampleValue: "ivan.petrov@lexbridge.example" },
+      { sourceColumn: "Компания", targetField: "companyName", sampleValue: "Лексбридж Лигал" },
+      { sourceColumn: "Должность", targetField: "role", sampleValue: "Старший партнёр" },
+      { sourceColumn: "Город", targetField: "city", sampleValue: "Москва" },
     ],
     summary: {
       total: 4_821,

@@ -81,7 +81,7 @@ export function ChartLegend({
 }) {
   return (
     <ul
-      aria-label="Chart legend"
+      aria-label="Легенда графика"
       className={cn("m-0 flex list-none flex-wrap items-center gap-x-5 gap-y-2 p-0", className)}
     >
       {items.map((item) => (

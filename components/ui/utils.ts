@@ -40,7 +40,7 @@ export function getInitials(name: string, limit = 2): string {
 }
 
 export function formatCompactNumber(value: number): string {
-  return new Intl.NumberFormat("en", {
+  return new Intl.NumberFormat("ru-RU", {
     notation: value >= 1_000 ? "compact" : "standard",
     maximumFractionDigits: 1,
   }).format(value);

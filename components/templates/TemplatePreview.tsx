@@ -7,6 +7,7 @@ import type { EmailTemplate } from "@/types";
 import { BRAND_NAME } from "@/config/brand";
 import { Badge, buttonVariants } from "@/components/ui";
 import { cn } from "@/components/ui/utils";
+import { templateCategoryLabels } from "./templateLabels";
 
 export function TemplateCard({
   template,
@@ -27,14 +28,14 @@ export function TemplateCard({
       <div className="relative">
         <Link
           href={resolvedBuilderHref}
-          aria-label={`Open ${template.name} in the email builder`}
+          aria-label={`Открыть шаблон «${template.name}» в редакторе писем`}
           className="block outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40"
         >
           <TemplateThumbnail template={template} />
         </Link>
         <button
           type="button"
-          aria-label={favorite ? `Remove ${template.name} from favorites` : `Add ${template.name} to favorites`}
+          aria-label={favorite ? `Удалить «${template.name}» из избранного` : `Добавить «${template.name}» в избранное`}
           aria-pressed={favorite}
           onClick={() => onFavoriteChange(!favorite)}
           className="absolute right-3 top-3 grid size-8 place-items-center rounded-full border border-white/75 bg-white/90 text-[#7a8090] shadow-[0_4px_14px_rgba(20,24,38,0.1)] backdrop-blur-md outline-none transition hover:scale-105 hover:text-[#e35368] focus-visible:ring-2 focus-visible:ring-primary/40 aria-pressed:text-[#e35368]"
@@ -54,14 +55,14 @@ export function TemplateCard({
             </p>
           </div>
           <Badge variant="neutral" className="shrink-0">
-            {template.category}
+            {templateCategoryLabels[template.category]}
           </Badge>
         </div>
 
         <div className="mt-4 flex items-center justify-between gap-3 border-t border-border/70 pt-3.5">
           <div className="flex items-center gap-1.5 text-[10px] text-text-subtle">
             <Users aria-hidden="true" className="size-3" />
-            Used {template.usageCount} times
+            Использований: {template.usageCount.toLocaleString("ru-RU")}
           </div>
           <Link
             href={resolvedBuilderHref}
@@ -71,7 +72,7 @@ export function TemplateCard({
               className: "-mr-1 h-7 px-2 text-[10px] text-primary hover:text-primary",
             })}
           >
-            Use template
+            Использовать
             <ArrowRight aria-hidden="true" className="size-3" />
           </Link>
         </div>
@@ -135,7 +136,7 @@ export function TemplateThumbnail({ template }: { template: EmailTemplate }) {
             className="mb-2 block text-[5px] font-semibold uppercase tracking-[0.16em]"
             style={{ color: template.accentColor }}
           >
-            {template.category}
+            {templateCategoryLabels[template.category]}
           </span>
           <p
             className={cn(

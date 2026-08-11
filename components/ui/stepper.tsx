@@ -10,7 +10,7 @@ export function Stepper({
   steps,
   currentStep,
   className,
-  "aria-label": ariaLabel = "Progress",
+  "aria-label": ariaLabel = "Ход выполнения",
 }: {
   steps: StepItem[];
   currentStep: number;

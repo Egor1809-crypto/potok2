@@ -19,6 +19,7 @@ import type {
   BuilderDocument,
   PreviewMode,
 } from "./builder-types";
+import { getBlockLabel } from "./BlockLibrary";
 
 type EmailCanvasProps = {
   document: BuilderDocument;
@@ -47,7 +48,7 @@ export function EmailCanvas({
 
   return (
     <section
-      aria-label={`${isMobile ? "Mobile" : "Desktop"} email preview`}
+      aria-label={`${isMobile ? "Мобильный" : "Компьютерный"} предпросмотр письма`}
       className={cn(
         "relative flex min-h-0 flex-col overflow-hidden bg-surface-inset",
         className,
@@ -56,10 +57,10 @@ export function EmailCanvas({
       <div className="flex h-10 shrink-0 items-center justify-between border-b border-border/70 bg-surface/75 px-3.5 backdrop-blur-sm">
         <div className="flex items-center gap-2">
           <span className="size-1.5 rounded-full bg-success" />
-          <span className="text-[10px] font-medium text-text-muted">Live preview</span>
+          <span className="text-[10px] font-medium text-text-muted">Предпросмотр в реальном времени</span>
         </div>
         <span className="rounded-md border border-border bg-surface px-2 py-0.5 font-mono text-[9px] text-text-subtle">
-          {isMobile ? "360 px" : `${document.contentWidth} px`}
+          {isMobile ? "360 пикс." : `${document.contentWidth} пикс.`}
         </span>
       </div>
 
@@ -74,18 +75,18 @@ export function EmailCanvas({
           <div className="mb-3 overflow-hidden rounded-[11px] border border-border bg-surface px-3.5 py-3 shadow-[var(--shadow-xs)]">
             <div className="flex items-center gap-2.5">
               <span className="grid size-7 shrink-0 place-items-center rounded-full bg-primary-subtle text-[9px] font-bold text-primary">
-                ES
+                ЕС
               </span>
               <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-1.5 text-[10px] font-semibold text-text-strong">
-                  Egor Sabalin
+                  Егор Сабалин
                   <span className="font-normal text-text-subtle">&lt;egor@mailflow.example&gt;</span>
                 </span>
                 <span className="block truncate text-[10px] text-text-muted">
                   {document.subject}
                 </span>
               </span>
-              <span className="text-[9px] text-text-subtle">Now</span>
+              <span className="text-[9px] text-text-subtle">Сейчас</span>
             </div>
           </div>
 
@@ -116,13 +117,13 @@ export function EmailCanvas({
                 className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-dashed border-border-strong px-3 text-[10px] font-medium text-text-muted outline-none transition hover:border-primary/40 hover:bg-primary-subtle/40 hover:text-primary focus-visible:ring-2 focus-visible:ring-primary/30"
               >
                 <Plus aria-hidden="true" className="size-3.5" />
-                Add content block
+                Добавить блок контента
               </button>
             </div>
           </div>
 
           <p className="m-0 px-4 pb-2 pt-4 text-center text-[9px] leading-4 text-text-subtle">
-            Preview uses demo contact data. Personalization fields resolve before sending.
+            В предпросмотре используются демо-данные контакта. Поля персонализации подставятся перед отправкой.
           </p>
         </div>
       </div>
@@ -163,7 +164,7 @@ function CanvasBlock({
     <div
       role="button"
       tabIndex={0}
-      aria-label={`${block.type} block${selected ? ", selected" : ""}`}
+      aria-label={`${getBlockLabel(block.type)}${selected ? ", выбран" : ""}`}
       onClick={onSelect}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
@@ -190,13 +191,13 @@ function CanvasBlock({
       {selected ? (
         <div
           role="toolbar"
-          aria-label="Selected block actions"
+          aria-label="Действия с выбранным блоком"
           className="absolute -top-4 right-2 z-20 flex items-center gap-0.5 rounded-lg border border-border bg-surface p-0.5 shadow-[var(--shadow-md)]"
           onClick={(event) => event.stopPropagation()}
           onKeyDown={(event) => event.stopPropagation()}
         >
           <IconButton
-            label="Move block up"
+            label="Переместить блок вверх"
             size="sm"
             variant="ghost"
             disabled={first}
@@ -205,7 +206,7 @@ function CanvasBlock({
             <ArrowUp aria-hidden="true" className="size-3.5" />
           </IconButton>
           <IconButton
-            label="Move block down"
+            label="Переместить блок вниз"
             size="sm"
             variant="ghost"
             disabled={last}
@@ -214,7 +215,7 @@ function CanvasBlock({
             <ArrowDown aria-hidden="true" className="size-3.5" />
           </IconButton>
           <IconButton
-            label="Duplicate block"
+            label="Дублировать блок"
             size="sm"
             variant="ghost"
             onClick={onDuplicate}
@@ -222,7 +223,7 @@ function CanvasBlock({
             <Copy aria-hidden="true" className="size-3.5" />
           </IconButton>
           <IconButton
-            label="Delete block"
+            label="Удалить блок"
             size="sm"
             variant="ghost"
             className="hover:!bg-danger-subtle hover:!text-danger"
@@ -352,7 +353,7 @@ function BlockContent({
     const columns = block.content.split("|");
     return (
       <div className="grid grid-cols-2 gap-3 text-left">
-        {[columns[0] || "First column", columns[1] || "Second column"].map((column, index) => (
+        {[columns[0] || "Первый столбец", columns[1] || "Второй столбец"].map((column, index) => (
           <div
             key={`${column}-${index}`}
             className="rounded-lg border border-black/5 bg-black/[0.025] p-3"
@@ -375,7 +376,7 @@ function BlockContent({
   if (block.type === "spacer") {
     return selected ? (
       <div className="rounded border border-dashed border-primary/30 py-1 text-center text-[9px] font-medium text-primary/70">
-        Spacer · {block.paddingTop + block.paddingBottom}px
+        Отступ · {block.paddingTop + block.paddingBottom} пикс.
       </div>
     ) : (
       <span className="block" aria-hidden="true" />

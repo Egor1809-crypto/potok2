@@ -124,36 +124,36 @@ const blockDefaults: Record<
 
 const initialContent: Record<EmailBlockType, Pick<EmailBlock, "content" | "label" | "href">> = {
   logo: { content: BRAND_NAME, label: undefined, href: undefined },
-  heading: { content: "A clear headline", label: undefined, href: undefined },
+  heading: { content: "Понятный заголовок", label: undefined, href: undefined },
   text: {
-    content: "Hello, {{first_name}}. Add a concise message that gives your reader a reason to continue.",
+    content: "Здравствуйте, {{first_name}}. Добавьте короткое сообщение, которое заинтересует читателя.",
     label: undefined,
     href: undefined,
   },
   image: {
-    content: "Campaign visual",
-    label: "Campaign visual",
+    content: "Изображение кампании",
+    label: "Изображение кампании",
     href: undefined,
   },
   button: {
-    content: "Continue",
-    label: "Continue",
+    content: "Продолжить",
+    label: "Продолжить",
     href: "https://mailflow.example",
   },
   columns: {
-    content: "One organized contact database|Campaigns with clear performance",
+    content: "Единая упорядоченная база контактов|Кампании с понятными показателями",
     label: undefined,
     href: undefined,
   },
   divider: { content: "", label: undefined, href: undefined },
   spacer: { content: "", label: undefined, href: undefined },
   social: {
-    content: "LinkedIn|Website|X",
+    content: "LinkedIn|Сайт|X",
     label: undefined,
     href: undefined,
   },
   footer: {
-    content: `${BRAND_NAME} · Manage preferences · Unsubscribe`,
+    content: `${BRAND_NAME} · Настроить подписку · Отписаться`,
     label: undefined,
     href: undefined,
   },

@@ -29,88 +29,88 @@ export type ProductNavGroup = {
 
 export const productNavigation: ProductNavGroup[] = [
   {
-    label: "Workspace",
+    label: "Рабочее пространство",
     items: [
       {
-        label: "Overview",
-        description: "Workspace activity and performance",
+        label: "Обзор",
+        description: "Активность и показатели команды",
         href: "/dashboard",
         icon: LayoutDashboard,
         exact: true,
-        keywords: ["home", "dashboard"],
+        keywords: ["главная", "обзор", "дашборд"],
       },
       {
-        label: "Contacts",
-        description: "People, saved views and relationship history",
+        label: "Контакты",
+        description: "Люди, сохранённые виды и история общения",
         href: "/contacts",
         icon: ContactRound,
-        keywords: ["people", "crm", "database"],
+        keywords: ["люди", "crm", "база"],
       },
       {
-        label: "Companies",
-        description: "Organizations and their contacts",
+        label: "Компании",
+        description: "Организации и связанные с ними контакты",
         href: "/companies",
         icon: Building2,
-        keywords: ["accounts", "organizations"],
+        keywords: ["аккаунты", "организации"],
       },
       {
-        label: "Segments",
-        description: "Saved and dynamic audiences",
+        label: "Сегменты",
+        description: "Сохранённые и динамические аудитории",
         href: "/segments",
         icon: UsersRound,
-        keywords: ["audiences", "lists", "filters"],
+        keywords: ["аудитории", "списки", "фильтры"],
       },
     ],
   },
   {
-    label: "Outreach",
+    label: "Рассылки",
     items: [
       {
-        label: "Campaigns",
-        description: "Draft, schedule and track outreach",
+        label: "Кампании",
+        description: "Черновики, расписание и результаты рассылок",
         href: "/campaigns",
         icon: Megaphone,
-        keywords: ["email", "send", "broadcast"],
+        keywords: ["почта", "отправить", "рассылка"],
       },
       {
-        label: "Email builder",
-        description: "Design and personalize campaign content",
+        label: "Редактор писем",
+        description: "Дизайн и персонализация писем",
         href: "/email-builder",
         icon: MailOpen,
-        keywords: ["editor", "compose", "design"],
+        keywords: ["редактор", "письмо", "дизайн"],
       },
       {
-        label: "Templates",
-        description: "Reusable email designs",
+        label: "Шаблоны",
+        description: "Готовые дизайны писем",
         href: "/templates",
         icon: FileText,
-        keywords: ["library", "designs"],
+        keywords: ["библиотека", "дизайны"],
       },
       {
-        label: "Analytics",
-        description: "Delivery, engagement and reply performance",
+        label: "Аналитика",
+        description: "Доставка, вовлечённость и ответы",
         href: "/analytics",
         icon: BarChart3,
-        keywords: ["reports", "metrics", "performance"],
+        keywords: ["отчёты", "метрики", "эффективность"],
       },
     ],
   },
   {
-    label: "Manage",
+    label: "Управление",
     items: [
       {
-        label: "Imports",
-        description: "Bring contacts into your workspace",
+        label: "Импорт",
+        description: "Перенос контактов в рабочее пространство",
         href: "/import",
         icon: UploadCloud,
-        keywords: ["csv", "xlsx", "upload"],
+        keywords: ["csv", "xlsx", "загрузка"],
       },
       {
-        label: "Settings",
-        description: "Workspace, members and sending setup",
+        label: "Настройки",
+        description: "Команда, рассылки и рабочее пространство",
         href: "/settings",
         icon: Settings,
-        keywords: ["billing", "domains", "brand", "members"],
+        keywords: ["оплата", "домены", "бренд", "участники"],
       },
     ],
   },
@@ -122,12 +122,12 @@ export const productRoutes: ProductNavItem[] = productNavigation.flatMap(
 
 export const quickCreateRoutes: ProductNavItem[] = [
   {
-    label: "New campaign",
-    description: "Choose an audience and start an email",
+    label: "Новая кампания",
+    description: "Выберите аудиторию и начните письмо",
     href: "/campaigns/new",
     icon: Shapes,
     exact: true,
-    keywords: ["create", "compose", "send"],
+    keywords: ["создать", "письмо", "отправить"],
   },
 ];
 
@@ -140,9 +140,9 @@ export function isProductRouteActive(
 }
 
 export function getProductSection(pathname: string) {
-  if (pathname === "/campaigns/new") return "New campaign";
+  if (pathname === "/campaigns/new") return "Новая кампания";
   return (
     productRoutes.find((item) => isProductRouteActive(pathname, item))?.label ??
-    "Overview"
+    "Обзор"
   );
 }

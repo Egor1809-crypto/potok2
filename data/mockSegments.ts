@@ -3,8 +3,8 @@ import type { Segment } from "@/types";
 export const segments: Segment[] = [
   {
     id: "segment-moscow-lawyers",
-    name: "Moscow Lawyers",
-    description: "Active legal professionals based in Moscow.",
+    name: "Юристы Москвы",
+    description: "Активные специалисты в области права из Москвы.",
     contactCount: 843,
     rules: [
       {
@@ -32,14 +32,14 @@ export const segments: Segment[] = [
     color: "#635BFF",
     isDynamic: true,
     campaignsCount: 12,
-    createdBy: "Egor Sabalin",
+    createdBy: "Егор Сабалин",
     createdAt: "2025-01-14T09:30:00Z",
     updatedAt: "2026-08-11T08:42:00Z",
   },
   {
     id: "segment-partners",
-    name: "Partners",
-    description: "Managing, senior and practice partners across the database.",
+    name: "Партнёры",
+    description: "Управляющие, старшие и профильные партнёры из всей базы.",
     contactCount: 1_284,
     rules: [
       {
@@ -67,14 +67,14 @@ export const segments: Segment[] = [
     color: "#0F8C79",
     isDynamic: true,
     campaignsCount: 18,
-    createdBy: "Alina Volkova",
+    createdBy: "Алина Волкова",
     createdAt: "2025-02-03T11:10:00Z",
     updatedAt: "2026-08-10T14:16:00Z",
   },
   {
     id: "segment-conference-attendees",
-    name: "Conference attendees",
-    description: "Contacts who attended or registered for a recent event.",
+    name: "Участники конференций",
+    description: "Контакты, которые недавно посетили мероприятие или зарегистрировались на него.",
     contactCount: 3_921,
     rules: [
       {
@@ -95,14 +95,14 @@ export const segments: Segment[] = [
     color: "#D97757",
     isDynamic: true,
     campaignsCount: 24,
-    createdBy: "Egor Sabalin",
+    createdBy: "Егор Сабалин",
     createdAt: "2025-03-18T13:45:00Z",
     updatedAt: "2026-08-09T16:20:00Z",
   },
   {
     id: "segment-vip-clients",
-    name: "VIP Clients",
-    description: "High-priority clients with strong recent engagement.",
+    name: "Ключевые клиенты",
+    description: "Приоритетные клиенты с высокой недавней активностью.",
     contactCount: 184,
     rules: [
       {
@@ -130,14 +130,14 @@ export const segments: Segment[] = [
     color: "#B7791F",
     isDynamic: true,
     campaignsCount: 7,
-    createdBy: "Egor Sabalin",
+    createdBy: "Егор Сабалин",
     createdAt: "2025-04-22T08:20:00Z",
     updatedAt: "2026-08-11T06:45:00Z",
   },
   {
     id: "segment-warm-leads",
-    name: "Warm leads",
-    description: "Prospects showing intent but not yet in an active opportunity.",
+    name: "Тёплые лиды",
+    description: "Потенциальные клиенты, которые проявили интерес, но ещё не стали активной сделкой.",
     contactCount: 2_140,
     rules: [
       {
@@ -165,14 +165,14 @@ export const segments: Segment[] = [
     color: "#E8792E",
     isDynamic: true,
     campaignsCount: 15,
-    createdBy: "Alina Volkova",
+    createdBy: "Алина Волкова",
     createdAt: "2025-06-01T10:05:00Z",
     updatedAt: "2026-08-10T09:23:00Z",
   },
   {
     id: "segment-recently-engaged",
-    name: "Recently engaged",
-    description: "Contacts with an engagement score above 70 and recent activity.",
+    name: "Недавно активные",
+    description: "Контакты с рейтингом вовлечённости выше 70 и недавней активностью.",
     contactCount: 1_672,
     rules: [
       {
@@ -200,7 +200,7 @@ export const segments: Segment[] = [
     color: "#2F7CF6",
     isDynamic: true,
     campaignsCount: 9,
-    createdBy: "Egor Sabalin",
+    createdBy: "Егор Сабалин",
     createdAt: "2025-09-16T12:00:00Z",
     updatedAt: "2026-08-11T08:08:00Z",
   },

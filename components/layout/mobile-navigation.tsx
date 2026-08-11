@@ -57,13 +57,13 @@ export function MobileNavigation({
       ref={dialogRef}
       role="dialog"
       aria-modal="true"
-      aria-label="Navigation menu"
+      aria-label="Меню навигации"
       className="fixed inset-0 z-[80] lg:hidden"
     >
       <button
         type="button"
         tabIndex={-1}
-        aria-label="Close navigation"
+        aria-label="Закрыть навигацию"
         onClick={() => onOpenChange(false)}
         className="absolute inset-0 cursor-default bg-slate-950/35 backdrop-blur-[2px] motion-safe:animate-[mf-fade-in_160ms_ease-out]"
       />

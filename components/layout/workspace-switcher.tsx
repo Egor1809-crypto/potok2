@@ -24,13 +24,13 @@ const defaultWorkspaces: WorkspaceOption[] = [
     id: workspaceConfig.id,
     name: workspaceConfig.name,
     plan: workspaceConfig.plan,
-    initials: "LT",
+    initials: "ЮК",
   },
   {
     id: "workspace-events",
-    name: "Events & PR",
-    plan: "Pro",
-    initials: "EP",
+    name: "Мероприятия и связи с общественностью",
+    plan: "Профессиональный",
+    initials: "МС",
   },
 ];
 
@@ -92,7 +92,7 @@ export function WorkspaceSwitcher({
         aria-expanded={open}
         aria-controls={menuId}
         aria-haspopup="listbox"
-        aria-label={collapsed ? `Workspace: ${selected.name}` : undefined}
+        aria-label={collapsed ? `Рабочее пространство: ${selected.name}` : undefined}
         title={collapsed ? selected.name : undefined}
         onClick={() => setOpen((current) => !current)}
         className={
@@ -111,7 +111,7 @@ export function WorkspaceSwitcher({
                 {selected.name}
               </span>
               <span className="block truncate text-[11px] text-text-muted">
-                {selected.plan ? `${selected.plan} workspace` : "Workspace"}
+                {selected.plan ? `Тариф ${selected.plan}` : "Рабочее пространство"}
               </span>
             </span>
             <ChevronsUpDown
@@ -126,7 +126,7 @@ export function WorkspaceSwitcher({
         <div
           id={menuId}
           role="listbox"
-          aria-label="Choose workspace"
+          aria-label="Выбор рабочего пространства"
           className={
             collapsed
               ? "absolute left-full top-0 z-50 ml-2 w-64 origin-top-left rounded-xl border border-border bg-surface p-1.5 shadow-[0_16px_48px_rgba(15,23,42,0.14)]"
@@ -134,7 +134,7 @@ export function WorkspaceSwitcher({
           }
         >
           <p className="px-2.5 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-text-subtle">
-            Workspaces
+            Рабочие пространства
           </p>
           {workspaces.map((workspace) => {
             const isSelected = workspace.id === selected.id;
@@ -155,7 +155,7 @@ export function WorkspaceSwitcher({
                     {workspace.name}
                   </span>
                   <span className="block text-[11px] text-text-muted">
-                    {workspace.plan ?? "Workspace"}
+                    {workspace.plan ? `Тариф ${workspace.plan}` : "Рабочее пространство"}
                   </span>
                 </span>
                 {isSelected ? (

@@ -27,10 +27,11 @@ test("server-renders the finished MAILFLOW landing page", async () => {
 
   const html = await response.text();
   assert.match(html, /MAILFLOW/);
-  assert.match(html, /Email outreach/);
-  assert.match(html, /Finally organized/);
-  assert.match(html, /Start for free/);
-  assert.match(html, /One database for every relationship/);
+  assert.match(html, /Деловые рассылки/);
+  assert.match(html, /Наконец-то порядок/);
+  assert.match(html, /Попробовать бесплатно/);
+  assert.match(html, /Все деловые связи/);
+  assert.match(html, /<html[^>]+lang="ru"/);
   assert.doesNotMatch(html, /codex-preview|SkeletonPreview|Your site is taking shape|react-loading-skeleton/i);
 });
 

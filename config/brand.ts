@@ -5,11 +5,11 @@
  */
 export const brandConfig = {
   name: "MAILFLOW",
-  legalName: "Mailflow Workspace, Inc.",
-  tagline: "Email outreach. Finally organized.",
+  legalName: "MAILFLOW",
+  tagline: "Рассылки по email. Наконец-то в порядке.",
   description:
-    "Manage contacts, build personalized emails and launch targeted campaigns from one beautifully organized workspace.",
-  shortDescription: "Contacts, emails and campaigns in one workspace.",
+    "Управляйте контактами, создавайте персонализированные письма и запускайте точные кампании в едином рабочем пространстве.",
+  shortDescription: "Контакты, письма и кампании в одном пространстве.",
   accentColor: "#635BFF",
   secondaryAccentColor: "#34B6E4",
   logoMark: "M",
@@ -23,21 +23,21 @@ export const brandConfig = {
 
 export const workspaceConfig = {
   id: "workspace-legal-team",
-  name: "Legal Team",
-  plan: "Scale",
+  name: "Юридическая команда",
+  plan: "Масштаб",
   timezone: "Europe/Moscow",
-  locale: "en",
+  locale: "ru-RU",
   contactLimit: 50_000,
   monthlySendLimit: 250_000,
 } as const;
 
 export const demoUser = {
   id: "user-egor-sabalin",
-  name: "Egor Sabalin",
-  firstName: "Egor",
+  name: "Егор Сабалин",
+  firstName: "Егор",
   email: "egor@mailflow.example",
-  initials: "ES",
-  role: "Workspace Admin",
+  initials: "ЕС",
+  role: "Администратор пространства",
   avatarColor: "#675CF5",
 } as const;
 

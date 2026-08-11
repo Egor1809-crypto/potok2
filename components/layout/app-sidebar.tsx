@@ -53,7 +53,7 @@ export function AppSidebar({
 
   return (
     <aside
-      aria-label="Product navigation"
+      aria-label="Навигация по платформе"
       className={cn(
         "relative flex h-dvh shrink-0 flex-col border-r border-border bg-surface text-text-strong transition-[width] duration-200 ease-out",
         mobile
@@ -74,7 +74,7 @@ export function AppSidebar({
         {mobile ? (
           <IconButton
             data-mobile-nav-close
-            label="Close navigation"
+            label="Закрыть навигацию"
             variant="ghost"
             size="sm"
             onClick={onClose}
@@ -83,7 +83,7 @@ export function AppSidebar({
           </IconButton>
         ) : !isCompact ? (
           <IconButton
-            label="Collapse sidebar"
+            label="Свернуть боковую панель"
             variant="ghost"
             size="sm"
             onClick={() => onCollapsedChange?.(true)}
@@ -103,7 +103,7 @@ export function AppSidebar({
       </div>
 
       <nav
-        aria-label="Main navigation"
+        aria-label="Главная навигация"
         className={cn(
           "min-h-0 flex-1 overflow-y-auto overscroll-contain pb-4",
           isCompact ? "px-3" : "px-3",
@@ -177,13 +177,13 @@ export function AppSidebar({
             })}
           >
             <Plus aria-hidden="true" className="size-4" />
-            New campaign
+            Новая кампания
           </Link>
         ) : (
           <Link
             href="/campaigns/new"
-            aria-label="New campaign"
-            title="New campaign"
+            aria-label="Новая кампания"
+            title="Новая кампания"
             className={buttonVariants({
               variant: "primary",
               size: "icon",
@@ -227,8 +227,8 @@ export function AppSidebar({
       {!mobile && isCompact ? (
         <button
           type="button"
-          aria-label="Expand sidebar"
-          title="Expand sidebar"
+          aria-label="Развернуть боковую панель"
+          title="Развернуть боковую панель"
           onClick={() => onCollapsedChange?.(false)}
           className="absolute -right-3 top-[22px] z-10 grid size-6 place-items-center rounded-full border border-border bg-surface text-text-subtle shadow-sm outline-none transition hover:text-text-strong focus-visible:ring-2 focus-visible:ring-primary/30"
         >

@@ -28,6 +28,12 @@ type TopbarProps = {
 
 type TopbarPanel = "notifications" | "help" | null;
 
+function unreadLabel(count: number) {
+  if (count % 10 === 1 && count % 100 !== 11) return `${count} непрочитанное уведомление`;
+  if (count % 10 >= 2 && count % 10 <= 4 && (count % 100 < 12 || count % 100 > 14)) return `${count} непрочитанных уведомления`;
+  return `${count} непрочитанных уведомлений`;
+}
+
 export function Topbar({ title, onMenuClick, onSearchClick, action }: TopbarProps) {
   const controlsRef = useRef<HTMLDivElement>(null);
   const [panel, setPanel] = useState<TopbarPanel>(null);
@@ -57,7 +63,7 @@ export function Topbar({ title, onMenuClick, onSearchClick, action }: TopbarProp
     <header className="sticky top-0 z-40 flex h-[var(--topbar-height)] shrink-0 items-center justify-between gap-3 border-b border-border/70 bg-surface/90 px-4 backdrop-blur-xl sm:px-6 lg:px-8">
       <div className="flex min-w-0 items-center gap-2.5">
         <IconButton
-          label="Open navigation"
+          label="Открыть навигацию"
           variant="ghost"
           className="lg:hidden"
           onClick={onMenuClick}
@@ -73,17 +79,17 @@ export function Topbar({ title, onMenuClick, onSearchClick, action }: TopbarProp
         <button
           type="button"
           onClick={onSearchClick}
-          aria-label="Search pages and actions"
+          aria-label="Поиск разделов и действий"
           className="group hidden h-9 w-44 items-center gap-2 rounded-lg border border-border bg-surface px-2.5 text-left text-[12px] text-text-subtle shadow-[0_1px_2px_rgba(15,23,42,0.03)] outline-none transition hover:border-border-strong hover:bg-surface-subtle focus-visible:ring-2 focus-visible:ring-primary/30 md:flex xl:w-56"
         >
           <Search aria-hidden="true" className="size-3.5" />
-          <span className="min-w-0 flex-1 truncate">Search</span>
+          <span className="min-w-0 flex-1 truncate">Поиск</span>
           <kbd className="inline-flex items-center gap-0.5 rounded border border-border bg-surface-subtle px-1 py-0.5 font-sans text-[9px] font-medium text-text-subtle">
             <Command aria-hidden="true" className="size-2.5" />K
           </kbd>
         </button>
         <IconButton
-          label="Search"
+          label="Поиск"
           variant="ghost"
           className="md:hidden"
           onClick={onSearchClick}
@@ -92,7 +98,7 @@ export function Topbar({ title, onMenuClick, onSearchClick, action }: TopbarProp
         </IconButton>
 
         <IconButton
-          label={unread ? `${unread} unread notifications` : "Notifications"}
+          label={unread ? unreadLabel(unread) : "Уведомления"}
           variant="ghost"
           aria-expanded={panel === "notifications"}
           aria-haspopup="dialog"
@@ -105,7 +111,7 @@ export function Topbar({ title, onMenuClick, onSearchClick, action }: TopbarProp
           ) : null}
         </IconButton>
         <IconButton
-          label="Help and support"
+          label="Помощь и поддержка"
           variant="ghost"
           aria-expanded={panel === "help"}
           aria-haspopup="dialog"
@@ -127,13 +133,13 @@ export function Topbar({ title, onMenuClick, onSearchClick, action }: TopbarProp
             })}
           >
             <Plus aria-hidden="true" className="size-4" />
-            <span className="hidden sm:inline">Create</span>
+            <span className="hidden sm:inline">Создать</span>
           </Link>
         )}
 
         <Link
           href="/settings"
-          aria-label={`${demoUser.name} profile and settings`}
+          aria-label={`${demoUser.name}: профиль и настройки`}
           className="ml-0.5 hidden rounded-full outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 focus-visible:ring-offset-surface sm:inline-flex"
         >
           <Avatar name={demoUser.name} size="sm" status="online" />
@@ -142,13 +148,13 @@ export function Topbar({ title, onMenuClick, onSearchClick, action }: TopbarProp
         {panel === "notifications" ? (
           <div
             role="dialog"
-            aria-label="Notifications"
+            aria-label="Уведомления"
             className="absolute right-0 top-[calc(100%+10px)] w-[min(90vw,340px)] overflow-hidden rounded-xl border border-border bg-surface shadow-[0_18px_55px_rgba(15,23,42,0.16)]"
           >
             <div className="flex items-center justify-between border-b border-border/70 px-4 py-3">
               <div>
-                <p className="text-[13px] font-semibold text-text-strong">Notifications</p>
-                <p className="text-[10px] text-text-subtle">Updates from your workspace</p>
+                <p className="text-[13px] font-semibold text-text-strong">Уведомления</p>
+                <p className="text-[10px] text-text-subtle">Новости вашего рабочего пространства</p>
               </div>
               {unread ? (
                 <Button
@@ -158,22 +164,22 @@ export function Topbar({ title, onMenuClick, onSearchClick, action }: TopbarProp
                   onClick={() => setUnread(0)}
                 >
                   <Check aria-hidden="true" className="size-3.5" />
-                  Mark read
+                  Прочитано
                 </Button>
               ) : null}
             </div>
             <div className="p-1.5">
               <NotificationItem
                 unread={unread > 0}
-                title="Campaign is ready to review"
-                body="Legal Conference Invitation passed all delivery checks."
-                time="8 min ago"
+                title="Кампания готова к проверке"
+                body="Приглашение на юридическую конференцию прошло все проверки доставки."
+                time="8 минут назад"
               />
               <NotificationItem
                 unread={unread > 1}
-                title="Import completed"
-                body="4,701 contacts were added to Legal Team."
-                time="42 min ago"
+                title="Импорт завершён"
+                body="4 701 контакт добавлен в пространство «Юридическая команда»."
+                time="42 минуты назад"
               />
             </div>
           </div>
@@ -182,23 +188,23 @@ export function Topbar({ title, onMenuClick, onSearchClick, action }: TopbarProp
         {panel === "help" ? (
           <div
             role="dialog"
-            aria-label="Help and support"
+            aria-label="Помощь и поддержка"
             className="absolute right-0 top-[calc(100%+10px)] w-[300px] overflow-hidden rounded-xl border border-border bg-surface p-2 shadow-[0_18px_55px_rgba(15,23,42,0.16)]"
           >
             <p className="px-2.5 pb-2 pt-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-text-subtle">
-              Help & support
+              Помощь и поддержка
             </p>
             <HelpLink
               href="/dashboard"
               icon={BookOpen}
-              title="Demo guide"
-              description={`Explore the ${brandConfig.name} workflow`}
+              title="Как работает демоверсия"
+              description={`Изучите сценарий работы в ${brandConfig.name}`}
               onClick={() => setPanel(null)}
             />
             <HelpLink
               href={`mailto:${brandConfig.supportEmail}`}
               icon={LifeBuoy}
-              title="Contact support"
+              title="Написать в поддержку"
               description={brandConfig.supportEmail}
               onClick={() => setPanel(null)}
             />
@@ -223,7 +229,7 @@ function NotificationItem({
   return (
     <div className="relative rounded-lg px-3 py-2.5 transition hover:bg-surface-subtle">
       {unread ? (
-        <span aria-label="Unread" className="absolute right-3 top-3 size-1.5 rounded-full bg-primary" />
+        <span aria-label="Непрочитанное уведомление" className="absolute right-3 top-3 size-1.5 rounded-full bg-primary" />
       ) : null}
       <p className={cn("pr-4 text-[12px] font-medium text-text-strong")}>{title}</p>
       <p className="mt-0.5 pr-3 text-[11px] leading-[1.45] text-text-muted">{body}</p>

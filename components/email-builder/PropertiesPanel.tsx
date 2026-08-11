@@ -32,14 +32,15 @@ import {
 import { cn } from "@/components/ui/utils";
 
 import type { BuilderBlock, BuilderDocument } from "./builder-types";
+import { getBlockLabel } from "./BlockLibrary";
 
 const personalizationFields = [
-  { label: "First name", token: "{{first_name}}", example: "Ivan" },
-  { label: "Last name", token: "{{last_name}}", example: "Petrov" },
-  { label: "Company", token: "{{company}}", example: "Lex Group" },
-  { label: "Position", token: "{{position}}", example: "Senior Partner" },
-  { label: "City", token: "{{city}}", example: "Moscow" },
-  { label: "Custom field", token: "{{custom_field}}", example: "Your field" },
+  { label: "Имя", token: "{{first_name}}", example: "Иван" },
+  { label: "Фамилия", token: "{{last_name}}", example: "Петров" },
+  { label: "Компания", token: "{{company}}", example: "Лекс Групп" },
+  { label: "Должность", token: "{{position}}", example: "Старший партнёр" },
+  { label: "Город", token: "{{city}}", example: "Москва" },
+  { label: "Своё поле", token: "{{custom_field}}", example: "Ваше значение" },
 ];
 
 type PropertiesPanelProps = {
@@ -89,28 +90,28 @@ export function PropertiesPanel({
 
   return (
     <aside
-      aria-label="Block properties"
+      aria-label="Свойства блока"
       className={cn("flex min-h-0 flex-col bg-surface", className)}
     >
       <div className="flex items-center justify-between gap-3 border-b border-border/70 px-4 py-3.5">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <SlidersHorizontal aria-hidden="true" className="size-4 text-primary" />
-            <h2 className="m-0 text-[13px] font-semibold text-text-strong">Properties</h2>
+            <h2 className="m-0 text-[13px] font-semibold text-text-strong">Свойства</h2>
           </div>
           <div className="mt-1.5 flex items-center gap-1.5">
             <Badge variant="accent" className="capitalize">
-              {block.type}
+              {getBlockLabel(block.type)}
             </Badge>
-            <span className="truncate text-[9px] text-text-subtle">Selected block</span>
+            <span className="truncate text-[9px] text-text-subtle">Выбранный блок</span>
           </div>
         </div>
         <div className="flex items-center gap-0.5">
-          <IconButton label="Duplicate selected block" variant="ghost" size="sm" onClick={onDuplicate}>
+          <IconButton label="Дублировать выбранный блок" variant="ghost" size="sm" onClick={onDuplicate}>
             <Copy aria-hidden="true" className="size-3.5" />
           </IconButton>
           <IconButton
-            label="Delete selected block"
+            label="Удалить выбранный блок"
             variant="ghost"
             size="sm"
             className="hover:!bg-danger-subtle hover:!text-danger"
@@ -125,18 +126,18 @@ export function PropertiesPanel({
         {canEditContent ? (
           <PropertySection
             icon={Type}
-            title={block.type === "image" ? "Alternative text" : "Content"}
+            title={block.type === "image" ? "Альтернативный текст" : "Контент"}
             action={
               block.type !== "image" ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm" className="h-7 px-2 text-[10px]">
                       <Braces aria-hidden="true" className="size-3.5" />
-                      Personalize
+                      Персонализировать
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" minWidth={235}>
-                    <DropdownMenuLabel>Contact fields</DropdownMenuLabel>
+                    <DropdownMenuLabel>Поля контакта</DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     {personalizationFields.map((field) => (
                       <DropdownMenuItem key={field.token} onSelect={() => insertToken(field.token)}>
@@ -156,10 +157,10 @@ export function PropertiesPanel({
               htmlFor="builder-block-content"
               hint={
                 block.type === "columns"
-                  ? "Separate both columns with a vertical bar (|)."
+                  ? "Разделите столбцы вертикальной чертой (|)."
                   : block.type === "image"
-                    ? "Describe the visual for recipients using screen readers."
-                    : "Changes appear instantly in the preview."
+                    ? "Опишите изображение для получателей, использующих экранные дикторы."
+                    : "Изменения сразу появятся в предпросмотре."
               }
             >
               <Textarea
@@ -173,7 +174,7 @@ export function PropertiesPanel({
             </FormField>
 
             {block.type === "button" ? (
-              <FormField label="Destination link" htmlFor="builder-button-link">
+              <FormField label="Целевая ссылка" htmlFor="builder-button-link">
                 <div className="relative">
                   <Link2 aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-text-subtle" />
                   <Input
@@ -190,9 +191,9 @@ export function PropertiesPanel({
         ) : null}
 
         {supportsAlignment || supportsTypography ? (
-          <PropertySection icon={Type} title="Typography">
+          <PropertySection icon={Type} title="Типографика">
             {supportsAlignment ? (
-              <FormField label="Alignment">
+              <FormField label="Выравнивание">
                 <div className="grid grid-cols-3 rounded-[9px] bg-surface-subtle p-1">
                   {(
                     [
@@ -204,7 +205,7 @@ export function PropertiesPanel({
                     <button
                       key={alignment}
                       type="button"
-                      aria-label={`Align ${alignment}`}
+                      aria-label={alignment === "left" ? "Выровнять по левому краю" : alignment === "center" ? "Выровнять по центру" : "Выровнять по правому краю"}
                       aria-pressed={block.alignment === alignment}
                       onClick={() => onUpdateBlock({ alignment })}
                       className="grid h-8 place-items-center rounded-[7px] text-text-muted outline-none transition hover:text-text-strong focus-visible:ring-2 focus-visible:ring-primary/30 aria-pressed:bg-surface aria-pressed:text-primary aria-pressed:shadow-[var(--shadow-xs)]"
@@ -216,7 +217,7 @@ export function PropertiesPanel({
               </FormField>
             ) : null}
             {supportsTypography ? (
-              <FormField label="Text size" htmlFor="builder-font-size">
+              <FormField label="Размер текста" htmlFor="builder-font-size">
                 <Select
                   id="builder-font-size"
                   value={String(block.fontSize)}
@@ -229,16 +230,16 @@ export function PropertiesPanel({
           </PropertySection>
         ) : null}
 
-        <PropertySection icon={SlidersHorizontal} title="Spacing">
+        <PropertySection icon={SlidersHorizontal} title="Отступы">
           <RangeField
-            label="Top"
+            label="Сверху"
             value={block.paddingTop}
             min={0}
             max={64}
             onChange={(value) => onUpdateBlock({ paddingTop: value })}
           />
           <RangeField
-            label="Bottom"
+            label="Снизу"
             value={block.paddingBottom}
             min={0}
             max={64}
@@ -246,7 +247,7 @@ export function PropertiesPanel({
           />
           {supportsRadius ? (
             <RangeField
-              label="Corner radius"
+              label="Скругление"
               value={block.borderRadius}
               min={0}
               max={24}
@@ -255,16 +256,16 @@ export function PropertiesPanel({
           ) : null}
         </PropertySection>
 
-        <PropertySection icon={Palette} title="Colors">
+        <PropertySection icon={Palette} title="Цвета">
           {block.type !== "spacer" ? (
             <ColorField
-              label={block.type === "divider" ? "Line" : "Text"}
+              label={block.type === "divider" ? "Линия" : "Текст"}
               value={block.textColor}
               onChange={(textColor) => onUpdateBlock({ textColor })}
             />
           ) : null}
           <ColorField
-            label="Block background"
+            label="Фон блока"
             value={block.backgroundColor}
             allowTransparent
             onChange={(backgroundColor) => onUpdateBlock({ backgroundColor })}
@@ -273,12 +274,12 @@ export function PropertiesPanel({
 
         <details className="group border-t border-border/70" open>
           <summary className="flex min-h-11 list-none items-center justify-between px-4 text-[11px] font-semibold text-text-strong outline-none transition hover:bg-surface-subtle focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30 [&::-webkit-details-marker]:hidden">
-            Email design
-            <span className="text-[9px] font-normal text-text-subtle group-open:hidden">Show</span>
-            <span className="hidden text-[9px] font-normal text-text-subtle group-open:inline">Hide</span>
+            Дизайн письма
+            <span className="text-[9px] font-normal text-text-subtle group-open:hidden">Показать</span>
+            <span className="hidden text-[9px] font-normal text-text-subtle group-open:inline">Скрыть</span>
           </summary>
           <div className="grid gap-3 px-4 pb-4">
-            <FormField label="Subject" htmlFor="builder-email-subject">
+            <FormField label="Тема" htmlFor="builder-email-subject">
               <Input
                 id="builder-email-subject"
                 value={document.subject}
@@ -286,7 +287,7 @@ export function PropertiesPanel({
                 className="text-[11px]"
               />
             </FormField>
-            <FormField label="Preview text" htmlFor="builder-preview-text">
+            <FormField label="Текст предпросмотра" htmlFor="builder-preview-text">
               <Textarea
                 id="builder-preview-text"
                 rows={2}
@@ -296,12 +297,12 @@ export function PropertiesPanel({
               />
             </FormField>
             <ColorField
-              label="Accent"
+              label="Акцент"
               value={document.accentColor}
               onChange={(accentColor) => onUpdateDocument({ accentColor })}
             />
             <ColorField
-              label="Email background"
+              label="Фон письма"
               value={document.bodyBackground}
               onChange={(bodyBackground) => onUpdateDocument({ bodyBackground })}
             />
@@ -396,11 +397,11 @@ function ColorField({
                 : "border-border bg-surface text-text-subtle hover:text-text",
             )}
           >
-            None
+            Нет
           </button>
         ) : null}
         <label className="relative grid size-7 cursor-pointer place-items-center overflow-hidden rounded-md border border-border shadow-[var(--shadow-xs)]">
-          <span className="sr-only">Choose {label.toLowerCase()}</span>
+          <span className="sr-only">Выбрать цвет: {label.toLowerCase()}</span>
           <span className="absolute inset-1 rounded-[3px]" style={{ backgroundColor: pickerValue }} />
           <input
             type="color"
@@ -410,7 +411,7 @@ function ColorField({
           />
         </label>
         <span className="w-[66px] truncate rounded-md border border-border bg-surface-subtle px-1.5 py-1 font-mono text-[9px] uppercase text-text-muted">
-          {value === "transparent" ? "None" : value}
+          {value === "transparent" ? "Нет" : value}
         </span>
       </div>
     </div>
@@ -419,10 +420,10 @@ function ColorField({
 
 function fontSizeOptions(type: BuilderBlock["type"]) {
   if (type === "heading") {
-    return [28, 32, 38, 44, 52].map((size) => ({ value: String(size), label: `${size}px` }));
+    return [28, 32, 38, 44, 52].map((size) => ({ value: String(size), label: `${size} пикс.` }));
   }
   if (type === "footer" || type === "logo" || type === "social") {
-    return [10, 11, 12, 13, 14].map((size) => ({ value: String(size), label: `${size}px` }));
+    return [10, 11, 12, 13, 14].map((size) => ({ value: String(size), label: `${size} пикс.` }));
   }
-  return [12, 13, 14, 15, 16, 18, 20].map((size) => ({ value: String(size), label: `${size}px` }));
+  return [12, 13, 14, 15, 16, 18, 20].map((size) => ({ value: String(size), label: `${size} пикс.` }));
 }

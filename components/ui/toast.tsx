@@ -109,7 +109,7 @@ export function ToastSurface({
       {onDismiss && (
         <button
           type="button"
-          aria-label="Dismiss notification"
+          aria-label="Закрыть уведомление"
           onClick={onDismiss}
           className="grid size-7 shrink-0 place-items-center rounded-[7px] text-text-subtle transition-colors hover:bg-surface-subtle hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
         >

@@ -19,6 +19,19 @@ type CommandMenuProps = {
 
 const commandRoutes = [...quickCreateRoutes, ...productRoutes];
 
+function formatResultsCount(count: number) {
+  const remainder100 = count % 100;
+  const remainder10 = count % 10;
+  const noun = remainder100 >= 11 && remainder100 <= 14
+    ? "результатов"
+    : remainder10 === 1
+      ? "результат"
+      : remainder10 >= 2 && remainder10 <= 4
+        ? "результата"
+        : "результатов";
+  return `${count} ${noun}`;
+}
+
 export function CommandMenu({ open, onOpenChange }: CommandMenuProps) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -85,13 +98,13 @@ export function CommandMenu({ open, onOpenChange }: CommandMenuProps) {
       <button
         type="button"
         tabIndex={-1}
-        aria-label="Close search"
+        aria-label="Закрыть поиск"
         onClick={() => onOpenChange(false)}
         className="absolute inset-0 cursor-default bg-slate-950/30 backdrop-blur-[2px] motion-safe:animate-[mf-fade-in_150ms_ease-out]"
       />
       <div className="relative flex max-h-[72vh] w-full max-w-[620px] flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-[0_24px_80px_rgba(15,23,42,0.22)] motion-safe:animate-[mf-slide-up_180ms_cubic-bezier(0.2,0.8,0.2,1)]">
         <h2 id="command-menu-title" className="sr-only">
-          Search {BRAND_NAME}
+          Поиск в {BRAND_NAME}
         </h2>
         <form
           onSubmit={(event) => {
@@ -102,7 +115,7 @@ export function CommandMenu({ open, onOpenChange }: CommandMenuProps) {
         >
           <Search aria-hidden="true" className="size-[18px] shrink-0 text-text-subtle" />
           <label htmlFor="mailflow-command-search" className="sr-only">
-            Search pages and actions
+            Поиск разделов и действий
           </label>
           <input
             ref={inputRef}
@@ -111,12 +124,12 @@ export function CommandMenu({ open, onOpenChange }: CommandMenuProps) {
             autoComplete="off"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search pages and actions…"
+            placeholder="Найти раздел или действие…"
             className="h-full min-w-0 flex-1 border-0 bg-transparent p-0 text-[15px] text-text-strong outline-none placeholder:text-text-subtle"
           />
           {query ? (
             <IconButton
-              label="Clear search"
+              label="Очистить поиск"
               variant="ghost"
               size="sm"
               onClick={() => setQuery("")}
@@ -132,7 +145,7 @@ export function CommandMenu({ open, onOpenChange }: CommandMenuProps) {
 
         <div className="min-h-0 flex-1 overflow-y-auto p-2">
           <p className="px-2.5 pb-1.5 pt-1.5 text-[10px] font-semibold uppercase tracking-[0.13em] text-text-subtle">
-            {query ? `${results.length} results` : "Quick jump"}
+            {query ? formatResultsCount(results.length) : "Быстрый переход"}
           </p>
           {results.length ? (
             <ul className="m-0 grid list-none gap-0.5 p-0">
@@ -175,9 +188,9 @@ export function CommandMenu({ open, onOpenChange }: CommandMenuProps) {
           ) : (
             <div className="grid min-h-40 place-items-center px-6 text-center">
               <div>
-                <p className="text-[13px] font-medium text-text-strong">No matches found</p>
+                <p className="text-[13px] font-medium text-text-strong">Ничего не нашлось</p>
                 <p className="mt-1 text-[12px] text-text-muted">
-                  Try a page name like Contacts or Analytics.
+                  Попробуйте ввести «Контакты» или «Аналитика».
                 </p>
               </div>
             </div>
@@ -185,10 +198,10 @@ export function CommandMenu({ open, onOpenChange }: CommandMenuProps) {
         </div>
 
         <div className="flex h-10 shrink-0 items-center justify-between border-t border-border/70 bg-surface-subtle/70 px-3.5 text-[10px] text-text-subtle">
-          <span>Navigate with keyboard or pointer</span>
+          <span>Навигация клавиатурой или мышью</span>
           <span className="flex items-center gap-1">
             <CornerDownLeft aria-hidden="true" className="size-3" />
-            Enter to open
+            Enter — открыть
           </span>
         </div>
       </div>

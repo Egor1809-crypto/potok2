@@ -27,7 +27,7 @@ import { contacts } from "@/data/mockContacts";
 import { segments } from "@/data/mockSegments";
 import { templates } from "@/data/templates";
 import { createCampaignMetrics } from "@/data/helpers";
-import type { Campaign, CampaignWizardStep } from "@/types";
+import type { Campaign, CampaignWizardStep, TemplateCategory } from "@/types";
 import { BRAND_NAME } from "@/config/brand";
 import {
   Alert,
@@ -58,10 +58,10 @@ export interface CampaignWizardProps {
 }
 
 const wizardSteps: { value: CampaignWizardStep; label: string; description: string }[] = [
-  { value: "audience", label: "Audience", description: "Choose recipients" },
-  { value: "content", label: "Content", description: "Prepare the email" },
-  { value: "sender", label: "Sender", description: "Set delivery details" },
-  { value: "review", label: "Review", description: "Confirm and launch" },
+  { value: "audience", label: "Аудитория", description: "Выберите получателей" },
+  { value: "content", label: "Письмо", description: "Подготовьте письмо" },
+  { value: "sender", label: "Отправитель", description: "Настройте отправку" },
+  { value: "review", label: "Проверка", description: "Проверьте и запустите" },
 ];
 
 const audienceOptions: {
@@ -72,26 +72,26 @@ const audienceOptions: {
 }[] = [
   {
     value: "segment",
-    label: "Segment",
-    description: "Use a live, rule-based audience",
+    label: "Сегмент",
+    description: "Использовать динамическую аудиторию по правилам",
     icon: UsersRound,
   },
   {
     value: "saved-list",
-    label: "Saved list",
-    description: "Send to a curated contact list",
+    label: "Сохранённый список",
+    description: "Отправить выбранному списку контактов",
     icon: FileText,
   },
   {
     value: "custom-filter",
-    label: "Custom filter",
-    description: "Define a one-time audience",
+    label: "Собственный фильтр",
+    description: "Настроить аудиторию для этой кампании",
     icon: Filter,
   },
   {
     value: "contacts",
-    label: "Individual contacts",
-    description: "Select people directly",
+    label: "Отдельные контакты",
+    description: "Выбрать получателей вручную",
     icon: UserRound,
   },
 ];
@@ -104,40 +104,56 @@ const contentOptions: {
 }[] = [
   {
     value: "scratch",
-    label: "Start from scratch",
-    description: "Build a clean email in the editor",
+    label: "Начать с нуля",
+    description: "Создать письмо в редакторе",
     icon: PencilLine,
   },
   {
     value: "template",
-    label: "Use template",
-    description: "Start with a proven structure",
+    label: "Использовать шаблон",
+    description: "Начать с готовой структуры",
     icon: FileText,
   },
   {
     value: "duplicate",
-    label: "Duplicate campaign",
-    description: "Reuse a previous campaign",
+    label: "Дублировать кампанию",
+    description: "Использовать предыдущую кампанию",
     icon: Copy,
   },
   {
     value: "ai",
-    label: "AI Draft",
-    description: "Generate a focused first draft",
+    label: "Черновик с ИИ",
+    description: "Создать первый вариант письма",
     icon: Sparkles,
   },
 ];
 
 const savedLists = [
-  { id: "list-priority-partners", name: "Priority partners", count: 612 },
-  { id: "list-event-speakers", name: "Event speakers", count: 96 },
-  { id: "list-client-briefing", name: "Client briefing list", count: 1_948 },
+  { id: "list-priority-partners", name: "Приоритетные партнёры", count: 612 },
+  { id: "list-event-speakers", name: "Спикеры мероприятий", count: 96 },
+  { id: "list-client-briefing", name: "Список для клиентского брифинга", count: 1_948 },
 ];
 
 const senderProfiles = [
-  { id: "egor", name: "Egor Sabalin", email: "egor@mailflow.example" },
-  { id: "alina", name: "Alina Gromova", email: "alina@mailflow.example" },
+  { id: "egor", name: "Егор Сабалин", email: "egor@mailflow.example" },
+  { id: "alina", name: "Алина Громова", email: "alina@mailflow.example" },
 ];
+
+const campaignStatusLabels: Record<Campaign["status"], string> = {
+  draft: "Черновик",
+  scheduled: "Запланирована",
+  sending: "Отправляется",
+  completed: "Завершена",
+};
+
+const templateCategoryLabels: Record<TemplateCategory, string> = {
+  Business: "Деловые",
+  Events: "Мероприятия",
+  Outreach: "Коммуникации",
+  Newsletter: "Рассылки",
+  "Follow-up": "Продолжение общения",
+  Transactional: "Транзакционные",
+};
 
 function subscribeToLocation(onStoreChange: () => void) {
   window.addEventListener("popstate", onStoreChange);
@@ -183,7 +199,18 @@ function serializeParams(
 }
 
 function formatNumber(value: number): string {
-  return new Intl.NumberFormat("en").format(value);
+  return new Intl.NumberFormat("ru-RU").format(value);
+}
+
+const campaignDateFormatter = new Intl.DateTimeFormat("ru-RU", {
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
+function formatCampaignDate(value: string): string {
+  return campaignDateFormatter.format(new Date(`${value}T12:00:00Z`));
 }
 
 function stepFromQuery(value: string | null): number {
@@ -293,9 +320,9 @@ function CampaignWizardState({
     builderDraft?.campaignName ??
     (sourceCampaign
       ? duplicateId
-        ? `${sourceCampaign.name} copy`
+        ? `${sourceCampaign.name} — копия`
         : sourceCampaign.name
-      : params.get("name")?.trim() || "Untitled campaign"),
+      : params.get("name")?.trim() || "Кампания без названия"),
   );
   const [audienceType, setAudienceType] = React.useState<AudienceType>(() =>
     queryAudienceType ?? (queryFilter
@@ -348,13 +375,13 @@ function CampaignWizardState({
     builderDraft?.document?.subject ??
       sourceCampaign?.subject ??
       startingTemplate?.subject ??
-      "A useful update for {{first_name}}",
+      "Полезное обновление для {{first_name}}",
   );
   const [previewText, setPreviewText] = React.useState(
     builderDraft?.document?.previewText ??
       sourceCampaign?.previewText ??
       startingTemplate?.previewText ??
-      "A short note from our team.",
+      "Короткое сообщение от нашей команды.",
   );
   const [sendMode, setSendMode] = React.useState<SendMode>("schedule");
   const [scheduleDate, setScheduleDate] = React.useState("2026-08-13");
@@ -391,12 +418,12 @@ function CampaignWizardState({
   })();
 
   const audienceLabel = (() => {
-    if (audienceType === "segment") return selectedSegment?.name ?? "No segment selected";
-    if (audienceType === "saved-list") return selectedSavedList?.name ?? "No list selected";
-    if (audienceType === "custom-filter") return "Lawyers · Moscow · Active";
-    if (queryCompany && explicitCount > 0) return `${queryCompany.name} contacts`;
+    if (audienceType === "segment") return selectedSegment?.name ?? "Сегмент не выбран";
+    if (audienceType === "saved-list") return selectedSavedList?.name ?? "Список не выбран";
+    if (audienceType === "custom-filter") return "Юристы · Москва · Активные";
+    if (queryCompany && explicitCount > 0) return `${queryCompany.name}: контакты`;
     if (selectedContacts.length === 1) return selectedContacts[0].fullName;
-    return `${formatNumber(recipientCount)} selected contacts`;
+    return `Выбрано контактов: ${formatNumber(recipientCount)}`;
   })();
 
   const selectTemplate = (templateId: string) => {
@@ -481,26 +508,26 @@ function CampaignWizardState({
 
   const validateStep = () => {
     if (currentStep === 0 && recipientCount <= 0) {
-      setError("Choose at least one recipient before continuing.");
+      setError("Выберите хотя бы одного получателя.");
       return false;
     }
     if (currentStep === 1) {
       if (contentMode === "template" && !selectedTemplateId) {
-        setError("Choose a template before continuing.");
+        setError("Выберите шаблон, чтобы продолжить.");
         return false;
       }
       if (contentMode === "duplicate" && !selectedDuplicateId) {
-        setError("Choose a campaign to duplicate before continuing.");
+        setError("Выберите кампанию для дублирования.");
         return false;
       }
     }
     if (currentStep === 2) {
       if (!senderName.trim() || !/^\S+@\S+\.\S+$/.test(senderEmail)) {
-        setError("Enter a valid sender name and email address.");
+        setError("Укажите имя отправителя и корректный адрес электронной почты.");
         return false;
       }
       if (!subject.trim()) {
-        setError("Add a subject line before review.");
+        setError("Добавьте тему письма перед проверкой.");
         return false;
       }
     }
@@ -520,7 +547,7 @@ function CampaignWizardState({
 
   const submitCampaign = () => {
     if (sendMode === "schedule" && (!scheduleDate || !scheduleTime)) {
-      setError("Choose a date and time for the scheduled campaign.");
+      setError("Выберите дату и время отправки кампании.");
       return;
     }
     setError(null);
@@ -542,7 +569,7 @@ function CampaignWizardState({
         status: sendMode === "schedule" ? "scheduled" : "sending",
         senderName,
         senderEmail,
-        owner: "Egor Sabalin",
+        owner: "Егор Сабалин",
         metrics: createCampaignMetrics({
           recipients: recipientCount,
           sent,
@@ -591,7 +618,7 @@ function CampaignWizardState({
     } catch {
       // The demo remains usable when storage is unavailable.
     }
-    setNotice("Draft saved");
+    setNotice("Черновик сохранён");
     if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
     noticeTimerRef.current = setTimeout(() => setNotice(null), 2800);
   };
@@ -607,38 +634,40 @@ function CampaignWizardState({
               <CheckCircle2 aria-hidden="true" className="size-7" />
             </span>
             <Badge variant="success" className="mt-6">
-              {sendMode === "schedule" ? "Scheduled" : "Sending"}
+              {sendMode === "schedule" ? "Запланирована" : "Отправляется"}
             </Badge>
             <h1 className="mt-3 mb-0 text-[25px] font-semibold tracking-[-0.035em] text-text-strong sm:text-[29px]">
-              {sendMode === "schedule" ? "Campaign scheduled" : "Campaign is on its way"}
+              {sendMode === "schedule" ? "Кампания запланирована" : "Кампания отправляется"}
             </h1>
             <p className="mx-auto mt-2 mb-0 max-w-md text-[13px] leading-5 text-text-muted">
-              {campaignName} is ready for {formatNumber(recipientCount)} recipients.
+              Кампания «{campaignName}» готова. Получателей: {formatNumber(recipientCount)}.
               {sendMode === "schedule"
-                ? ` Delivery starts ${new Intl.DateTimeFormat("en", {
-                    month: "long",
-                    day: "numeric",
-                  }).format(new Date(`${scheduleDate}T${scheduleTime}`))} at ${scheduleTime}.`
-                : " We’ll keep the performance view updated as replies arrive."}
+                ? ` Отправка начнётся ${formatCampaignDate(scheduleDate)} в ${scheduleTime}.`
+                : " Статистика будет обновляться по мере поступления ответов."}
             </p>
             <div className="mt-7 flex flex-wrap justify-center gap-2">
               <Link href="/campaigns" className={buttonVariants({ variant: "secondary" })}>
-                All campaigns
+                Все кампании
               </Link>
               <Link
                 href={`/campaigns/${detailId}`}
                 className={buttonVariants({ variant: "primary" })}
               >
-                View campaign
+                Открыть кампанию
                 <ArrowRight aria-hidden="true" className="size-4" />
               </Link>
             </div>
           </div>
           <div className="grid border-t border-border bg-surface-subtle/45 sm:grid-cols-3">
             {[
-              ["Audience", audienceLabel],
-              ["Sender", senderName],
-              ["Delivery", sendMode === "schedule" ? `${scheduleDate} · ${scheduleTime}` : "Now"],
+              ["Аудитория", audienceLabel],
+              ["Отправитель", senderName],
+              [
+                "Отправка",
+                sendMode === "schedule"
+                  ? `${formatCampaignDate(scheduleDate)} · ${scheduleTime}`
+                  : "Сейчас",
+              ],
             ].map(([label, value]) => (
               <div key={label} className="border-b border-border p-4 last:border-b-0 sm:border-r sm:border-b-0 sm:last:border-r-0">
                 <p className="m-0 text-[10px] font-medium text-text-subtle">{label}</p>
@@ -662,16 +691,16 @@ function CampaignWizardState({
             className="mb-3 inline-flex items-center gap-1.5 rounded-md text-[11px] font-medium text-text-muted hover:text-text-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
           >
             <ArrowLeft aria-hidden="true" className="size-3.5" />
-            Campaigns
+            Кампании
           </Link>
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="m-0 text-[25px] font-semibold tracking-[-0.035em] text-text-strong sm:text-[29px]">
-              Create campaign
+              Создание кампании
             </h1>
-            <Badge variant="accent">Demo mode</Badge>
+            <Badge variant="accent">Деморежим</Badge>
           </div>
           <p className="mt-1.5 mb-0 text-[13px] text-text-muted">
-            Audience, content and delivery details in one focused flow.
+            Настройте аудиторию, письмо и отправку в одном окне.
           </p>
         </div>
         <Button
@@ -680,15 +709,15 @@ function CampaignWizardState({
           onClick={saveDraft}
           disabled={submitState === "processing"}
         >
-          Save draft
+          Сохранить черновик
         </Button>
       </header>
 
-      <section className="card mb-5 px-4 py-5 sm:px-7" aria-label="Campaign setup progress">
+      <section className="card mb-5 px-4 py-5 sm:px-7" aria-label="Ход настройки кампании">
         <Stepper
           steps={wizardSteps.map(({ label, description }) => ({ label, description }))}
           currentStep={currentStep}
-          aria-label="Campaign setup progress"
+          aria-label="Ход настройки кампании"
         />
       </section>
 
@@ -760,12 +789,12 @@ function CampaignWizardState({
               recipientCount={recipientCount}
               contentLabel={
                 contentMode === "template"
-                  ? selectedTemplate?.name ?? "Template"
+                  ? selectedTemplate?.name ?? "Шаблон"
                   : contentMode === "duplicate"
-                    ? selectedDuplicate?.name ?? "Duplicated campaign"
+                    ? selectedDuplicate?.name ?? "Дублированная кампания"
                     : contentMode === "ai"
-                      ? "AI-assisted draft"
-                      : "Custom email"
+                      ? "Черновик с ИИ"
+                      : "Собственное письмо"
               }
               senderName={senderName}
               senderEmail={senderEmail}
@@ -785,7 +814,7 @@ function CampaignWizardState({
           )}
 
           {error && (
-            <Alert tone="danger" title="Before you continue" className="mt-5">
+            <Alert tone="danger" title="Перед продолжением" className="mt-5">
               {error}
             </Alert>
           )}
@@ -793,21 +822,21 @@ function CampaignWizardState({
           <footer className="mt-7 flex flex-col-reverse gap-2 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
             {currentStep === 0 ? (
               <Link href="/campaigns" className={buttonVariants({ variant: "ghost" })}>
-                Cancel
+                Отменить
               </Link>
             ) : (
               <Button variant="ghost" leadingIcon={<ArrowLeft className="size-4" />} onClick={goBack}>
-                Back
+                Назад
               </Button>
             )}
             {currentStep < wizardSteps.length - 1 ? (
               <Button trailingIcon={<ArrowRight className="size-4" />} onClick={goNext}>
-                Continue to {wizardSteps[currentStep + 1]?.label}
+                Далее: {wizardSteps[currentStep + 1]?.label}
               </Button>
             ) : (
               <Button
                 loading={submitState === "processing"}
-                loadingText={sendMode === "schedule" ? "Scheduling…" : "Starting send…"}
+                loadingText={sendMode === "schedule" ? "Планируем…" : "Запускаем отправку…"}
                 leadingIcon={
                   sendMode === "schedule" ? (
                     <CalendarClock className="size-4" />
@@ -817,43 +846,43 @@ function CampaignWizardState({
                 }
                 onClick={submitCampaign}
               >
-                {sendMode === "schedule" ? "Schedule campaign" : "Send campaign"}
+                {sendMode === "schedule" ? "Запланировать кампанию" : "Отправить кампанию"}
               </Button>
             )}
           </footer>
         </section>
 
-        <aside className="card p-5 xl:sticky xl:top-5" aria-label="Campaign summary">
+        <aside className="card p-5 xl:sticky xl:top-5" aria-label="Сводка кампании">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="m-0 text-[13px] font-semibold text-text-strong">Campaign summary</h2>
+            <h2 className="m-0 text-[13px] font-semibold text-text-strong">Сводка кампании</h2>
             <Badge variant={recipientCount > 0 ? "success" : "warning"} dot>
-              {recipientCount > 0 ? "Ready" : "Incomplete"}
+              {recipientCount > 0 ? "Готово" : "Не завершено"}
             </Badge>
           </div>
           <dl className="mt-5 grid gap-4">
-            <SummaryItem icon={<UsersRound className="size-3.5" />} label="Audience" value={audienceLabel} />
+            <SummaryItem icon={<UsersRound className="size-3.5" />} label="Аудитория" value={audienceLabel} />
             <SummaryItem
               icon={<Mail className="size-3.5" />}
-              label="Content"
+              label="Письмо"
               value={
                 contentMode === "template"
-                  ? selectedTemplate?.name ?? "Choose template"
+                  ? selectedTemplate?.name ?? "Выберите шаблон"
                   : contentMode === "duplicate"
-                    ? selectedDuplicate?.name ?? "Choose campaign"
+                    ? selectedDuplicate?.name ?? "Выберите кампанию"
                     : contentMode === "ai"
-                      ? "AI-assisted draft"
-                      : "From scratch"
+                      ? "Черновик с ИИ"
+                      : "С нуля"
               }
             />
-            <SummaryItem icon={<UserRound className="size-3.5" />} label="Sender" value={senderName} />
+            <SummaryItem icon={<UserRound className="size-3.5" />} label="Отправитель" value={senderName} />
           </dl>
           <div className="mt-5 rounded-[11px] bg-primary-subtle/55 p-4">
-            <p className="m-0 text-[10px] font-medium text-primary">Estimated recipients</p>
+            <p className="m-0 text-[10px] font-medium text-primary">Получателей</p>
             <p className="mt-1 mb-0 text-[25px] font-semibold tracking-[-0.04em] text-text-strong">
               {formatNumber(recipientCount)}
             </p>
             <p className="mt-1 mb-0 text-[10px] leading-4 text-text-muted">
-              Suppressions are applied immediately before sending.
+              Исключения будут применены непосредственно перед отправкой.
             </p>
           </div>
         </aside>
@@ -864,7 +893,7 @@ function CampaignWizardState({
           <ToastSurface
             tone="success"
             title={notice}
-            description="Your campaign setup is preserved in this demo session."
+            description="Настройки кампании сохранены для текущей демонстрационной сессии."
             onDismiss={() => setNotice(null)}
           />
         </div>
@@ -909,9 +938,9 @@ function AudienceStep({
   return (
     <div>
       <StepHeading
-        eyebrow="Step 1"
-        title="Who should receive this campaign?"
-        description="Choose an existing audience or bring in a selection from Contacts."
+        eyebrow="Шаг 1"
+        title="Кто должен получить эту кампанию?"
+        description="Выберите готовую аудиторию или используйте контакты из базы."
       />
       <div className="mt-6 grid gap-2 sm:grid-cols-2">
         {audienceOptions.map(({ value, label, description, icon: Icon }) => {
@@ -956,10 +985,10 @@ function AudienceStep({
           <div>
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
-                <h3 className="m-0 text-[12px] font-semibold text-text-strong">Choose a segment</h3>
-                <p className="mt-0.5 mb-0 text-[10px] text-text-muted">Counts update as segment rules change.</p>
+                <h3 className="m-0 text-[12px] font-semibold text-text-strong">Выберите сегмент</h3>
+                <p className="mt-0.5 mb-0 text-[10px] text-text-muted">Количество обновляется при изменении правил сегмента.</p>
               </div>
-              <Badge variant="accent">Dynamic</Badge>
+              <Badge variant="accent">Динамический</Badge>
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
               {segments.slice(0, 6).map((segment) => (
@@ -978,7 +1007,7 @@ function AudienceStep({
                   <span className="min-w-0">
                     <span className="block truncate text-[11px] font-semibold text-text-strong">{segment.name}</span>
                     <span className="mt-0.5 block text-[9px] text-text-muted">
-                      {formatNumber(segment.contactCount)} contacts
+                      Контактов: {formatNumber(segment.contactCount)}
                     </span>
                   </span>
                   <span
@@ -998,14 +1027,14 @@ function AudienceStep({
         )}
 
         {audienceType === "saved-list" && (
-          <FormField label="Saved list" htmlFor="campaign-saved-list">
+          <FormField label="Сохранённый список" htmlFor="campaign-saved-list">
             <Select
               id="campaign-saved-list"
               value={savedListId}
               onChange={(event) => onSavedListChange(event.target.value)}
               options={savedLists.map((list) => ({
                 value: list.id,
-                label: `${list.name} — ${formatNumber(list.count)} contacts`,
+                label: `${list.name} — контактов: ${formatNumber(list.count)}`,
               }))}
             />
           </FormField>
@@ -1014,14 +1043,14 @@ function AudienceStep({
         {audienceType === "custom-filter" && (
           <div>
             <div className="flex flex-wrap items-center gap-2 text-[10px]">
-              <span className="font-semibold text-text-muted">WHERE</span>
+              <span className="font-semibold text-text-muted">ГДЕ</span>
               {[
-                ["Role", "is", "Lawyer"],
-                ["City", "is", "Moscow"],
-                ["Status", "is", "Active"],
+                ["Должность", "равно", "Юрист"],
+                ["Город", "равно", "Москва"],
+                ["Статус", "равно", "Активный"],
               ].map((rule, index) => (
                 <React.Fragment key={rule[0]}>
-                  {index > 0 && <Badge variant="accent">AND</Badge>}
+                  {index > 0 && <Badge variant="accent">И</Badge>}
                   <span className="rounded-[8px] border border-border bg-surface px-2.5 py-1.5 text-text">
                     {rule.join(" · ")}
                   </span>
@@ -1030,11 +1059,11 @@ function AudienceStep({
             </div>
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
               <div>
-                <p className="m-0 text-[10px] text-text-muted">Matching audience</p>
-                <p className="mt-0.5 mb-0 text-[17px] font-semibold text-text-strong">843 contacts</p>
+                <p className="m-0 text-[10px] text-text-muted">Подходящая аудитория</p>
+                <p className="mt-0.5 mb-0 text-[17px] font-semibold text-text-strong">843 контакта</p>
               </div>
               <Link href="/contacts?filter=lawyers-moscow-active" className={buttonVariants({ variant: "secondary", size: "sm" })}>
-                Edit in Contacts
+                Изменить в контактах
               </Link>
             </div>
           </div>
@@ -1043,12 +1072,12 @@ function AudienceStep({
         {audienceType === "contacts" && (
           <div>
             {explicitCount > 0 && selectedContactIds.length === 0 && (
-              <Alert tone="info" title={`${formatNumber(explicitCount)} contacts received from Contacts`}>
-                The current bulk selection is attached to this campaign.
+              <Alert tone="info" title={`Получено из контактов: ${formatNumber(explicitCount)}`}>
+                Выбранная группа контактов добавлена в эту кампанию.
               </Alert>
             )}
             <p className={cn("mb-2 text-[10px] text-text-muted", explicitCount > 0 && "mt-4")}>
-              Add or remove individual contacts
+              Добавьте или удалите отдельные контакты
             </p>
             <div className="grid gap-2 sm:grid-cols-2">
               {contacts.slice(0, 6).map((contact) => {
@@ -1092,24 +1121,24 @@ function AudienceStep({
       </div>
 
       <div className="mt-6 border-t border-border pt-5">
-        <h3 className="m-0 text-[12px] font-semibold text-text-strong">Audience protection</h3>
-        <p className="mt-1 mb-4 text-[10px] text-text-muted">These checks run again immediately before delivery.</p>
+        <h3 className="m-0 text-[12px] font-semibold text-text-strong">Защита аудитории</h3>
+        <p className="mt-1 mb-4 text-[10px] text-text-muted">Эти проверки повторятся непосредственно перед отправкой.</p>
         <div className="grid gap-4">
           <ProtectionToggle
-            label="Exclude unsubscribed contacts"
-            description="Required for every campaign"
+            label="Исключить отписавшихся"
+            description="Обязательно для каждой кампании"
             checked={excludeUnsubscribed}
             onCheckedChange={onExcludeUnsubscribed}
           />
           <ProtectionToggle
-            label="Exclude bounced addresses"
-            description="Protect sender reputation"
+            label="Исключить недоставляемые адреса"
+            description="Защищает репутацию отправителя"
             checked={excludeBounced}
             onCheckedChange={onExcludeBounced}
           />
           <ProtectionToggle
-            label="Exclude previously contacted"
-            description="Skip contacts reached in the last 14 days"
+            label="Исключить недавних получателей"
+            description="Не отправлять тем, кто получал письма за последние 14 дней"
             checked={excludePreviouslyContacted}
             onCheckedChange={onExcludePreviouslyContacted}
           />
@@ -1150,9 +1179,9 @@ function ContentStep({
   return (
     <div>
       <StepHeading
-        eyebrow="Step 2"
-        title="How do you want to create the email?"
-        description="Choose a starting point, then refine everything in the email builder."
+        eyebrow="Шаг 2"
+        title="Как создать письмо?"
+        description="Выберите основу, а затем доработайте письмо в редакторе."
       />
       <div className="mt-6 grid gap-2 sm:grid-cols-2">
         {contentOptions.map(({ value, label, description, icon: Icon }) => (
@@ -1188,11 +1217,11 @@ function ContentStep({
         <div className="mt-6">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
-              <h3 className="m-0 text-[12px] font-semibold text-text-strong">Choose a template</h3>
-              <p className="mt-0.5 mb-0 text-[10px] text-text-muted">Every block remains editable.</p>
+              <h3 className="m-0 text-[12px] font-semibold text-text-strong">Выберите шаблон</h3>
+              <p className="mt-0.5 mb-0 text-[10px] text-text-muted">Каждый блок можно редактировать.</p>
             </div>
             <Link href={templateLibraryHref} className="text-[10px] font-semibold text-primary hover:text-primary-hover">
-              Browse library
+              Открыть библиотеку
             </Link>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -1228,7 +1257,7 @@ function ContentStep({
                 <span className="mt-0.5 block truncate text-[9px] text-text-muted">{campaign.subject}</span>
               </span>
               <Badge variant={selectedDuplicateId === campaign.id ? "accent" : "neutral"}>
-                {campaign.status}
+                {campaignStatusLabels[campaign.status]}
               </Badge>
             </button>
           ))}
@@ -1240,28 +1269,28 @@ function ContentStep({
           {contentMode === "ai" && (
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h3 className="m-0 text-[12px] font-semibold text-text-strong">Draft with {BRAND_NAME} AI</h3>
-                <p className="mt-0.5 mb-0 text-[10px] text-text-muted">A concise starting point using the audience context.</p>
+                <h3 className="m-0 text-[12px] font-semibold text-text-strong">Черновик с ИИ {BRAND_NAME}</h3>
+                <p className="mt-0.5 mb-0 text-[10px] text-text-muted">Краткий первый вариант с учётом выбранной аудитории.</p>
               </div>
               <Button
                 size="sm"
                 variant="secondary"
                 leadingIcon={<Bot className="size-3.5" />}
                 onClick={() => {
-                  setSubject("A focused invitation for {{company}}");
-                  setPreviewText("One relevant reason to join the conversation this September.");
+                  setSubject("Персональное приглашение для {{company}}");
+                  setPreviewText("Одна веская причина присоединиться к обсуждению в сентябре.");
                   setAiGenerated(true);
                 }}
               >
-                {aiGenerated ? "Regenerate draft" : "Generate draft"}
+                {aiGenerated ? "Создать заново" : "Создать черновик"}
               </Button>
             </div>
           )}
           <div className="grid gap-4">
-            <FormField label="Subject line" htmlFor="content-subject">
+            <FormField label="Тема письма" htmlFor="content-subject">
               <Input id="content-subject" value={subject} onChange={(event) => setSubject(event.target.value)} />
             </FormField>
-            <FormField label="Preview text" htmlFor="content-preview">
+            <FormField label="Текст предпросмотра" htmlFor="content-preview">
               <Input id="content-preview" value={previewText} onChange={(event) => setPreviewText(event.target.value)} />
             </FormField>
           </div>
@@ -1274,12 +1303,12 @@ function ContentStep({
             <PencilLine aria-hidden="true" className="size-4" />
           </span>
           <div>
-            <p className="m-0 text-[11px] font-semibold text-text-strong">Ready to shape the message?</p>
-            <p className="mt-0.5 mb-0 text-[10px] text-text-muted">Open the full editor, then return directly to Sender.</p>
+            <p className="m-0 text-[11px] font-semibold text-text-strong">Готовы доработать письмо?</p>
+            <p className="mt-0.5 mb-0 text-[10px] text-text-muted">Откройте редактор, а затем вернитесь к выбору отправителя.</p>
           </div>
         </div>
         <a href={editorHref} className={buttonVariants({ variant: "primary", size: "sm" })}>
-          Open email builder
+          Открыть редактор писем
           <ArrowRight aria-hidden="true" className="size-3.5" />
         </a>
       </div>
@@ -1311,9 +1340,9 @@ function SenderStep({
   return (
     <div>
       <StepHeading
-        eyebrow="Step 3"
-        title="Who is this message from?"
-        description="Use a verified sender and confirm how the message appears in the inbox."
+        eyebrow="Шаг 3"
+        title="От чьего имени отправить письмо?"
+        description="Выберите проверенного отправителя и проверьте вид письма во входящих."
       />
       <div className="mt-6 grid gap-2 sm:grid-cols-2">
         {senderProfiles.map((profile) => {
@@ -1349,28 +1378,28 @@ function SenderStep({
         })}
       </div>
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        <FormField label="Sender name" htmlFor="sender-name" required>
+        <FormField label="Имя отправителя" htmlFor="sender-name" required>
           <Input id="sender-name" value={senderName} onChange={(event) => onSenderNameChange(event.target.value)} />
         </FormField>
-        <FormField label="Sender email" htmlFor="sender-email" required hint="Verified sending domain">
+        <FormField label="Адрес отправителя" htmlFor="sender-email" required hint="Проверенный домен отправки">
           <Input id="sender-email" type="email" value={senderEmail} onChange={(event) => onSenderEmailChange(event.target.value)} />
         </FormField>
       </div>
       <div className="mt-6 border-t border-border pt-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h3 className="m-0 text-[12px] font-semibold text-text-strong">Inbox preview</h3>
-            <p className="mt-0.5 mb-0 text-[10px] text-text-muted">Confirm the subject and preview text.</p>
+            <h3 className="m-0 text-[12px] font-semibold text-text-strong">Предпросмотр во входящих</h3>
+            <p className="mt-0.5 mb-0 text-[10px] text-text-muted">Проверьте тему и текст предпросмотра.</p>
           </div>
           <a href={editorHref} className="text-[10px] font-semibold text-primary hover:text-primary-hover">
-            Edit email content
+            Изменить содержимое письма
           </a>
         </div>
         <div className="mt-4 grid gap-4">
-          <FormField label="Subject line" htmlFor="sender-subject" required>
+          <FormField label="Тема письма" htmlFor="sender-subject" required>
             <Input id="sender-subject" value={subject} onChange={(event) => onSubjectChange(event.target.value)} />
           </FormField>
-          <FormField label="Preview text" htmlFor="sender-preview">
+          <FormField label="Текст предпросмотра" htmlFor="sender-preview">
             <Input id="sender-preview" value={previewText} onChange={(event) => onPreviewTextChange(event.target.value)} />
           </FormField>
         </div>
@@ -1385,11 +1414,11 @@ function SenderStep({
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-3">
-                <p className="m-0 truncate text-[11px] font-semibold text-text-strong">{senderName || "Sender"}</p>
-                <span className="text-[9px] text-text-subtle">9:41 AM</span>
+                <p className="m-0 truncate text-[11px] font-semibold text-text-strong">{senderName || "Отправитель"}</p>
+                <span className="text-[9px] text-text-subtle">09:41</span>
               </div>
-              <p className="mt-0.5 mb-0 truncate text-[10px] font-medium text-text">{subject || "Your subject line"}</p>
-              <p className="mt-0.5 mb-0 truncate text-[9px] text-text-muted">{previewText || "Preview text appears here."}</p>
+              <p className="mt-0.5 mb-0 truncate text-[10px] font-medium text-text">{subject || "Тема вашего письма"}</p>
+              <p className="mt-0.5 mb-0 truncate text-[9px] text-text-muted">{previewText || "Здесь появится текст предпросмотра."}</p>
             </div>
           </div>
         </div>
@@ -1434,28 +1463,28 @@ function ReviewStep({
   return (
     <div>
       <StepHeading
-        eyebrow="Step 4"
-        title="Review before launch"
-        description="Confirm the audience, content and delivery timing. No email is sent in demo mode."
+        eyebrow="Шаг 4"
+        title="Проверьте перед запуском"
+        description="Проверьте аудиторию, письмо и время отправки. В деморежиме письма не отправляются."
       />
       <div className="mt-6">
-        <FormField label="Campaign name" htmlFor="review-campaign-name" required>
+        <FormField label="Название кампании" htmlFor="review-campaign-name" required>
           <Input id="review-campaign-name" value={campaignName} onChange={(event) => setCampaignName(event.target.value)} />
         </FormField>
       </div>
       <div className="mt-5 divide-y divide-border rounded-[12px] border border-border">
-        <ReviewRow icon={<UsersRound className="size-4" />} label="Audience" value={audienceLabel} meta={`${formatNumber(recipientCount)} recipients`} />
-        <ReviewRow icon={<MailCheck className="size-4" />} label="Content" value={contentLabel} meta={subject} />
-        <ReviewRow icon={<UserRound className="size-4" />} label="Sender" value={senderName} meta={senderEmail} />
+        <ReviewRow icon={<UsersRound className="size-4" />} label="Аудитория" value={audienceLabel} meta={`Получателей: ${formatNumber(recipientCount)}`} />
+        <ReviewRow icon={<MailCheck className="size-4" />} label="Письмо" value={contentLabel} meta={subject} />
+        <ReviewRow icon={<UserRound className="size-4" />} label="Отправитель" value={senderName} meta={senderEmail} />
       </div>
 
       <div className="mt-6">
-        <h3 className="m-0 text-[12px] font-semibold text-text-strong">Delivery</h3>
-        <p className="mt-1 mb-3 text-[10px] text-text-muted">Choose when {BRAND_NAME} should begin processing recipients.</p>
+        <h3 className="m-0 text-[12px] font-semibold text-text-strong">Отправка</h3>
+        <p className="mt-1 mb-3 text-[10px] text-text-muted">Выберите, когда {BRAND_NAME} должен начать обработку получателей.</p>
         <div className="grid gap-2 sm:grid-cols-2">
           {[
-            { value: "now" as const, label: "Send now", description: "Start processing immediately", icon: Send },
-            { value: "schedule" as const, label: "Schedule", description: "Choose a future date and time", icon: CalendarClock },
+            { value: "now" as const, label: "Отправить сейчас", description: "Начать отправку сразу", icon: Send },
+            { value: "schedule" as const, label: "Запланировать", description: "Выбрать дату и время", icon: CalendarClock },
           ].map(({ value, label, description, icon: Icon }) => (
             <button
               key={value}
@@ -1479,10 +1508,10 @@ function ReviewStep({
         </div>
         {sendMode === "schedule" && (
           <div className="mt-3 grid gap-3 rounded-[10px] border border-border bg-surface-subtle/35 p-4 sm:grid-cols-2">
-            <FormField label="Date" htmlFor="schedule-date">
+            <FormField label="Дата" htmlFor="schedule-date">
               <Input id="schedule-date" type="date" min="2026-08-12" value={scheduleDate} onChange={(event) => onScheduleDateChange(event.target.value)} />
             </FormField>
-            <FormField label="Time" htmlFor="schedule-time" hint="Europe/Saratov (UTC+4)">
+            <FormField label="Время" htmlFor="schedule-time" hint="Саратов (UTC+4)">
               <Input id="schedule-time" type="time" value={scheduleTime} onChange={(event) => onScheduleTimeChange(event.target.value)} />
             </FormField>
           </div>
@@ -1492,14 +1521,14 @@ function ReviewStep({
       <div className="mt-6 rounded-[11px] border border-success/15 bg-success-subtle/55 p-4">
         <div className="flex items-center gap-2 text-[11px] font-semibold text-success">
           <CheckCircle2 aria-hidden="true" className="size-4" />
-          Ready to launch
+          Всё готово к запуску
         </div>
         <ul className="mt-3 grid gap-2 text-[10px] text-text sm:grid-cols-2">
-          <li className="flex items-center gap-2"><Check className="size-3 text-success" />Verified sending domain</li>
-          <li className="flex items-center gap-2"><Check className="size-3 text-success" />Content and subject ready</li>
-          {exclusions.unsubscribed && <li className="flex items-center gap-2"><Check className="size-3 text-success" />Unsubscribed suppressed</li>}
-          {exclusions.bounced && <li className="flex items-center gap-2"><Check className="size-3 text-success" />Bounced suppressed</li>}
-          {exclusions.previouslyContacted && <li className="flex items-center gap-2"><Check className="size-3 text-success" />Recent contacts suppressed</li>}
+          <li className="flex items-center gap-2"><Check className="size-3 text-success" />Домен отправки проверен</li>
+          <li className="flex items-center gap-2"><Check className="size-3 text-success" />Письмо и тема готовы</li>
+          {exclusions.unsubscribed && <li className="flex items-center gap-2"><Check className="size-3 text-success" />Отписавшиеся исключены</li>}
+          {exclusions.bounced && <li className="flex items-center gap-2"><Check className="size-3 text-success" />Недоставляемые адреса исключены</li>}
+          {exclusions.previouslyContacted && <li className="flex items-center gap-2"><Check className="size-3 text-success" />Недавние получатели исключены</li>}
         </ul>
       </div>
     </div>
@@ -1628,7 +1657,9 @@ function TemplateChoice({
       </span>
       <span className="block border-t border-border p-3">
         <span className="block truncate text-[10px] font-semibold text-text-strong">{template.name}</span>
-        <span className="mt-0.5 block text-[9px] text-text-muted">{template.category}</span>
+        <span className="mt-0.5 block text-[9px] text-text-muted">
+          {templateCategoryLabels[template.category]}
+        </span>
       </span>
     </button>
   );

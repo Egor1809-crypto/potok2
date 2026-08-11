@@ -20,6 +20,7 @@ import {
 import { cn } from "@/components/ui/utils";
 
 import { TemplateCard } from "./TemplatePreview";
+import { templateCategoryLabels } from "./templateLabels";
 
 const categories = [
   "All",
@@ -111,6 +112,7 @@ export function TemplatesView() {
           : [
               template.name,
               template.category,
+              templateCategoryLabels[template.category],
               template.description,
               template.subject,
             ]
@@ -119,7 +121,7 @@ export function TemplatesView() {
               .includes(normalized),
       )
       .sort((first, second) => {
-        if (sort === "name") return first.name.localeCompare(second.name);
+        if (sort === "name") return first.name.localeCompare(second.name, "ru-RU");
         if (sort === "recent") {
           return Date.parse(second.updatedAt) - Date.parse(first.updatedAt);
         }
@@ -145,12 +147,12 @@ export function TemplatesView() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Design library"
-        title="Templates"
+        eyebrow="Библиотека дизайнов"
+        title="Шаблоны"
         description={routeContext.campaignName
-          ? `Choose a starting point for ${routeContext.campaignName}; your audience and setup will stay attached.`
-          : "Start with a polished structure, then make every detail your own."}
-        meta={`${templates.length} designs`}
+          ? `Выберите основу для кампании «${routeContext.campaignName}» — аудитория и настройки сохранятся.`
+          : "Начните с готовой структуры и настройте каждую деталь под себя."}
+        meta={`Дизайнов: ${templates.length}`}
         action={
           <div className="flex flex-wrap items-center gap-2">
             {routeContext.backTo ? (
@@ -159,7 +161,7 @@ export function TemplatesView() {
                 className={buttonVariants({ variant: "secondary", size: "md" })}
               >
                 <ArrowLeft aria-hidden="true" className="size-4" />
-                Back to campaign
+                Вернуться к кампании
               </Link>
             ) : null}
             <Link
@@ -170,7 +172,7 @@ export function TemplatesView() {
               className={buttonVariants({ variant: "primary", size: "md" })}
             >
               <Plus aria-hidden="true" className="size-4" />
-              Start from scratch
+              Начать с нуля
             </Link>
           </div>
         }
@@ -184,7 +186,7 @@ export function TemplatesView() {
         <TabsList className="-mb-px">
           {categories.map((item) => (
             <TabsTrigger key={item} value={item}>
-              {item}
+              {item === "All" ? "Все" : templateCategoryLabels[item]}
               <span className="ml-1.5 text-[10px] font-normal text-text-subtle">
                 {item === "All"
                   ? templates.length
@@ -200,8 +202,8 @@ export function TemplatesView() {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               onClear={() => setQuery("")}
-              placeholder="Search templates…"
-              aria-label="Search templates"
+              placeholder="Поиск шаблонов…"
+              aria-label="Поиск шаблонов"
               wrapperClassName="w-full sm:max-w-sm"
             />
             <div className="flex items-center gap-2">
@@ -215,16 +217,16 @@ export function TemplatesView() {
                 )}
               >
                 <Heart aria-hidden="true" className={cn("size-3.5", favoritesOnly && "fill-current")} />
-                Favorites
+                Избранное
               </button>
               <Select
                 value={sort}
                 onChange={(event) => setSort(event.target.value as SortMode)}
-                aria-label="Sort templates"
+                aria-label="Сортировать шаблоны"
                 options={[
-                  { value: "popular", label: "Most used" },
-                  { value: "recent", label: "Recently updated" },
-                  { value: "name", label: "Name" },
+                  { value: "popular", label: "Чаще используемые" },
+                  { value: "recent", label: "Недавно обновлённые" },
+                  { value: "name", label: "По названию" },
                 ]}
                 wrapperClassName="w-40"
                 className="h-8 min-h-8 text-[11px]"
@@ -234,13 +236,13 @@ export function TemplatesView() {
 
           <div className="mt-4 flex items-center justify-between gap-3">
             <p className="m-0 text-[11px] text-text-muted">
-              <span className="font-semibold text-text-strong">{filteredTemplates.length}</span>{" "}
-              {filteredTemplates.length === 1 ? "template" : "templates"}
-              {category !== "All" ? ` in ${category}` : ""}
+              Шаблонов:{" "}
+              <span className="font-semibold text-text-strong">{filteredTemplates.length}</span>
+              {category !== "All" ? ` · ${templateCategoryLabels[category]}` : ""}
             </p>
             <span className="hidden items-center gap-1.5 text-[10px] text-text-subtle sm:flex">
               <FileText aria-hidden="true" className="size-3" />
-              Every design is fully editable
+              Каждый дизайн можно полностью изменить
             </span>
           </div>
 
@@ -264,9 +266,9 @@ export function TemplatesView() {
             <div className="mt-4 rounded-[14px] border border-border bg-surface">
               <EmptyState
                 icon={<SearchX aria-hidden="true" className="size-5" />}
-                title="No templates match"
-                description="Try another search, category, or show all designs."
-                action={{ label: "Clear filters", onClick: clearFilters }}
+                title="Подходящих шаблонов нет"
+                description="Измените запрос или категорию либо покажите все дизайны."
+                action={{ label: "Сбросить фильтры", onClick: clearFilters }}
               />
             </div>
           )}

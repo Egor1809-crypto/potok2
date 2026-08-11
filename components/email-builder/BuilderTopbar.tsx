@@ -56,7 +56,7 @@ export function BuilderTopbar({
       <div className="flex min-w-0 items-center gap-2 sm:gap-3">
         <div className="min-w-0">
           <label htmlFor="builder-campaign-name" className="sr-only">
-            Campaign name
+            Название кампании
           </label>
           <input
             id="builder-campaign-name"
@@ -68,12 +68,12 @@ export function BuilderTopbar({
             {dirty ? (
               <>
                 <Cloud aria-hidden="true" className="size-2.5" />
-                Unsaved changes
+                Есть несохранённые изменения
               </>
             ) : (
               <>
                 <Check aria-hidden="true" className="size-2.5 text-success" />
-                All changes saved
+                Все изменения сохранены
               </>
             )}
           </span>
@@ -81,13 +81,13 @@ export function BuilderTopbar({
 
         <div className="hidden h-5 w-px bg-border sm:block" />
         <div className="hidden items-center gap-0.5 sm:flex">
-          <Tooltip content="Undo · ⌘Z">
-            <IconButton label="Undo" variant="ghost" size="sm" disabled={!canUndo} onClick={onUndo}>
+          <Tooltip content="Отменить · ⌘Z">
+            <IconButton label="Отменить" variant="ghost" size="sm" disabled={!canUndo} onClick={onUndo}>
               <Undo2 aria-hidden="true" className="size-3.5" />
             </IconButton>
           </Tooltip>
-          <Tooltip content="Redo · ⇧⌘Z">
-            <IconButton label="Redo" variant="ghost" size="sm" disabled={!canRedo} onClick={onRedo}>
+          <Tooltip content="Повторить · ⇧⌘Z">
+            <IconButton label="Повторить" variant="ghost" size="sm" disabled={!canRedo} onClick={onRedo}>
               <Redo2 aria-hidden="true" className="size-3.5" />
             </IconButton>
           </Tooltip>
@@ -95,10 +95,10 @@ export function BuilderTopbar({
       </div>
 
       <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-        <div className="hidden items-center rounded-[9px] bg-surface-subtle p-1 md:flex" aria-label="Preview size">
+        <div className="hidden items-center rounded-[9px] bg-surface-subtle p-1 md:flex" aria-label="Размер предпросмотра">
           <button
             type="button"
-            aria-label="Desktop preview"
+            aria-label="Предпросмотр на компьютере"
             aria-pressed={previewMode === "desktop"}
             onClick={() => onPreviewModeChange("desktop")}
             className="grid size-7 place-items-center rounded-[7px] text-text-subtle outline-none transition hover:text-text aria-pressed:bg-surface aria-pressed:text-primary aria-pressed:shadow-[var(--shadow-xs)] focus-visible:ring-2 focus-visible:ring-primary/30"
@@ -107,7 +107,7 @@ export function BuilderTopbar({
           </button>
           <button
             type="button"
-            aria-label="Mobile preview"
+            aria-label="Предпросмотр на смартфоне"
             aria-pressed={previewMode === "mobile"}
             onClick={() => onPreviewModeChange("mobile")}
             className="grid size-7 place-items-center rounded-[7px] text-text-subtle outline-none transition hover:text-text aria-pressed:bg-surface aria-pressed:text-primary aria-pressed:shadow-[var(--shadow-xs)] focus-visible:ring-2 focus-visible:ring-primary/30"
@@ -121,21 +121,21 @@ export function BuilderTopbar({
           size="sm"
           loading={sendingTest}
           leadingIcon={<Send aria-hidden="true" className="size-3.5" />}
-          aria-label="Send a test email"
+          aria-label="Отправить тестовое письмо"
           onClick={onSendTest}
           className="px-2 sm:px-3"
         >
-          <span className="hidden lg:inline">Send test</span>
+          <span className="hidden lg:inline">Тестовое письмо</span>
         </Button>
         <Button
           variant="secondary"
           size="sm"
-          aria-label="Save email"
+          aria-label="Сохранить письмо"
           onClick={onSave}
           className="px-2 sm:px-3"
         >
           <Save aria-hidden="true" className="size-3.5" />
-          <span className="hidden lg:inline">Save</span>
+          <span className="hidden lg:inline">Сохранить</span>
         </Button>
         <Link
           href={continueHref}
@@ -146,7 +146,7 @@ export function BuilderTopbar({
             className: "px-2.5 sm:px-3",
           })}
         >
-          <span className="hidden sm:inline">Continue</span>
+          <span className="hidden sm:inline">Продолжить</span>
           <ArrowRight aria-hidden="true" className="size-3.5" />
         </Link>
       </div>
@@ -174,7 +174,7 @@ export function MobilePreviewToggle({
           className="flex h-7 items-center gap-1.5 rounded-[7px] px-2.5 text-[10px] font-medium capitalize text-text-muted outline-none transition aria-pressed:bg-surface aria-pressed:text-primary aria-pressed:shadow-[var(--shadow-xs)] focus-visible:ring-2 focus-visible:ring-primary/30"
         >
           {mode === "desktop" ? <Monitor aria-hidden="true" className="size-3" /> : <Smartphone aria-hidden="true" className="size-3" />}
-          {mode}
+          {mode === "desktop" ? "Компьютер" : "Смартфон"}
         </button>
       ))}
     </div>

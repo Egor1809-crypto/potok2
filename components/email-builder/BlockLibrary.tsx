@@ -27,17 +27,20 @@ export type BlockLibraryItem = {
 };
 
 export const blockLibrary: BlockLibraryItem[] = [
-  { type: "text", label: "Text", description: "Paragraph copy", icon: Type },
-  { type: "heading", label: "Heading", description: "Section title", icon: Heading2 },
-  { type: "image", label: "Image", description: "Visual or photo", icon: ImageIcon },
-  { type: "button", label: "Button", description: "Primary action", icon: MousePointerClick },
-  { type: "columns", label: "Columns", description: "Two-up content", icon: Columns3 },
-  { type: "divider", label: "Divider", description: "Visual separator", icon: Minus },
-  { type: "spacer", label: "Spacer", description: "Vertical rhythm", icon: Space },
-  { type: "social", label: "Social", description: "Social links", icon: Share2 },
-  { type: "logo", label: "Logo", description: "Brand mark", icon: GalleryHorizontal },
-  { type: "footer", label: "Footer", description: "Compliance copy", icon: PanelBottom },
+  { type: "text", label: "Текст", description: "Абзац текста", icon: Type },
+  { type: "heading", label: "Заголовок", description: "Название раздела", icon: Heading2 },
+  { type: "image", label: "Изображение", description: "Графика или фото", icon: ImageIcon },
+  { type: "button", label: "Кнопка", description: "Основное действие", icon: MousePointerClick },
+  { type: "columns", label: "Столбцы", description: "Два блока рядом", icon: Columns3 },
+  { type: "divider", label: "Разделитель", description: "Визуальная граница", icon: Minus },
+  { type: "spacer", label: "Отступ", description: "Вертикальный интервал", icon: Space },
+  { type: "social", label: "Соцсети", description: "Ссылки на соцсети", icon: Share2 },
+  { type: "logo", label: "Логотип", description: "Знак бренда", icon: GalleryHorizontal },
+  { type: "footer", label: "Подвал", description: "Служебный текст", icon: PanelBottom },
 ];
+
+export const getBlockLabel = (type: EmailBlockType) =>
+  blockLibrary.find((item) => item.type === type)?.label ?? "Блок";
 
 export function BlockLibrary({
   onAdd,
@@ -48,16 +51,16 @@ export function BlockLibrary({
 }) {
   return (
     <aside
-      aria-label="Content blocks"
+      aria-label="Блоки контента"
       className={cn("flex min-h-0 flex-col bg-surface", className)}
     >
       <div className="border-b border-border/70 px-4 py-4">
         <div className="flex items-center gap-2">
           <AlignJustify aria-hidden="true" className="size-4 text-primary" />
-          <h2 className="m-0 text-[13px] font-semibold text-text-strong">Content blocks</h2>
+          <h2 className="m-0 text-[13px] font-semibold text-text-strong">Блоки контента</h2>
         </div>
         <p className="mt-1 text-[11px] leading-4 text-text-muted">
-          Add a block beneath the current selection.
+          Добавьте блок под текущим выбранным элементом.
         </p>
       </div>
 
@@ -89,10 +92,10 @@ export function BlockLibrary({
         <div className="mt-4 rounded-[11px] border border-primary/15 bg-primary-subtle/55 p-3">
           <div className="flex items-center gap-2 text-[11px] font-semibold text-primary">
             <Link2 aria-hidden="true" className="size-3.5" />
-            Personalization ready
+            Персонализация настроена
           </div>
           <p className="mt-1.5 text-[10px] leading-4 text-text-muted">
-            Insert contact fields from the properties panel to make every message feel direct.
+            Добавляйте поля контакта на панели свойств, чтобы каждое письмо было персональным.
           </p>
         </div>
       </div>
