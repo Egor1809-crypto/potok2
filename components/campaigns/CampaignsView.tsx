@@ -3,213 +3,187 @@
 import * as React from "react";
 import Link from "next/link";
 import {
+  AlertTriangle,
   ArrowRight,
   BarChart3,
   CalendarClock,
+  CheckCircle2,
+  Clock3,
   Copy,
   Mail,
   MailPlus,
   MessageCircle,
-  MoreHorizontal,
-  Pause,
-  Play,
+  RefreshCw,
   Send,
   SendHorizontal,
   UsersRound,
 } from "lucide-react";
-import { campaigns as mockCampaigns } from "@/data/mockCampaigns";
-import type { Campaign, CampaignDeliveryChannel, CampaignStatus } from "@/types";
+
+import type { CampaignDeliveryChannel } from "@/types";
+import type {
+  CampaignRecord,
+  CampaignStatus,
+  DeliveryPlanRecord,
+  WorkspaceSnapshot,
+} from "@/types/api";
 import { PageHeader } from "@/components/shared";
 import {
+  Alert,
   Badge,
-  Button,
   EmptyState,
-  IconButton,
-  Modal,
   SearchInput,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableHeader,
-  TableRow,
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  ToastSurface,
   buttonVariants,
   cn,
 } from "@/components/ui";
-import {
-  campaignStatusLabels,
-  formatCampaignNumber,
-  formatCampaignPercent,
-} from "./campaignLabels";
 
 export type CampaignsTab = "all" | CampaignStatus;
+
+type CampaignListItem = {
+  id: string;
+  name: string;
+  subject: string;
+  messengerMessage: string;
+  audience: string;
+  deliveryChannels: CampaignDeliveryChannel[];
+  status: CampaignStatus;
+  statusReason: string;
+  metrics: {
+    recipients: number;
+    sent: number;
+    delivered: number;
+    opened: number;
+    replies: number;
+  };
+  createdAt: string;
+  scheduledAt: string | null;
+};
 
 const tabs: { value: CampaignsTab; label: string }[] = [
   { value: "all", label: "Все" },
   { value: "draft", label: "Черновики" },
-  { value: "scheduled", label: "Запланированные" },
+  { value: "blocked", label: "Есть блокеры" },
+  { value: "ready", label: "Готовы" },
+  { value: "scheduled", label: "Запланированы" },
   { value: "sending", label: "Отправляются" },
-  { value: "completed", label: "Завершённые" },
+  { value: "completed", label: "Завершены" },
+  { value: "cancelled", label: "Отменены" },
 ];
 
-const statusTone: Record<
-  CampaignStatus,
-  "neutral" | "info" | "accent" | "success"
-> = {
-  draft: "neutral",
-  scheduled: "info",
-  sending: "accent",
-  completed: "success",
+const statusMeta: Record<CampaignStatus, {
+  label: string;
+  tone: "neutral" | "warning" | "success" | "info" | "accent";
+  next: string;
+  icon: typeof Clock3;
+}> = {
+  draft: { label: "Черновик", tone: "neutral", next: "Завершите аудиторию, сообщение и маршруты", icon: Clock3 },
+  blocked: { label: "Есть блокеры", tone: "warning", next: "Исправьте блокеры и повторите проверку", icon: AlertTriangle },
+  ready: { label: "Готова", tone: "success", next: "Проверки пройдены; внешняя отправка не выполнялась", icon: CheckCircle2 },
+  scheduled: { label: "План по времени", tone: "info", next: "Расписание сохранено; адаптер не запускался", icon: CalendarClock },
+  sending: { label: "Отправляется", tone: "accent", next: "Провайдеры обрабатывают получателей", icon: Send },
+  completed: { label: "Обработка завершена", tone: "success", next: "Смотрите фактически принятые провайдером сообщения", icon: CheckCircle2 },
+  cancelled: { label: "Отменена", tone: "neutral", next: "Создайте копию, чтобы повторить", icon: Clock3 },
 };
 
-const deliveryChannelMeta: Record<
-  CampaignDeliveryChannel,
-  { label: string; icon: typeof Mail; className: string }
-> = {
+const channelMeta: Record<CampaignDeliveryChannel, { label: string; icon: typeof Mail; className: string }> = {
   email: { label: "Email", icon: Mail, className: "bg-primary-subtle text-primary" },
   telegram: { label: "Telegram", icon: SendHorizontal, className: "bg-info-subtle text-info" },
   vk: { label: "ВКонтакте", icon: MessageCircle, className: "bg-[#eaf3ff] text-[#1671d9]" },
 };
 
-function formatDate(value: string | null): string {
-  if (!value) return "—";
+function formatNumber(value: number) {
+  return new Intl.NumberFormat("ru-RU").format(value);
+}
+
+function formatDate(value: string | null) {
+  if (!value) return "Не задано";
   return new Intl.DateTimeFormat("ru-RU", {
-    month: "short",
     day: "numeric",
+    month: "short",
     year: "numeric",
     timeZone: "UTC",
   }).format(new Date(value));
 }
 
-function formatNumber(value: number): string {
-  return formatCampaignNumber(value);
-}
-
-function subscribeToCampaignStorage(onStoreChange: () => void) {
-  window.addEventListener("storage", onStoreChange);
-  return () => window.removeEventListener("storage", onStoreChange);
-}
-
-function getSavedCampaignsSnapshot() {
-  try {
-    return window.localStorage.getItem("mailflow:demo-campaigns") ??
-      window.localStorage.getItem("mailflow:last-campaign") ??
-      "";
-  } catch {
-    return "";
-  }
-}
-
-function getServerCampaignSnapshot() {
-  return "";
+function fromApi(campaign: CampaignRecord): CampaignListItem {
+  return {
+    id: campaign.id,
+    name: campaign.name,
+    subject: campaign.subject,
+    messengerMessage: campaign.messengerMessage,
+    audience: campaign.audienceLabel,
+    deliveryChannels: campaign.deliveryChannels,
+    status: campaign.status,
+    statusReason: campaign.statusReason,
+    metrics: campaign.metrics,
+    createdAt: campaign.createdAt,
+    scheduledAt: campaign.scheduledAt,
+  };
 }
 
 export interface CampaignsViewProps {
-  items?: Campaign[];
   initialTab?: CampaignsTab;
 }
 
 export function CampaignsView({
-  items = mockCampaigns,
   initialTab = "all",
 }: CampaignsViewProps) {
-  const savedCampaignsSnapshot = React.useSyncExternalStore(
-    subscribeToCampaignStorage,
-    getSavedCampaignsSnapshot,
-    getServerCampaignSnapshot,
-  );
+  const [campaigns, setCampaigns] = React.useState<CampaignListItem[]>([]);
+  const [deliveryPlans, setDeliveryPlans] = React.useState<DeliveryPlanRecord[]>([]);
+  const [apiMode, setApiMode] = React.useState<"loading" | "online" | "offline">("loading");
   const [activeTab, setActiveTab] = React.useState<CampaignsTab>(initialTab);
   const [search, setSearch] = React.useState("");
-  const [actionCampaign, setActionCampaign] = React.useState<Campaign | null>(null);
-  const [notice, setNotice] = React.useState<string | null>(null);
-  const noticeTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const savedDemoCampaigns = React.useMemo(() => {
-    if (!savedCampaignsSnapshot) return [];
+  const loadCampaigns = React.useCallback(async () => {
+    setApiMode("loading");
     try {
-      const parsed = JSON.parse(savedCampaignsSnapshot) as Campaign | Campaign[];
-      const campaignItems = Array.isArray(parsed) ? parsed : [parsed];
-      return campaignItems.filter(
-        (campaign) => campaign?.id && campaign?.name && campaign?.metrics,
-      );
+      const response = await fetch("/api/workspace", { headers: { Accept: "application/json" } });
+      if (!response.ok) throw new Error("Кампании недоступны");
+      const body = await response.json() as WorkspaceSnapshot;
+      setCampaigns(body.campaigns.map(fromApi));
+      setDeliveryPlans(body.deliveryPlans);
+      setApiMode("online");
     } catch {
-      return [];
+      setCampaigns([]);
+      setDeliveryPlans([]);
+      setApiMode("offline");
     }
-  }, [savedCampaignsSnapshot]);
+  }, []);
 
-  const displayItems = React.useMemo(
-    () => [
-      ...savedDemoCampaigns.filter(
-        (savedCampaign) => !items.some((campaign) => campaign.id === savedCampaign.id),
-      ),
-      ...items,
-    ],
-    [items, savedDemoCampaigns],
-  );
+  React.useEffect(() => {
+    const frame = window.requestAnimationFrame(() => void loadCampaigns());
+    return () => window.cancelAnimationFrame(frame);
+  }, [loadCampaigns]);
 
-  React.useEffect(
-    () => () => {
-      if (noticeTimer.current) clearTimeout(noticeTimer.current);
-    },
-    [],
-  );
-
-  const notify = (message: string) => {
-    if (noticeTimer.current) clearTimeout(noticeTimer.current);
-    setNotice(message);
-    noticeTimer.current = setTimeout(() => setNotice(null), 3200);
-  };
-
-  const filteredCampaigns = React.useMemo(() => {
-    const query = search.trim().toLocaleLowerCase();
-    return displayItems.filter((campaign) => {
-      const matchesTab = activeTab === "all" || campaign.status === activeTab;
-      const matchesSearch =
-        !query ||
-        [campaign.name, campaign.subject, campaign.audience, campaign.owner]
-          .join(" ")
-          .toLocaleLowerCase()
-          .includes(query);
-      return matchesTab && matchesSearch;
+  const filtered = React.useMemo(() => {
+    const query = search.trim().toLocaleLowerCase("ru-RU");
+    return campaigns.filter((campaign) => {
+      const tabMatches = activeTab === "all" || campaign.status === activeTab;
+      const searchMatches = !query || [campaign.name, campaign.subject, campaign.messengerMessage, campaign.audience]
+        .join(" ")
+        .toLocaleLowerCase("ru-RU")
+        .includes(query);
+      return tabMatches && searchMatches;
     });
-  }, [activeTab, displayItems, search]);
+  }, [activeTab, campaigns, search]);
 
-  const statusCounts = React.useMemo(
-    () =>
-      displayItems.reduce<Record<CampaignsTab, number>>(
-        (counts, campaign) => {
-          counts.all += 1;
-          counts[campaign.status] += 1;
-          return counts;
-        },
-        { all: 0, draft: 0, scheduled: 0, sending: 0, completed: 0 },
-      ),
-    [displayItems],
-  );
+  const counts = React.useMemo(() => campaigns.reduce<Record<CampaignsTab, number>>(
+    (result, campaign) => {
+      result.all += 1;
+      result[campaign.status] += 1;
+      return result;
+    },
+    { all: 0, draft: 0, ready: 0, blocked: 0, scheduled: 0, sending: 0, completed: 0, cancelled: 0 },
+  ), [campaigns]);
 
-  const delivered = displayItems.reduce(
-    (total, campaign) => total + campaign.metrics.delivered,
-    0,
-  );
-  const averageOpenRate =
-    displayItems.filter((campaign) => campaign.metrics.delivered > 0).reduce(
-      (total, campaign, _, completed) =>
-        total + campaign.metrics.openRate / completed.length,
-      0,
-    ) || 0;
+  const delivered = campaigns.reduce((total, campaign) => total + campaign.metrics.delivered, 0);
+  const active = counts.ready + counts.scheduled + counts.sending;
 
   return (
-    <div className="relative space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6 pb-10">
       <PageHeader
-        eyebrow="Коммуникации"
+        eyebrow="Полный цикл коммуникации"
         title="Кампании"
-        description="Создавайте адресные рассылки, управляйте расписанием и отслеживайте каждый диалог."
-        meta={`Кампаний: ${displayItems.length}`}
+        description="Каждая кампания проходит понятный путь: черновик → проверка → готовность → отправка → результат."
         action={
           <Link href="/campaigns/new" className={buttonVariants({ variant: "primary" })}>
             <MailPlus aria-hidden="true" className="size-4" />
@@ -218,285 +192,163 @@ export function CampaignsView({
         }
       />
 
+      {apiMode === "offline" ? (
+        <Alert tone="danger" title="Кампании не загружены">
+          Не удалось получить данные рабочего пространства. Список очищен, чтобы не показывать устаревшие или вымышленные записи.
+          <button
+            type="button"
+            onClick={() => void loadCampaigns()}
+            className="mt-3 inline-flex items-center gap-2 text-[12px] font-semibold text-danger underline underline-offset-4"
+          >
+            <RefreshCw aria-hidden="true" className="size-3.5" />
+            Повторить загрузку
+          </button>
+        </Alert>
+      ) : null}
+
       <section className="grid gap-3 sm:grid-cols-3" aria-label="Сводка по кампаниям">
-        <article className="card flex items-center gap-3.5 p-4">
-          <span className="grid size-9 place-items-center rounded-[10px] bg-primary-subtle text-primary">
-            <Send aria-hidden="true" className="size-4" />
-          </span>
-          <div>
-            <p className="m-0 text-[11px] text-text-muted">Доставлено</p>
-            <p className="mt-0.5 mb-0 text-[19px] font-semibold tracking-[-0.03em] text-text-strong">
-              {formatNumber(delivered)}
-            </p>
-          </div>
-        </article>
-        <article className="card flex items-center gap-3.5 p-4">
-          <span className="grid size-9 place-items-center rounded-[10px] bg-info-subtle text-info">
-            <CalendarClock aria-hidden="true" className="size-4" />
-          </span>
-          <div>
-            <p className="m-0 text-[11px] text-text-muted">Запланированы и отправляются</p>
-            <p className="mt-0.5 mb-0 text-[19px] font-semibold tracking-[-0.03em] text-text-strong">
-              {statusCounts.scheduled + statusCounts.sending}
-            </p>
-          </div>
-        </article>
-        <article className="card flex items-center gap-3.5 p-4">
-          <span className="grid size-9 place-items-center rounded-[10px] bg-success-subtle text-success">
-            <BarChart3 aria-hidden="true" className="size-4" />
-          </span>
-          <div>
-            <p className="m-0 text-[11px] text-text-muted">Средняя доля открытий</p>
-            <p className="mt-0.5 mb-0 text-[19px] font-semibold tracking-[-0.03em] text-text-strong">
-              {formatCampaignPercent(averageOpenRate)}
-            </p>
-          </div>
-        </article>
+        <SummaryCard icon={Send} label="Активный цикл" value={formatNumber(active)} text="Готовы, запланированы или отправляются" />
+        <SummaryCard icon={AlertTriangle} label="Требуют внимания" value={formatNumber(counts.blocked + counts.draft)} text="Черновики и кампании с блокерами" tone="warning" />
+        <SummaryCard icon={BarChart3} label="Доставлено" value={formatNumber(delivered)} text="По всем завершённым и активным кампаниям" tone="success" />
       </section>
 
-      <section className="card overflow-hidden">
-        <div className="flex flex-col gap-3 border-b border-border px-4 pt-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-          <Tabs
-            value={activeTab}
-            onValueChange={(value) => setActiveTab(value as CampaignsTab)}
-            className="min-w-0"
-          >
-            <TabsList className="border-b-0">
-              {tabs.map((tab) => (
-                <TabsTrigger key={tab.value} value={tab.value}>
-                  {tab.label}
-                  <span
-                    className={cn(
-                      "ml-1.5 rounded-full bg-surface-subtle px-1.5 py-0.5 text-[9px] text-text-subtle",
-                      activeTab === tab.value && "bg-primary-subtle text-primary",
-                    )}
-                  >
-                    {statusCounts[tab.value]}
-                  </span>
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
-          <SearchInput
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            onClear={() => setSearch("")}
-            placeholder="Поиск кампаний"
-            aria-label="Поиск кампаний"
-            wrapperClassName="mb-3 w-full sm:w-64"
-            className="h-9 min-h-9"
-          />
+      <section className="card overflow-hidden" aria-labelledby="campaign-list-title">
+        <div className="border-b border-border p-4 sm:p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 id="campaign-list-title" className="text-[16px] font-semibold text-text-strong">Рабочий список</h2>
+              <p className="mt-1 text-[12px] text-text-muted">Статус показывает, что уже сделано и какое действие нужно следующим.</p>
+            </div>
+            <SearchInput
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              onClear={() => setSearch("")}
+              placeholder="Название или аудитория"
+              aria-label="Поиск кампаний"
+              wrapperClassName="w-full lg:w-72"
+            />
+          </div>
+          <div className="mt-4 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Статус кампании">
+            {tabs.map((tab) => (
+              <button
+                key={tab.value}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === tab.value}
+                onClick={() => setActiveTab(tab.value)}
+                className={cn(
+                  "inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-[12px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
+                  activeTab === tab.value
+                    ? "border-primary/30 bg-primary-subtle text-primary"
+                    : "border-border bg-surface text-text-muted hover:border-border-strong",
+                )}
+              >
+                {tab.label}
+                <span className="rounded-full bg-surface px-1.5 py-0.5 text-[10px]">{counts[tab.value]}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
-        {filteredCampaigns.length > 0 ? (
-          <TableContainer className="rounded-none border-0 shadow-none">
-            <Table className="min-w-[1080px]">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Кампания</TableHead>
-                  <TableHead>Аудитория</TableHead>
-                  <TableHead>Каналы</TableHead>
-                  <TableHead>Получатели</TableHead>
-                  <TableHead>Отправлено</TableHead>
-                  <TableHead>Открытия</TableHead>
-                  <TableHead>Переходы</TableHead>
-                  <TableHead>Ответы</TableHead>
-                  <TableHead>Создана</TableHead>
-                  <TableHead>Статус</TableHead>
-                  <TableHead className="w-12">
-                    <span className="sr-only">Действия</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredCampaigns.map((campaign) => (
-                  <TableRow key={campaign.id}>
-                    <TableCell className="min-w-64">
-                      <a
-                        href={`/campaigns/${campaign.id}`}
-                        className="group inline-flex max-w-64 items-center gap-2.5"
-                      >
-                        <span className="grid size-8 shrink-0 place-items-center rounded-[9px] border border-primary/10 bg-primary-subtle text-primary">
-                          <Send aria-hidden="true" className="size-3.5" />
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block truncate text-[12px] font-semibold text-text-strong transition-colors group-hover:text-primary">
-                            {campaign.name}
-                          </span>
-                          <span className="mt-0.5 block max-w-52 truncate text-[10px] text-text-subtle">
-                            {campaign.subject}
-                          </span>
-                        </span>
-                      </a>
-                    </TableCell>
-                    <TableCell>
-                      <span className="inline-flex items-center gap-1.5 text-[11px] text-text">
-                        <UsersRound aria-hidden="true" className="size-3.5 text-text-subtle" />
-                        {campaign.audience}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="flex items-center gap-1">
-                        {(campaign.deliveryChannels ?? ["email"]).map((channel) => {
-                          const meta = deliveryChannelMeta[channel];
-                          const ChannelIcon = meta.icon;
-                          return (
-                            <span
-                              key={channel}
-                              title={meta.label}
-                              aria-label={meta.label}
-                              className={`grid size-7 place-items-center rounded-[8px] ${meta.className}`}
-                            >
-                              <ChannelIcon aria-hidden="true" className="size-3.5" />
-                            </span>
-                          );
-                        })}
-                      </span>
-                    </TableCell>
-                    <TableCell className="tabular-nums">
-                      {formatNumber(campaign.metrics.recipients)}
-                    </TableCell>
-                    <TableCell className="tabular-nums">
-                      {campaign.metrics.sent > 0 ? formatNumber(campaign.metrics.sent) : "—"}
-                    </TableCell>
-                    <TableCell className="tabular-nums">
-                      {campaign.metrics.delivered > 0
-                        ? formatCampaignPercent(campaign.metrics.openRate)
-                        : "—"}
-                    </TableCell>
-                    <TableCell className="tabular-nums">
-                      {campaign.metrics.delivered > 0
-                        ? formatCampaignPercent(campaign.metrics.clickRate)
-                        : "—"}
-                    </TableCell>
-                    <TableCell className="tabular-nums">
-                      {campaign.metrics.replies > 0
-                        ? formatNumber(campaign.metrics.replies)
-                        : "—"}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-[11px] text-text-muted">
-                      {formatDate(campaign.createdAt)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={statusTone[campaign.status]} dot>
-                        {campaignStatusLabels[campaign.status]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <IconButton
-                        label={`Действия с кампанией «${campaign.name}»`}
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setActionCampaign(campaign)}
-                      >
-                        <MoreHorizontal aria-hidden="true" className="size-4" />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+        {filtered.length ? (
+          <div className="divide-y divide-border">
+            {filtered.map((campaign) => {
+              const meta = statusMeta[campaign.status];
+              const StatusIcon = meta.icon;
+              const blockedPlans = deliveryPlans.filter((plan) => plan.campaignId === campaign.id && plan.status === "blocked");
+              const editHref = `/campaigns/new?campaign=${encodeURIComponent(campaign.id)}&step=${campaign.status === "blocked" ? "review" : "audience"}`;
+              return (
+                <article key={campaign.id} className="grid gap-4 p-5 transition-colors hover:bg-surface-subtle/35 lg:grid-cols-[minmax(0,1.3fr)_minmax(170px,.6fr)_minmax(190px,.75fr)_auto] lg:items-center lg:px-6">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant={meta.tone} dot>{meta.label}</Badge>
+                      <span className="text-[11px] text-text-subtle">Создана {formatDate(campaign.createdAt)}</span>
+                    </div>
+                    <Link href={`/campaigns/${campaign.id}`} className="mt-2 block truncate text-[15px] font-semibold text-text-strong hover:text-primary">
+                      {campaign.name}
+                    </Link>
+                    <p className="mt-1 line-clamp-1 text-[12px] text-text-muted">{campaign.subject || campaign.messengerMessage || "Сообщение ещё не подготовлено"}</p>
+                  </div>
+
+                  <div>
+                    <p className="flex items-center gap-2 text-[12px] font-medium text-text-strong"><UsersRound aria-hidden="true" className="size-4 text-text-subtle" />{campaign.audience}</p>
+                    <p className="mt-1 text-[11px] text-text-muted">Получателей: {formatNumber(campaign.metrics.recipients)}</p>
+                    <div className="mt-2 flex gap-1.5">
+                      {campaign.deliveryChannels.map((channel) => {
+                        const item = channelMeta[channel];
+                        const Icon = item.icon;
+                        return <span key={channel} title={item.label} aria-label={item.label} className={`grid size-7 place-items-center rounded-lg ${item.className}`}><Icon aria-hidden="true" className="size-3.5" /></span>;
+                      })}
+                    </div>
+                  </div>
+
+                  <div className={cn("rounded-xl border p-3", campaign.status === "blocked" ? "border-warning/25 bg-warning-subtle" : "border-border bg-surface-subtle/50")}>
+                    <p className="flex items-center gap-2 text-[12px] font-semibold text-text-strong"><StatusIcon aria-hidden="true" className="size-4" />Следующий шаг</p>
+                    <p className="mt-1 text-[11px] leading-4.5 text-text-muted">
+                      {campaign.statusReason || blockedPlans[0]?.statusReason || meta.next}
+                    </p>
+                    {blockedPlans.length > 1 ? <p className="mt-1 text-[10px] font-medium text-warning">Заблокировано каналов: {blockedPlans.length}</p> : null}
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 lg:justify-end">
+                    {(campaign.status === "draft" || campaign.status === "blocked") ? (
+                      <Link href={editHref} className={buttonVariants({ variant: "primary", size: "sm" })}>
+                        {campaign.status === "blocked" ? "Исправить" : "Продолжить"}
+                        <ArrowRight aria-hidden="true" className="size-3.5" />
+                      </Link>
+                    ) : (
+                      <Link href={`/campaigns/${campaign.id}`} className={buttonVariants({ variant: "secondary", size: "sm" })}>
+                        Открыть
+                        <ArrowRight aria-hidden="true" className="size-3.5" />
+                      </Link>
+                    )}
+                    <Link href={`/campaigns/new?duplicate=${encodeURIComponent(campaign.id)}`} aria-label={`Дублировать кампанию «${campaign.name}»`} className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                      <Copy aria-hidden="true" className="size-3.5" />
+                    </Link>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
         ) : (
           <EmptyState
             icon={<Send className="size-5" />}
             title="Кампании не найдены"
-            description={
-              search
-                ? "Измените запрос или сбросьте текущие фильтры."
-                : "В этом рабочем пространстве пока нет кампаний с выбранным статусом."
-            }
-            action={
-              search
-                ? { label: "Очистить поиск", onClick: () => setSearch("") }
-                : { label: "Создать кампанию", onClick: () => window.location.assign("/campaigns/new") }
-            }
+            description={search ? "Измените поисковый запрос." : "В этом статусе пока нет кампаний."}
+            action={search ? { label: "Очистить поиск", onClick: () => setSearch("") } : { label: "Создать кампанию", onClick: () => window.location.assign("/campaigns/new") }}
           />
         )}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-5 py-3 text-[11px] text-text-muted">
-          <span>
-            Показано {filteredCampaigns.length} из {displayItems.length} кампаний
-          </span>
-          <span>Обновлено несколько секунд назад</span>
-        </div>
       </section>
-
-      <Modal
-        open={Boolean(actionCampaign)}
-        onOpenChange={(open) => !open && setActionCampaign(null)}
-        title={actionCampaign?.name ?? "Действия с кампанией"}
-        description="Выберите действие с этой кампанией."
-        size="sm"
-      >
-        {actionCampaign && (
-          <div className="grid gap-2">
-            <a
-              href={`/campaigns/${actionCampaign.id}`}
-              className="group flex items-center justify-between rounded-[10px] border border-border p-3.5 transition-colors hover:border-primary/25 hover:bg-primary-subtle/40"
-            >
-              <span className="flex items-center gap-3">
-                <span className="grid size-8 place-items-center rounded-[9px] bg-primary-subtle text-primary">
-                  <BarChart3 aria-hidden="true" className="size-4" />
-                </span>
-                <span>
-                  <span className="block text-[12px] font-semibold text-text-strong">Открыть кампанию</span>
-                  <span className="mt-0.5 block text-[10px] text-text-muted">Эффективность и подробности доставки</span>
-                </span>
-              </span>
-              <ArrowRight aria-hidden="true" className="size-4 text-text-subtle group-hover:text-primary" />
-            </a>
-            <a
-              href={actionCampaign.id.startsWith("campaign-demo-")
-                ? `/campaigns/new?resume=${encodeURIComponent(actionCampaign.id)}&copy=1`
-                : `/campaigns/new?duplicate=${encodeURIComponent(actionCampaign.id)}`}
-              className="group flex items-center justify-between rounded-[10px] border border-border p-3.5 transition-colors hover:border-primary/25 hover:bg-primary-subtle/40"
-            >
-              <span className="flex items-center gap-3">
-                <span className="grid size-8 place-items-center rounded-[9px] bg-surface-subtle text-text-muted">
-                  <Copy aria-hidden="true" className="size-4" />
-                </span>
-                <span>
-                  <span className="block text-[12px] font-semibold text-text-strong">Дублировать кампанию</span>
-                  <span className="mt-0.5 block text-[10px] text-text-muted">Повторно использовать аудиторию и контент</span>
-                </span>
-              </span>
-              <ArrowRight aria-hidden="true" className="size-4 text-text-subtle group-hover:text-primary" />
-            </a>
-            <Button
-              variant="ghost"
-              className="mt-1 justify-start"
-              leadingIcon={
-                actionCampaign.status === "sending" ? (
-                  <Pause className="size-4" />
-                ) : (
-                  <Play className="size-4" />
-                )
-              }
-              onClick={() => {
-                notify(
-                  actionCampaign.status === "sending"
-                    ? "Отправка приостановлена в деморежиме"
-                    : "Кампания поставлена в очередь в деморежиме",
-                );
-                setActionCampaign(null);
-              }}
-            >
-              {actionCampaign.status === "sending" ? "Приостановить отправку" : "Выполнить демо-действие"}
-            </Button>
-          </div>
-        )}
-      </Modal>
-
-      {notice && (
-        <div className="fixed right-4 bottom-4 z-[170] w-[min(360px,calc(100vw-32px))]">
-          <ToastSurface
-            tone="success"
-            title={notice}
-            description="Внешние письма не отправлялись."
-            onDismiss={() => setNotice(null)}
-          />
-        </div>
-      )}
     </div>
+  );
+}
+
+function SummaryCard({
+  icon: Icon,
+  label,
+  value,
+  text,
+  tone = "primary",
+}: {
+  icon: typeof Send;
+  label: string;
+  value: string;
+  text: string;
+  tone?: "primary" | "warning" | "success";
+}) {
+  const classes = {
+    primary: "bg-primary-subtle text-primary",
+    warning: "bg-warning-subtle text-warning",
+    success: "bg-success-subtle text-success",
+  }[tone];
+  return (
+    <article className="card flex items-start gap-3 p-4 sm:p-5">
+      <span className={`grid size-10 shrink-0 place-items-center rounded-xl ${classes}`}><Icon aria-hidden="true" className="size-4" /></span>
+      <div>
+        <p className="text-[12px] font-medium text-text-muted">{label}</p>
+        <p className="mt-0.5 text-[22px] font-semibold tracking-[-0.04em] text-text-strong">{value}</p>
+        <p className="mt-1 text-[11px] leading-4.5 text-text-subtle">{text}</p>
+      </div>
+    </article>
   );
 }

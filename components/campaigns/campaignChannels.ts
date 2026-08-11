@@ -13,24 +13,12 @@ export interface CampaignChannelDefinition {
   description: string;
   identityLabel: string;
   consentHint: string;
-  demoCoverageRate: number;
 }
 
 export interface CampaignChannelProvider {
   id: IntegrationProviderId;
   label: string;
   description: string;
-}
-
-export interface CampaignDeliveryPlan {
-  demo: true;
-  channels: Array<{
-    channel: CampaignChannel;
-    provider: IntegrationProviderId;
-    estimatedCoverage: number;
-  }>;
-  messengerMessage: string;
-  consentConfirmed: boolean;
 }
 
 export const campaignChannelDefinitions: CampaignChannelDefinition[] = [
@@ -42,7 +30,6 @@ export const campaignChannelDefinitions: CampaignChannelDefinition[] = [
     identityLabel: "Корректный email",
     consentHint:
       "Отправляйте только контактам с основанием для рассылки; система исключит отписавшихся и недоставляемые адреса.",
-    demoCoverageRate: 0.96,
   },
   {
     id: "telegram",
@@ -52,7 +39,6 @@ export const campaignChannelDefinitions: CampaignChannelDefinition[] = [
     identityLabel: "chat_id и диалог с ботом",
     consentHint:
       "Для Telegram нужен chat_id: получатель должен сам запустить бота и разрешить коммуникацию.",
-    demoCoverageRate: 0.54,
   },
   {
     id: "vk",
@@ -62,7 +48,6 @@ export const campaignChannelDefinitions: CampaignChannelDefinition[] = [
     identityLabel: "VK ID и разрешение сообществу",
     consentHint:
       "Сообщество может писать только получателям, которые разрешили сообщения; нужны VK ID и доступ сообщества.",
-    demoCoverageRate: 0.47,
   },
 ];
 
@@ -70,17 +55,17 @@ const campaignProviderDescriptions: Partial<
   Record<IntegrationProviderId, string>
 > = {
   "vk-workspace":
-    "SMTP после серверного подключения; для нативных «Рассылок» — экспорт получателей.",
+    "Только CSV для ручного импорта и запуска в VK WorkSpace; автоматической отправки нет.",
   "telegram-bot-api": "Прямая отправка от бота по сохранённому chat_id.",
   "vk-api": "Сообщения от имени сообщества пользователям с разрешением.",
-  unisender: "Email-рассылки через API и проверенный домен.",
-  sendpulse: "Email или Telegram через подключённый канал SendPulse.",
+  unisender: "Массовая email-кампания через importContacts, createEmailMessage и createCampaign.",
+  sendpulse: "Проверка ключей доступна, адаптер отправки находится в плане развития.",
 };
 
 function campaignProvidersFor(channel: CampaignChannel): CampaignChannelProvider[] {
   return getProvidersForChannel(channel).map((provider) => ({
     id: provider.id,
-    label: provider.name,
+    label: `${provider.name}${provider.deliveryMode === "manual_export" ? " · вручную" : provider.deliveryMode === "roadmap" ? " · в плане" : ""}`,
     description: campaignProviderDescriptions[provider.id] ?? provider.summary,
   }));
 }
@@ -98,7 +83,7 @@ export const defaultCampaignChannelProvider: Record<
   CampaignChannel,
   IntegrationProviderId
 > = {
-  email: "vk-workspace",
+  email: "unisender",
   telegram: "telegram-bot-api",
   vk: "vk-api",
 };
@@ -112,15 +97,4 @@ export function getCampaignChannelProvider(
   providerId: string,
 ) {
   return campaignChannelProviders[channel].find((item) => item.id === providerId);
-}
-
-export function estimateCampaignChannelCoverage(
-  channel: CampaignChannel,
-  recipientCount: number,
-) {
-  const definition = getCampaignChannelDefinition(channel);
-  return Math.min(
-    recipientCount,
-    Math.max(0, Math.round(recipientCount * definition.demoCoverageRate)),
-  );
 }

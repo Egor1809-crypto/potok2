@@ -8,7 +8,6 @@ import {
   Monitor,
   Redo2,
   Save,
-  Send,
   Smartphone,
   Undo2,
 } from "lucide-react";
@@ -26,10 +25,8 @@ type BuilderTopbarProps = {
   canUndo: boolean;
   canRedo: boolean;
   dirty: boolean;
-  sendingTest: boolean;
   onUndo: () => void;
   onRedo: () => void;
-  onSendTest: () => void;
   onSave: () => void;
   onContinue: () => void;
   continueHref: string;
@@ -43,10 +40,8 @@ export function BuilderTopbar({
   canUndo,
   canRedo,
   dirty,
-  sendingTest,
   onUndo,
   onRedo,
-  onSendTest,
   onSave,
   onContinue,
   continueHref,
@@ -116,17 +111,6 @@ export function BuilderTopbar({
           </button>
         </div>
 
-        <Button
-          variant="outline"
-          size="sm"
-          loading={sendingTest}
-          leadingIcon={<Send aria-hidden="true" className="size-3.5" />}
-          aria-label="Отправить тестовое письмо"
-          onClick={onSendTest}
-          className="px-2 sm:px-3"
-        >
-          <span className="hidden lg:inline">Тестовое письмо</span>
-        </Button>
         <Button
           variant="secondary"
           size="sm"

@@ -1,6 +1,6 @@
 export type DeliveryChannelId = "email" | "telegram" | "vk";
 
-export const INTEGRATION_DEMO_ROUTES_STORAGE_KEY = "mailflow:demo-routes";
+export const PREFERRED_PROVIDERS_STORAGE_KEY = "mailflow:preferred-providers";
 
 export type IntegrationProviderId =
   | "vk-workspace"
@@ -31,6 +31,7 @@ export type IntegrationProviderDefinition = {
   setupSteps: string[];
   limitations: string[];
   route: string;
+  deliveryMode: "automatic" | "manual_export" | "roadmap";
 };
 
 export const deliveryChannels: DeliveryChannelDefinition[] = [
@@ -67,30 +68,30 @@ export const integrationProviders: IntegrationProviderDefinition[] = [
   {
     id: "vk-workspace",
     name: "VK WorkSpace",
-    category: "Корпоративная почта и «Рассылки»",
+    category: "Ручной импорт в «Рассылки»",
     summary:
-      "Автоматическая отправка из корпоративного ящика по SMTP или экспорт получателей в нативный модуль «Рассылки» VK WorkSpace.",
+      "MAILFLOW готовит CSV получателей для ручного импорта в модуль «Рассылки» VK WorkSpace.",
     channelIds: ["email"],
     accent: "#1777ff",
     initials: "VK",
-    recommendedFor: "Деловых писем и управляемых рассылок с корпоративного домена",
+    recommendedFor: "Команд, которые запускают email-рассылку вручную в VK WorkSpace",
     credentials: [
-      "Адрес и имя корпоративного отправителя",
-      "SMTP smtp.mail.ru:465 с SSL/TLS и паролем приложения",
-      "Проверенный домен и общий ящик для нативных «Рассылок»",
+      "Активные контакты с email и согласием",
+      "Доступ участника к модулю «Рассылки» VK WorkSpace",
+      "Проверенный отправитель в кабинете VK WorkSpace",
     ],
     setupSteps: [
-      "Подготовить отдельный ящик для рассылок в VK WorkSpace.",
-      "Для автоматической отправки передать SMTP-доступ в защищённую серверную конфигурацию.",
-      "Для нативных «Рассылок» выгрузить список получателей и завершить запуск в интерфейсе VK WorkSpace.",
-      "Проверить подпись отправителя, прогрев домена, тестовую доставку и лимиты.",
+      "Проверить согласия и email выбранной аудитории в MAILFLOW.",
+      "Скачать CSV из готовой кампании.",
+      "Импортировать файл и завершить настройку письма в VK WorkSpace.",
+      "Запустить рассылку и сверять результаты в кабинете VK WorkSpace.",
     ],
     limitations: [
-      "У нативных «Рассылок» VK WorkSpace нет задокументированного публичного API: MAILFLOW готовит экспорт, а запуск выполняется в VK WorkSpace.",
-      "SMTP — это обычная отправка из ящика; скорость и объём ограничены правилами домена и почтового сервиса.",
-      "Новый домен начинает с прогрева, а доступная скорость увеличивается постепенно.",
+      "У модуля «Рассылки» VK WorkSpace нет используемого здесь публичного API: MAILFLOW не выдаёт ручной экспорт за автоматическую отправку.",
+      "Контент, отправитель, запуск и статистика остаются в интерфейсе VK WorkSpace.",
     ],
-    route: "MAILFLOW → SMTP или TXT/CSV-экспорт → VK WorkSpace",
+    route: "MAILFLOW → CSV → ручной импорт в VK WorkSpace",
+    deliveryMode: "manual_export",
   },
   {
     id: "telegram-bot-api",
@@ -105,18 +106,18 @@ export const integrationProviders: IntegrationProviderDefinition[] = [
     credentials: [
       "Токен Telegram-бота",
       "Идентификаторы чатов получателей",
-      "Адрес webhook и секрет проверки, если принимаются ответы",
     ],
     setupSteps: [
       "Создать или выбрать бота и описать правила подписки.",
       "Собрать chat ID только после первого сообщения от пользователя.",
-      "Проверить тестовую отправку и обработку ответов на сервере.",
+      "Проверить доступ бота read-only запросом перед запуском.",
     ],
     limitations: [
       "Бот не может первым написать пользователю, который не начал диалог.",
       "Общий лимит Telegram Bot API по умолчанию — около 30 сообщений в секунду.",
     ],
     route: "MAILFLOW → серверный адаптер → Telegram Bot API",
+    deliveryMode: "automatic",
   },
   {
     id: "vk-api",
@@ -131,18 +132,18 @@ export const integrationProviders: IntegrationProviderDefinition[] = [
     credentials: [
       "Идентификатор сообщества",
       "Серверный ключ доступа сообщества",
-      "Настройки Callback API для ответов и статусов",
     ],
     setupSteps: [
       "Включить сообщения сообщества и получить серверный ключ доступа.",
       "Сохранять идентификаторы только тех пользователей, кто разрешил сообщения.",
-      "Проверить тестовый диалог и события Callback API.",
+      "Проверить сообщество read-only запросом перед запуском.",
     ],
     limitations: [
       "Получатель должен разрешить сообщения от сообщества.",
       "Массовая отправка должна соблюдать правила платформы и её лимиты.",
     ],
     route: "MAILFLOW → серверный адаптер → VK API",
+    deliveryMode: "automatic",
   },
   {
     id: "unisender",
@@ -169,17 +170,18 @@ export const integrationProviders: IntegrationProviderDefinition[] = [
       "Тариф и модерация сервиса определяют доступный объём.",
     ],
     route: "MAILFLOW → серверный адаптер → UniSender",
+    deliveryMode: "automatic",
   },
   {
     id: "sendpulse",
     name: "SendPulse",
     category: "Мультиканальный сервис",
     summary:
-      "Единая внешняя платформа для email и сценариев Telegram с раздельной настройкой каждого канала.",
+      "Серверные ключи можно проверить, но автоматическая отправка из MAILFLOW пока не реализована.",
     channelIds: ["email", "telegram"],
     accent: "#16a66a",
     initials: "SP",
-    recommendedFor: "Команд, которым нужен один кабинет для нескольких каналов",
+    recommendedFor: "Будущего расширения маршрутов после реализации адаптера",
     credentials: [
       "Идентификатор и секрет API рабочей учётной записи",
       "Проверенный email-отправитель или подключённый Telegram-бот",
@@ -191,10 +193,12 @@ export const integrationProviders: IntegrationProviderDefinition[] = [
       "Отдельно проверить тестовый маршрут, статусы и отписки каждого канала.",
     ],
     limitations: [
+      "Маршрут находится в плане развития: готовая кампания не может быть отправлена через SendPulse из MAILFLOW.",
       "Возможности, тарифы и лимиты отличаются для email и Telegram.",
       "Получатели должны дать согласие в соответствующем канале.",
     ],
-    route: "MAILFLOW → серверный адаптер → SendPulse",
+    route: "MAILFLOW → проверка ключей; отправка ещё не реализована",
+    deliveryMode: "roadmap",
   },
 ];
 

@@ -36,7 +36,7 @@ export async function generateMetadata(): Promise<Metadata> {
       siteName: brandConfig.name,
       title,
       description,
-      images: [{ url: socialImage, width: 1731, height: 909, alt: `${brandConfig.name} — ${brandConfig.tagline}` }],
+      images: [{ url: socialImage, width: 1734, height: 907, alt: `${brandConfig.name} — ${brandConfig.tagline}` }],
     },
     twitter: { card: "summary_large_image", title, description, images: [socialImage] },
   };

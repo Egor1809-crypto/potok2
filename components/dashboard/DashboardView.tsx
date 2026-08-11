@@ -1,75 +1,224 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, ArrowUpRight, MailPlus, MoreHorizontal, Sparkles, UsersRound } from "lucide-react";
-import { campaigns } from "@/data/mockCampaigns";
-import type { CampaignStatus } from "@/types";
-import { PerformanceChart } from "./PerformanceChart";
+import {
+  ArrowRight,
+  Cable,
+  Check,
+  CircleAlert,
+  Clock3,
+  ContactRound,
+  FileText,
+  LoaderCircle,
+  Megaphone,
+  Plus,
+  RefreshCw,
+  Send,
+  UsersRound,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-const metrics = [
-  { label: "Контакты", value: "24 821", change: "+8,2%", note: "Добавлено 1 894", color: "#625cf6", progress: "72%" },
-  { label: "Отправлено кампаний", value: "128", change: "+12%", note: "14 в этом месяце", color: "#33a3d6", progress: "56%" },
-  { label: "Доставляемость", value: "98,2%", change: "+1,4%", note: "Выше среднего", color: "#45a36c", progress: "98%" },
-  { label: "Доля ответов", value: "6,4%", change: "+0,8%", note: "328 диалогов", color: "#e09742", progress: "64%" },
-];
+import type { CampaignRecord, CampaignStatus, WorkspaceSnapshot } from "@/types/api";
 
-const statusTone: Record<CampaignStatus, string> = {
-  draft: "neutral",
-  scheduled: "warning",
-  sending: "info",
-  completed: "success",
-};
-
-const recentCampaigns = [...campaigns]
-  .sort((first, second) => Date.parse(second.createdAt) - Date.parse(first.createdAt))
-  .slice(0, 4);
+const number = new Intl.NumberFormat("ru-RU");
+const date = new Intl.DateTimeFormat("ru-RU", {
+  day: "numeric",
+  month: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+  timeZone: "Europe/Moscow",
+});
 
 const statusLabel: Record<CampaignStatus, string> = {
   draft: "Черновик",
+  ready: "Готова к запуску",
+  blocked: "Нужна настройка",
   scheduled: "Запланирована",
   sending: "Отправляется",
   completed: "Завершена",
+  cancelled: "Отменена",
 };
 
-function formatNumber(value: number) {
-  return new Intl.NumberFormat("ru-RU").format(value);
+const statusTone: Record<CampaignStatus, string> = {
+  draft: "badge-neutral",
+  ready: "badge-success",
+  blocked: "badge-warning",
+  scheduled: "badge-info",
+  sending: "badge-info",
+  completed: "badge-success",
+  cancelled: "badge-neutral",
+};
+
+function unwrap(payload: unknown): WorkspaceSnapshot {
+  if (!payload || typeof payload !== "object") throw new Error("Сервер вернул пустой ответ");
+  const envelope = payload as { data?: unknown };
+  return (envelope.data && typeof envelope.data === "object" ? envelope.data : payload) as WorkspaceSnapshot;
 }
 
-function formatCampaignDate(value: string) {
-  return new Intl.DateTimeFormat("ru-RU", {
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(value));
+function errorMessage(payload: unknown) {
+  if (payload && typeof payload === "object" && "error" in payload && typeof (payload as { error?: unknown }).error === "string") {
+    return (payload as { error: string }).error;
+  }
+  return "Не удалось загрузить рабочее состояние";
 }
 
 export function DashboardView() {
+  const [snapshot, setSnapshot] = useState<WorkspaceSnapshot | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch("/api/workspace", { cache: "no-store" });
+      const payload: unknown = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(errorMessage(payload));
+      setSnapshot(unwrap(payload));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Не удалось загрузить данные");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => void load());
+    return () => window.cancelAnimationFrame(frame);
+  }, [load]);
+
+  const recentCampaigns = useMemo(
+    () => [...(snapshot?.campaigns ?? [])].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)).slice(0, 5),
+    [snapshot],
+  );
+
+  if (loading && !snapshot) {
+    return <LoadingState />;
+  }
+
+  if (!snapshot) {
+    return (
+      <div className="mx-auto max-w-xl rounded-2xl border border-[var(--danger)]/20 bg-[var(--surface)] p-8 text-center shadow-sm">
+        <CircleAlert aria-hidden="true" className="mx-auto size-8 text-[var(--danger)]" />
+        <h1 className="mt-4 text-xl font-semibold">Не удалось открыть рабочее пространство</h1>
+        <p className="mt-2 text-sm text-[var(--text-muted)]">{error}</p>
+        <button type="button" onClick={() => void load()} className="btn btn-primary mt-5 gap-2"><RefreshCw aria-hidden="true" className="size-4" />Повторить</button>
+      </div>
+    );
+  }
+
+  const nextAction = getNextAction(snapshot);
+  const participantName = snapshot.participant.displayName || "Участник";
+  const firstName = participantName.split(" ")[0];
+  const metrics = [
+    { label: "Контакты", value: number.format(snapshot.stats.totalContacts), note: `${number.format(snapshot.stats.activeContacts)} доступны для работы`, Icon: ContactRound, href: "/contacts" },
+    { label: "Сегменты", value: number.format(snapshot.stats.totalSegments), note: "Аудитории обновляются по правилам", Icon: UsersRound, href: "/segments" },
+    { label: "Кампании", value: number.format(snapshot.stats.totalCampaigns), note: `${number.format(snapshot.stats.activeCampaigns)} требуют внимания`, Icon: Megaphone, href: "/campaigns" },
+    { label: "Подключённые каналы", value: number.format(snapshot.stats.connectedIntegrations), note: "Email, Telegram или ВКонтакте", Icon: Cable, href: "/integrations" },
+  ];
+
   return (
     <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-2xl border border-[#dddff8] bg-[linear-gradient(118deg,#f4f3ff_0%,#fbfbff_60%,#eef8ff_100%)] p-5 sm:p-7">
-        <div className="absolute -right-8 -top-20 size-64 rounded-full bg-[#716afa]/10 blur-3xl" />
-        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-          <div><p className="section-eyebrow">Вторник, 11 августа</p><h1 className="mt-2 text-[27px] font-medium tracking-[-.04em] text-[#20212c] sm:text-[32px]">Доброе утро, Егор</h1><p className="mt-2 text-sm text-[#727481]">Главное о ваших рассылках на сегодня.</p></div>
-          <Link href="/campaigns/new" className="btn btn-primary w-fit gap-2"><MailPlus size={15} />Создать кампанию</Link>
+      <section className="grid gap-5 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm md:grid-cols-[minmax(0,1fr)_auto] md:items-center sm:p-7">
+        <div>
+          <p className="section-eyebrow">{snapshot.workspace.name}</p>
+          <h1 className="text-[28px] font-semibold tracking-[-.04em] sm:text-[32px]">{firstName ? `${firstName}, вот что важно сейчас` : "Что важно сейчас"}</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-muted)]">MAILFLOW ведёт по одному рабочему маршруту: база → аудитория → сообщение → каналы → проверка → запуск.</p>
+        </div>
+        <Link href="/campaigns/new" className="btn btn-primary w-fit gap-2"><Plus aria-hidden="true" className="size-4" />Новая кампания</Link>
+      </section>
+
+      <section className={`rounded-2xl border p-5 sm:p-6 ${nextAction.tone}`} aria-labelledby="next-action-title">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-white/75 text-[var(--primary)] shadow-sm"><nextAction.Icon aria-hidden="true" className="size-5" /></span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold uppercase tracking-[.1em] text-[var(--text-muted)]">Следующий шаг</p>
+            <h2 id="next-action-title" className="mt-1 text-[17px] font-semibold">{nextAction.title}</h2>
+            <p className="mt-1 text-[12px] leading-5 text-[var(--text-muted)]">{nextAction.description}</p>
+          </div>
+          <Link href={nextAction.href} className="btn btn-primary shrink-0 gap-2">{nextAction.action}<ArrowRight aria-hidden="true" className="size-4" /></Link>
         </div>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {metrics.map(metric => <article key={metric.label} className="card group p-5 transition-transform hover:-translate-y-0.5"><div className="flex items-start justify-between"><p className="text-xs font-medium text-[var(--text-secondary)]">{metric.label}</p><span className="grid size-7 place-items-center rounded-lg" style={{ backgroundColor: `${metric.color}12`, color: metric.color }}><ArrowUpRight size={14} /></span></div><div className="mt-5 flex items-end gap-2"><p className="text-[28px] font-semibold tracking-[-.045em] text-[var(--text-primary)]">{metric.value}</p><span className="mb-1 rounded-md bg-[#edf8f1] px-1.5 py-1 text-[9px] font-semibold text-[#3e8d5c]">{metric.change}</span></div><p className="mt-1 text-[10px] text-[var(--text-tertiary)]">{metric.note}</p><div className="mt-4 h-1 overflow-hidden rounded-full bg-[var(--surface-subtle)]"><div className="h-full rounded-full" style={{ width: metric.progress, backgroundColor: metric.color }} /></div></article>)}
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Состояние рабочего пространства">
+        {metrics.map(({ label, value, note, Icon, href }) => (
+          <Link key={label} href={href} className="card group p-4 transition hover:border-[var(--primary)]/30 hover:shadow-sm sm:p-5">
+            <div className="flex items-start justify-between gap-3"><p className="text-[12px] font-semibold text-[var(--text-muted)]">{label}</p><Icon aria-hidden="true" className="size-4 text-[var(--primary)]" /></div>
+            <p className="mt-4 text-[26px] font-semibold tracking-[-.04em]">{value}</p>
+            <p className="mt-1 text-[11px] leading-4 text-[var(--text-subtle)]">{note}</p>
+          </Link>
+        ))}
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_310px]">
-        <PerformanceChart />
-        <div className="space-y-4">
-          <article className="card p-5"><div className="flex items-center justify-between"><div><h2 className="text-[14px] font-semibold">Рост аудитории</h2><p className="mt-1 text-[10px] text-[var(--text-tertiary)]">Новые контакты в этом месяце</p></div><UsersRound size={17} className="text-[#625cf6]" /></div><p className="mt-5 text-[30px] font-semibold tracking-[-.045em]">+1 894</p><p className="mt-1 text-[10px] font-medium text-[#3e8d5c]">На 8,2% больше, чем в прошлом месяце</p><div className="mt-5 flex h-20 items-end gap-1">{[24,31,29,42,37,52,48,61,55,74,68,82,78,91,86].map((height,index)=><span key={index} className="flex-1 rounded-t-sm bg-[#716afa]/80" style={{height:`${height}%`,opacity:.45+index/30}} />)}</div></article>
-          <article className="overflow-hidden rounded-xl bg-[#242530] p-5 text-white shadow-[0_14px_35px_rgba(31,32,47,.18)]"><span className="grid size-9 place-items-center rounded-lg bg-white/10 text-[#aaa6ff]"><Sparkles size={17} /></span><h2 className="mt-5 text-[16px] font-semibold tracking-[-.02em]">Ваша лучшая аудитория растёт.</h2><p className="mt-2 text-[11px] leading-5 text-white/55">В сегменте «Юристы Москвы» появились 84 новых активных контакта за неделю.</p><Link href="/segments" className="mt-5 flex items-center gap-1.5 text-[10px] font-semibold text-[#b9b6ff]">Открыть сегмент <ArrowRight size={12} /></Link></article>
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(300px,.75fr)]">
+        <div className="card overflow-hidden">
+          <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4 sm:px-6">
+            <div><h2 className="text-[15px] font-semibold">Кампании</h2><p className="mt-1 text-[11px] text-[var(--text-subtle)]">Черновики, блокировки и запуски из базы</p></div>
+            <Link href="/campaigns" className="text-[12px] font-semibold text-[var(--primary)]">Все кампании</Link>
+          </div>
+          {recentCampaigns.length ? (
+            <div className="divide-y divide-[var(--border)]">
+              {recentCampaigns.map((campaign) => <CampaignRow key={campaign.id} campaign={campaign} />)}
+            </div>
+          ) : (
+            <EmptyCampaigns />
+          )}
         </div>
-      </section>
 
-      <section className="card overflow-hidden">
-        <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4 sm:px-6"><div><h2 className="text-[14px] font-semibold">Недавние кампании</h2><p className="mt-1 text-[10px] text-[var(--text-tertiary)]">Последние кампании и черновики</p></div><Link href="/campaigns" className="btn btn-ghost gap-1.5 text-[11px]">Показать все <ArrowRight size={13} /></Link></div>
-        <div className="overflow-x-auto"><table className="w-full min-w-[820px] text-left"><thead><tr className="border-b border-[var(--border)] bg-[var(--surface-subtle)] text-[9px] font-semibold uppercase tracking-[.08em] text-[var(--text-tertiary)]"><th className="px-6 py-3">Кампания</th><th className="px-4 py-3">Аудитория</th><th className="px-4 py-3">Отправлено</th><th className="px-4 py-3">Открытия</th><th className="px-4 py-3">Переходы</th><th className="px-4 py-3">Ответы</th><th className="px-4 py-3">Статус</th><th className="w-10 px-4 py-3" /></tr></thead><tbody>{recentCampaigns.map(row => <tr key={row.id} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--surface-subtle)]"><td className="px-6 py-4"><Link href={`/campaigns/${row.id}`} className="text-[11px] font-semibold text-[var(--text-primary)] hover:text-[#625cf6]">{row.name}</Link><p className="mt-0.5 text-[9px] text-[var(--text-tertiary)]">Обновлено {formatCampaignDate(row.sentAt ?? row.scheduledAt ?? row.createdAt)}</p></td><td className="px-4 py-4 text-[10px] text-[var(--text-secondary)]">{row.audience}</td><td className="px-4 py-4 text-[10px] font-medium">{row.metrics.sent > 0 ? formatNumber(row.metrics.sent) : "—"}</td><td className="px-4 py-4 text-[10px]">{row.metrics.sent > 0 ? `${new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(row.metrics.openRate)}%` : "—"}</td><td className="px-4 py-4 text-[10px]">{row.metrics.sent > 0 ? `${new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(row.metrics.clickRate)}%` : "—"}</td><td className="px-4 py-4 text-[10px]">{row.metrics.sent > 0 ? formatNumber(row.metrics.replies) : "—"}</td><td className="px-4 py-4"><span className={`badge badge-${statusTone[row.status]}`}>{statusLabel[row.status]}</span></td><td className="px-4 py-4"><button aria-label={`Другие действия для кампании «${row.name}»`} className="text-[var(--text-tertiary)]"><MoreHorizontal size={16} /></button></td></tr>)}</tbody></table></div>
+        <div className="card p-5 sm:p-6">
+          <div className="flex items-center justify-between gap-3"><div><h2 className="text-[15px] font-semibold">Готовность к рассылке</h2><p className="mt-1 text-[11px] text-[var(--text-subtle)]">Проверяется перед каждым запуском</p></div><Check aria-hidden="true" className="size-5 text-[var(--success)]" /></div>
+          <ol className="mt-5 space-y-1">
+            <ReadinessStep ready={snapshot.stats.totalContacts > 0} label="Есть контакты" action="Добавить" href="/contacts" />
+            <ReadinessStep ready={snapshot.stats.totalSegments > 0} label="Есть сохранённая аудитория" action="Создать" href="/segments" />
+            <ReadinessStep ready={snapshot.stats.connectedIntegrations > 0} label="Подключён хотя бы один канал" action="Подключить" href="/integrations" />
+            <ReadinessStep ready={recentCampaigns.some((campaign) => campaign.status === "ready" || campaign.status === "scheduled")} label="Есть проверенная кампания" action="Проверить" href="/campaigns" />
+          </ol>
+          <p className="mt-5 rounded-xl bg-[var(--surface-subtle)] p-3 text-[11px] leading-5 text-[var(--text-muted)]">Запуск не изображается как успешная отправка: без настроенного провайдера кампания получает статус «Нужна настройка» и показывает причину.</p>
+        </div>
       </section>
     </div>
+  );
+}
+
+function getNextAction(snapshot: WorkspaceSnapshot) {
+  if (snapshot.stats.totalContacts === 0) return { title: "Добавьте первые контакты", description: "Импортируйте CSV или создайте контакт вручную. Без аудитории запуск невозможен.", action: "Добавить контакты", href: "/contacts", Icon: ContactRound, tone: "border-[#d9e7f5] bg-[#f3f8fd]" };
+  if (snapshot.stats.connectedIntegrations === 0) return { title: "Подключите канал доставки", description: "Выберите email, Telegram или ВКонтакте и завершите настройку провайдера.", action: "Настроить канал", href: "/integrations", Icon: Cable, tone: "border-[#eadfbd] bg-[#fff9eb]" };
+  const blocked = snapshot.campaigns.find((campaign) => campaign.status === "blocked");
+  if (blocked) return { title: `Исправьте кампанию «${blocked.name}»`, description: blocked.statusReason || "Кампания не прошла проверку готовности.", action: "Открыть кампанию", href: `/campaigns/${blocked.id}`, Icon: CircleAlert, tone: "border-[#f0d8dc] bg-[#fff5f6]" };
+  const draft = snapshot.campaigns.find((campaign) => campaign.status === "draft");
+  if (draft) return { title: `Продолжите «${draft.name}»`, description: "Аудитория и черновик уже сохранены. Завершите каналы и проверку.", action: "Продолжить", href: `/campaigns/${draft.id}`, Icon: FileText, tone: "border-[#dedcff] bg-[#f6f5ff]" };
+  return { title: "Создайте следующую кампанию", description: "Контакты и канал готовы. Выберите аудиторию, сообщение и проверьте маршрут доставки.", action: "Создать кампанию", href: "/campaigns/new", Icon: Send, tone: "border-[#d9eadf] bg-[#f2faf5]" };
+}
+
+function CampaignRow({ campaign }: { campaign: CampaignRecord }) {
+  return (
+    <Link href={`/campaigns/${campaign.id}`} className="flex items-center gap-3 px-5 py-4 transition hover:bg-[var(--surface-subtle)] sm:px-6">
+      <span className={`grid size-9 shrink-0 place-items-center rounded-xl ${campaign.status === "blocked" ? "bg-[var(--warning-subtle)] text-[var(--warning)]" : "bg-[var(--primary-subtle)] text-[var(--primary)]"}`}><Megaphone aria-hidden="true" className="size-4" /></span>
+      <span className="min-w-0 flex-1"><span className="block truncate text-[12px] font-semibold">{campaign.name}</span><span className="mt-1 block truncate text-[10px] text-[var(--text-subtle)]">{campaign.audienceLabel} · {date.format(new Date(campaign.updatedAt))}</span></span>
+      <span className={`badge ${statusTone[campaign.status]}`}>{statusLabel[campaign.status]}</span>
+      <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-[var(--text-subtle)]" />
+    </Link>
+  );
+}
+
+function ReadinessStep({ ready, label, action, href }: { ready: boolean; label: string; action: string; href: string }) {
+  return (
+    <li className="flex items-center gap-3 rounded-lg py-2.5">
+      <span className={`grid size-6 shrink-0 place-items-center rounded-full ${ready ? "bg-[var(--success-subtle)] text-[var(--success)]" : "bg-[var(--warning-subtle)] text-[var(--warning)]"}`}>{ready ? <Check aria-hidden="true" className="size-3.5" /> : <Clock3 aria-hidden="true" className="size-3.5" />}</span>
+      <span className="flex-1 text-[12px] font-medium">{label}</span>
+      {!ready && <Link href={href} className="text-[11px] font-semibold text-[var(--primary)]">{action}</Link>}
+    </li>
+  );
+}
+
+function EmptyCampaigns() {
+  return (
+    <div className="px-6 py-10 text-center"><Megaphone aria-hidden="true" className="mx-auto size-7 text-[var(--text-subtle)]" /><p className="mt-3 text-[13px] font-semibold">Кампаний пока нет</p><p className="mt-1 text-[11px] text-[var(--text-muted)]">Начните с аудитории, затем выберите сообщение и каналы.</p><Link href="/campaigns/new" className="btn btn-primary mt-4">Создать кампанию</Link></div>
+  );
+}
+
+function LoadingState() {
+  return (
+    <div className="grid min-h-[420px] place-items-center"><div className="text-center"><LoaderCircle aria-hidden="true" className="mx-auto size-7 animate-spin text-[var(--primary)]" /><p className="mt-3 text-sm text-[var(--text-muted)]">Загружаем рабочее состояние…</p></div></div>
   );
 }

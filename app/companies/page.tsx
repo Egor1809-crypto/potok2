@@ -1,6 +1,6 @@
-import type { Metadata } from "next";
-import { AppShell } from "@/components/layout/AppShell";
-import { CompaniesView } from "@/components/companies/CompaniesView";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Компании" };
-export default function CompaniesPage() { return <AppShell title="Компании"><CompaniesView /></AppShell>; }
+/** Компания теперь атрибут контакта, а не отдельная fake-CRM без API. */
+export default function CompaniesPage() {
+  redirect("/contacts");
+}

@@ -1,38 +1,62 @@
 "use client";
 
+import * as React from "react";
+import Link from "next/link";
 import {
   ArrowRight,
-  Bot,
-  Braces,
-  Check,
   CheckCircle2,
+  CircleAlert,
   CircleDashed,
   Download,
-  KeyRound,
-  LockKeyhole,
   Mail,
   MessageCircleMore,
   MessagesSquare,
-  Route,
-  ServerCog,
+  RefreshCw,
+  Settings2,
   ShieldCheck,
-  Sparkles,
+  Unplug,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
 
 import { PageHeader } from "@/components/shared/PageHeader";
-import { Alert, Badge, Button, Modal } from "@/components/ui";
-import { contacts } from "@/data/mockContacts";
 import {
-  deliveryChannelById,
+  Alert,
+  Badge,
+  Button,
+  FormField,
+  Input,
+  Modal,
+  Select,
+  buttonVariants,
+} from "@/components/ui";
+import {
   deliveryChannels,
   getProvidersForChannel,
   integrationProviderById,
-  INTEGRATION_DEMO_ROUTES_STORAGE_KEY,
+  PREFERRED_PROVIDERS_STORAGE_KEY,
   type DeliveryChannelId,
   type IntegrationProviderDefinition,
   type IntegrationProviderId,
 } from "@/config/integrations";
+import type {
+  ApiError,
+  ContactsListResponse,
+  IntegrationConnectionStatus,
+  IntegrationMutationResponse,
+  IntegrationRecord,
+  WorkspaceSnapshot,
+} from "@/types/api";
+
+type ConnectionStatus = IntegrationConnectionStatus;
+
+type ApiMode = "loading" | "online" | "offline";
+
+type SetupField = {
+  key: string;
+  label: string;
+  placeholder: string;
+  type?: "email" | "url" | "text";
+  hint: string;
+};
 
 const channelIcons = {
   email: Mail,
@@ -40,807 +64,657 @@ const channelIcons = {
   vk: MessagesSquare,
 } satisfies Record<DeliveryChannelId, typeof Mail>;
 
-type DemoRoutes = Record<DeliveryChannelId, IntegrationProviderId | null>;
-
-type ChannelProviderSelection = {
-  channelId: DeliveryChannelId;
-  providerId: IntegrationProviderId;
+const setupFields: Record<IntegrationProviderId, SetupField[]> = {
+  "vk-workspace": [
+    {
+      key: "exportLabel",
+      label: "Метка экспорта",
+      placeholder: "Основная рассылка",
+      hint: "Необязательное название ручного CSV-маршрута.",
+    },
+  ],
+  "telegram-bot-api": [
+    {
+      key: "botUsername",
+      label: "Имя бота",
+      placeholder: "company_bot",
+      hint: "Без символа @. Токен бота хранится только на сервере.",
+    },
+  ],
+  "vk-api": [
+    {
+      key: "communityId",
+      label: "ID сообщества",
+      placeholder: "123456789",
+      hint: "Ключ доступа сообщества задаётся на сервере.",
+    },
+  ],
+  unisender: [
+    {
+      key: "senderEmail",
+      label: "Проверенный адрес отправителя",
+      placeholder: "mailing@company.ru",
+      type: "email",
+      hint: "API-ключ задаётся только в серверном окружении.",
+    },
+    {
+      key: "listId",
+      label: "ID списка получателей",
+      placeholder: "123456",
+      hint: "Сервер проверит существование списка через getLists.",
+    },
+  ],
+  sendpulse: [
+    {
+      key: "senderEmail",
+      label: "Адрес отправителя",
+      placeholder: "mailing@company.ru",
+      type: "email",
+      hint: "Для email-канала. API-секреты задаются на сервере.",
+    },
+    {
+      key: "botUsername",
+      label: "Telegram-бот",
+      placeholder: "company_bot",
+      hint: "Для Telegram-канала, без символа @.",
+    },
+  ],
 };
 
-type ChannelProviderKey =
-  `${DeliveryChannelId}:${IntegrationProviderId}`;
-
-const emptyDemoRoutes: DemoRoutes = {
-  email: null,
-  telegram: null,
-  vk: null,
+const statusMeta: Record<
+  ConnectionStatus,
+  { label: string; badge: "success" | "warning" | "neutral"; icon: typeof CheckCircle2 }
+> = {
+  connected: { label: "Подключено", badge: "success", icon: CheckCircle2 },
+  needs_attention: { label: "Нужна настройка", badge: "warning", icon: CircleAlert },
+  disconnected: { label: "Не подключено", badge: "neutral", icon: CircleDashed },
 };
 
-function parseDemoRoutesSnapshot(snapshot: string | null): DemoRoutes {
-  if (!snapshot) return emptyDemoRoutes;
-  try {
-    const value = JSON.parse(snapshot) as Partial<DemoRoutes>;
-    return Object.fromEntries(
-      deliveryChannels.map((channel) => {
-        const providerId = value[channel.id];
-        const validProvider = providerId
-          ? integrationProviderById[providerId]
-          : null;
-        return [
-          channel.id,
-          validProvider?.channelIds.includes(channel.id) ? providerId : null,
-        ];
-      }),
-    ) as DemoRoutes;
-  } catch {
-    return emptyDemoRoutes;
-  }
+function isProviderId(value: unknown): value is IntegrationProviderId {
+  return typeof value === "string" && value in integrationProviderById;
 }
 
-function getChannelProviderKey(
-  channelId: DeliveryChannelId,
-  providerId: IntegrationProviderId,
-): ChannelProviderKey {
-  return `${channelId}:${providerId}`;
+function normalizeIntegrations(value: unknown): IntegrationRecord[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is IntegrationRecord => {
+    if (!item || typeof item !== "object") return false;
+    const record = item as Partial<IntegrationRecord>;
+    if (!isProviderId(record.providerId)) return false;
+    const status = record.status;
+    if (
+      status !== "connected" &&
+      status !== "needs_attention" &&
+      status !== "disconnected"
+    ) {
+      return false;
+    }
+    return true;
+  });
+}
+
+function readPreferredProviders() {
+  const fallback = Object.fromEntries(
+    deliveryChannels.map((channel) => [channel.id, channel.providerIds[0]]),
+  ) as Record<DeliveryChannelId, IntegrationProviderId>;
+  try {
+    const value = JSON.parse(
+      window.localStorage.getItem(PREFERRED_PROVIDERS_STORAGE_KEY) ?? "{}",
+    ) as Partial<Record<DeliveryChannelId, IntegrationProviderId>>;
+    deliveryChannels.forEach((channel) => {
+      if (value[channel.id] && channel.providerIds.includes(value[channel.id]!)) {
+        fallback[channel.id] = value[channel.id]!;
+      }
+    });
+  } catch {
+    // The provider can still be selected for the current page session.
+  }
+  const route = readRequestedSetup();
+  if (route) fallback[route.channelId] = route.providerId;
+  return fallback;
+}
+
+function readRequestedSetup(): {
+  channelId: DeliveryChannelId;
+  providerId: IntegrationProviderId;
+} | null {
+  const params = new URLSearchParams(window.location.search);
+  const channelId = params.get("channel");
+  const providerId = params.get("provider");
+  if (
+    (channelId !== "email" && channelId !== "telegram" && channelId !== "vk") ||
+    !isProviderId(providerId) ||
+    !getProvidersForChannel(channelId).some((provider) => provider.id === providerId)
+  ) {
+    return null;
+  }
+  return { channelId, providerId };
 }
 
 export function IntegrationsView() {
-  const [activeChannelId, setActiveChannelId] =
-    useState<DeliveryChannelId>("email");
-  const [selectedSetup, setSelectedSetup] =
-    useState<ChannelProviderSelection | null>(null);
-  const [draftProviderKeys, setDraftProviderKeys] = useState<
-    Set<ChannelProviderKey>
-  >(() => new Set());
-  const [demoRoutes, setDemoRoutes] =
-    useState<DemoRoutes>(emptyDemoRoutes);
-  const [announcement, setAnnouncement] = useState<string | null>(null);
+  const [apiMode, setApiMode] = React.useState<ApiMode>("loading");
+  const [records, setRecords] = React.useState<IntegrationRecord[]>([]);
+  const [preferredProviders, setPreferredProviders] = React.useState<
+    Record<DeliveryChannelId, IntegrationProviderId>
+  >(() => Object.fromEntries(
+    deliveryChannels.map((channel) => [channel.id, channel.providerIds[0]]),
+  ) as Record<DeliveryChannelId, IntegrationProviderId>);
+  const [setupProviderId, setSetupProviderId] =
+    React.useState<IntegrationProviderId | null>(null);
+  const [setupChannelId, setSetupChannelId] =
+    React.useState<DeliveryChannelId>("email");
+  const [setupValues, setSetupValues] = React.useState<Record<string, string>>({});
+  const [busyAction, setBusyAction] = React.useState<string | null>(null);
+  const [notice, setNotice] = React.useState<{
+    tone: "success" | "warning" | "danger";
+    title: string;
+    text: string;
+  } | null>(null);
 
-  const activeChannel = deliveryChannelById[activeChannelId];
-  const providers = useMemo(
-    () => getProvidersForChannel(activeChannelId),
-    [activeChannelId],
-  );
-  const selectedProvider = selectedSetup
-    ? integrationProviderById[selectedSetup.providerId]
-    : null;
-  const selectedChannelId = selectedSetup?.channelId ?? activeChannelId;
-  const configuredDemoRoutes = Object.values(demoRoutes).filter(Boolean).length;
-
-  useEffect(() => {
-    let frame = 0;
+  const loadIntegrations = React.useCallback(async () => {
+    setApiMode("loading");
+    setNotice(null);
     try {
-      const storedRoutes = parseDemoRoutesSnapshot(
-        window.localStorage.getItem(INTEGRATION_DEMO_ROUTES_STORAGE_KEY),
-      );
-      frame = window.requestAnimationFrame(() => setDemoRoutes(storedRoutes));
+      const response = await fetch("/api/workspace", {
+        headers: { Accept: "application/json" },
+      });
+      if (!response.ok) throw new Error("Сервис настроек временно недоступен.");
+      const body = await response.json() as WorkspaceSnapshot;
+      const nextRecords = normalizeIntegrations(body.integrations);
+      setRecords(nextRecords);
+      const requestedSetup = readRequestedSetup();
+      if (requestedSetup) {
+        setSetupValues(
+          nextRecords.find((record) => record.providerId === requestedSetup.providerId)?.publicConfig ?? {},
+        );
+      }
+      setApiMode("online");
     } catch {
-      // The integration demo remains usable when storage is unavailable.
+      setRecords([]);
+      setApiMode("offline");
     }
-    return () => window.cancelAnimationFrame(frame);
   }, []);
 
-  const selectChannel = (channelId: DeliveryChannelId) => {
-    setActiveChannelId(channelId);
-    setAnnouncement(null);
-  };
-
-  const toggleDemoRoute = (provider: IntegrationProviderDefinition) => {
-    const isSelected = demoRoutes[activeChannelId] === provider.id;
-    setDemoRoutes((current) => {
-      const next = {
-        ...current,
-        [activeChannelId]: isSelected ? null : provider.id,
-      };
-      try {
-        window.localStorage.setItem(
-          INTEGRATION_DEMO_ROUTES_STORAGE_KEY,
-          JSON.stringify(next),
-        );
-      } catch {
-        // The selected demo route still works for the current page session.
+  React.useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      setPreferredProviders(readPreferredProviders());
+      const requestedSetup = readRequestedSetup();
+      if (requestedSetup) {
+        setSetupChannelId(requestedSetup.channelId);
+        setSetupProviderId(requestedSetup.providerId);
+        setSetupValues({});
       }
-      return next;
+      void loadIntegrations();
     });
-    setAnnouncement(
-      isSelected
-        ? `${provider.name} удалён из демомаршрута «${activeChannel.shortLabel}». Реальное подключение не изменилось.`
-        : `${provider.name} выбран для демомаршрута «${activeChannel.shortLabel}». Сообщения не отправляются.`,
-    );
-  };
+    return () => window.cancelAnimationFrame(frame);
+  }, [loadIntegrations]);
 
-  const saveDraft = () => {
-    if (!selectedProvider || !selectedSetup) return;
+  const recordByProvider = React.useMemo(
+    () => Object.fromEntries(records.map((record) => [record.providerId, record])) as
+      Partial<Record<IntegrationProviderId, IntegrationRecord>>,
+    [records],
+  );
 
-    setDraftProviderKeys((current) => {
-      const next = new Set(current);
-      next.add(
-        getChannelProviderKey(
-          selectedSetup.channelId,
-          selectedSetup.providerId,
-        ),
+  const readyChannels = deliveryChannels.filter((channel) =>
+    channel.providerIds.some(
+      (providerId) =>
+        recordByProvider[providerId]?.status === "connected" &&
+        integrationProviderById[providerId].deliveryMode !== "roadmap",
+    ),
+  ).length;
+
+  const chooseProvider = (channelId: DeliveryChannelId, providerId: IntegrationProviderId) => {
+    const next = { ...preferredProviders, [channelId]: providerId };
+    setPreferredProviders(next);
+    try {
+      window.localStorage.setItem(
+        PREFERRED_PROVIDERS_STORAGE_KEY,
+        JSON.stringify(next),
       );
-      return next;
-    });
-    const selectedChannel = deliveryChannelById[selectedSetup.channelId];
-    setAnnouncement(
-      `Черновик настройки ${selectedProvider.name} для канала «${selectedChannel.shortLabel}» сохранён только в текущем сеансе. Реальное подключение не выполнено.`,
-    );
-    setSelectedSetup(null);
+    } catch {
+      // Preference remains available in memory.
+    }
   };
 
-  const exportVkWorkspaceRecipients = () => {
-    const recipients = contacts
-      .filter((contact) => contact.status === "active")
-      .map((contact) => contact.email)
-      .join("\n");
-    const blob = new Blob([recipients], {
-      type: "text/plain;charset=utf-8",
-    });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = "mailflow-vk-workspace-recipients.txt";
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(url);
-    setAnnouncement(
-      `Подготовлен TXT-список из ${contacts.filter((contact) => contact.status === "active").length} демо-контактов. Загрузите его в нативный модуль «Рассылки» VK WorkSpace; отправка не запускалась.`,
-    );
+  const openSetup = (channelId: DeliveryChannelId, providerId: IntegrationProviderId) => {
+    setSetupChannelId(channelId);
+    setSetupProviderId(providerId);
+    setSetupValues(recordByProvider[providerId]?.publicConfig ?? {});
+    setNotice(null);
   };
+
+  const saveIntegration = async () => {
+    if (!setupProviderId) return;
+    setBusyAction(`save:${setupProviderId}`);
+    setNotice(null);
+    try {
+      const response = await fetch("/api/integrations", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          providerId: setupProviderId,
+          action: "save",
+          enabled: true,
+          publicConfig: setupValues,
+        }),
+      });
+      const savedBody = await response.json() as IntegrationMutationResponse | ApiError;
+      if (!response.ok || !("integration" in savedBody)) {
+        throw new Error("error" in savedBody ? savedBody.error : "Не удалось сохранить настройку.");
+      }
+      const checkResponse = await fetch("/api/integrations", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ providerId: setupProviderId, action: "check" }),
+      });
+      const checkBody = await checkResponse.json() as IntegrationMutationResponse | ApiError;
+      if (!checkResponse.ok || !("integration" in checkBody)) {
+        throw new Error("error" in checkBody ? checkBody.error : "Проверка провайдера не выполнена.");
+      }
+      const [integration] = normalizeIntegrations([checkBody.integration]);
+      if (!integration) throw new Error("Сервер вернул некорректный статус интеграции.");
+      setRecords((current) => [
+        integration,
+        ...current.filter((item) => item.providerId !== integration.providerId),
+      ]);
+      setApiMode("online");
+      setSetupProviderId(null);
+      setNotice({
+        tone: integration.status === "connected" ? "success" : "warning",
+        title: integration.status === "connected" ? "Интеграция готова" : "Публичные настройки сохранены",
+        text: integration.statusMessage,
+      });
+    } catch (error) {
+      setNotice({
+        tone: "danger",
+        title: "Настройка не сохранена",
+        text: error instanceof Error ? error.message : "Проверьте соединение и повторите попытку.",
+      });
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const checkIntegration = async (providerId: IntegrationProviderId) => {
+    setBusyAction(`check:${providerId}`);
+    setNotice(null);
+    try {
+      const response = await fetch("/api/integrations", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ providerId, action: "check" }),
+      });
+      const body = await response.json() as IntegrationMutationResponse | ApiError;
+      if (!response.ok || !("integration" in body)) {
+        throw new Error("error" in body ? body.error : "Проверка провайдера не выполнена.");
+      }
+      const [integration] = normalizeIntegrations([body.integration]);
+      if (!integration) throw new Error("Сервер вернул некорректный статус интеграции.");
+      setRecords((current) => [
+        integration,
+        ...current.filter((item) => item.providerId !== providerId),
+      ]);
+      setNotice({
+        tone: integration.status === "connected" ? "success" : "warning",
+        title: integration.status === "connected" ? "Проверка пройдена" : "Проверка не пройдена",
+        text: integration.statusMessage,
+      });
+    } catch (error) {
+      setNotice({
+        tone: "danger",
+        title: "Проверка не выполнена",
+        text: error instanceof Error ? error.message : "Повторите попытку.",
+      });
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const disconnect = async (providerId: IntegrationProviderId) => {
+    setBusyAction(`disconnect:${providerId}`);
+    setNotice(null);
+    try {
+      const response = await fetch("/api/integrations", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ providerId, action: "disconnect" }),
+      });
+      const body = await response.json() as IntegrationMutationResponse | ApiError;
+      if (!response.ok || !("integration" in body)) {
+        throw new Error("error" in body ? body.error : "Не удалось отключить интеграцию.");
+      }
+      const [integration] = normalizeIntegrations([body.integration]);
+      if (integration) {
+        setRecords((current) => [
+          integration,
+          ...current.filter((item) => item.providerId !== providerId),
+        ]);
+      }
+      setNotice({
+        tone: "success",
+        title: "Интеграция отключена",
+        text: `${integrationProviderById[providerId].name} больше не используется новыми кампаниями.`,
+      });
+    } catch (error) {
+      setNotice({
+        tone: "danger",
+        title: "Не удалось отключить",
+        text: error instanceof Error ? error.message : "Повторите попытку.",
+      });
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const exportVkWorkspaceRecipients = async () => {
+    setBusyAction("export:vk-workspace");
+    setNotice(null);
+    try {
+      const response = await fetch("/api/contacts", { headers: { Accept: "application/json" } });
+      const body = await response.json() as ContactsListResponse | ApiError;
+      if (!response.ok || !("contacts" in body)) {
+        throw new Error("error" in body ? body.error : "Не удалось получить контакты.");
+      }
+      const eligible = body.contacts.filter(
+        (contact) => contact.status === "active" && Boolean(contact.email) && contact.emailConsent,
+      );
+      const csv = ["email", ...eligible.map((contact) => `"${contact.email.replaceAll('"', '""')}"`)].join("\r\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = "mailflow-vk-workspace-recipients.csv";
+      anchor.click();
+      URL.revokeObjectURL(url);
+      setNotice({
+        tone: "success",
+        title: "Список подготовлен",
+        text: `В CSV добавлено ${eligible.length} активных контактов с email и согласием. Остальные контакты исключены.`,
+      });
+    } catch (error) {
+      setNotice({
+        tone: "danger",
+        title: "Экспорт не создан",
+        text: error instanceof Error ? error.message : "Повторите попытку.",
+      });
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const selectedSetupProvider = setupProviderId
+    ? integrationProviderById[setupProviderId]
+    : null;
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6 pb-10">
       <PageHeader
-        eyebrow="Инфраструктура рассылок"
+        eyebrow="Настройка доставки"
         title="Каналы и интеграции"
-        description="Соберите единый маршрут для email, Telegram и ВКонтакте. Сначала подготовьте провайдера, затем выберите его в кампании."
+        description="Подключите хотя бы один провайдер. Затем выберите его на третьем шаге создания кампании."
         action={
-          <Badge variant="accent" dot className="min-h-7 px-3">
-            Безопасный деморежим
-          </Badge>
+          <Link href="/campaigns/new" className={buttonVariants({ variant: "primary" })}>
+            Создать кампанию
+            <ArrowRight aria-hidden="true" className="size-4" />
+          </Link>
         }
       />
 
-      <Alert
-        tone="info"
-        title="Сейчас внешние сервисы не подключены"
-        icon={<ShieldCheck aria-hidden="true" className="size-4" />}
-      >
-        Можно изучить требования, сохранить черновик настройки и собрать
-        демомаршрут. Токены и пароли здесь не запрашиваются, API-вызовы не
-        выполняются, сообщения контактам не уходят.
-      </Alert>
+      {apiMode === "offline" ? (
+        <Alert tone="danger" title="Интеграции не загружены">
+          Сервер рабочего пространства не отвечает. Пустые статусы ниже не являются
+          данными провайдеров; настройки не будут сохранены.
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-3"
+            onClick={() => void loadIntegrations()}
+            leadingIcon={<RefreshCw aria-hidden="true" className="size-3.5" />}
+          >
+            Повторить подключение
+          </Button>
+        </Alert>
+      ) : (
+        <Alert tone="info" title="Статус подтверждается провайдером" icon={<ShieldCheck aria-hidden="true" className="size-4" />}>
+          Сохранение формы не означает подключение. Кнопка проверки выполняет безопасный
+          запрос конкретного провайдера; секреты читаются только из серверного окружения.
+        </Alert>
+      )}
 
-      {announcement ? (
-        <div
-          role="status"
-          aria-live="polite"
-          className="flex items-start gap-2.5 rounded-[11px] border border-primary/15 bg-primary-subtle px-4 py-3 text-[12px] leading-5 text-text"
-        >
-          <CheckCircle2
-            aria-hidden="true"
-            className="mt-0.5 size-4 shrink-0 text-primary"
-          />
-          <span>{announcement}</span>
-        </div>
+      {notice ? (
+        <Alert tone={notice.tone} title={notice.title}>
+          {notice.text}
+        </Alert>
       ) : null}
 
-      <section
-        aria-label="Состояние интеграций"
-        className="grid gap-3 sm:grid-cols-3"
-      >
-        <StatusCard
-          icon={<Braces aria-hidden="true" className="size-4" />}
-          label="Доступно провайдеров"
-          value="5"
-          description="Для трёх каналов"
-        />
-        <StatusCard
-          icon={<CircleDashed aria-hidden="true" className="size-4" />}
-          label="Реальных подключений"
-          value="0"
-          description="Нужна серверная настройка"
-        />
-        <StatusCard
-          icon={<Route aria-hidden="true" className="size-4" />}
-          label="Демомаршрутов"
-          value={String(configuredDemoRoutes)}
-          description="Без внешней отправки"
-        />
-      </section>
-
-      <section className="card overflow-hidden" aria-labelledby="channels-title">
-        <div className="border-b border-border px-5 py-4 sm:px-6">
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
-            <div>
-              <h2
-                id="channels-title"
-                className="text-[15px] font-semibold tracking-[-0.015em]"
-              >
-                Выберите канал доставки
-              </h2>
-              <p className="mt-1 text-[12px] text-text-muted">
-                Для каждого канала используется отдельный провайдер и отдельное
-                согласие получателя.
-              </p>
-            </div>
-            <span className="text-[11px] font-medium text-text-subtle">
-              Шаг 1 из 2
-            </span>
+      <section className="card overflow-hidden" aria-labelledby="delivery-checklist-title">
+        <div className="flex flex-col gap-3 border-b border-border px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <div>
+            <h2 id="delivery-checklist-title" className="text-[17px] font-semibold text-text-strong">
+              Чек-лист подключения
+            </h2>
+            <p className="mt-1 text-[13px] leading-5 text-text-muted">
+              Канал → провайдер → статус → следующий шаг.
+            </p>
           </div>
+          <Badge variant={readyChannels > 0 ? "success" : "warning"} dot className="w-fit">
+            Готово каналов: {readyChannels} из {deliveryChannels.length}
+          </Badge>
         </div>
 
-        <div
-          className="grid gap-3 p-4 sm:grid-cols-3 sm:p-5"
-          role="group"
-          aria-label="Каналы доставки"
-        >
-          {deliveryChannels.map((channel) => {
+        <div className="divide-y divide-border">
+          {deliveryChannels.map((channel, index) => {
             const Icon = channelIcons[channel.id];
-            const selected = channel.id === activeChannelId;
-            const demoProvider = demoRoutes[channel.id]
-              ? integrationProviderById[demoRoutes[channel.id]!]
-              : null;
+            const providerId = preferredProviders[channel.id];
+            const provider = integrationProviderById[providerId];
+            const record = recordByProvider[providerId];
+            const status = apiMode === "online" ? record?.status ?? "disconnected" : "disconnected";
+            const meta = statusMeta[status];
+            const campaignHref = `/campaigns/new?step=sender&channel=${channel.id}&provider_${channel.id}=${provider.id}`;
 
             return (
-              <button
-                key={channel.id}
-                type="button"
-                aria-pressed={selected}
-                aria-describedby={`channel-${channel.id}-description`}
-                onClick={() => selectChannel(channel.id)}
-                className={`min-h-[150px] rounded-xl border p-4 text-left transition-[border-color,background-color,box-shadow,transform] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25 active:scale-[.99] ${
-                  selected
-                    ? "border-primary/40 bg-primary-subtle shadow-[0_0_0_1px_rgb(99_91_255_/_0.08)]"
-                    : "border-border bg-surface hover:border-border-strong hover:bg-surface-subtle/50"
-                }`}
-              >
-                <span className="flex items-start justify-between gap-3">
-                  <span
-                    className={`grid size-9 place-items-center rounded-[10px] ${
-                      selected
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-surface-subtle text-text-muted"
-                    }`}
-                  >
-                    <Icon aria-hidden="true" className="size-4" />
-                  </span>
-                  {demoProvider ? (
-                    <Badge variant="accent" className="max-w-[130px] truncate">
-                      {demoProvider.name}
-                    </Badge>
+              <article key={channel.id} className="grid gap-4 px-5 py-5 sm:px-6 lg:grid-cols-[48px_minmax(190px,.8fr)_minmax(220px,1fr)_170px_170px] lg:items-center">
+                <span className="grid size-11 place-items-center rounded-xl bg-primary-subtle text-primary">
+                  <Icon aria-hidden="true" className="size-5" />
+                </span>
+
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-subtle">
+                    {index + 1}. Канал
+                  </p>
+                  <h3 className="mt-1 text-[15px] font-semibold text-text-strong">{channel.shortLabel}</h3>
+                  <p className="mt-1 text-[12px] leading-5 text-text-muted">{channel.contactField}</p>
+                </div>
+
+                <FormField label="Провайдер" htmlFor={`provider-${channel.id}`}>
+                  <Select
+                    id={`provider-${channel.id}`}
+                    value={providerId}
+                    onChange={(event) => chooseProvider(channel.id, event.target.value as IntegrationProviderId)}
+                    options={getProvidersForChannel(channel.id).map((item) => ({
+                      value: item.id,
+                      label: item.name,
+                    }))}
+                  />
+                </FormField>
+
+                <div className="lg:justify-self-start">
+                  <Badge variant={meta.badge} dot>
+                    {apiMode === "loading" ? "Проверяем…" : meta.label}
+                  </Badge>
+                  <p className="mt-2 text-[11px] leading-4 text-text-muted">
+                    {record?.statusMessage ?? (status === "connected"
+                      ? "Проверка провайдера пройдена"
+                      : status === "needs_attention"
+                        ? "Нужна повторная проверка"
+                        : "Сначала сохраните настройку")}
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2 lg:justify-end">
+                  {status === "connected" && provider.deliveryMode !== "roadmap" ? (
+                    <Link href={campaignHref} className={buttonVariants({ variant: "primary", size: "sm" })}>
+                      В кампанию
+                      <ArrowRight aria-hidden="true" className="size-3.5" />
+                    </Link>
                   ) : (
-                    <Badge variant="outline">Не выбран</Badge>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => openSetup(channel.id, provider.id)}
+                      leadingIcon={<Settings2 aria-hidden="true" className="size-3.5" />}
+                    >
+                      Настроить
+                    </Button>
                   )}
-                </span>
-                <span className="mt-4 block text-[13px] font-semibold text-text-strong">
-                  {channel.label}
-                </span>
-                <span
-                  id={`channel-${channel.id}-description`}
-                  className="mt-1 block text-[11px] leading-4.5 text-text-muted"
-                >
-                  {channel.providerIds.length} {providerWord(channel.providerIds.length)}
-                  <span aria-hidden="true"> · </span>
-                  <span className="block pt-1 text-text-subtle">
-                    Поле контакта: {channel.contactField}
-                  </span>
-                </span>
-              </button>
+                  {record?.enabled ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      loading={busyAction === `check:${provider.id}`}
+                      loadingText="Проверяем…"
+                      onClick={() => void checkIntegration(provider.id)}
+                      leadingIcon={<RefreshCw aria-hidden="true" className="size-3.5" />}
+                    >
+                      Проверить
+                    </Button>
+                  ) : null}
+                  {record?.enabled ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Отключить ${provider.name}`}
+                      loading={busyAction === `disconnect:${provider.id}`}
+                      onClick={() => void disconnect(provider.id)}
+                      leadingIcon={<Unplug aria-hidden="true" className="size-3.5" />}
+                    >
+                      Отключить
+                    </Button>
+                  ) : null}
+                </div>
+              </article>
             );
           })}
         </div>
       </section>
 
-      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(280px,.55fr)]">
-        <section aria-labelledby="providers-title">
-          <div className="mb-4 flex items-end justify-between gap-4">
+      <section className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
+        <div className="rounded-xl border border-[#bcd8ff] bg-[#f3f8ff] p-5">
+          <div className="flex items-start gap-3">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#1777ff] text-white">
+              <Download aria-hidden="true" className="size-4" />
+            </span>
             <div>
-              <p className="section-eyebrow">Шаг 2</p>
-              <h2
-                id="providers-title"
-                className="mt-2 text-[18px] font-semibold tracking-[-0.025em]"
-              >
-                Провайдеры: {activeChannel.shortLabel}
-              </h2>
-              <p className="mt-1 max-w-2xl text-[12px] leading-5 text-text-muted">
-                {activeChannel.description}
+              <h2 className="text-[14px] font-semibold text-text-strong">Нативные «Рассылки» VK WorkSpace</h2>
+              <p className="mt-1 text-[12px] leading-5 text-text-muted">
+                MAILFLOW формирует только CSV получателей. HTML, отправитель, запуск и статистика
+                настраиваются в VK WorkSpace вручную; публичный Mailing API не имитируется.
               </p>
             </div>
-            <Badge variant="neutral" className="shrink-0">
-              {providers.length} {providerWord(providers.length)}
-            </Badge>
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            {providers.map((provider) => {
-              const draftSaved = draftProviderKeys.has(
-                getChannelProviderKey(activeChannelId, provider.id),
-              );
-              const inDemoRoute = demoRoutes[activeChannelId] === provider.id;
-
-              return (
-                <ProviderCard
-                  key={provider.id}
-                  provider={provider}
-                  activeChannelId={activeChannelId}
-                  draftSaved={draftSaved}
-                  inDemoRoute={inDemoRoute}
-                  onPrepare={() =>
-                    setSelectedSetup({
-                      channelId: activeChannelId,
-                      providerId: provider.id,
-                    })
-                  }
-                  onToggleRoute={() => toggleDemoRoute(provider)}
-                />
-              );
-            })}
-          </div>
-
-          {activeChannelId === "email" ? (
-            <div className="mt-4 flex flex-col gap-4 rounded-xl border border-[#bcd8ff] bg-[#f3f8ff] p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex min-w-0 items-start gap-3">
-                <span className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-[#1777ff] text-white">
-                  <Download aria-hidden="true" className="size-4" />
-                </span>
-                <div>
-                  <h3 className="text-[12px] font-semibold text-text-strong">
-                    Нативные «Рассылки» VK WorkSpace
-                  </h3>
-                  <p className="mt-1 max-w-2xl text-[10px] leading-4 text-text-muted">
-                    Публичного API у этого режима нет: MAILFLOW подготовит TXT-список,
-                    а HTML, отправитель и запуск настраиваются в интерфейсе VK WorkSpace.
-                    Для полной автоматизации используется отдельный SMTP-маршрут.
-                  </p>
-                </div>
-              </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                className="shrink-0"
-                onClick={exportVkWorkspaceRecipients}
-                leadingIcon={<Download aria-hidden="true" className="size-3.5" />}
-              >
-                Скачать демо TXT
-              </Button>
-            </div>
-          ) : null}
-        </section>
-
-        <aside className="card xl:sticky xl:top-[92px]" aria-labelledby="route-title">
-          <div className="border-b border-border px-5 py-4">
-            <div className="flex items-center gap-2.5">
-              <span className="grid size-8 place-items-center rounded-[9px] bg-primary-subtle text-primary">
-                <Route aria-hidden="true" className="size-4" />
-              </span>
-              <div>
-                <h2 id="route-title" className="text-[14px] font-semibold">
-                  Демомаршрут кампании
-                </h2>
-                <p className="mt-0.5 text-[10px] text-text-subtle">
-                  Только схема, без отправки
-                </p>
-              </div>
-            </div>
-          </div>
-          <div className="space-y-3 p-5">
-            {deliveryChannels.map((channel) => {
-              const providerId = demoRoutes[channel.id];
-              const provider = providerId
-                ? integrationProviderById[providerId]
-                : null;
-              const Icon = channelIcons[channel.id];
-
-              return (
-                <div
-                  key={channel.id}
-                  className="flex items-center gap-3 rounded-[10px] border border-border bg-surface-subtle/55 p-3"
-                >
-                  <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-surface text-text-muted shadow-[var(--shadow-xs)]">
-                    <Icon aria-hidden="true" className="size-3.5" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[11px] font-semibold text-text-strong">
-                      {channel.shortLabel}
-                    </p>
-                    <p className="mt-0.5 truncate text-[10px] text-text-muted">
-                      {provider?.name ?? "Провайдер не выбран"}
-                    </p>
-                  </div>
-                  {provider ? (
-                    <Check aria-label="Выбран" className="size-4 text-success" />
-                  ) : (
-                    <CircleDashed
-                      aria-label="Не выбран"
-                      className="size-4 text-text-subtle"
-                    />
-                  )}
-                </div>
-              );
-            })}
-
-            <div className="rounded-[10px] border border-dashed border-border-strong p-3.5">
-              <p className="text-[11px] font-semibold text-text-strong">
-                Что проверится перед запуском
-              </p>
-              <ul className="mt-2 space-y-1.5 text-[10px] leading-4 text-text-muted">
-                <li className="flex gap-2">
-                  <CheckCircle2
-                    aria-hidden="true"
-                    className="mt-0.5 size-3.5 shrink-0 text-success"
-                  />
-                  Согласие и доступность контакта в канале
-                </li>
-                <li className="flex gap-2">
-                  <CheckCircle2
-                    aria-hidden="true"
-                    className="mt-0.5 size-3.5 shrink-0 text-success"
-                  />
-                  Подтверждённый отправитель или бот
-                </li>
-                <li className="flex gap-2">
-                  <CheckCircle2
-                    aria-hidden="true"
-                    className="mt-0.5 size-3.5 shrink-0 text-success"
-                  />
-                  Лимиты и тестовая доставка
-                </li>
-              </ul>
-            </div>
-          </div>
-        </aside>
-      </div>
-
-      <section className="card p-5 sm:p-6" aria-labelledby="flow-title">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-          <div className="max-w-xl">
-            <p className="section-eyebrow">Архитектура</p>
-            <h2
-              id="flow-title"
-              className="mt-2 text-[17px] font-semibold tracking-[-0.02em]"
-            >
-              Ключи остаются на сервере, кампания — в одном интерфейсе
-            </h2>
-            <p className="mt-2 text-[12px] leading-5 text-text-muted">
-              После реального подключения MAILFLOW будет выбирать адаптер по
-              каналу, отправлять сообщение провайдеру и возвращать единый статус
-              доставки. Браузер не должен получать секретные ключи.
-            </p>
-          </div>
-          <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-[1fr_auto_1fr_auto_1fr] lg:max-w-[620px] lg:self-center">
-            <FlowStep icon={Sparkles} label="Кампания" description="Текст и аудитория" />
-            <ArrowRight
-              aria-hidden="true"
-              className="hidden size-4 self-center text-text-subtle sm:block"
-            />
-            <FlowStep icon={ServerCog} label="Адаптер" description="Выбор провайдера" />
-            <ArrowRight
-              aria-hidden="true"
-              className="hidden size-4 self-center text-text-subtle sm:block"
-            />
-            <FlowStep icon={Bot} label="Канал" description="Доставка и статус" />
           </div>
         </div>
+        <Button
+          variant="secondary"
+          onClick={() => void exportVkWorkspaceRecipients()}
+          loading={busyAction === "export:vk-workspace"}
+          loadingText="Готовим CSV…"
+          leadingIcon={<Download aria-hidden="true" className="size-4" />}
+        >
+          Скачать CSV
+        </Button>
       </section>
 
-      <ProviderSetupModal
-        provider={selectedProvider}
-        activeChannelId={selectedChannelId}
-        open={Boolean(selectedProvider)}
-        onOpenChange={(open) => {
-          if (!open) setSelectedSetup(null);
-        }}
-        onSaveDraft={saveDraft}
+      <SetupModal
+        provider={selectedSetupProvider}
+        channelId={setupChannelId}
+        values={setupValues}
+        onValueChange={(key, value) => setSetupValues((current) => ({ ...current, [key]: value }))}
+        open={Boolean(selectedSetupProvider)}
+        onOpenChange={(open) => !open && setSetupProviderId(null)}
+        onSave={() => void saveIntegration()}
+        saving={Boolean(setupProviderId && busyAction === `save:${setupProviderId}`)}
       />
     </div>
   );
 }
 
-function StatusCard({
-  icon,
-  label,
-  value,
-  description,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  description: string;
-}) {
-  return (
-    <article className="card flex min-w-0 items-center gap-3.5 p-4 sm:p-5">
-      <span className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-primary-subtle text-primary">
-        {icon}
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-baseline justify-between gap-3">
-          <p className="truncate text-[11px] font-medium text-text-muted">
-            {label}
-          </p>
-          <p className="text-[20px] font-semibold tracking-[-0.035em] text-text-strong">
-            {value}
-          </p>
-        </div>
-        <p className="mt-0.5 text-[10px] text-text-subtle">{description}</p>
-      </div>
-    </article>
-  );
-}
-
-function ProviderCard({
+function SetupModal({
   provider,
-  activeChannelId,
-  draftSaved,
-  inDemoRoute,
-  onPrepare,
-  onToggleRoute,
-}: {
-  provider: IntegrationProviderDefinition;
-  activeChannelId: DeliveryChannelId;
-  draftSaved: boolean;
-  inDemoRoute: boolean;
-  onPrepare: () => void;
-  onToggleRoute: () => void;
-}) {
-  const channel = deliveryChannelById[activeChannelId];
-
-  return (
-    <article className="card flex min-h-[330px] flex-col overflow-hidden">
-      <div className="flex flex-1 flex-col p-5">
-        <div className="flex items-start gap-3.5">
-          <span
-            aria-hidden="true"
-            className="grid size-11 shrink-0 place-items-center rounded-xl text-[12px] font-bold text-white shadow-[var(--shadow-xs)]"
-            style={{ backgroundColor: provider.accent }}
-          >
-            {provider.initials}
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-[14px] font-semibold tracking-[-0.015em]">
-                {provider.name}
-              </h3>
-              {inDemoRoute ? (
-                <Badge variant="accent" dot>
-                  В демомаршруте
-                </Badge>
-              ) : draftSaved ? (
-                <Badge variant="warning" dot>
-                  Черновик
-                </Badge>
-              ) : (
-                <Badge variant="outline" dot>
-                  Не подключено
-                </Badge>
-              )}
-            </div>
-            <p className="mt-1 text-[10px] font-medium text-text-subtle">
-              {provider.category}
-            </p>
-          </div>
-        </div>
-
-        <p className="mt-4 text-[12px] leading-5 text-text-muted">
-          {provider.summary}
-        </p>
-
-        <div className="mt-4 rounded-[10px] bg-surface-subtle p-3.5">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-text-subtle">
-            Лучше всего подходит
-          </p>
-          <p className="mt-1.5 text-[11px] leading-4.5 text-text">
-            {provider.recommendedFor}
-          </p>
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-1.5">
-          {provider.channelIds.map((channelId) => (
-            <Badge key={channelId} variant="neutral">
-              {deliveryChannelById[channelId].shortLabel}
-            </Badge>
-          ))}
-          <Badge variant="outline">Нужна серверная настройка</Badge>
-        </div>
-
-        <p className="mt-4 flex items-start gap-2 text-[10px] leading-4 text-text-muted">
-          <LockKeyhole
-            aria-hidden="true"
-            className="mt-0.5 size-3.5 shrink-0 text-text-subtle"
-          />
-          {provider.limitations[0]}
-        </p>
-      </div>
-
-      <div className="grid gap-2 border-t border-border bg-surface-subtle/35 p-4 sm:grid-cols-2">
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={onPrepare}
-          leadingIcon={<KeyRound aria-hidden="true" className="size-3.5" />}
-        >
-          {draftSaved ? "Продолжить настройку" : "Подготовить"}
-        </Button>
-        <Button
-          variant={inDemoRoute ? "outline" : "primary"}
-          size="sm"
-          onClick={onToggleRoute}
-          aria-pressed={inDemoRoute}
-          leadingIcon={
-            inDemoRoute ? (
-              <Check aria-hidden="true" className="size-3.5" />
-            ) : (
-              <Route aria-hidden="true" className="size-3.5" />
-            )
-          }
-        >
-          {inDemoRoute ? "Маршрут выбран" : `Выбрать для ${channel.shortLabel}`}
-        </Button>
-      </div>
-    </article>
-  );
-}
-
-function ProviderSetupModal({
-  provider,
-  activeChannelId,
+  channelId,
+  values,
+  onValueChange,
   open,
   onOpenChange,
-  onSaveDraft,
+  onSave,
+  saving,
 }: {
   provider: IntegrationProviderDefinition | null;
-  activeChannelId: DeliveryChannelId;
+  channelId: DeliveryChannelId;
+  values: Record<string, string>;
+  onValueChange: (key: string, value: string) => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSaveDraft: () => void;
+  onSave: () => void;
+  saving: boolean;
 }) {
   if (!provider) return null;
-
-  const channel = deliveryChannelById[activeChannelId];
+  const fields = setupFields[provider.id];
 
   return (
     <Modal
       open={open}
       onOpenChange={onOpenChange}
-      size="lg"
-      title={`Подготовка: ${provider.name}`}
-      description={`${channel.label} · черновик без передачи ключей и API-вызовов`}
+      title={`Настройка ${provider.name}`}
+      description={`Канал: ${deliveryChannels.find((channel) => channel.id === channelId)?.shortLabel}. Сервер сохранит открытые параметры, затем выполнит отдельную проверку провайдера.`}
+      size="md"
       footer={
         <>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Отмена
-          </Button>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Отмена</Button>
           <Button
-            onClick={onSaveDraft}
-            leadingIcon={<Check aria-hidden="true" className="size-4" />}
+            onClick={onSave}
+            loading={saving}
+            loadingText="Проверяем…"
+            leadingIcon={<ShieldCheck aria-hidden="true" className="size-4" />}
           >
-            Сохранить черновик
+            Сохранить и проверить
           </Button>
         </>
       }
     >
       <div className="space-y-5">
-        <Alert
-          tone="warning"
-          title="Не вставляйте токены и пароли в демоверсию"
-          icon={<LockKeyhole aria-hidden="true" className="size-4" />}
-        >
-          Эта форма показывает состав будущей настройки. Для реального запуска
-          секреты нужно добавить в защищённую серверную конфигурацию.
+        <Alert tone="info" title="Секреты не вводятся в браузере">
+          Токены, пароли и API-ключи берутся из серверного окружения. Эта форма
+          сохраняет только открытые идентификаторы и адреса.
         </Alert>
 
-        <section aria-labelledby="credentials-title">
-          <div className="flex items-center gap-2">
-            <KeyRound aria-hidden="true" className="size-4 text-primary" />
-            <h3 id="credentials-title" className="text-[13px] font-semibold">
-              Что потребуется
-            </h3>
-          </div>
-          <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-            {provider.credentials.map((credential) => (
-              <li
-                key={credential}
-                className="flex items-start gap-2.5 rounded-[10px] border border-border bg-surface-subtle/45 p-3 text-[11px] leading-4.5 text-text"
-              >
-                <CircleDashed
-                  aria-hidden="true"
-                  className="mt-0.5 size-3.5 shrink-0 text-primary"
-                />
+        {fields.map((field) => (
+          <FormField
+            key={field.key}
+            label={field.label}
+            htmlFor={`integration-${provider.id}-${field.key}`}
+            hint={field.hint}
+          >
+            <Input
+              id={`integration-${provider.id}-${field.key}`}
+              type={field.type ?? "text"}
+              value={values[field.key] ?? ""}
+              placeholder={field.placeholder}
+              onChange={(event) => onValueChange(field.key, event.target.value)}
+            />
+          </FormField>
+        ))}
+
+        <div className="rounded-xl border border-border bg-surface-subtle p-4">
+          <p className="text-[12px] font-semibold text-text-strong">Что проверит сервер</p>
+          <ul className="mt-2 space-y-2 text-[12px] leading-5 text-text-muted">
+            {provider.credentials.slice(0, 3).map((credential) => (
+              <li key={credential} className="flex gap-2">
+                <CircleDashed aria-hidden="true" className="mt-1 size-3.5 shrink-0" />
                 {credential}
               </li>
             ))}
           </ul>
-        </section>
-
-        <section aria-labelledby="steps-title">
-          <div className="flex items-center gap-2">
-            <ServerCog aria-hidden="true" className="size-4 text-primary" />
-            <h3 id="steps-title" className="text-[13px] font-semibold">
-              План подключения
-            </h3>
-          </div>
-          <ol className="mt-3 space-y-2">
-            {provider.setupSteps.map((step, index) => (
-              <li
-                key={step}
-                className="flex items-start gap-3 rounded-[10px] border border-border p-3"
-              >
-                <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary-subtle text-[10px] font-semibold text-primary">
-                  {index + 1}
-                </span>
-                <span className="pt-0.5 text-[11px] leading-4.5 text-text-muted">
-                  {step}
-                </span>
-              </li>
-            ))}
-          </ol>
-        </section>
-
-        <section
-          aria-labelledby="route-preview-title"
-          className="rounded-xl border border-primary/15 bg-primary-subtle/70 p-4"
-        >
-          <div className="flex items-center gap-2">
-            <Route aria-hidden="true" className="size-4 text-primary" />
-            <h3 id="route-preview-title" className="text-[12px] font-semibold">
-              Будущий маршрут
-            </h3>
-          </div>
-          <p className="mt-2 font-mono text-[10px] leading-4.5 text-text-muted">
-            {provider.route}
-          </p>
-        </section>
-
-        <section aria-labelledby="limitations-title">
-          <h3 id="limitations-title" className="text-[13px] font-semibold">
-            Ограничения и правила
-          </h3>
-          <ul className="mt-2 space-y-1.5">
-            {provider.limitations.map((limitation) => (
-              <li
-                key={limitation}
-                className="flex items-start gap-2 text-[11px] leading-4.5 text-text-muted"
-              >
-                <ShieldCheck
-                  aria-hidden="true"
-                  className="mt-0.5 size-3.5 shrink-0 text-success"
-                />
-                {limitation}
-              </li>
-            ))}
-          </ul>
-        </section>
+        </div>
       </div>
     </Modal>
   );
-}
-
-function FlowStep({
-  icon: Icon,
-  label,
-  description,
-}: {
-  icon: typeof Mail;
-  label: string;
-  description: string;
-}) {
-  return (
-    <div className="flex min-w-0 items-center gap-2.5 rounded-[10px] border border-border bg-surface-subtle/55 p-3">
-      <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-surface text-primary shadow-[var(--shadow-xs)]">
-        <Icon aria-hidden="true" className="size-3.5" />
-      </span>
-      <div className="min-w-0">
-        <p className="text-[11px] font-semibold text-text-strong">{label}</p>
-        <p className="truncate text-[9px] text-text-subtle">{description}</p>
-      </div>
-    </div>
-  );
-}
-
-function providerWord(count: number) {
-  if (count === 1) return "провайдер";
-  if (count > 1 && count < 5) return "провайдера";
-  return "провайдеров";
 }

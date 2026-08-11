@@ -2,15 +2,10 @@
 
 import { useEffect, useRef } from "react";
 
-import { AppSidebar, type AppSidebarProps } from "./app-sidebar";
+import { AppSidebar } from "./app-sidebar";
 import { containTabFocus } from "./focus-management";
 
-type MobileNavigationProps = Pick<
-  AppSidebarProps,
-  | "workspaces"
-  | "selectedWorkspaceId"
-  | "onWorkspaceChange"
-> & {
+type MobileNavigationProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 };
@@ -18,9 +13,6 @@ type MobileNavigationProps = Pick<
 export function MobileNavigation({
   open,
   onOpenChange,
-  workspaces,
-  selectedWorkspaceId,
-  onWorkspaceChange,
 }: MobileNavigationProps) {
   const priorFocusRef = useRef<HTMLElement | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -58,7 +50,7 @@ export function MobileNavigation({
       role="dialog"
       aria-modal="true"
       aria-label="Меню навигации"
-      className="fixed inset-0 z-[80] lg:hidden"
+      className="fixed inset-0 z-[80] xl:hidden"
     >
       <button
         type="button"
@@ -70,9 +62,6 @@ export function MobileNavigation({
       <div className="relative h-full w-fit motion-safe:animate-[mf-slide-in-left_200ms_cubic-bezier(0.2,0.8,0.2,1)]">
         <AppSidebar
           mobile
-          workspaces={workspaces}
-          selectedWorkspaceId={selectedWorkspaceId}
-          onWorkspaceChange={onWorkspaceChange}
           onClose={() => onOpenChange(false)}
           onNavigate={() => onOpenChange(false)}
         />

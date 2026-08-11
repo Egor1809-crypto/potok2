@@ -35,7 +35,7 @@ export function FeatureShowcase() {
             <div className="flex items-center justify-between"><div><p className="text-sm font-semibold text-[#242631]">Найдите именно тех, кто вам нужен</p><p className="mt-1 text-[11px] text-[#9698a5]">Все условия должны совпасть</p></div><button className="rounded-lg border border-[#e2e3e9] px-2.5 py-1.5 text-[9px] font-semibold text-[#555765]">Сбросить</button></div>
             <div className="mt-5 space-y-2.5">
               {[
-                ["Роль", "равно", "Юрист"], ["Город", "равно", "Москва"], ["Статус", "равно", "Активен"],
+                ["Должность", "равно", "Юрист"], ["Город", "равно", "Москва"], ["Статус", "равно", "Активен"],
               ].map((row, index) => (
                 <div key={row[0]} className="flex items-center gap-2"><span className="w-9 text-[8px] font-semibold text-[#625cf6]">{index === 0 ? "ГДЕ" : "И"}</span>{row.map((cell) => <button key={cell} className="flex flex-1 items-center justify-between rounded-lg border border-[#e2e3e9] bg-[#fafafb] px-3 py-2.5 text-left text-[10px] font-medium text-[#454754]">{cell}<ChevronDown size={12} className="text-[#9698a5]" /></button>)}</div>
               ))}

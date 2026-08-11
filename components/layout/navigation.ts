@@ -1,15 +1,10 @@
 import {
   BarChart3,
-  Building2,
   Cable,
   ContactRound,
-  FileText,
   LayoutDashboard,
-  MailOpen,
   Megaphone,
-  Settings,
   Shapes,
-  UploadCloud,
   UsersRound,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -21,6 +16,7 @@ export type ProductNavItem = {
   icon: LucideIcon;
   exact?: boolean;
   keywords?: string[];
+  children?: ProductNavItem[];
 };
 
 export type ProductNavGroup = {
@@ -28,129 +24,94 @@ export type ProductNavGroup = {
   items: ProductNavItem[];
 };
 
+/**
+ * Шесть разделов повторяют реальный рабочий маршрут: база → аудитория →
+ * кампания → каналы → результат. Импорт, шаблоны и редактор открываются
+ * из контекста задачи и не перегружают навигацию.
+ */
 export const productNavigation: ProductNavGroup[] = [
   {
-    label: "Рабочее пространство",
+    label: "Рабочий процесс",
     items: [
       {
         label: "Обзор",
-        description: "Активность и показатели команды",
+        description: "Что требует внимания сейчас",
         href: "/dashboard",
         icon: LayoutDashboard,
         exact: true,
-        keywords: ["главная", "обзор", "дашборд"],
+        keywords: ["главная", "сводка"],
       },
       {
         label: "Контакты",
-        description: "Люди, сохранённые виды и история общения",
+        description: "Люди, каналы связи и согласия",
         href: "/contacts",
         icon: ContactRound,
-        keywords: ["люди", "crm", "база"],
+        keywords: ["люди", "crm", "база", "импорт"],
       },
       {
-        label: "Компании",
-        description: "Организации и связанные с ними контакты",
-        href: "/companies",
-        icon: Building2,
-        keywords: ["аккаунты", "организации"],
-      },
-      {
-        label: "Сегменты",
-        description: "Сохранённые и динамические аудитории",
+        label: "Аудитории",
+        description: "Сегменты по правилам контактов",
         href: "/segments",
         icon: UsersRound,
-        keywords: ["аудитории", "списки", "фильтры"],
+        keywords: ["сегменты", "аудитория", "фильтры"],
       },
-    ],
-  },
-  {
-    label: "Рассылки",
-    items: [
       {
         label: "Кампании",
-        description: "Email, Telegram и ВКонтакте в одной кампании",
+        description: "Сообщения, проверка и запуск",
         href: "/campaigns",
         icon: Megaphone,
-        keywords: ["почта", "telegram", "вконтакте", "отправить", "рассылка"],
+        keywords: ["рассылка", "email", "telegram", "вконтакте", "шаблоны"],
       },
       {
-        label: "Каналы и интеграции",
-        description: "VK WorkSpace, Telegram, ВКонтакте и сервисы отправки",
+        label: "Каналы",
+        description: "Провайдеры email, Telegram и ВК",
         href: "/integrations",
         icon: Cable,
-        keywords: ["vk workspace", "telegram", "вконтакте", "unisender", "sendpulse", "smtp", "api"],
+        keywords: ["vk workspace", "telegram", "вконтакте", "smtp", "api", "интеграции"],
       },
       {
-        label: "Редактор писем",
-        description: "Дизайн и персонализация писем",
-        href: "/email-builder",
-        icon: MailOpen,
-        keywords: ["редактор", "письмо", "дизайн"],
-      },
-      {
-        label: "Шаблоны",
-        description: "Готовые дизайны писем",
-        href: "/templates",
-        icon: FileText,
-        keywords: ["библиотека", "дизайны"],
-      },
-      {
-        label: "Аналитика",
-        description: "Доставка, вовлечённость и ответы",
+        label: "Результаты",
+        description: "Доставка и отклик по кампаниям",
         href: "/analytics",
         icon: BarChart3,
-        keywords: ["отчёты", "метрики", "эффективность"],
-      },
-    ],
-  },
-  {
-    label: "Управление",
-    items: [
-      {
-        label: "Импорт",
-        description: "Перенос контактов в рабочее пространство",
-        href: "/import",
-        icon: UploadCloud,
-        keywords: ["csv", "xlsx", "загрузка"],
-      },
-      {
-        label: "Настройки",
-        description: "Команда, рассылки и рабочее пространство",
-        href: "/settings",
-        icon: Settings,
-        keywords: ["оплата", "домены", "бренд", "участники"],
+        keywords: ["аналитика", "отчёты", "метрики", "эффективность"],
       },
     ],
   },
 ];
 
-export const productRoutes: ProductNavItem[] = productNavigation.flatMap(
-  (group) => group.items,
-);
+export const primaryProductRoutes = productNavigation.flatMap((group) => group.items);
+
+export const productRoutes = primaryProductRoutes.flatMap((item) => [
+  item,
+  ...(item.children ?? []),
+]);
 
 export const quickCreateRoutes: ProductNavItem[] = [
   {
-    label: "Новая кампания",
-    description: "Выберите аудиторию и начните письмо",
+    label: "Создать кампанию",
+    description: "Выбрать аудиторию, сообщение и каналы",
     href: "/campaigns/new",
     icon: Shapes,
     exact: true,
-    keywords: ["создать", "письмо", "отправить"],
+    keywords: ["новая", "создать", "отправить"],
   },
 ];
 
-export function isProductRouteActive(
-  pathname: string,
-  item: ProductNavItem,
-) {
+function isOwnRouteActive(pathname: string, item: ProductNavItem) {
   if (item.exact) return pathname === item.href;
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
 
+export function isProductRouteActive(pathname: string, item: ProductNavItem) {
+  return isOwnRouteActive(pathname, item) || item.children?.some((child) => isOwnRouteActive(pathname, child)) === true;
+}
+
 export function getProductSection(pathname: string) {
   if (pathname === "/campaigns/new") return "Новая кампания";
-  return (
-    productRoutes.find((item) => isProductRouteActive(pathname, item))?.label ??
-    "Обзор"
-  );
+  if (pathname.startsWith("/settings")) return "Настройки";
+  if (pathname.startsWith("/import")) return "Импорт контактов";
+  if (pathname.startsWith("/templates")) return "Шаблоны";
+  if (pathname.startsWith("/email-builder")) return "Редактор писем";
+  return productRoutes.slice().reverse().find((item) => isOwnRouteActive(pathname, item))?.label ?? "Обзор";
 }

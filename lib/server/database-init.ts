@@ -1,0 +1,446 @@
+import { and, eq, isNull } from "drizzle-orm";
+import { getD1, getDb } from "@/db";
+import {
+  integrations,
+  participants,
+  systemState,
+  workspaces,
+} from "@/db/schema";
+import { integrationProviders } from "@/config/integrations";
+import { ApiRequestError } from "./api-utils";
+
+export const WORKSPACE_ID = "workspace-main";
+export const PARTICIPANT_ID = "participant-main";
+
+let initialization: Promise<void> | null = null;
+
+const schemaStatements = [
+  `CREATE TABLE IF NOT EXISTS workspaces (
+    id TEXT PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL,
+    company_name TEXT NOT NULL,
+    timezone TEXT NOT NULL DEFAULT 'Europe/Moscow',
+    default_sender_name TEXT NOT NULL DEFAULT '',
+    default_sender_email TEXT NOT NULL DEFAULT '',
+    reply_to_email TEXT NOT NULL DEFAULT '',
+    signature TEXT NOT NULL DEFAULT '',
+    require_consent INTEGER NOT NULL DEFAULT 1,
+    notify_campaign_complete INTEGER NOT NULL DEFAULT 1,
+    notify_blocked_campaign INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS participants (
+    id TEXT PRIMARY KEY NOT NULL,
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    auth_user_id TEXT,
+    display_name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS contacts (
+    id TEXT PRIMARY KEY NOT NULL,
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    first_name TEXT NOT NULL,
+    last_name TEXT NOT NULL,
+    full_name TEXT NOT NULL,
+    email TEXT NOT NULL DEFAULT '',
+    phone TEXT NOT NULL DEFAULT '',
+    company_id TEXT,
+    company_name TEXT NOT NULL DEFAULT '',
+    job_title TEXT NOT NULL DEFAULT '',
+    category TEXT NOT NULL DEFAULT 'Client',
+    city TEXT NOT NULL DEFAULT '',
+    country TEXT NOT NULL DEFAULT 'Россия',
+    tags TEXT NOT NULL DEFAULT '[]',
+    status TEXT NOT NULL DEFAULT 'active',
+    engagement_score INTEGER NOT NULL DEFAULT 0,
+    avatar_color TEXT NOT NULL DEFAULT '#6558E8',
+    email_consent INTEGER NOT NULL DEFAULT 0,
+    telegram_chat_id TEXT,
+    telegram_consent INTEGER NOT NULL DEFAULT 0,
+    vk_user_id TEXT,
+    vk_consent INTEGER NOT NULL DEFAULT 0,
+    last_contacted_at TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS segments (
+    id TEXT PRIMARY KEY NOT NULL,
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    rules TEXT NOT NULL DEFAULT '[]',
+    color TEXT NOT NULL DEFAULT '#6558E8',
+    is_dynamic INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS integrations (
+    id TEXT PRIMARY KEY NOT NULL,
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    provider_id TEXT NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    public_config TEXT NOT NULL DEFAULT '{}',
+    last_checked_at TEXT,
+    check_status TEXT NOT NULL DEFAULT 'disconnected',
+    check_message TEXT NOT NULL DEFAULT 'Подключение ещё не проверено.',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS campaigns (
+    id TEXT PRIMARY KEY NOT NULL,
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    participant_id TEXT NOT NULL REFERENCES participants(id),
+    name TEXT NOT NULL,
+    audience_type TEXT NOT NULL,
+    audience_label TEXT NOT NULL DEFAULT '',
+    segment_id TEXT REFERENCES segments(id) ON DELETE SET NULL,
+    contact_ids TEXT NOT NULL DEFAULT '[]',
+    template_id TEXT,
+    sender_name TEXT NOT NULL DEFAULT '',
+    sender_email TEXT NOT NULL DEFAULT '',
+    subject TEXT NOT NULL DEFAULT '',
+    preview_text TEXT NOT NULL DEFAULT '',
+    email_body_text TEXT NOT NULL DEFAULT '',
+    email_body_html TEXT NOT NULL DEFAULT '',
+    email_builder_document TEXT,
+    messenger_message TEXT NOT NULL DEFAULT '',
+    delivery_channels TEXT NOT NULL DEFAULT '[]',
+    status TEXT NOT NULL DEFAULT 'draft',
+    status_reason TEXT NOT NULL DEFAULT 'Черновик сохранён',
+    scheduled_at TEXT,
+    sent_at TEXT,
+    metrics TEXT NOT NULL DEFAULT '{"recipients":0,"sent":0,"delivered":0,"opened":0,"clicked":0,"replies":0,"bounced":0,"unsubscribed":0}',
+    ready_version_id TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS campaign_versions (
+    id TEXT PRIMARY KEY NOT NULL,
+    campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+    version INTEGER NOT NULL,
+    content_hash TEXT NOT NULL,
+    snapshot TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS delivery_jobs (
+    id TEXT PRIMARY KEY NOT NULL,
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+    campaign_version_id TEXT NOT NULL REFERENCES campaign_versions(id),
+    idempotency_key TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'queued',
+    accepted_count INTEGER NOT NULL DEFAULT 0,
+    rejected_count INTEGER NOT NULL DEFAULT 0,
+    ambiguous_count INTEGER NOT NULL DEFAULT 0,
+    manual_count INTEGER NOT NULL DEFAULT 0,
+    provider_external_ids TEXT NOT NULL DEFAULT '{}',
+    status_message TEXT NOT NULL DEFAULT 'Задание создано.',
+    completed_at TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS delivery_outbox (
+    id TEXT PRIMARY KEY NOT NULL,
+    job_id TEXT NOT NULL REFERENCES delivery_jobs(id) ON DELETE CASCADE,
+    campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+    campaign_version_id TEXT NOT NULL REFERENCES campaign_versions(id),
+    contact_id TEXT NOT NULL,
+    channel TEXT NOT NULL,
+    provider_id TEXT NOT NULL,
+    recipient_endpoint TEXT NOT NULL,
+    idempotency_key TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    attempts INTEGER NOT NULL DEFAULT 0,
+    external_id TEXT,
+    status_message TEXT NOT NULL DEFAULT 'Ожидает обработки.',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS delivery_plans (
+    id TEXT PRIMARY KEY NOT NULL,
+    campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+    channel TEXT NOT NULL,
+    provider_id TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'draft',
+    eligible_count INTEGER NOT NULL DEFAULT 0,
+    blocked_count INTEGER NOT NULL DEFAULT 0,
+    status_reason TEXT NOT NULL DEFAULT 'План не проверен',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS campaign_events (
+    id TEXT PRIMARY KEY NOT NULL,
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    campaign_id TEXT REFERENCES campaigns(id) ON DELETE CASCADE,
+    type TEXT NOT NULL,
+    message TEXT NOT NULL,
+    details TEXT NOT NULL DEFAULT '{}',
+    occurred_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS system_state (
+    key TEXT PRIMARY KEY NOT NULL,
+    value TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_participants_workspace_singleton ON participants(workspace_id)`,
+  `DROP INDEX IF EXISTS idx_contacts_workspace_email`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_contacts_workspace_email ON contacts(workspace_id, email) WHERE email <> ''`,
+  `DROP INDEX IF EXISTS idx_contacts_workspace_telegram`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_contacts_workspace_telegram ON contacts(workspace_id, telegram_chat_id) WHERE telegram_chat_id IS NOT NULL`,
+  `DROP INDEX IF EXISTS idx_contacts_workspace_vk`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_contacts_workspace_vk ON contacts(workspace_id, vk_user_id) WHERE vk_user_id IS NOT NULL`,
+  `CREATE INDEX IF NOT EXISTS idx_contacts_workspace_status ON contacts(workspace_id, status)`,
+  `CREATE INDEX IF NOT EXISTS idx_contacts_workspace_company ON contacts(workspace_id, company_id)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_segments_workspace_name ON segments(workspace_id, name)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_integrations_workspace_provider ON integrations(workspace_id, provider_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_campaigns_workspace_status_updated ON campaigns(workspace_id, status, updated_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_campaigns_segment ON campaigns(segment_id)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_campaign_versions_number ON campaign_versions(campaign_id, version)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_campaign_versions_hash ON campaign_versions(campaign_id, content_hash)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_delivery_jobs_idempotency ON delivery_jobs(workspace_id, idempotency_key)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_delivery_jobs_version ON delivery_jobs(campaign_version_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_delivery_jobs_campaign_created ON delivery_jobs(campaign_id, created_at)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_delivery_outbox_idempotency ON delivery_outbox(idempotency_key)`,
+  `CREATE INDEX IF NOT EXISTS idx_delivery_outbox_job_status ON delivery_outbox(job_id, status)`,
+  `CREATE INDEX IF NOT EXISTS idx_delivery_outbox_campaign_channel ON delivery_outbox(campaign_id, channel)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_delivery_plans_campaign_channel ON delivery_plans(campaign_id, channel)`,
+  `CREATE INDEX IF NOT EXISTS idx_delivery_plans_provider ON delivery_plans(provider_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_campaign_events_workspace_occurred ON campaign_events(workspace_id, occurred_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_campaign_events_campaign_occurred ON campaign_events(campaign_id, occurred_at)`,
+  `CREATE TRIGGER IF NOT EXISTS prevent_campaign_versions_update
+    BEFORE UPDATE ON campaign_versions
+    BEGIN
+      SELECT RAISE(ABORT, 'campaign versions are immutable');
+    END`,
+  `PRAGMA optimize`,
+];
+
+type RequestIdentity = {
+  authUserId: string | null;
+  displayName: string;
+  email: string;
+};
+
+function identityFromRequest(request: Request): RequestIdentity {
+  const forwardedUserId = request.headers.get("oai-authenticated-user-id");
+  const forwardedEmail = request.headers.get("oai-authenticated-user-email");
+  const authUserId =
+    forwardedUserId && forwardedEmail ? forwardedUserId : null;
+  const email = forwardedEmail ?? "participant@mailflow.local";
+  const encodedName = request.headers.get("oai-authenticated-user-full-name");
+  let displayName = "Участник MAILFLOW";
+  if (
+    encodedName &&
+    request.headers.get("oai-authenticated-user-full-name-encoding") ===
+      "percent-encoded-utf-8"
+  ) {
+    try {
+      displayName = decodeURIComponent(encodedName);
+    } catch {
+      // A malformed optional display-name header must not block the workspace.
+    }
+  }
+  return { authUserId, displayName, email: email.toLowerCase() };
+}
+
+function isLocalDevelopmentRequest(request: Request): boolean {
+  const hostname = new URL(request.url).hostname;
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
+}
+
+export async function requireWorkspaceParticipant(request: Request) {
+  const identity = identityFromRequest(request);
+  if (!identity.authUserId) {
+    if (isLocalDevelopmentRequest(request)) return;
+    throw new ApiRequestError(
+      "Для доступа к рабочему пространству необходимо войти в аккаунт.",
+      401,
+    );
+  }
+
+  const db = getDb();
+  let [participant] = await db
+    .select()
+    .from(participants)
+    .where(eq(participants.id, PARTICIPANT_ID))
+    .limit(1);
+  if (!participant) {
+    throw new ApiRequestError("Участник рабочего пространства не найден.", 403);
+  }
+
+  if (!participant.authUserId) {
+    const now = new Date().toISOString();
+    await db
+      .update(participants)
+      .set({
+        authUserId: identity.authUserId,
+        displayName: identity.displayName,
+        email: identity.email,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(participants.id, PARTICIPANT_ID),
+          isNull(participants.authUserId),
+        ),
+      );
+    [participant] = await db
+      .select()
+      .from(participants)
+      .where(eq(participants.id, PARTICIPANT_ID))
+      .limit(1);
+  }
+
+  if (participant?.authUserId !== identity.authUserId) {
+    throw new ApiRequestError(
+      "Это рабочее пространство уже принадлежит другому аккаунту.",
+      403,
+    );
+  }
+}
+
+async function createSchema() {
+  const d1 = getD1();
+  await d1.batch(schemaStatements.map((statement) => d1.prepare(statement)));
+  const campaignColumns = await d1
+    .prepare("PRAGMA table_info(campaigns)")
+    .all<{ name: string }>();
+  if (!campaignColumns.results.some((column) => column.name === "email_body_text")) {
+    await d1
+      .prepare(
+        "ALTER TABLE campaigns ADD COLUMN email_body_text TEXT NOT NULL DEFAULT ''",
+      )
+      .run();
+  }
+  if (!campaignColumns.results.some((column) => column.name === "ready_version_id")) {
+    await d1
+      .prepare("ALTER TABLE campaigns ADD COLUMN ready_version_id TEXT")
+      .run();
+  }
+  if (!campaignColumns.results.some((column) => column.name === "email_body_html")) {
+    await d1
+      .prepare(
+        "ALTER TABLE campaigns ADD COLUMN email_body_html TEXT NOT NULL DEFAULT ''",
+      )
+      .run();
+  }
+  if (!campaignColumns.results.some((column) => column.name === "email_builder_document")) {
+    await d1
+      .prepare("ALTER TABLE campaigns ADD COLUMN email_builder_document TEXT")
+      .run();
+  }
+  const integrationColumns = await d1
+    .prepare("PRAGMA table_info(integrations)")
+    .all<{ name: string }>();
+  if (!integrationColumns.results.some((column) => column.name === "check_status")) {
+    await d1
+      .prepare(
+        "ALTER TABLE integrations ADD COLUMN check_status TEXT NOT NULL DEFAULT 'disconnected'",
+      )
+      .run();
+  }
+  if (!integrationColumns.results.some((column) => column.name === "check_message")) {
+    await d1
+      .prepare(
+        "ALTER TABLE integrations ADD COLUMN check_message TEXT NOT NULL DEFAULT 'Подключение ещё не проверено.'",
+      )
+      .run();
+  }
+}
+
+async function seedDatabase(request: Request) {
+  const db = getDb();
+  const identity = identityFromRequest(request);
+  const now = new Date().toISOString();
+
+  await db
+    .insert(workspaces)
+    .values({
+      id: WORKSPACE_ID,
+      name: "Рабочее пространство MAILFLOW",
+      companyName: "MAILFLOW",
+      timezone: "Europe/Moscow",
+      defaultSenderName: identity.displayName,
+      defaultSenderEmail: identity.email,
+      replyToEmail: identity.email,
+      signature: `С уважением,\n${identity.displayName}`,
+      requireConsent: true,
+      notifyCampaignComplete: true,
+      notifyBlockedCampaign: true,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoNothing();
+
+  await db
+    .insert(participants)
+    .values({
+      id: PARTICIPANT_ID,
+      workspaceId: WORKSPACE_ID,
+      authUserId: identity.authUserId,
+      displayName: identity.displayName,
+      email: identity.email,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoNothing();
+
+  const existingParticipant = await db
+    .select()
+    .from(participants)
+    .where(eq(participants.id, PARTICIPANT_ID))
+    .limit(1);
+  if (identity.authUserId && !existingParticipant[0]?.authUserId) {
+    await db
+      .update(participants)
+      .set({ authUserId: identity.authUserId, updatedAt: now })
+      .where(eq(participants.id, PARTICIPANT_ID));
+  }
+
+  const [initializationState] = await db
+    .select()
+    .from(systemState)
+    .where(eq(systemState.key, "initial-data-version"))
+    .limit(1);
+
+  await db
+    .insert(integrations)
+    .values(
+      integrationProviders.map((provider) => ({
+        id: `integration-${provider.id}`,
+        workspaceId: WORKSPACE_ID,
+        providerId: provider.id,
+        enabled: true,
+        publicConfig: {},
+        lastCheckedAt: null,
+        createdAt: now,
+        updatedAt: now,
+      })),
+    )
+    .onConflictDoNothing();
+
+  if (!initializationState) {
+    await db.insert(systemState).values({
+      key: "initial-data-version",
+      value: "empty-workspace-v2",
+      updatedAt: now,
+    });
+  }
+}
+
+export async function ensureDatabase(request: Request): Promise<void> {
+  if (!initialization) {
+    initialization = (async () => {
+      await createSchema();
+      await seedDatabase(request);
+    })().catch((error) => {
+      initialization = null;
+      throw error;
+    });
+  }
+  await initialization;
+  await requireWorkspaceParticipant(request);
+}

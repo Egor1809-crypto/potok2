@@ -1,49 +1,136 @@
 "use client";
 
-import { ChevronDown, Download, MailCheck, MousePointerClick, Reply, Send, ShieldCheck, UserMinus } from "lucide-react";
-import { useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { PerformanceChart } from "@/components/dashboard/PerformanceChart";
-import { campaigns } from "@/data/mockCampaigns";
+import {
+  BarChart3,
+  Check,
+  CircleAlert,
+  Download,
+  LoaderCircle,
+  MailCheck,
+  MousePointerClick,
+  Reply,
+  Send,
+  ShieldCheck,
+  UserMinus,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-const kpis = [
-  { label: "Отправлено", value: "10 000", delta: "+12,4%", Icon: Send, color: "#625cf6" },
-  { label: "Доставлено", value: "9 820", delta: "98,2%", Icon: ShieldCheck, color: "#33a3d6" },
-  { label: "Открыто", value: "4 921", delta: "+8,6%", Icon: MailCheck, color: "#825bd8" },
-  { label: "Переходы", value: "1 284", delta: "+2,1%", Icon: MousePointerClick, color: "#45a36c" },
-  { label: "Ответы", value: "328", delta: "+0,8%", Icon: Reply, color: "#e09742" },
-  { label: "Отписки", value: "18", delta: "0,18%", Icon: UserMinus, color: "#9a9ca8" },
-];
+import type { CampaignMetricsRecord, CampaignRecord, WorkspaceSnapshot } from "@/types/api";
 
-const funnel = [
-  { label: "Отправлено", value: 10000, rate: "100%", width: 100, color: "#625cf6" },
-  { label: "Доставлено", value: 9820, rate: "98,2%", width: 90, color: "#716bf1" },
-  { label: "Открыто", value: 4921, rate: "50,1%", width: 68, color: "#5f94e1" },
-  { label: "Переходы", value: 1284, rate: "26,1%", width: 46, color: "#48a987" },
-  { label: "Ответы", value: 328, rate: "25,5%", width: 28, color: "#3e8d5c" },
-];
+const number = new Intl.NumberFormat("ru-RU");
+const percent = new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+const emptyMetrics: CampaignMetricsRecord = {
+  recipients: 0,
+  sent: 0,
+  delivered: 0,
+  opened: 0,
+  clicked: 0,
+  replies: 0,
+  bounced: 0,
+  unsubscribed: 0,
+};
+
+function rate(value: number, base: number) {
+  return base > 0 ? (value / base) * 100 : 0;
+}
+
+function sumMetrics(campaigns: CampaignRecord[]) {
+  return campaigns.reduce<CampaignMetricsRecord>((total, campaign) => {
+    for (const key of Object.keys(total) as Array<keyof CampaignMetricsRecord>) total[key] += campaign.metrics[key];
+    return total;
+  }, { ...emptyMetrics });
+}
 
 export function AnalyticsView() {
   const searchParams = useSearchParams();
-  const requestedCampaign = campaigns.find(item => item.id === searchParams.get("campaign"));
-  const demoName = searchParams.get("demoName")?.trim();
-  const initialCampaign = demoName || requestedCampaign?.name || "Все кампании";
-  const [campaign, setCampaign] = useState(initialCampaign);
+  const requestedCampaign = searchParams.get("campaign") ?? "all";
+  const [snapshot, setSnapshot] = useState<WorkspaceSnapshot | null>(null);
+  const [selection, setSelection] = useState(requestedCampaign);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch("/api/workspace", { cache: "no-store" });
+      const payload: WorkspaceSnapshot | { error?: string } = await response.json();
+      if (!response.ok || !("campaigns" in payload)) throw new Error("error" in payload && payload.error ? payload.error : "Не удалось загрузить результаты");
+      setSnapshot(payload);
+      if (requestedCampaign !== "all" && !payload.campaigns.some((campaign) => campaign.id === requestedCampaign)) setSelection("all");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Не удалось загрузить результаты");
+    } finally {
+      setLoading(false);
+    }
+  }, [requestedCampaign]);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => void load());
+    return () => window.cancelAnimationFrame(frame);
+  }, [load]);
+
+  const campaigns = useMemo(() => snapshot?.campaigns ?? [], [snapshot]);
+  const selectedCampaigns = useMemo(() => selection === "all" ? campaigns : campaigns.filter((campaign) => campaign.id === selection), [campaigns, selection]);
+  const metrics = useMemo(() => sumMetrics(selectedCampaigns), [selectedCampaigns]);
+  const title = selection === "all" ? "Все кампании" : campaigns.find((campaign) => campaign.id === selection)?.name ?? "Кампания";
+
+  const exportCsv = () => {
+    const rows = [
+      ["Кампания", "Получатели", "Отправлено", "Доставлено", "Открыто", "Переходы", "Ответы", "Ошибки", "Отписки"],
+      ...selectedCampaigns.map((campaign) => [campaign.name, ...Object.values(campaign.metrics).map(String)]),
+    ];
+    const escape = (value: string) => `"${value.replaceAll('"', '""')}"`;
+    const blob = new Blob(["\uFEFF", rows.map((row) => row.map(escape).join(";")).join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `mailflow-results-${new Date().toISOString().slice(0, 10)}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  if (loading && !snapshot) return <div className="grid min-h-[420px] place-items-center"><div className="text-center"><LoaderCircle aria-hidden="true" className="mx-auto size-7 animate-spin text-[var(--primary)]" /><p className="mt-3 text-sm text-[var(--text-muted)]">Загружаем результаты…</p></div></div>;
+
+  if (!snapshot) return <div className="card mx-auto max-w-lg p-8 text-center"><CircleAlert aria-hidden="true" className="mx-auto size-8 text-[var(--danger)]" /><h1 className="mt-4 text-xl font-semibold">Результаты недоступны</h1><p className="mt-2 text-sm text-[var(--text-muted)]">{error}</p><button type="button" onClick={() => void load()} className="btn btn-primary mt-5">Повторить</button></div>;
+
+  const kpis = [
+    { label: "Отправлено", value: metrics.sent, note: `${number.format(metrics.recipients)} получателей`, Icon: Send },
+    { label: "Доставлено", value: metrics.delivered, note: `${percent.format(rate(metrics.delivered, metrics.sent))}% от отправленных`, Icon: ShieldCheck },
+    { label: "Открыто", value: metrics.opened, note: `${percent.format(rate(metrics.opened, metrics.delivered))}% от доставленных`, Icon: MailCheck },
+    { label: "Переходы", value: metrics.clicked, note: `${percent.format(rate(metrics.clicked, metrics.opened))}% от открытий`, Icon: MousePointerClick },
+    { label: "Ответы", value: metrics.replies, note: `${percent.format(rate(metrics.replies, metrics.delivered))}% от доставленных`, Icon: Reply },
+    { label: "Отписки", value: metrics.unsubscribed, note: `${percent.format(rate(metrics.unsubscribed, metrics.delivered))}% от доставленных`, Icon: UserMinus },
+  ];
+
+  const funnel = [
+    { label: "Получатели", value: metrics.recipients, base: metrics.recipients },
+    { label: "Отправлено", value: metrics.sent, base: metrics.recipients },
+    { label: "Доставлено", value: metrics.delivered, base: metrics.recipients },
+    { label: "Открыто", value: metrics.opened, base: metrics.recipients },
+    { label: "Ответили", value: metrics.replies, base: metrics.recipients },
+  ];
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="section-eyebrow">Показатели эффективности</p><h1 className="mt-2 text-[28px] font-medium tracking-[-.04em]">Аналитика</h1><p className="mt-1.5 text-sm text-[var(--text-secondary)]">Поймите, что превращает отправку в диалог.</p></div><div className="flex flex-wrap gap-2"><label className="relative"><span className="sr-only">Выбрать кампанию</span><select value={campaign} onChange={event => setCampaign(event.target.value)} className="input h-10 appearance-none pr-9 text-[11px]"><option>Все кампании</option>{demoName && !campaigns.some(item => item.name === demoName) ? <option>{demoName}</option> : null}{campaigns.map(item => <option key={item.id}>{item.name}</option>)}</select><ChevronDown size={13} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" /></label><button className="btn btn-secondary gap-2"><Download size={14} />Экспорт</button></div></div>
+      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div><p className="section-eyebrow">Результаты доставки</p><h1 className="text-[28px] font-semibold tracking-[-.04em]">Результаты</h1><p className="mt-2 text-sm text-[var(--text-muted)]">Только факты, которые сохранены у кампаний. Расчётные показатели не подставляются.</p></div>
+        <div className="flex flex-wrap gap-2"><label><span className="sr-only">Выбрать кампанию</span><select className="input min-w-56" value={selection} onChange={(event) => setSelection(event.target.value)}><option value="all">Все кампании</option>{campaigns.map((campaign) => <option key={campaign.id} value={campaign.id}>{campaign.name}</option>)}</select></label><button type="button" onClick={exportCsv} disabled={!selectedCampaigns.length} className="btn btn-secondary gap-2"><Download aria-hidden="true" className="size-4" />Скачать CSV</button></div>
+      </header>
 
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">{kpis.map(({ label, value, delta, Icon, color }) => <article key={label} className="card p-4"><div className="flex items-center justify-between"><span className="grid size-7 place-items-center rounded-lg" style={{backgroundColor:`${color}12`,color}}><Icon size={14}/></span><span className={`text-[9px] font-semibold ${label === "Отписки" ? "text-[var(--text-tertiary)]" : "text-[#3e8d5c]"}`}>{delta}</span></div><p className="mt-5 text-[21px] font-semibold tracking-[-.04em]">{value}</p><p className="mt-1 text-[10px] text-[var(--text-tertiary)]">{label}</p></article>)}</section>
-
-      <section className="grid gap-6 xl:grid-cols-[.8fr_1.2fr]">
-        <article className="card p-5 sm:p-6"><div className="flex items-start justify-between"><div><h2 className="text-[14px] font-semibold">Воронка вовлечённости</h2><p className="mt-1 text-[10px] text-[var(--text-tertiary)]">{campaign} · последние 30 дней</p></div><span className="badge badge-success">Хорошо</span></div><div className="mt-7 space-y-3">{funnel.map((step,index)=><div key={step.label} className="group"><div className="mb-1.5 flex items-end justify-between text-[10px]"><span className="font-semibold">{step.label}</span><span className="text-[var(--text-tertiary)]">{step.value.toLocaleString("ru-RU")} · {step.rate}</span></div><div className="h-9 overflow-hidden rounded-lg bg-[var(--surface-subtle)]"><div className="flex h-full items-center px-3 font-mono text-[9px] font-semibold text-white transition-[width] duration-500" style={{width:`${step.width}%`,backgroundColor:step.color}}>{index === 0 ? "Аудитория" : `Отсев: ${(funnel[index-1].value-step.value).toLocaleString("ru-RU")}`}</div></div></div>)}</div><div className="mt-6 rounded-xl border border-[#dbebdf] bg-[#f3faf5] p-4"><p className="text-[10px] font-semibold text-[#347a50]">Лучшая конверсия</p><p className="mt-1 text-[11px] text-[#5f7868]">25,5% перешедших по ссылке ответили — на 4,8 п. п. выше среднего по рабочему пространству.</p></div></article>
-        <article className="card p-5 sm:p-6"><PerformanceChart compact /></article>
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+        {kpis.map(({ label, value, note, Icon }) => <article key={label} className="card p-4"><div className="flex items-center justify-between"><span className="grid size-8 place-items-center rounded-lg bg-[var(--primary-subtle)] text-[var(--primary)]"><Icon aria-hidden="true" className="size-4" /></span>{value > 0 && <Check aria-hidden="true" className="size-4 text-[var(--success)]" />}</div><p className="mt-5 text-[22px] font-semibold tracking-[-.04em]">{number.format(value)}</p><p className="mt-1 text-[11px] font-semibold">{label}</p><p className="mt-1 text-[9px] leading-4 text-[var(--text-subtle)]">{note}</p></article>)}
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[1.2fr_.8fr]">
-        <article className="card overflow-hidden"><div className="border-b border-[var(--border)] px-5 py-4"><h2 className="text-[14px] font-semibold">Лучшие кампании</h2><p className="mt-1 text-[10px] text-[var(--text-tertiary)]">По доле ответов</p></div><div className="overflow-x-auto"><table className="w-full min-w-[580px] text-left"><thead><tr className="bg-[var(--surface-subtle)] text-[9px] font-semibold uppercase tracking-[.07em] text-[var(--text-tertiary)]"><th className="px-5 py-3">Кампания</th><th className="px-4 py-3">Отправлено</th><th className="px-4 py-3">Открыто</th><th className="px-4 py-3">Переходы</th><th className="px-4 py-3">Ответы</th></tr></thead><tbody>{[["Партнёры — III квартал","1 284","62,1%","18,7%","8,4%"],["Приглашение на юридическую конференцию","3 921","54,8%","14,2%","7,1%"],["Ужин лидеров арбитража","584","58,2%","16,9%","6,8%"],["Продолжение диалога в августе","2 110","44,6%","9,8%","5,2%"]].map(row=><tr key={row[0]} className="border-t border-[var(--border)]"><td className="px-5 py-4 text-[10px] font-semibold">{row[0]}</td>{row.slice(1).map(value=><td key={value} className="px-4 py-4 text-[10px] text-[var(--text-secondary)]">{value}</td>)}</tr>)}</tbody></table></div></article>
-        <article className="card p-5"><div><h2 className="text-[14px] font-semibold">Качество аудитории</h2><p className="mt-1 text-[10px] text-[var(--text-tertiary)]">Состояние доставляемости по всей базе</p></div><div className="mt-6 flex items-center justify-center"><div className="relative grid size-40 place-items-center rounded-full" style={{background:"conic-gradient(#625cf6 0 78%, #33a3d6 78% 92%, #e6e7ec 92% 100%)"}}><div className="grid size-[118px] place-items-center rounded-full bg-white text-center"><div><p className="text-[27px] font-semibold tracking-[-.04em]">94%</p><p className="text-[9px] text-[var(--text-tertiary)]">Корректные контакты</p></div></div></div></div><div className="mt-7 grid grid-cols-3 gap-2">{[["Корректные","23 334","#625cf6"],["В зоне риска","1 102","#33a3d6"],["Некорректные","385","#d8dae2"]].map(([label,value,color])=><div key={label} className="rounded-lg bg-[var(--surface-subtle)] p-2.5"><span className="mb-2 block size-1.5 rounded-full" style={{backgroundColor:color}}/><p className="text-[12px] font-semibold">{value}</p><p className="text-[8px] text-[var(--text-tertiary)]">{label}</p></div>)}</div></article>
+      {metrics.sent === 0 && <section className="rounded-2xl border border-[#eadfbd] bg-[#fff9eb] p-5"><div className="flex items-start gap-3"><BarChart3 aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-[var(--warning)]" /><div><h2 className="text-[13px] font-semibold">Результатов отправки пока нет</h2><p className="mt-1 text-[11px] leading-5 text-[var(--text-muted)]">Подготовка и проверка кампании работают уже сейчас. Метрики доставки появятся только после реальной обработки подключённым провайдером.</p><Link href="/campaigns" className="mt-2 inline-flex text-[11px] font-semibold text-[var(--primary)]">Открыть кампании →</Link></div></div></section>}
+
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,.9fr)_minmax(0,1.1fr)]">
+        <article className="card p-5 sm:p-6"><h2 className="text-[15px] font-semibold">Воронка</h2><p className="mt-1 text-[11px] text-[var(--text-subtle)]">{title}</p><div className="mt-6 space-y-4">{funnel.map((step) => { const width = step.base > 0 ? Math.max(2, rate(step.value, step.base)) : 0; return <div key={step.label}><div className="mb-1.5 flex items-center justify-between text-[11px]"><span className="font-semibold">{step.label}</span><span className="text-[var(--text-muted)]">{number.format(step.value)} · {percent.format(step.base > 0 ? rate(step.value, step.base) : 0)}%</span></div><div className="h-8 overflow-hidden rounded-lg bg-[var(--surface-subtle)]"><div className="h-full rounded-lg bg-[var(--primary)] transition-[width]" style={{ width: `${width}%` }} /></div></div>; })}</div></article>
+
+        <article className="card overflow-hidden"><div className="border-b border-[var(--border)] px-5 py-4 sm:px-6"><h2 className="text-[15px] font-semibold">По кампаниям</h2><p className="mt-1 text-[11px] text-[var(--text-subtle)]">Откройте кампанию, чтобы увидеть причину блокировки или план доставки.</p></div>{selectedCampaigns.length ? <div className="overflow-x-auto"><table className="data-table min-w-[650px]"><thead><tr><th>Кампания</th><th>Отправлено</th><th>Доставка</th><th>Ответы</th><th>Ошибки</th></tr></thead><tbody>{selectedCampaigns.map((campaign) => <tr key={campaign.id}><td><Link href={`/campaigns/${campaign.id}`} className="text-[12px] font-semibold hover:text-[var(--primary)]">{campaign.name}</Link><p className="mt-0.5 text-[10px] text-[var(--text-subtle)]">{campaign.audienceLabel}</p></td><td>{number.format(campaign.metrics.sent)}</td><td>{percent.format(rate(campaign.metrics.delivered, campaign.metrics.sent))}%</td><td>{number.format(campaign.metrics.replies)}</td><td>{number.format(campaign.metrics.bounced)}</td></tr>)}</tbody></table></div> : <div className="px-6 py-12 text-center text-[12px] text-[var(--text-muted)]">Кампаний пока нет.</div>}</article>
       </section>
     </div>
   );

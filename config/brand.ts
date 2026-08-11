@@ -22,8 +22,8 @@ export const brandConfig = {
 } as const;
 
 export const workspaceConfig = {
-  id: "workspace-legal-team",
-  name: "Юридическая команда",
+  id: "workspace-main",
+  name: "Моё пространство",
   plan: "Масштаб",
   timezone: "Europe/Moscow",
   locale: "ru-RU",
@@ -32,12 +32,12 @@ export const workspaceConfig = {
 } as const;
 
 export const demoUser = {
-  id: "user-egor-sabalin",
+  id: "participant-main",
   name: "Егор Сабалин",
   firstName: "Егор",
   email: "egor@mailflow.example",
   initials: "ЕС",
-  role: "Администратор пространства",
+  role: "Участник · полный доступ",
   avatarColor: "#675CF5",
 } as const;
 

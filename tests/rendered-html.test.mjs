@@ -42,7 +42,6 @@ test("all key product routes render without a dead end", async () => {
     "/dashboard",
     "/contacts",
     "/contacts/contact-ivan-petrov",
-    "/companies",
     "/segments",
     "/import",
     "/campaigns",
@@ -63,7 +62,13 @@ test("all key product routes render without a dead end", async () => {
   }
 });
 
-test("multichannel integrations render with an explicit safe demo boundary", async () => {
+test("retired mock-only companies route returns users to contacts", async () => {
+  const response = await render("/companies");
+  assert.ok([307, 308].includes(response.status));
+  assert.equal(new URL(response.headers.get("location"), "http://mailflow.test").pathname, "/contacts");
+});
+
+test("multichannel integrations render with an explicit connection boundary", async () => {
   const response = await render("/integrations");
   assert.equal(response.status, 200);
 
@@ -71,8 +76,9 @@ test("multichannel integrations render with an explicit safe demo boundary", asy
   assert.match(html, /VK WorkSpace/);
   assert.match(html, /Telegram/);
   assert.match(html, /ВКонтакте/);
-  assert.match(html, /Безопасный деморежим/);
-  assert.match(html, /сообщения контактам не уходят/);
+  assert.match(html, /Статус подтверждается провайдером/);
+  assert.match(html, /секреты читаются только из серверного окружения/);
+  assert.doesNotMatch(html, /Безопасный деморежим/);
 });
 
 test("starter artifacts are replaced with project metadata and assets", async () => {

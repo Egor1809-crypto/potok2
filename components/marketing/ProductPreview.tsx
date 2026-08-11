@@ -62,7 +62,7 @@ export function ProductPreview() {
               </div>
               <div className="mt-[255px] flex items-center gap-2 border-t border-[#ececf1] px-1 pt-3">
                 <span className="grid size-7 place-items-center rounded-full bg-[#e9e6ff] text-[9px] font-semibold text-[#625cf6]">ЕС</span>
-                <div><p className="text-[10px] font-semibold">Егор С.</p><p className="text-[8px] text-[#9a9ca8]">Администратор</p></div>
+                <div><p className="text-[10px] font-semibold">Егор С.</p><p className="text-[8px] text-[#9a9ca8]">Участник · полный доступ</p></div>
               </div>
             </aside>
 
@@ -92,7 +92,7 @@ export function ProductPreview() {
 
                 <div className="mt-3 overflow-hidden rounded-xl border border-[#e6e7ec]">
                   <div className="grid grid-cols-[28px_1.5fr_1.2fr_.85fr_.65fr] items-center gap-2 bg-[#fafafb] px-3 py-2.5 text-[8px] font-semibold uppercase tracking-[.08em] text-[#9698a5] sm:grid-cols-[28px_1.6fr_1.3fr_1fr_.8fr]">
-                    <span className="size-3 rounded-[3px] border border-[#cfd1da]" /><span>Имя</span><span>Компания</span><span>Роль</span><span>Тег</span>
+                    <span className="size-3 rounded-[3px] border border-[#cfd1da]" /><span>Имя</span><span>Компания</span><span>Должность</span><span>Тег</span>
                   </div>
                   {rows.map((row, index) => (
                     <div key={row.email} className="grid grid-cols-[28px_1.5fr_1.2fr_.85fr_.65fr] items-center gap-2 border-t border-[#efeff3] px-3 py-3 sm:grid-cols-[28px_1.6fr_1.3fr_1fr_.8fr]">
@@ -111,7 +111,7 @@ export function ProductPreview() {
       <div className="absolute -bottom-10 right-0 z-10 hidden w-[330px] rounded-2xl border border-[#dedfe7] bg-white p-4 shadow-[0_24px_65px_rgba(32,33,50,.2)] lg:block xl:-right-9 xl:bottom-14">
         <div className="flex items-center justify-between"><div><p className="text-[11px] font-semibold text-[#2a2b37]">Фильтр контактов</p><p className="mt-0.5 text-[9px] text-[#989aa6]">Все условия должны совпасть</p></div><span className="rounded-md bg-[#eeedff] px-2 py-1 text-[8px] font-semibold text-[#5b55da]">И</span></div>
         <div className="mt-3 space-y-2">
-          {["Роль · равно · Юрист", "Город · равно · Москва", "Статус · равно · Активен"].map((filter) => <div key={filter} className="rounded-lg border border-[#e6e7ec] bg-[#fafafb] px-3 py-2 text-[9px] font-medium text-[#535562]">{filter}</div>)}
+          {["Должность · равно · Юрист", "Город · равно · Москва", "Статус · равно · Активен"].map((filter) => <div key={filter} className="rounded-lg border border-[#e6e7ec] bg-[#fafafb] px-3 py-2 text-[9px] font-medium text-[#535562]">{filter}</div>)}
         </div>
         <div className="mt-3 flex items-center gap-1.5" aria-label="Каналы кампании">
           {[[Mail, "Email"], [SendHorizontal, "Telegram"], [MessageCircle, "ВКонтакте"]].map(([Icon, label]) => {

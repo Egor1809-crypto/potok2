@@ -11,3 +11,13 @@ export function getDb() {
 
   return drizzle(env.DB, { schema });
 }
+
+export function getD1(): D1Database {
+  if (!env.DB) {
+    throw new Error(
+      "Cloudflare D1 binding `DB` недоступен. Проверьте настройку хранилища проекта.",
+    );
+  }
+
+  return env.DB;
+}

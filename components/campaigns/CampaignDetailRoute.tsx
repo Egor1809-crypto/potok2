@@ -1,79 +1,142 @@
 "use client";
 
-import { useParams, useSearchParams } from "next/navigation";
-import { useCallback, useMemo, useSyncExternalStore } from "react";
-import { campaigns } from "@/data/mockCampaigns";
-import type { Campaign, CampaignStatus } from "@/types";
+import * as React from "react";
+import { useParams, useRouter } from "next/navigation";
+
+import type {
+  ApiError,
+  CampaignEventRecord,
+  CampaignMutationResponse,
+  CampaignRecord,
+  DeliveryJobRecord,
+  DeliveryPlanRecord,
+  WorkspaceSnapshot,
+} from "@/types/api";
 import { CampaignDetailView } from "./CampaignDetailView";
-import type { CampaignDeliveryPlan } from "./campaignChannels";
 
 export function CampaignDetailRoute() {
   const params = useParams<{ id?: string }>();
-  const searchParams = useSearchParams();
+  const router = useRouter();
   const campaignId = params?.id;
-  const getStoredSnapshot = useCallback(
-    () => campaignId ? window.localStorage.getItem(`mailflow:campaign:${campaignId}`) ?? "" : "",
-    [campaignId],
-  );
-  const storedSnapshot = useSyncExternalStore(
-    (onStoreChange) => {
-      window.addEventListener("storage", onStoreChange);
-      return () => window.removeEventListener("storage", onStoreChange);
-    },
-    getStoredSnapshot,
-    () => "",
-  );
-  const getDeliverySnapshot = useCallback(
-    () => campaignId
-      ? window.localStorage.getItem(`mailflow:campaign-delivery:${campaignId}`) ?? ""
-      : "",
-    [campaignId],
-  );
-  const deliverySnapshot = useSyncExternalStore(
-    (onStoreChange) => {
-      window.addEventListener("storage", onStoreChange);
-      return () => window.removeEventListener("storage", onStoreChange);
-    },
-    getDeliverySnapshot,
-    () => "",
-  );
-  const storedCampaign = useMemo(() => {
-    if (!storedSnapshot) return null;
-    try {
-      return JSON.parse(storedSnapshot) as Campaign;
-    } catch {
-      return null;
-    }
-  }, [storedSnapshot]);
-  const deliveryPlan = useMemo(() => {
-    if (!deliverySnapshot) return null;
-    try {
-      const value = JSON.parse(deliverySnapshot) as CampaignDeliveryPlan;
-      return value?.demo === true && Array.isArray(value.channels)
-        ? value
-        : null;
-    } catch {
-      return null;
-    }
-  }, [deliverySnapshot]);
+  const [campaign, setCampaign] = React.useState<CampaignRecord | null>(null);
+  const [deliveryPlans, setDeliveryPlans] = React.useState<DeliveryPlanRecord[]>([]);
+  const [events, setEvents] = React.useState<CampaignEventRecord[]>([]);
+  const [deliveryJob, setDeliveryJob] = React.useState<DeliveryJobRecord | null>(null);
+  const [apiMode, setApiMode] = React.useState<"loading" | "online" | "offline">("loading");
+  const [dispatching, setDispatching] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
+  const [dispatchNotice, setDispatchNotice] = React.useState<string | null>(null);
 
-  const demoName = searchParams.get("demoName");
-  const requestedStatus = searchParams.get("demoStatus");
-  const demoStatus: CampaignStatus | undefined =
-    requestedStatus === "scheduled" || requestedStatus === "sending"
-      ? requestedStatus
-      : undefined;
-  const baseCampaign = campaigns.find((campaign) => campaign.id === campaignId);
-  const queryCampaign = baseCampaign && demoName
-    ? { ...baseCampaign, name: demoName, status: demoStatus ?? baseCampaign.status }
-    : undefined;
-  const campaign = storedCampaign ?? queryCampaign;
+  const loadCampaign = React.useCallback(async () => {
+    if (!campaignId) {
+      setApiMode("offline");
+      return;
+    }
+    setApiMode("loading");
+    try {
+      const response = await fetch("/api/workspace", { headers: { Accept: "application/json" } });
+      if (!response.ok) throw new Error("Кампания недоступна");
+      const body = await response.json() as WorkspaceSnapshot;
+      const item = body.campaigns.find((candidate) => candidate.id === campaignId) ?? null;
+      setCampaign(item);
+      setDeliveryPlans(body.deliveryPlans.filter((plan) => plan.campaignId === campaignId));
+      setEvents(body.events.filter((event) => event.campaignId === campaignId));
+      setDeliveryJob(
+        body.deliveryJobs.find(
+          (job) => job.campaignVersionId === item?.readyVersionId,
+        ) ?? null,
+      );
+      setApiMode("online");
+    } catch {
+      setCampaign(null);
+      setDeliveryPlans([]);
+      setEvents([]);
+      setDeliveryJob(null);
+      setApiMode("offline");
+    }
+  }, [campaignId]);
+
+  const dispatchCampaign = React.useCallback(async () => {
+    if (!campaign?.readyVersionId) return;
+    setDispatching(true);
+    setDispatchNotice(null);
+    try {
+      const response = await fetch("/api/campaigns", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          id: campaign.id,
+          action: "dispatch",
+          idempotencyKey: `dispatch:${campaign.readyVersionId}`,
+        }),
+      });
+      const body = await response.json() as CampaignMutationResponse | ApiError;
+      if (!response.ok || !("campaign" in body)) {
+        throw new Error("error" in body ? body.error : "Отправка не началась.");
+      }
+      setCampaign(body.campaign);
+      setDeliveryPlans(body.deliveryPlans);
+      if (body.deliveryJob) {
+        setDeliveryJob(body.deliveryJob);
+        setDispatchNotice(body.deliveryJob.statusMessage);
+      }
+      await loadCampaign();
+    } catch (error) {
+      setDispatchNotice(
+        error instanceof Error ? error.message : "Отправка не началась.",
+      );
+      await loadCampaign();
+    } finally {
+      setDispatching(false);
+    }
+  }, [campaign, loadCampaign]);
+
+  const deleteCampaign = React.useCallback(async () => {
+    if (!campaign) return;
+    if (!window.confirm(`Удалить кампанию «${campaign.name}» без возможности восстановления?`)) {
+      return;
+    }
+    setDeleting(true);
+    setDispatchNotice(null);
+    try {
+      const response = await fetch(`/api/campaigns?id=${encodeURIComponent(campaign.id)}`, {
+        method: "DELETE",
+        headers: { Accept: "application/json" },
+      });
+      const body = await response.json() as { deletedId?: string } | ApiError;
+      if (!response.ok || !("deletedId" in body)) {
+        throw new Error("error" in body ? body.error : "Кампания не удалена.");
+      }
+      router.push("/campaigns");
+      router.refresh();
+    } catch (error) {
+      setDispatchNotice(
+        error instanceof Error ? error.message : "Кампания не удалена.",
+      );
+    } finally {
+      setDeleting(false);
+    }
+  }, [campaign, router]);
+
+  React.useEffect(() => {
+    const frame = window.requestAnimationFrame(() => void loadCampaign());
+    return () => window.cancelAnimationFrame(frame);
+  }, [loadCampaign]);
 
   return (
     <CampaignDetailView
       campaignId={campaignId}
       campaign={campaign}
-      deliveryPlan={deliveryPlan}
+      deliveryPlans={deliveryPlans}
+      events={events}
+      deliveryJob={deliveryJob}
+      apiMode={apiMode}
+      onReload={() => void loadCampaign()}
+      onDispatch={() => void dispatchCampaign()}
+      dispatching={dispatching}
+      deleting={deleting}
+      dispatchNotice={dispatchNotice}
+      onDelete={() => void deleteCampaign()}
     />
   );
 }

@@ -1,40 +1,28 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import {
   ArrowLeft,
   ArrowRight,
-  Bot,
-  CalendarClock,
   Check,
   CheckCircle2,
-  Cable,
-  Copy,
-  FileText,
-  Filter,
+  CircleAlert,
+  CircleDashed,
   Mail,
-  MailCheck,
   MessageCircle,
   PencilLine,
+  RefreshCw,
   Save,
   Send,
   SendHorizontal,
+  Settings2,
   ShieldCheck,
-  Sparkles,
   UserRound,
   UsersRound,
 } from "lucide-react";
-import Link from "next/link";
-import { campaigns } from "@/data/mockCampaigns";
-import { companies } from "@/data/mockCompanies";
-import { contacts } from "@/data/mockContacts";
-import { segments } from "@/data/mockSegments";
+
 import { templates } from "@/data/templates";
-import { createCampaignMetrics } from "@/data/helpers";
-import { countReachableContacts } from "@/data/contactChannels";
-import type { Campaign, CampaignWizardStep, TemplateCategory } from "@/types";
-import { BRAND_NAME } from "@/config/brand";
-import { INTEGRATION_DEMO_ROUTES_STORAGE_KEY } from "@/config/integrations";
 import {
   Alert,
   Badge,
@@ -43,9 +31,7 @@ import {
   Input,
   Select,
   Stepper,
-  Switch,
   Textarea,
-  ToastSurface,
   buttonVariants,
   cn,
 } from "@/components/ui";
@@ -53,1117 +39,655 @@ import {
   campaignChannelDefinitions,
   campaignChannelProviders,
   defaultCampaignChannelProvider,
-  estimateCampaignChannelCoverage,
   getCampaignChannelDefinition,
   getCampaignChannelProvider,
   type CampaignChannel,
-} from "@/components/campaigns/campaignChannels";
-import type { BuilderDocument } from "@/components/email-builder/builder-types";
+} from "./campaignChannels";
+import {
+  PREFERRED_PROVIDERS_STORAGE_KEY,
+  integrationProviderById,
+  type IntegrationProviderId,
+} from "@/config/integrations";
+import type {
+  ApiError,
+  CampaignCreateInput,
+  CampaignEvaluation,
+  CampaignMutationResponse,
+  CampaignRecord,
+  ContactRecord,
+  DeliveryPlanRecord,
+  EmailBuilderDocumentInput,
+  IntegrationConnectionStatus,
+  SegmentRecord,
+  WorkspaceSnapshot,
+} from "@/types/api";
 
-type AudienceType = "segment" | "saved-list" | "custom-filter" | "contacts";
-type ContentMode = "scratch" | "template" | "duplicate" | "ai";
-type SendMode = "now" | "schedule";
-type SubmitState = "idle" | "processing" | "success";
+type ApiMode = "loading" | "online" | "offline";
+type ConnectionStatus = IntegrationConnectionStatus;
 
-type SavedCampaignWizardDraft = {
-  name?: string;
-  audienceType?: AudienceType;
-  segmentId?: string | null;
-  savedListId?: string;
-  companyId?: string | null;
-  contactIds?: string[];
-  recipientCount?: number;
-  contentMode?: ContentMode;
-  templateId?: string | null;
-  duplicateCampaignId?: string | null;
-  senderName?: string;
-  senderEmail?: string;
-  subject?: string;
-  previewText?: string;
-  channels?: CampaignChannel[];
-  providers?: Partial<Record<CampaignChannel, string>>;
-  messengerMessage?: string;
-  channelConsentConfirmed?: boolean;
-  excludeUnsubscribed?: boolean;
-  excludeBounced?: boolean;
-  excludePreviouslyContacted?: boolean;
-  sendMode?: SendMode;
-  scheduleDate?: string;
-  scheduleTime?: string;
-  builderDocument?: BuilderDocument;
+type AudienceContact = Pick<
+  ContactRecord,
+  "id" | "fullName" | "email" | "companyName" | "status"
+> & Partial<Pick<
+  ContactRecord,
+  "emailConsent" | "telegramChatId" | "telegramConsent" | "vkUserId" | "vkConsent"
+>>;
+
+type AudienceSegment = Pick<
+  SegmentRecord,
+  "id" | "name" | "description" | "contactCount"
+>;
+
+type IntegrationSnapshot = {
+  providerId: IntegrationProviderId;
+  status: ConnectionStatus;
 };
 
-const MESSENGER_MESSAGE_MAX_LENGTH = 4_000;
-const CAMPAIGN_WIZARD_DRAFT_STORAGE_KEY = "mailflow:campaign-wizard-draft";
-const CAMPAIGN_WIZARD_HANDOFF_STORAGE_PREFIX =
-  "mailflow:campaign-wizard-handoff:";
-const CAMPAIGN_WIZARD_RESUME_STORAGE_PREFIX =
-  "mailflow:campaign-wizard-resume:";
-const meaningfulCampaignQueryKeys = new Set([
-  "audience",
-  "audienceType",
-  "builderDraft",
-  "campaign",
-  "channel",
-  "company",
-  "consent",
-  "contact",
-  "count",
-  "draft",
-  "duplicate",
-  "filter",
-  "handoff",
-  "message",
-  "name",
-  "provider_email",
-  "provider_telegram",
-  "provider_vk",
-  "resume",
-  "copy",
-  "savedList",
-  "segment",
-  "source",
-  "step",
-  "template",
-]);
+type Evaluation = CampaignEvaluation;
 
-export type CampaignWizardSearchParams = Record<
-  string,
-  string | string[] | undefined
->;
+type WizardDraft = {
+  campaignId?: string | null;
+  campaignName: string;
+  name?: string;
+  audienceType: "none" | "segment" | "contacts";
+  segmentId: string;
+  contactIds: string[];
+  subject: string;
+  previewText: string;
+  emailBodyText: string;
+  emailBuilderDocument: EmailBuilderDocumentInput | null;
+  messengerMessage: string;
+  channels: CampaignChannel[];
+  providers: Record<CampaignChannel, IntegrationProviderId>;
+  senderName: string;
+  senderEmail: string;
+};
+
+export type CampaignWizardSearchParams = Record<string, string | string[] | undefined>;
 
 export interface CampaignWizardProps {
   searchParams?: CampaignWizardSearchParams | URLSearchParams;
 }
 
-const wizardSteps: { value: CampaignWizardStep; label: string; description: string }[] = [
-  { value: "audience", label: "Аудитория", description: "Выберите получателей" },
-  { value: "content", label: "Каналы", description: "Подготовьте сообщения" },
-  { value: "sender", label: "Провайдеры", description: "Выберите платформы" },
-  { value: "review", label: "Проверка", description: "Проверьте и запустите" },
+const WIZARD_DRAFT_KEY = "mailflow:campaign-wizard-draft-v2";
+const EMAIL_BUILDER_DRAFT_KEY = "mailflow:email-draft";
+const CAMPAIGN_WIZARD_HANDOFF_STORAGE_PREFIX = "mailflow:campaign-wizard-handoff:";
+const CAMPAIGN_WIZARD_HANDOFF_TOKEN = "current-campaign";
+
+const steps = [
+  { label: "Аудитория", description: "Кому отправляем" },
+  { label: "Сообщение", description: "Что отправляем" },
+  { label: "Каналы", description: "Как доставляем" },
+  { label: "Готовность", description: "Охват и блокеры" },
 ];
 
-const audienceOptions: {
-  value: AudienceType;
-  label: string;
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
-}[] = [
-  {
-    value: "segment",
-    label: "Сегмент",
-    description: "Использовать динамическую аудиторию по правилам",
-    icon: UsersRound,
-  },
-  {
-    value: "saved-list",
-    label: "Сохранённый список",
-    description: "Отправить выбранному списку контактов",
-    icon: FileText,
-  },
-  {
-    value: "custom-filter",
-    label: "Собственный фильтр",
-    description: "Настроить аудиторию для этой кампании",
-    icon: Filter,
-  },
-  {
-    value: "contacts",
-    label: "Отдельные контакты",
-    description: "Выбрать получателей вручную",
-    icon: UserRound,
-  },
-];
-
-const contentOptions: {
-  value: ContentMode;
-  label: string;
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
-}[] = [
-  {
-    value: "scratch",
-    label: "Начать с нуля",
-    description: "Создать письмо в редакторе",
-    icon: PencilLine,
-  },
-  {
-    value: "template",
-    label: "Использовать шаблон",
-    description: "Начать с готовой структуры",
-    icon: FileText,
-  },
-  {
-    value: "duplicate",
-    label: "Дублировать кампанию",
-    description: "Использовать предыдущую кампанию",
-    icon: Copy,
-  },
-  {
-    value: "ai",
-    label: "Черновик с ИИ",
-    description: "Создать первый вариант письма",
-    icon: Sparkles,
-  },
-];
-
-const channelIcons: Record<
-  CampaignChannel,
-  React.ComponentType<{ className?: string }>
-> = {
+const channelIcons: Record<CampaignChannel, typeof Mail> = {
   email: Mail,
   telegram: SendHorizontal,
   vk: MessageCircle,
 };
 
-const savedLists = [
-  { id: "list-priority-partners", name: "Приоритетные партнёры", count: 612 },
-  { id: "list-event-speakers", name: "Спикеры мероприятий", count: 96 },
-  { id: "list-client-briefing", name: "Список для клиентского брифинга", count: 1_948 },
-];
-
-const senderProfiles = [
-  { id: "egor", name: "Егор Сабалин", email: "egor@mailflow.example" },
-  { id: "alina", name: "Алина Громова", email: "alina@mailflow.example" },
-];
-
-const campaignStatusLabels: Record<Campaign["status"], string> = {
-  draft: "Черновик",
-  scheduled: "Запланирована",
-  sending: "Отправляется",
-  completed: "Завершена",
+const connectionLabels: Record<ConnectionStatus, string> = {
+  connected: "Подключено",
+  needs_attention: "Нужна настройка",
+  disconnected: "Не подключено",
 };
 
-const templateCategoryLabels: Record<TemplateCategory, string> = {
-  Business: "Деловые",
-  Events: "Мероприятия",
-  Outreach: "Коммуникации",
-  Newsletter: "Рассылки",
-  "Follow-up": "Продолжение общения",
-  Transactional: "Транзакционные",
-};
-
-function subscribeToLocation(onStoreChange: () => void) {
+function subscribeToBrowser(onStoreChange: () => void) {
   window.addEventListener("popstate", onStoreChange);
-  return () => window.removeEventListener("popstate", onStoreChange);
-}
-
-function getBrowserSearch() {
-  return window.location.search;
-}
-
-function getServerSearch() {
-  return "";
-}
-
-function subscribeToBuilderDraft(onStoreChange: () => void) {
   window.addEventListener("storage", onStoreChange);
-  return () => window.removeEventListener("storage", onStoreChange);
+  return () => {
+    window.removeEventListener("popstate", onStoreChange);
+    window.removeEventListener("storage", onStoreChange);
+  };
 }
 
-function getBuilderDraftSnapshot() {
+function getBrowserSnapshot() {
+  let draft = "";
+  let builderDraft = "";
   try {
-    return window.localStorage.getItem("mailflow:email-draft") ?? "";
+    const query = new URLSearchParams(window.location.search);
+    const handoffToken = query.get("handoff")?.replace(/[^a-zA-Z0-9_-]/g, "");
+    const handoffDraft = handoffToken
+      ? window.localStorage.getItem(`${CAMPAIGN_WIZARD_HANDOFF_STORAGE_PREFIX}${handoffToken}`) ?? ""
+      : "";
+    draft = handoffDraft || window.localStorage.getItem(WIZARD_DRAFT_KEY) || "";
+    builderDraft = window.localStorage.getItem(EMAIL_BUILDER_DRAFT_KEY) ?? "";
   } catch {
-    return "";
+    // The wizard remains usable without local recovery.
   }
+  return JSON.stringify({ search: window.location.search, draft, builderDraft });
 }
 
-function getServerBuilderDraftSnapshot() {
-  return "";
+function getServerSnapshot() {
+  return JSON.stringify({ search: "", draft: "", builderDraft: "" });
 }
 
-function getCampaignWizardSnapshot(storageKey: string | null) {
-  if (!storageKey) return "";
-  try {
-    return window.localStorage.getItem(storageKey) ?? "";
-  } catch {
-    return "";
-  }
-}
-
-function getServerCampaignWizardSnapshot() {
-  return "";
-}
-
-function safeStorageToken(value: string | null) {
-  if (!value || !/^[a-zA-Z0-9_-]{1,160}$/.test(value)) return null;
-  return value;
-}
-
-function getDemoRoutesSnapshot() {
-  try {
-    return window.localStorage.getItem(INTEGRATION_DEMO_ROUTES_STORAGE_KEY) ?? "";
-  } catch {
-    return "";
-  }
-}
-
-function getServerDemoRoutesSnapshot() {
-  return "";
-}
-
-function hasMeaningfulCampaignQuery(params: URLSearchParams) {
-  return Array.from(params.keys()).some((key) =>
-    meaningfulCampaignQueryKeys.has(key),
-  );
-}
-
-function parseSavedCampaignWizardDraft(
-  snapshot: string,
-): SavedCampaignWizardDraft | null {
-  if (!snapshot) return null;
-
-  try {
-    const value = JSON.parse(snapshot) as SavedCampaignWizardDraft;
-    return value && typeof value === "object" ? value : null;
-  } catch {
-    return null;
-  }
-}
-
-function serializeParams(
-  input: CampaignWizardSearchParams | URLSearchParams | undefined,
-): string | null {
-  if (!input) return null;
-  if (input instanceof URLSearchParams) return input.toString();
+function serializeParams(params?: CampaignWizardSearchParams | URLSearchParams) {
+  if (!params) return null;
+  if (params instanceof URLSearchParams) return params.toString();
   const result = new URLSearchParams();
-  Object.entries(input).forEach(([key, value]) => {
+  Object.entries(params).forEach(([key, value]) => {
     if (Array.isArray(value)) value.forEach((item) => result.append(key, item));
     else if (value !== undefined) result.set(key, value);
   });
   return result.toString();
 }
 
-function formatNumber(value: number): string {
+function safeParseDraft(value: string): Partial<WizardDraft> | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as Partial<WizardDraft>;
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function parseBuilderDraft(value: string) {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as {
+      campaignName?: string;
+      document?: EmailBuilderDocumentInput;
+      emailBodyText?: string;
+    };
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function parseStep(value: string | null) {
+  if (value === "content" || value === "message") return 1;
+  if (value === "sender" || value === "channels") return 2;
+  if (value === "review") return 3;
+  return 0;
+}
+
+function formatNumber(value: number) {
   return new Intl.NumberFormat("ru-RU").format(value);
 }
 
-function stepFromQuery(value: string | null): number {
-  const index = wizardSteps.findIndex((step) => step.value === value);
-  return index >= 0 ? index : 0;
+function templateToPlainText(template: (typeof templates)[number] | undefined) {
+  if (!template) return "";
+  return template.blocks
+    .filter((block) => !["logo", "image", "divider", "spacer", "social"].includes(block.type))
+    .map((block) => block.content.trim())
+    .filter(Boolean)
+    .join("\n\n");
 }
 
-function audienceTypeFromQuery(value: string | null): AudienceType | null {
-  return audienceOptions.some((option) => option.value === value)
-    ? (value as AudienceType)
-    : null;
+function isProviderId(value: unknown): value is IntegrationProviderId {
+  return typeof value === "string" && value in integrationProviderById;
 }
 
-function parseContactIds(params: URLSearchParams): string[] {
-  return params
-    .getAll("contact")
-    .flatMap((value) => value.split(","))
-    .map((value) => value.trim())
-    .filter(Boolean);
-}
-
-function parseCampaignChannels(
-  params: URLSearchParams,
-  fallback: CampaignChannel[] = ["email"],
-): CampaignChannel[] {
-  const channels = params
-    .getAll("channel")
-    .flatMap((value) => value.split(","))
-    .filter((value): value is CampaignChannel =>
-      campaignChannelDefinitions.some((channel) => channel.id === value),
-    );
-  return channels.length > 0
-    ? Array.from(new Set(channels))
-    : fallback.length > 0
-      ? [...fallback]
-      : ["email"];
-}
-
-function getInitialProvider(
-  params: URLSearchParams,
-  channel: CampaignChannel,
-  demoRoutesSnapshot: string,
-  restoredProvider?: string,
-): string {
-  const requested = params.get(`provider_${channel}`);
-  if (campaignChannelProviders[channel].some(
-    (provider) => provider.id === requested,
-  )) return requested!;
-
-  if (campaignChannelProviders[channel].some(
-    (provider) => provider.id === restoredProvider,
-  )) return restoredProvider!;
-
+function initialProviders(params: URLSearchParams, draft: Partial<WizardDraft> | null) {
+  let preferred: Partial<Record<CampaignChannel, IntegrationProviderId>> = {};
   try {
-    const demoRoutes = JSON.parse(demoRoutesSnapshot) as Partial<
-      Record<CampaignChannel, string | null>
-    >;
-    const savedProvider = demoRoutes[channel];
-    if (campaignChannelProviders[channel].some(
-      (provider) => provider.id === savedProvider,
-    )) return savedProvider!;
+    preferred = JSON.parse(
+      window.localStorage.getItem(PREFERRED_PROVIDERS_STORAGE_KEY) ?? "{}",
+    ) as Partial<Record<CampaignChannel, IntegrationProviderId>>;
   } catch {
-    // Fall through to the recommended provider.
+    // Defaults below are safe.
   }
+  return Object.fromEntries(
+    campaignChannelDefinitions.map((channel) => {
+      const fromQuery = params.get(`provider_${channel.id}`);
+      const candidates = [fromQuery, draft?.providers?.[channel.id], preferred[channel.id]];
+      const provider = candidates.find(
+        (candidate): candidate is IntegrationProviderId =>
+          isProviderId(candidate) &&
+          campaignChannelProviders[channel.id].some((item) => item.id === candidate),
+      );
+      return [channel.id, provider ?? defaultCampaignChannelProvider[channel.id]];
+    }),
+  ) as Record<CampaignChannel, IntegrationProviderId>;
+}
 
-  return defaultCampaignChannelProvider[channel];
+function initialChannels(params: URLSearchParams, draft: Partial<WizardDraft> | null) {
+  const requested = params.getAll("channel").filter(
+    (value): value is CampaignChannel =>
+      campaignChannelDefinitions.some((channel) => channel.id === value),
+  );
+  if (requested.length > 0) return Array.from(new Set(requested));
+  if (Array.isArray(draft?.channels) && draft.channels.length > 0) return draft.channels;
+  return ["email"] as CampaignChannel[];
+}
+
+function normalizeBlockers(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((blocker) => {
+    if (typeof blocker === "string") return blocker;
+    if (blocker && typeof blocker === "object") {
+      const item = blocker as Record<string, unknown>;
+      return String(item.message ?? item.reason ?? item.code ?? "Неизвестный блокер");
+    }
+    return String(blocker);
+  });
 }
 
 export function CampaignWizard({ searchParams }: CampaignWizardProps) {
-  const browserSearch = React.useSyncExternalStore(
-    subscribeToLocation,
-    getBrowserSearch,
-    getServerSearch,
+  const browserSnapshot = React.useSyncExternalStore(
+    subscribeToBrowser,
+    getBrowserSnapshot,
+    getServerSnapshot,
   );
-  const builderDraftSnapshot = React.useSyncExternalStore(
-    subscribeToBuilderDraft,
-    getBuilderDraftSnapshot,
-    getServerBuilderDraftSnapshot,
-  );
-  const demoRoutesSnapshot = React.useSyncExternalStore(
-    subscribeToBuilderDraft,
-    getDemoRoutesSnapshot,
-    getServerDemoRoutesSnapshot,
-  );
+  const snapshot = JSON.parse(browserSnapshot) as {
+    search: string;
+    draft: string;
+    builderDraft: string;
+  };
   const providedSearch = serializeParams(searchParams);
-  const resolvedSearch = providedSearch ?? browserSearch.replace(/^\?/, "");
-  const resolvedParams = new URLSearchParams(resolvedSearch);
-  const restoreSavedDraft = !hasMeaningfulCampaignQuery(resolvedParams);
-  const handoffToken = safeStorageToken(resolvedParams.get("handoff"));
-  const resumeCampaignId = safeStorageToken(resolvedParams.get("resume"));
-  const restoreStorageKey = handoffToken
-    ? `${CAMPAIGN_WIZARD_HANDOFF_STORAGE_PREFIX}${handoffToken}`
-    : resumeCampaignId
-      ? `${CAMPAIGN_WIZARD_RESUME_STORAGE_PREFIX}${resumeCampaignId}`
-      : restoreSavedDraft
-        ? CAMPAIGN_WIZARD_DRAFT_STORAGE_KEY
-        : null;
-  const getRestoreSnapshot = React.useCallback(
-    () => getCampaignWizardSnapshot(restoreStorageKey),
-    [restoreStorageKey],
-  );
-  const campaignWizardDraftSnapshot = React.useSyncExternalStore(
-    subscribeToBuilderDraft,
-    getRestoreSnapshot,
-    getServerCampaignWizardSnapshot,
-  );
+  const resolvedSearch = providedSearch ?? snapshot.search.replace(/^\?/, "");
 
   return (
     <CampaignWizardState
-      key={`${resolvedSearch || "campaign-wizard-default"}:${
-        resolvedSearch.includes("builderDraft=1") ? builderDraftSnapshot : ""
-      }:${demoRoutesSnapshot}:${campaignWizardDraftSnapshot}`}
-      params={resolvedParams}
-      builderDraftSnapshot={builderDraftSnapshot}
-      demoRoutesSnapshot={demoRoutesSnapshot}
-      campaignWizardDraftSnapshot={campaignWizardDraftSnapshot}
+      key={`${resolvedSearch}:${snapshot.builderDraft}`}
+      params={new URLSearchParams(resolvedSearch)}
+      recoveredDraft={safeParseDraft(snapshot.draft)}
+      builderDraft={parseBuilderDraft(snapshot.builderDraft)}
     />
   );
 }
 
 function CampaignWizardState({
   params,
-  builderDraftSnapshot,
-  demoRoutesSnapshot,
-  campaignWizardDraftSnapshot,
+  recoveredDraft,
+  builderDraft,
 }: {
   params: URLSearchParams;
-  builderDraftSnapshot: string;
-  demoRoutesSnapshot: string;
-  campaignWizardDraftSnapshot: string;
+  recoveredDraft: Partial<WizardDraft> | null;
+  builderDraft: ReturnType<typeof parseBuilderDraft>;
 }) {
-  const generatedHandoffId = React.useId().replace(/[^a-zA-Z0-9_-]/g, "");
-  const requestedHandoffToken = safeStorageToken(params.get("handoff"));
-  const handoffToken =
-    requestedHandoffToken ??
-    `wizard-${generatedHandoffId || "current"}`;
-  const handoffStorageKey =
-    `${CAMPAIGN_WIZARD_HANDOFF_STORAGE_PREFIX}${handoffToken}`;
-  const builderDraft = (() => {
-    if (params.get("builderDraft") !== "1" || !builderDraftSnapshot) return null;
-    try {
-      return JSON.parse(builderDraftSnapshot) as {
-        campaignName?: string;
-        document?: BuilderDocument;
-      };
-    } catch {
-      return null;
-    }
-  })();
-  const savedWizardDraft = parseSavedCampaignWizardDraft(
-    campaignWizardDraftSnapshot,
-  );
-  const resumeCampaignId = safeStorageToken(params.get("resume"));
-  const copyRestoredCampaign = Boolean(
-    resumeCampaignId && params.get("copy") === "1",
-  );
-  const duplicateId = params.get("duplicate");
-  const sourceCampaign = campaigns.find(
-    (campaign) =>
-      campaign.id === (duplicateId ?? params.get("draft") ?? params.get("campaign")),
-  );
-  const audienceQuery = params.get("audience")?.trim() ?? "";
-  const querySegment = segments.find(
-    (segment) =>
-      segment.id === audienceQuery ||
-      segment.name.toLocaleLowerCase() === audienceQuery.toLocaleLowerCase(),
-  );
-  const queryContactIds = parseContactIds(params);
-  const queryCompany = companies.find(
-    (company) =>
-      company.id === (params.get("company") ?? savedWizardDraft?.companyId),
-  );
-  const companyContactIds = queryCompany
-    ? contacts
-        .filter((contact) => contact.companyId === queryCompany.id)
-        .map((contact) => contact.id)
-    : [];
-  const savedContactIds = Array.isArray(savedWizardDraft?.contactIds)
-    ? savedWizardDraft.contactIds.filter((id): id is string => typeof id === "string")
-    : [];
-  const seededContactIds = queryContactIds.length > 0
-    ? queryContactIds
-    : companyContactIds.length > 0
-      ? companyContactIds
-      : savedContactIds;
-  const queryCount = Math.max(0, Number.parseInt(params.get("count") ?? "0", 10) || 0);
-  const queryFilter = params.get("filter") === "lawyers-moscow-active";
-  const queryAudienceType = audienceTypeFromQuery(params.get("audienceType"));
-  const savedAudienceType = audienceOptions.some(
-    (option) => option.value === savedWizardDraft?.audienceType,
-  )
-    ? savedWizardDraft!.audienceType!
-    : null;
-  const fromContacts =
-    params.get("source") === "contacts" || seededContactIds.length > 0;
-  const queryTemplate = templates.find(
-    (template) =>
-      template.id === (params.get("template") ?? builderDraft?.document?.templateId),
-  );
-  const duplicateTemplate = templates.find(
-    (template) => template.id === sourceCampaign?.templateId,
-  );
-  const savedTemplate = templates.find(
-    (template) => template.id === savedWizardDraft?.templateId,
-  );
-  const startingTemplate =
-    queryTemplate ?? duplicateTemplate ?? savedTemplate ?? templates[0];
-  const savedRecipientCount =
-    typeof savedWizardDraft?.recipientCount === "number" &&
-    Number.isFinite(savedWizardDraft.recipientCount)
-      ? Math.max(0, savedWizardDraft.recipientCount)
-      : 0;
-  const savedChannels = Array.isArray(savedWizardDraft?.channels)
-    ? Array.from(
-        new Set(
-          savedWizardDraft.channels.filter((value): value is CampaignChannel =>
-            campaignChannelDefinitions.some((channel) => channel.id === value),
-          ),
-        ),
-      )
-    : undefined;
+  const builderResult = params.get("builderDraft") === "1" ? builderDraft : null;
+  const sourceId = params.get("campaign") ?? params.get("draft") ?? params.get("duplicate");
+  const duplicate = params.has("duplicate") || params.get("copy") === "1";
+  const queryTemplate = templates.find((template) => template.id === params.get("template"));
+  const querySegmentId = params.get("segment") ?? params.get("audience");
+  const queryContactIds = params.getAll("contact").filter(Boolean);
+  const hasExternalSeed = Boolean(resolvedSeed(params));
+  const seedDraft = hasExternalSeed ? null : recoveredDraft;
 
-  const [currentStep, setCurrentStep] = React.useState(() =>
-    stepFromQuery(params.get("step")),
+  const [apiMode, setApiMode] = React.useState<ApiMode>("loading");
+  const [workspaceContacts, setWorkspaceContacts] = React.useState<AudienceContact[]>([]);
+  const [workspaceSegments, setWorkspaceSegments] = React.useState<AudienceSegment[]>([]);
+  const [integrations, setIntegrations] = React.useState<IntegrationSnapshot[]>([]);
+  const [currentStep, setCurrentStep] = React.useState(() => parseStep(params.get("step")));
+  const [campaignId, setCampaignId] = React.useState<string | null>(
+    duplicate ? null : sourceId ?? seedDraft?.campaignId ?? null,
   );
   const [campaignName, setCampaignName] = React.useState(
-    builderDraft?.campaignName ??
-    (sourceCampaign
-      ? duplicateId
-        ? `${sourceCampaign.name} — копия`
-        : sourceCampaign.name
-      : params.get("name")?.trim() ||
-        (copyRestoredCampaign && savedWizardDraft?.name
-          ? `${savedWizardDraft.name} — копия`
-          : savedWizardDraft?.name) ||
-        "Кампания без названия"),
+    builderResult?.campaignName ??
+      params.get("name") ?? seedDraft?.campaignName ?? "Новая кампания",
   );
-  const [audienceType, setAudienceType] = React.useState<AudienceType>(() =>
-    queryAudienceType ?? savedAudienceType ?? (queryFilter
-      ? "custom-filter"
-      : querySegment || sourceCampaign?.segmentId
-      ? "segment"
-      : fromContacts || queryCount > 0 || sourceCampaign
-        ? "contacts"
-        : "segment"),
+  const [audienceType, setAudienceType] = React.useState<"none" | "segment" | "contacts">(
+    queryContactIds.length > 0 || params.get("audienceType") === "contacts"
+      ? "contacts"
+      : querySegmentId || params.get("audienceType") === "segment"
+        ? "segment"
+        : seedDraft?.audienceType ?? "none",
   );
-  const [selectedSegmentId, setSelectedSegmentId] = React.useState(
-    params.get("segment") ??
-      querySegment?.id ??
-      sourceCampaign?.segmentId ??
-      savedWizardDraft?.segmentId ??
-      segments[0]?.id ??
-      "",
+  const [segmentId, setSegmentId] = React.useState(
+    querySegmentId ?? seedDraft?.segmentId ?? "",
   );
-  const [savedListId, setSavedListId] = React.useState(
-    savedLists.some((list) => list.id === params.get("savedList"))
-      ? params.get("savedList")!
-      : savedLists.some((list) => list.id === savedWizardDraft?.savedListId)
-        ? savedWizardDraft!.savedListId!
-        : savedLists[0].id,
-  );
-  const [selectedContactIds, setSelectedContactIds] = React.useState<string[]>(
-    seededContactIds,
-  );
-  const [explicitCount, setExplicitCount] = React.useState(
-    queryCount ||
-      queryCompany?.contactsCount ||
-      (sourceCampaign && !sourceCampaign.segmentId
-        ? sourceCampaign.metrics.recipients
-        : 0) ||
-      savedRecipientCount,
-  );
-  const [excludeUnsubscribed, setExcludeUnsubscribed] = React.useState(
-    savedWizardDraft?.excludeUnsubscribed ?? true,
-  );
-  const [excludeBounced, setExcludeBounced] = React.useState(
-    savedWizardDraft?.excludeBounced ?? true,
-  );
-  const [excludePreviouslyContacted, setExcludePreviouslyContacted] = React.useState(
-    savedWizardDraft?.excludePreviouslyContacted ?? false,
-  );
-  const [selectedChannels, setSelectedChannels] = React.useState<CampaignChannel[]>(
-    () =>
-      parseCampaignChannels(
-        params,
-        sourceCampaign?.deliveryChannels ?? savedChannels,
-      ),
-  );
-  const [channelProviders, setChannelProviders] = React.useState<
-    Record<CampaignChannel, string>
-  >(() => ({
-    email: getInitialProvider(
-      params,
-      "email",
-      demoRoutesSnapshot,
-      savedWizardDraft?.providers?.email,
-    ),
-    telegram: getInitialProvider(
-      params,
-      "telegram",
-      demoRoutesSnapshot,
-      savedWizardDraft?.providers?.telegram,
-    ),
-    vk: getInitialProvider(
-      params,
-      "vk",
-      demoRoutesSnapshot,
-      savedWizardDraft?.providers?.vk,
-    ),
-  }));
-  const [messengerMessage, setMessengerMessage] = React.useState(
-    params.get("message")?.trim() ??
-      savedWizardDraft?.messengerMessage ??
-      "Здравствуйте, {{first_name}}! Делимся коротким обновлением от нашей команды.",
-  );
-  const [channelConsentConfirmed, setChannelConsentConfirmed] = React.useState(
-    params.get("consent") === "1" ||
-      savedWizardDraft?.channelConsentConfirmed === true,
-  );
-  const [contentMode, setContentMode] = React.useState<ContentMode>(
-    sourceCampaign
-        ? "duplicate"
-        : savedWizardDraft?.contentMode
-          ? params.get("template") &&
-            params.get("template") !== savedWizardDraft.templateId
-            ? "template"
-            : savedWizardDraft.contentMode
-          : builderDraft
-            ? builderDraft.document?.templateId
-              ? "template"
-              : "scratch"
-            : savedWizardDraft
-              ? savedTemplate
-                ? "template"
-                : "scratch"
-          : "template",
-  );
-  const [selectedTemplateId, setSelectedTemplateId] = React.useState(
-    savedWizardDraft
-      ? templates.find((template) => template.id === params.get("template"))?.id ??
-        savedTemplate?.id ??
-        ""
-      : builderDraft?.document?.templateId ?? startingTemplate?.id ?? "",
-  );
-  const [selectedDuplicateId, setSelectedDuplicateId] = React.useState(
-    sourceCampaign?.id ??
-      savedWizardDraft?.duplicateCampaignId ??
-      campaigns[0]?.id ??
-      "",
-  );
-  const [senderName, setSenderName] = React.useState(
-    sourceCampaign?.senderName ?? savedWizardDraft?.senderName ?? senderProfiles[0].name,
-  );
-  const [senderEmail, setSenderEmail] = React.useState(
-    sourceCampaign?.senderEmail ?? savedWizardDraft?.senderEmail ?? senderProfiles[0].email,
+  const [contactIds, setContactIds] = React.useState<string[]>(
+    queryContactIds.length > 0 ? queryContactIds : seedDraft?.contactIds ?? [],
   );
   const [subject, setSubject] = React.useState(
-    builderDraft?.document?.subject ??
-      sourceCampaign?.subject ??
-      savedWizardDraft?.subject ??
-      startingTemplate?.subject ??
-      "Полезное обновление для {{first_name}}",
+    builderResult?.document?.subject ?? queryTemplate?.subject ?? seedDraft?.subject ?? "",
   );
   const [previewText, setPreviewText] = React.useState(
-    builderDraft?.document?.previewText ??
-      sourceCampaign?.previewText ??
-      savedWizardDraft?.previewText ??
-      startingTemplate?.previewText ??
-      "Короткое сообщение от нашей команды.",
+    builderResult?.document?.previewText ?? queryTemplate?.previewText ?? seedDraft?.previewText ?? "",
   );
-  const [sendMode, setSendMode] = React.useState<SendMode>(
-    savedWizardDraft?.sendMode === "now" ? "now" : "schedule",
+  const [emailBodyText, setEmailBodyText] = React.useState(
+    builderResult?.emailBodyText ?? seedDraft?.emailBodyText ?? templateToPlainText(queryTemplate),
   );
-  const [scheduleDate, setScheduleDate] = React.useState(
-    savedWizardDraft?.scheduleDate || "2026-08-13",
+  const [emailBuilderDocument, setEmailBuilderDocument] = React.useState<EmailBuilderDocumentInput | null>(
+    builderResult?.document ?? seedDraft?.emailBuilderDocument ?? null,
   );
-  const [scheduleTime, setScheduleTime] = React.useState(
-    savedWizardDraft?.scheduleTime || "09:00",
+  const [messengerMessage, setMessengerMessage] = React.useState(
+    params.get("message") ?? seedDraft?.messengerMessage ?? "",
   );
-  const [submitState, setSubmitState] = React.useState<SubmitState>("idle");
-  const [createdCampaignId, setCreatedCampaignId] = React.useState<string | null>(null);
+  const [channels, setChannels] = React.useState<CampaignChannel[]>(
+    () => initialChannels(params, seedDraft),
+  );
+  const [providers, setProviders] = React.useState<Record<CampaignChannel, IntegrationProviderId>>(
+    () => initialProviders(params, seedDraft),
+  );
+  const [senderName, setSenderName] = React.useState(
+    seedDraft?.senderName ?? "",
+  );
+  const [senderEmail, setSenderEmail] = React.useState(
+    seedDraft?.senderEmail ?? "",
+  );
+  const [busyAction, setBusyAction] = React.useState<"save" | "launch" | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [notice, setNotice] = React.useState<string | null>(null);
-  const submitTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  const noticeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [evaluation, setEvaluation] = React.useState<Evaluation | null>(null);
+  const [finishedCampaign, setFinishedCampaign] = React.useState<{ id: string; status: string } | null>(null);
+  const hydratedCampaignId = React.useRef<string | null>(null);
 
-  React.useEffect(
-    () => () => {
-      if (submitTimerRef.current) clearTimeout(submitTimerRef.current);
-      if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
-    },
-    [],
-  );
+  // Setter identities are stable; sourceId and duplicate are the only changing inputs.
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
+  const loadWorkspace = React.useCallback(async () => {
+    setApiMode("loading");
+    try {
+      const response = await fetch("/api/workspace", { headers: { Accept: "application/json" } });
+      if (!response.ok) throw new Error("Рабочее пространство недоступно");
+      const body = await response.json() as WorkspaceSnapshot;
+      if (Array.isArray(body.contacts)) setWorkspaceContacts(body.contacts);
+      if (Array.isArray(body.segments)) setWorkspaceSegments(body.segments);
+      setIntegrations((body.integrations ?? []).flatMap((record) => {
+        if (!isProviderId(record.providerId)) return [];
+        if (record.status !== "connected" && record.status !== "needs_attention" && record.status !== "disconnected") return [];
+        return [{ providerId: record.providerId, status: record.status }];
+      }));
 
-  const selectedSegment = segments.find((segment) => segment.id === selectedSegmentId);
-  const selectedSavedList = savedLists.find((list) => list.id === savedListId);
-  const selectedTemplate = templates.find((template) => template.id === selectedTemplateId);
-  const selectedDuplicate = campaigns.find((campaign) => campaign.id === selectedDuplicateId);
-  const selectedContacts = contacts.filter((contact) =>
-    selectedContactIds.includes(contact.id),
-  );
+      if (!sourceId) {
+        setSenderName((current) => current || body.workspace.defaultSenderName);
+        setSenderEmail((current) => current || body.workspace.defaultSenderEmail);
+      }
 
-  const recipientCount = (() => {
-    if (explicitCount > 0) return explicitCount;
-    if (audienceType === "segment") return selectedSegment?.contactCount ?? 0;
-    if (audienceType === "saved-list") return selectedSavedList?.count ?? 0;
-    if (audienceType === "custom-filter") return 843;
-    return selectedContactIds.length;
-  })();
+      if (sourceId && hydratedCampaignId.current !== sourceId) {
+        const item = body.campaigns?.find((campaign) => campaign.id === sourceId);
+        if (item) {
+          hydrateFromApiCampaign(
+            item,
+            body.deliveryPlans.filter((plan) => plan.campaignId === item.id),
+            {
+            setCampaignId,
+            setCampaignName,
+            setAudienceType,
+            setSegmentId,
+            setContactIds,
+            setSubject,
+            setPreviewText,
+            setEmailBodyText,
+            setEmailBuilderDocument,
+            setMessengerMessage,
+            setChannels,
+            setProviders,
+            setSenderName,
+            setSenderEmail,
+            },
+          );
+          if (duplicate) {
+            setCampaignId(null);
+            setCampaignName(`${item.name} — копия`);
+          }
+          hydratedCampaignId.current = sourceId;
+        } else {
+          setError("Исходная кампания не найдена в рабочем пространстве.");
+        }
+      }
+      setApiMode("online");
+    } catch {
+      setWorkspaceContacts([]);
+      setWorkspaceSegments([]);
+      setIntegrations([]);
+      setApiMode("offline");
+    }
+  }, [duplicate, sourceId]);
 
-  const audienceLabel = (() => {
-    if (audienceType === "segment") return selectedSegment?.name ?? "Сегмент не выбран";
-    if (audienceType === "saved-list") return selectedSavedList?.name ?? "Список не выбран";
-    if (audienceType === "custom-filter") return "Юристы · Москва · Активные";
-    if (queryCompany && explicitCount > 0) return `${queryCompany.name}: контакты`;
-    if (selectedContacts.length === 1) return selectedContacts[0].fullName;
-    return `Выбрано контактов: ${formatNumber(recipientCount)}`;
-  })();
+  React.useEffect(() => {
+    const frame = window.requestAnimationFrame(() => void loadWorkspace());
+    return () => window.cancelAnimationFrame(frame);
+  }, [loadWorkspace]);
 
-  const hasExactChannelCoverage =
-    audienceType === "contacts" &&
-    selectedContacts.length > 0 &&
-    selectedContacts.length === recipientCount;
-  const channelCoverage = Object.fromEntries(
+  const selectedSegment = workspaceSegments.find((segment) => segment.id === segmentId);
+  const selectedContacts = workspaceContacts.filter((contact) => contactIds.includes(contact.id));
+  const recipientCount = audienceType === "segment"
+    ? selectedSegment?.contactCount ?? 0
+    : audienceType === "contacts"
+      ? selectedContacts.length
+      : 0;
+  const audienceLabel = audienceType === "segment"
+    ? selectedSegment?.name ?? "Сегмент не выбран"
+    : audienceType === "contacts"
+      ? selectedContacts.length === 1
+        ? selectedContacts[0].fullName
+        : `Выбрано контактов: ${formatNumber(selectedContacts.length)}`
+      : "Аудитория не выбрана";
+
+  const coverage = React.useMemo(() => Object.fromEntries(
     campaignChannelDefinitions.map((channel) => [
       channel.id,
-      hasExactChannelCoverage
-        ? countReachableContacts(selectedContacts, channel.id)
-        : estimateCampaignChannelCoverage(channel.id, recipientCount),
+      audienceType === "contacts"
+        ? countAudienceReachable(selectedContacts, channel.id)
+        : 0,
     ]),
-  ) as Record<CampaignChannel, number>;
-  const channelLabel = selectedChannels
-    .map((channel) => getCampaignChannelDefinition(channel).shortLabel)
-    .join(" · ");
-  const providerLabel = selectedChannels
-    .map(
-      (channel) =>
-        getCampaignChannelProvider(channel, channelProviders[channel])?.label ??
-        "Не выбран",
-    )
-    .join(" · ");
+  ) as Record<CampaignChannel, number>, [audienceType, selectedContacts]);
 
-  const selectTemplate = (templateId: string) => {
-    const template = templates.find((item) => item.id === templateId);
-    setSelectedTemplateId(templateId);
-    if (template) {
-      setSubject(template.subject);
-      setPreviewText(template.previewText);
+  const integrationByProvider = React.useMemo(
+    () => Object.fromEntries(integrations.map((item) => [item.providerId, item])) as
+      Partial<Record<IntegrationProviderId, IntegrationSnapshot>>,
+    [integrations],
+  );
+
+  const clientBlockers = React.useMemo(() => {
+    const blockers: string[] = [];
+    if (recipientCount <= 0) blockers.push("Выберите аудиторию хотя бы с одним получателем.");
+    if (!campaignName.trim()) blockers.push("Укажите название кампании.");
+    if (channels.length === 0) blockers.push("Выберите хотя бы один канал доставки.");
+    if (channels.includes("email") && !subject.trim()) blockers.push("Добавьте тему email-письма.");
+    if (channels.includes("email") && !emailBodyText.trim()) blockers.push("Добавьте текст email-письма.");
+    if (channels.some((channel) => channel !== "email") && !messengerMessage.trim()) {
+      blockers.push("Добавьте сообщение для Telegram или ВКонтакте.");
     }
+    if (channels.includes("email") && (!senderName.trim() || !/^\S+@\S+\.\S+$/.test(senderEmail))) {
+      blockers.push("Укажите имя и корректный email отправителя.");
+    }
+    channels.forEach((channel) => {
+      const providerId = providers[channel];
+      if (!providerId) blockers.push(`Выберите провайдера для канала ${getCampaignChannelDefinition(channel).shortLabel}.`);
+      else if (integrationByProvider[providerId]?.status !== "connected") {
+        blockers.push(`${integrationProviderById[providerId].name} не подключён для канала ${getCampaignChannelDefinition(channel).shortLabel}.`);
+      }
+    });
+    return Array.from(new Set(blockers));
+  }, [campaignName, channels, emailBodyText, integrationByProvider, messengerMessage, providers, recipientCount, senderEmail, senderName, subject]);
+
+  const draft: WizardDraft = {
+    campaignId,
+    campaignName,
+    name: campaignName,
+    audienceType,
+    segmentId,
+    contactIds,
+    subject,
+    previewText,
+    emailBodyText,
+    emailBuilderDocument,
+    messengerMessage,
+    channels,
+    providers,
+    senderName,
+    senderEmail,
+  };
+  const draftJson = JSON.stringify(draft);
+  const editorReturnParams = new URLSearchParams({
+    step: "message",
+    builderDraft: "1",
+    handoff: CAMPAIGN_WIZARD_HANDOFF_TOKEN,
+  });
+  const editorQuery = new URLSearchParams({
+    campaign: campaignName,
+    handoff: CAMPAIGN_WIZARD_HANDOFF_TOKEN,
+    returnTo: `/campaigns/new?${editorReturnParams.toString()}`,
+  });
+  if (queryTemplate?.id) editorQuery.set("template", queryTemplate.id);
+  const editorHref = `/email-builder?${editorQuery.toString()}`;
+
+  React.useEffect(() => {
+    try {
+      window.localStorage.setItem(WIZARD_DRAFT_KEY, draftJson);
+      window.localStorage.setItem(
+        `${CAMPAIGN_WIZARD_HANDOFF_STORAGE_PREFIX}${CAMPAIGN_WIZARD_HANDOFF_TOKEN}`,
+        draftJson,
+      );
+    } catch {
+      // API saving remains available if browser recovery is disabled.
+    }
+  }, [draftJson]);
+
+  const validateStep = (step: number) => {
+    let message: string | null = null;
+    if (step === 0 && recipientCount <= 0) message = "Выберите сегмент или хотя бы один контакт.";
+    if (step === 1 && !campaignName.trim()) message = "Укажите название кампании.";
+    if (step === 1 && channels.includes("email") && (!subject.trim() || !emailBodyText.trim())) {
+      message = "Заполните тему и текст email-письма.";
+    }
+    if (step === 1 && channels.some((channel) => channel !== "email") && !messengerMessage.trim()) {
+      message = "Добавьте текст для мессенджеров.";
+    }
+    if (step === 2 && channels.length === 0) message = "Выберите хотя бы один канал.";
+    if (step === 2 && channels.includes("email") && (!subject.trim() || !emailBodyText.trim())) {
+      message = "Вернитесь к шагу «Сообщение» и заполните email-версию.";
+    }
+    if (step === 2 && channels.some((channel) => channel !== "email") && !messengerMessage.trim()) {
+      message = "Вернитесь к шагу «Сообщение» и добавьте текст для мессенджеров.";
+    }
+    setError(message);
+    return !message;
   };
 
-  const selectDuplicate = (campaignId: string) => {
-    const campaign = campaigns.find((item) => item.id === campaignId);
-    setSelectedDuplicateId(campaignId);
-    if (campaign) {
-      setSelectedTemplateId(campaign.templateId ?? "");
-      setSubject(campaign.subject);
-      setPreviewText(campaign.previewText);
-    }
+  const goNext = () => {
+    if (!validateStep(currentStep)) return;
+    setCurrentStep((step) => Math.min(3, step + 1));
   };
 
-  const chooseAudienceType = (value: AudienceType) => {
-    setAudienceType(value);
-    setExplicitCount(0);
+  const toggleChannel = (channel: CampaignChannel) => {
+    setChannels((current) => current.includes(channel)
+      ? current.filter((item) => item !== channel)
+      : [...current, channel]);
+    setEvaluation(null);
     setError(null);
   };
 
   const toggleContact = (contactId: string) => {
-    setExplicitCount(0);
-    setSelectedContactIds((current) =>
-      current.includes(contactId)
-        ? current.filter((id) => id !== contactId)
-        : [...current, contactId],
-    );
+    setContactIds((current) => current.includes(contactId)
+      ? current.filter((id) => id !== contactId)
+      : [...current, contactId]);
+    setEvaluation(null);
   };
 
-  const toggleChannel = (channel: CampaignChannel) => {
-    setError(null);
-    setSelectedChannels((current) => {
-      if (current.includes(channel)) {
-        if (current.length === 1) {
-          setError("Оставьте хотя бы один канал для кампании.");
-          return current;
-        }
-        return current.filter((item) => item !== channel);
-      }
-      return [...current, channel];
-    });
-  };
-
-  const restoredBuilderDocument =
-    builderDraft?.document ?? savedWizardDraft?.builderDocument;
-  const builderDocument =
-    restoredBuilderDocument &&
-    (contentMode === "scratch" ||
-      contentMode === "ai" ||
-      restoredBuilderDocument.templateId === selectedTemplateId)
-      ? {
-          ...restoredBuilderDocument,
-          subject,
-          previewText,
-        }
-      : undefined;
-
-  const wizardSnapshot: SavedCampaignWizardDraft = {
-    name: campaignName,
+  const campaignPayload = (): CampaignCreateInput => ({
+    name: campaignName.trim(),
     audienceType,
-    segmentId: audienceType === "segment" ? selectedSegmentId : null,
-    savedListId,
-    companyId: queryCompany?.id ?? null,
-    contactIds: selectedContactIds,
-    recipientCount,
-    contentMode,
-    templateId: selectedTemplateId || null,
-    duplicateCampaignId: selectedDuplicateId || null,
-    senderName,
-    senderEmail,
-    subject,
-    previewText,
-    channels: selectedChannels,
-    providers: channelProviders,
-    messengerMessage,
-    channelConsentConfirmed,
-    excludeUnsubscribed,
-    excludeBounced,
-    excludePreviouslyContacted,
-    sendMode,
-    scheduleDate,
-    scheduleTime,
-    builderDocument,
-  };
-  const wizardSnapshotJson = JSON.stringify(wizardSnapshot);
+    ...(audienceType === "segment"
+      ? { segmentId }
+      : audienceType === "contacts"
+        ? { contactIds }
+        : {}),
+    senderName: senderName.trim(),
+    senderEmail: senderEmail.trim(),
+    subject: subject.trim(),
+    previewText: previewText.trim(),
+    emailBodyText: emailBodyText.trim(),
+    emailBuilderDocument,
+    messengerMessage: messengerMessage.trim(),
+    channels: channels.map((channel) => ({
+      channel,
+      providerId: providers[channel],
+    })),
+    scheduledAt: null,
+  });
 
-  const persistWizardSnapshot = (storageKey: string) => {
+  const mutateCampaign = async (action: "save" | "launch") => {
+    if (action === "launch" && clientBlockers.some((blocker) => !blocker.includes("не подключён"))) {
+      setEvaluation({ status: "blocked", eligibleByChannel: {}, blockers: clientBlockers });
+      setError("Исправьте обязательные поля перед серверной проверкой.");
+      return;
+    }
+
+    setBusyAction(action);
+    setError(null);
+    setNotice(null);
     try {
-      window.localStorage.setItem(storageKey, wizardSnapshotJson);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
-  React.useEffect(() => {
-    if (requestedHandoffToken && !campaignWizardDraftSnapshot) return;
-    try {
-      window.localStorage.setItem(handoffStorageKey, wizardSnapshotJson);
-    } catch {
-      // Navigation remains usable with the current in-memory state.
-    }
-  }, [
-    campaignWizardDraftSnapshot,
-    handoffStorageKey,
-    requestedHandoffToken,
-    wizardSnapshotJson,
-  ]);
-
-  const editorReturnParams = new URLSearchParams({
-    handoff: handoffToken,
-    step: "sender",
-    builderDraft: "1",
-  });
-  if (selectedTemplateId) editorReturnParams.set("template", selectedTemplateId);
-  const editorQuery = new URLSearchParams({
-    campaign: campaignName,
-    handoff: handoffToken,
-    returnTo: `/campaigns/new?${editorReturnParams.toString()}`,
-  });
-  if (selectedTemplateId) editorQuery.set("template", selectedTemplateId);
-  const editorHref = `/email-builder?${editorQuery.toString()}`;
-
-  const libraryBackParams = new URLSearchParams({
-    handoff: handoffToken,
-    step: "content",
-  });
-  if (selectedTemplateId) libraryBackParams.set("template", selectedTemplateId);
-  const libraryContinueParams = new URLSearchParams({
-    handoff: handoffToken,
-    step: "sender",
-    builderDraft: "1",
-  });
-  const libraryQuery = new URLSearchParams({
-    campaign: campaignName,
-    backTo: `/campaigns/new?${libraryBackParams.toString()}`,
-    returnTo: `/campaigns/new?${libraryContinueParams.toString()}`,
-  });
-  const templateLibraryHref = `/templates?${libraryQuery.toString()}`;
-
-  const validateStep = () => {
-    if (currentStep === 0 && recipientCount <= 0) {
-      setError("Выберите хотя бы одного получателя.");
-      return false;
-    }
-    if (currentStep === 1) {
-      if (selectedChannels.length === 0) {
-        setError("Выберите хотя бы один канал.");
-        return false;
+      let id = campaignId;
+      if (!id) {
+        const createResponse = await fetch("/api/campaigns", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify(campaignPayload()),
+        });
+        const createBody = await createResponse.json() as CampaignMutationResponse | ApiError;
+        if (!createResponse.ok || !("campaign" in createBody)) {
+          throw new Error("error" in createBody ? createBody.error : "Не удалось создать черновик кампании.");
+        }
+        id = createBody.campaign.id;
+        setCampaignId(id);
       }
-      if (
-        selectedChannels.includes("email") &&
-        contentMode === "template" &&
-        !selectedTemplateId
-      ) {
-        setError("Выберите шаблон, чтобы продолжить.");
-        return false;
-      }
-      if (
-        selectedChannels.includes("email") &&
-        contentMode === "duplicate" &&
-        !selectedDuplicateId
-      ) {
-        setError("Выберите кампанию для дублирования.");
-        return false;
-      }
-      if (
-        selectedChannels.some((channel) => channel !== "email") &&
-        !messengerMessage.trim()
-      ) {
-        setError("Добавьте текст для Telegram или ВКонтакте.");
-        return false;
-      }
-      if (
-        selectedChannels.some((channel) => channel !== "email") &&
-        messengerMessage.length > MESSENGER_MESSAGE_MAX_LENGTH
-      ) {
-        setError(
-          `Сократите текст для мессенджеров до ${formatNumber(MESSENGER_MESSAGE_MAX_LENGTH)} символов.`,
-        );
-        return false;
-      }
-    }
-    if (currentStep === 2) {
-      if (
-        selectedChannels.includes("email") &&
-        (!senderName.trim() || !/^\S+@\S+\.\S+$/.test(senderEmail))
-      ) {
-        setError("Укажите имя отправителя и корректный адрес электронной почты.");
-        return false;
-      }
-      if (selectedChannels.includes("email") && !subject.trim()) {
-        setError("Добавьте тему письма перед проверкой.");
-        return false;
-      }
-      if (!channelConsentConfirmed) {
-        setError(
-          "Подтвердите согласие аудитории и наличие идентификаторов для выбранных каналов.",
-        );
-        return false;
-      }
-    }
-    setError(null);
-    return true;
-  };
 
-  const goNext = () => {
-    if (!validateStep()) return;
-    setCurrentStep((step) => Math.min(wizardSteps.length - 1, step + 1));
-  };
+      const updateResponse = await fetch("/api/campaigns", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ id, ...campaignPayload(), action }),
+      });
+      const updateBody = await updateResponse.json() as CampaignMutationResponse | ApiError;
+      if (!updateResponse.ok || !("campaign" in updateBody)) {
+        throw new Error("error" in updateBody ? updateBody.error : "Сервер не сохранил кампанию.");
+      }
+      const body = updateBody;
 
-  const goBack = () => {
-    setError(null);
-    setCurrentStep((step) => Math.max(0, step - 1));
-  };
-
-  const submitCampaign = () => {
-    if (!channelConsentConfirmed) {
-      setError(
-        "Подтвердите согласие аудитории в настройках провайдеров.",
-      );
-      return;
-    }
-    if (
-      selectedChannels.some((channel) => channel !== "email") &&
-      !messengerMessage.trim()
-    ) {
-      setError("Добавьте текст для Telegram или ВКонтакте.");
-      return;
-    }
-    if (
-      selectedChannels.some((channel) => channel !== "email") &&
-      messengerMessage.length > MESSENGER_MESSAGE_MAX_LENGTH
-    ) {
-      setError(
-        `Сократите текст для мессенджеров до ${formatNumber(MESSENGER_MESSAGE_MAX_LENGTH)} символов.`,
-      );
-      return;
-    }
-    if (sendMode === "schedule" && (!scheduleDate || !scheduleTime)) {
-      setError("Выберите дату и время демоплана кампании.");
-      return;
-    }
-    setError(null);
-    setSubmitState("processing");
-    if (submitTimerRef.current) clearTimeout(submitTimerRef.current);
-    submitTimerRef.current = setTimeout(() => {
-      const now = new Date().toISOString();
-      const generatedId = `campaign-demo-${Date.now()}`;
-      const demoCampaign: Campaign = {
-        id: generatedId,
-        name: campaignName,
-        subject,
-        previewText,
-        audience: audienceLabel,
-        segmentId: audienceType === "segment" ? selectedSegmentId : null,
-        templateId: selectedTemplateId || null,
-        deliveryChannels: selectedChannels,
-        status: "draft",
-        senderName,
-        senderEmail,
-        owner: "Егор Сабалин",
-        metrics: createCampaignMetrics({
-          recipients: recipientCount,
-          sent: 0,
-          delivered: 0,
-          opened: 0,
-          clicked: 0,
-          replies: 0,
-          bounced: 0,
-          unsubscribed: 0,
-        }),
-        createdAt: now,
-        scheduledAt: sendMode === "schedule"
-          ? new Date(`${scheduleDate}T${scheduleTime}:00+04:00`).toISOString()
-          : now,
-        sentAt: null,
-      };
-
+      setApiMode("online");
+      setCampaignId(body.campaign.id);
       try {
-        window.localStorage.setItem(`mailflow:campaign:${generatedId}`, JSON.stringify(demoCampaign));
-        window.localStorage.setItem("mailflow:last-campaign", JSON.stringify(demoCampaign));
-        window.localStorage.setItem(
-          `${CAMPAIGN_WIZARD_RESUME_STORAGE_PREFIX}${generatedId}`,
-          wizardSnapshotJson,
-        );
-        const savedCampaigns = (() => {
-          try {
-            const value = JSON.parse(
-              window.localStorage.getItem("mailflow:demo-campaigns") ?? "[]",
-            ) as Campaign[];
-            return Array.isArray(value) ? value : [];
-          } catch {
-            return [];
-          }
-        })();
-        window.localStorage.setItem(
-          "mailflow:demo-campaigns",
-          JSON.stringify([
-            demoCampaign,
-            ...savedCampaigns.filter((item) => item.id !== generatedId),
-          ].slice(0, 20)),
-        );
-        window.localStorage.setItem(
-          `mailflow:campaign-delivery:${generatedId}`,
-          JSON.stringify({
-            demo: true,
-            channels: selectedChannels.map((channel) => ({
-              channel,
-              provider: channelProviders[channel],
-              estimatedCoverage: channelCoverage[channel] ?? 0,
-            })),
-            messengerMessage,
-            consentConfirmed: channelConsentConfirmed,
-          }),
-        );
-        setCreatedCampaignId(generatedId);
+        window.localStorage.removeItem(WIZARD_DRAFT_KEY);
       } catch {
-        setCreatedCampaignId(
-          sendMode === "schedule" ? "campaign-product-brief" : "campaign-legal-conference",
-        );
+        // The durable API already contains the campaign.
       }
-      setSubmitState("success");
-    }, 1250);
+
+      if (action === "save") {
+        setNotice("Черновик сохранён в рабочем пространстве.");
+        return;
+      }
+
+      const serverEvaluation: Evaluation = {
+        status: body.evaluation?.status ?? (body.campaign.status === "scheduled" ? "scheduled" : body.campaign.status === "blocked" ? "blocked" : "ready"),
+        eligibleByChannel: body.evaluation?.eligibleByChannel ?? {},
+        blockers: normalizeBlockers(body.evaluation?.blockers),
+      };
+      setEvaluation(serverEvaluation);
+      if (serverEvaluation.blockers.length > 0 || serverEvaluation.status === "blocked") {
+        setError("План не готов: исправьте блокеры, затем повторите проверку.");
+      } else {
+        setFinishedCampaign({
+          id: body.campaign.id,
+          status: body.campaign.status ?? serverEvaluation.status ?? "ready",
+        });
+      }
+    } catch (mutationError) {
+      setError(mutationError instanceof Error
+        ? mutationError.message
+        : "Не удалось связаться с сервером рабочего пространства.");
+    } finally {
+      setBusyAction(null);
+    }
   };
 
-  const saveDraft = () => {
-    persistWizardSnapshot(CAMPAIGN_WIZARD_DRAFT_STORAGE_KEY);
-    setNotice("Черновик сохранён");
-    if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
-    noticeTimerRef.current = setTimeout(() => setNotice(null), 2800);
-  };
-
-  if (submitState === "success") {
-    const detailId = createdCampaignId ??
-      (sendMode === "schedule" ? "campaign-product-brief" : "campaign-legal-conference");
+  if (finishedCampaign) {
     return (
-      <div className="mx-auto flex min-h-[min(720px,calc(100vh-150px))] max-w-2xl items-center justify-center py-8">
-        <section className="card w-full overflow-hidden text-center">
-          <div className="bg-[radial-gradient(circle_at_top,var(--primary-subtle),transparent_68%)] px-6 py-10 sm:px-10 sm:py-14">
-            <span className="mx-auto grid size-14 place-items-center rounded-full bg-success-subtle text-success ring-8 ring-success-subtle/45">
-              <CheckCircle2 aria-hidden="true" className="size-7" />
-            </span>
-            <Badge variant="accent" className="mt-6">
-              Демозапуск создан
-            </Badge>
-            <h1 className="mt-3 mb-0 text-[25px] font-semibold tracking-[-0.035em] text-text-strong sm:text-[29px]">
-              План кампании сохранён
-            </h1>
-            <p className="mx-auto mt-2 mb-0 max-w-md text-[13px] leading-5 text-text-muted">
-              Ни одно письмо или сообщение не отправлено. Кампания «{campaignName}»
-              сохранена как демонстрационный план на {formatNumber(recipientCount)} контактов.
-              Реальный запуск станет доступен после подключения выбранных провайдеров.
-            </p>
-            <div className="mt-7 flex flex-wrap justify-center gap-2">
-              <Link href="/campaigns" className={buttonVariants({ variant: "secondary" })}>
-                Все кампании
-              </Link>
-              <Link
-                href={`/campaigns/${detailId}`}
-                className={buttonVariants({ variant: "primary" })}
-              >
-                Открыть кампанию
-                <ArrowRight aria-hidden="true" className="size-4" />
-              </Link>
-            </div>
-          </div>
-          <div className="grid border-t border-border bg-surface-subtle/45 sm:grid-cols-3">
-            {[
-              ["Аудитория", audienceLabel],
-              ["Каналы", channelLabel],
-              ["Статус", "Ожидает подключения"],
-            ].map(([label, value]) => (
-              <div key={label} className="border-b border-border p-4 last:border-b-0 sm:border-r sm:border-b-0 sm:last:border-r-0">
-                <p className="m-0 text-[10px] font-medium text-text-subtle">{label}</p>
-                <p className="mt-1 mb-0 truncate text-[12px] font-semibold text-text-strong">
-                  {value}
-                </p>
-              </div>
-            ))}
+      <div className="mx-auto flex min-h-[560px] max-w-2xl items-center py-10">
+        <section className="card w-full p-7 text-center sm:p-10">
+          <span className="mx-auto grid size-14 place-items-center rounded-full bg-success-subtle text-success">
+            <CheckCircle2 aria-hidden="true" className="size-7" />
+          </span>
+          <Badge variant="success" className="mt-5">Готовность подтверждена</Badge>
+          <h1 className="mt-4 text-[26px] font-semibold tracking-[-0.035em] text-text-strong">
+            План кампании сохранён
+          </h1>
+          <p className="mx-auto mt-2 max-w-lg text-[14px] leading-6 text-text-muted">
+            Сервер сохранил аудиторию, сообщения, маршруты и результат проверки.
+            Внешняя отправка не выполнялась.
+          </p>
+          <div className="mt-7 flex flex-col justify-center gap-2 sm:flex-row">
+            <Link href="/campaigns" className={buttonVariants({ variant: "secondary" })}>Все кампании</Link>
+            <Link href={`/campaigns/${finishedCampaign.id}`} className={buttonVariants({ variant: "primary" })}>
+              Открыть кампанию
+              <ArrowRight aria-hidden="true" className="size-4" />
+            </Link>
           </div>
         </section>
       </div>
@@ -1171,243 +695,228 @@ function CampaignWizardState({
   }
 
   return (
-    <div className="relative mx-auto max-w-6xl pb-8">
-      <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div className="mx-auto max-w-6xl space-y-5 pb-10">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <Link
-            href="/campaigns"
-            className="mb-3 inline-flex items-center gap-1.5 rounded-md text-[11px] font-medium text-text-muted hover:text-text-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
-          >
-            <ArrowLeft aria-hidden="true" className="size-3.5" />
+          <Link href="/campaigns" className="inline-flex items-center gap-1.5 text-[13px] font-medium text-text-muted hover:text-text-strong">
+            <ArrowLeft aria-hidden="true" className="size-4" />
             Кампании
           </Link>
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="m-0 text-[25px] font-semibold tracking-[-0.035em] text-text-strong sm:text-[29px]">
-              Создание кампании
-            </h1>
-            <Badge variant="accent">Деморежим</Badge>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <h1 className="text-[28px] font-semibold tracking-[-0.04em] text-text-strong">Новая кампания</h1>
+            <Badge variant={apiMode === "online" ? "success" : "warning"} dot>
+              {campaignId ? "Черновик на сервере" : "Не сохранена"}
+            </Badge>
           </div>
-          <p className="mt-1.5 mb-0 text-[13px] text-text-muted">
-            Настройте единую кампанию для email, Telegram и ВКонтакте.
+          <p className="mt-1.5 max-w-2xl text-[14px] leading-6 text-text-muted">
+            Четыре шага: аудитория, сообщение, маршрут доставки и серверная проверка.
           </p>
         </div>
         <Button
           variant="secondary"
-          leadingIcon={<Save className="size-4" />}
-          onClick={saveDraft}
-          disabled={submitState === "processing"}
+          onClick={() => void mutateCampaign("save")}
+          loading={busyAction === "save"}
+          loadingText="Сохраняем…"
+          leadingIcon={<Save aria-hidden="true" className="size-4" />}
         >
           Сохранить черновик
         </Button>
       </header>
 
-      <section className="card mb-5 px-4 py-5 sm:px-7" aria-label="Ход настройки кампании">
-        <Stepper
-          steps={wizardSteps.map(({ label, description }) => ({ label, description }))}
-          currentStep={currentStep}
-          aria-label="Ход настройки кампании"
-        />
+      {apiMode === "offline" ? (
+        <Alert tone="danger" title="Рабочее пространство недоступно">
+          Контакты, аудитории и подключения не загружены. Черновик формы останется
+          в этом браузере, но кампания не будет создана без ответа сервера.
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-3"
+            onClick={() => void loadWorkspace()}
+            leadingIcon={<RefreshCw aria-hidden="true" className="size-3.5" />}
+          >
+            Повторить подключение
+          </Button>
+        </Alert>
+      ) : null}
+
+      <section className="card px-4 py-5 sm:px-7" aria-label="Этапы создания кампании">
+        <Stepper steps={steps} currentStep={currentStep} aria-label="Этапы создания кампании" />
       </section>
 
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
         <section className="card min-w-0 p-5 sm:p-7">
-          {currentStep === 0 && (
+          {currentStep === 0 ? (
             <AudienceStep
               audienceType={audienceType}
-              onAudienceTypeChange={chooseAudienceType}
-              selectedSegmentId={selectedSegmentId}
-              onSegmentChange={(id) => {
-                setSelectedSegmentId(id);
-                setExplicitCount(0);
-              }}
-              savedListId={savedListId}
-              onSavedListChange={(id) => {
-                setSavedListId(id);
-                setExplicitCount(0);
-              }}
-              selectedContactIds={selectedContactIds}
+              onAudienceTypeChange={(value) => { setAudienceType(value); setEvaluation(null); }}
+              segments={workspaceSegments}
+              selectedSegmentId={segmentId}
+              onSegmentChange={setSegmentId}
+              contacts={workspaceContacts}
+              contactIds={contactIds}
               onToggleContact={toggleContact}
-              explicitCount={explicitCount}
-              excludeUnsubscribed={excludeUnsubscribed}
-              excludeBounced={excludeBounced}
-              excludePreviouslyContacted={excludePreviouslyContacted}
-              onExcludeUnsubscribed={setExcludeUnsubscribed}
-              onExcludeBounced={setExcludeBounced}
-              onExcludePreviouslyContacted={setExcludePreviouslyContacted}
             />
-          )}
-          {currentStep === 1 && (
-            <ContentStep
-              selectedChannels={selectedChannels}
-              onToggleChannel={toggleChannel}
-              recipientCount={recipientCount}
-              channelCoverage={channelCoverage}
-              coverageIsExact={hasExactChannelCoverage}
+          ) : null}
+
+          {currentStep === 1 ? (
+            <MessageStep
+              campaignName={campaignName}
+              onCampaignNameChange={setCampaignName}
+              subject={subject}
+              onSubjectChange={(value) => { setSubject(value); setEmailBuilderDocument(null); }}
+              previewText={previewText}
+              onPreviewTextChange={(value) => { setPreviewText(value); setEmailBuilderDocument(null); }}
+              emailBodyText={emailBodyText}
+              onEmailBodyTextChange={(value) => { setEmailBodyText(value); setEmailBuilderDocument(null); }}
               messengerMessage={messengerMessage}
               onMessengerMessageChange={setMessengerMessage}
-              contentMode={contentMode}
-              onContentModeChange={(value) => {
-                setContentMode(value);
-                setError(null);
-                if (value === "scratch" || value === "ai") setSelectedTemplateId("");
-              }}
-              selectedTemplateId={selectedTemplateId}
-              onTemplateChange={selectTemplate}
-              selectedDuplicateId={selectedDuplicateId}
-              onDuplicateChange={selectDuplicate}
-              subject={subject}
-              setSubject={setSubject}
-              previewText={previewText}
-              setPreviewText={setPreviewText}
               editorHref={editorHref}
-              templateLibraryHref={templateLibraryHref}
-              onBeforeEditorNavigation={() =>
-                persistWizardSnapshot(handoffStorageKey)
-              }
             />
-          )}
-          {currentStep === 2 && (
-            <SenderStep
-              selectedChannels={selectedChannels}
-              channelProviders={channelProviders}
-              onProviderChange={(channel, provider) =>
-                setChannelProviders((current) => ({
-                  ...current,
-                  [channel]: provider,
-                }))
-              }
-              channelCoverage={channelCoverage}
+          ) : null}
+
+          {currentStep === 2 ? (
+            <ChannelsStep
+              channels={channels}
+              onToggleChannel={toggleChannel}
+              providers={providers}
+              onProviderChange={(channel, providerId) => {
+                setProviders((current) => ({ ...current, [channel]: providerId }));
+                setEvaluation(null);
+              }}
+              integrationByProvider={integrationByProvider}
+              coverage={coverage}
               recipientCount={recipientCount}
-              channelConsentConfirmed={channelConsentConfirmed}
-              onChannelConsentConfirmedChange={setChannelConsentConfirmed}
               senderName={senderName}
               senderEmail={senderEmail}
-              subject={subject}
-              previewText={previewText}
               onSenderNameChange={setSenderName}
               onSenderEmailChange={setSenderEmail}
-              onSubjectChange={setSubject}
-              onPreviewTextChange={setPreviewText}
-              editorHref={editorHref}
-              onBeforeEditorNavigation={() =>
-                persistWizardSnapshot(handoffStorageKey)
-              }
+              audienceType={audienceType}
             />
-          )}
-          {currentStep === 3 && (
+          ) : null}
+
+          {currentStep === 3 ? (
             <ReviewStep
               campaignName={campaignName}
-              setCampaignName={setCampaignName}
               audienceLabel={audienceLabel}
               recipientCount={recipientCount}
-              contentLabel={
-                contentMode === "template"
-                  ? selectedTemplate?.name ?? "Шаблон"
-                  : contentMode === "duplicate"
-                    ? selectedDuplicate?.name ?? "Дублированная кампания"
-                    : contentMode === "ai"
-                      ? "Черновик с ИИ"
-                      : "Собственное письмо"
-              }
-              senderName={senderName}
-              senderEmail={senderEmail}
-              subject={subject}
-              selectedChannels={selectedChannels}
-              channelProviders={channelProviders}
-              channelCoverage={channelCoverage}
-              messengerMessage={messengerMessage}
-              channelConsentConfirmed={channelConsentConfirmed}
-              exclusions={{
-                unsubscribed: excludeUnsubscribed,
-                bounced: excludeBounced,
-                previouslyContacted: excludePreviouslyContacted,
-              }}
-              sendMode={sendMode}
-              onSendModeChange={setSendMode}
-              scheduleDate={scheduleDate}
-              scheduleTime={scheduleTime}
-              onScheduleDateChange={setScheduleDate}
-              onScheduleTimeChange={setScheduleTime}
+              channels={channels}
+              providers={providers}
+              coverage={evaluation?.eligibleByChannel ?? coverage}
+              coveragePending={audienceType === "segment" && !evaluation}
+              clientBlockers={clientBlockers}
+              evaluation={evaluation}
             />
-          )}
+          ) : null}
 
-          {error && (
-            <Alert tone="danger" title="Перед продолжением" className="mt-5">
-              {error}
-            </Alert>
-          )}
+          {error ? <Alert tone="danger" title="Нужно исправить" className="mt-6">{error}</Alert> : null}
+          {notice ? <Alert tone="success" title="Готово" className="mt-6">{notice}</Alert> : null}
 
           <footer className="mt-7 flex flex-col-reverse gap-2 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
             {currentStep === 0 ? (
-              <Link href="/campaigns" className={buttonVariants({ variant: "ghost" })}>
-                Отменить
-              </Link>
+              <Link href="/campaigns" className={buttonVariants({ variant: "ghost" })}>Отмена</Link>
             ) : (
-              <Button variant="ghost" leadingIcon={<ArrowLeft className="size-4" />} onClick={goBack}>
+              <Button variant="ghost" onClick={() => { setCurrentStep((step) => step - 1); setError(null); }} leadingIcon={<ArrowLeft className="size-4" />}>
                 Назад
               </Button>
             )}
-            {currentStep < wizardSteps.length - 1 ? (
-              <Button trailingIcon={<ArrowRight className="size-4" />} onClick={goNext}>
-                Далее: {wizardSteps[currentStep + 1]?.label}
+            {currentStep < 3 ? (
+              <Button onClick={goNext} trailingIcon={<ArrowRight className="size-4" />}>
+                Далее: {steps[currentStep + 1].label}
               </Button>
             ) : (
               <Button
-                loading={submitState === "processing"}
-                loadingText="Сохраняем демоплан…"
-                leadingIcon={
-                  sendMode === "schedule" ? (
-                    <CalendarClock className="size-4" />
-                  ) : (
-                    <Send className="size-4" />
-                  )
-                }
-                onClick={submitCampaign}
+                onClick={() => void mutateCampaign("launch")}
+                loading={busyAction === "launch"}
+                loadingText="Проверяем…"
+                leadingIcon={<Send className="size-4" />}
               >
-                {sendMode === "schedule" ? "Создать демоплан" : "Сохранить демозапуск"}
+                {evaluation?.blockers.length ? "Проверить повторно" : "Проверить готовность"}
               </Button>
             )}
           </footer>
         </section>
 
-        <aside className="card p-5 xl:sticky xl:top-5" aria-label="Сводка кампании">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="m-0 text-[13px] font-semibold text-text-strong">Сводка кампании</h2>
-            <Badge variant={recipientCount > 0 ? "success" : "warning"} dot>
-              {recipientCount > 0 ? "Готово" : "Не завершено"}
-            </Badge>
-          </div>
-          <dl className="mt-5 grid gap-4">
-            <SummaryItem icon={<UsersRound className="size-3.5" />} label="Аудитория" value={audienceLabel} />
-            <SummaryItem
-              icon={<Cable className="size-3.5" />}
-              label="Каналы"
-              value={channelLabel}
-            />
-            <SummaryItem icon={<ShieldCheck className="size-3.5" />} label="Провайдеры" value={providerLabel} />
-          </dl>
-          <div className="mt-5 rounded-[11px] bg-primary-subtle/55 p-4">
-            <p className="m-0 text-[10px] font-medium text-primary">Получателей</p>
-            <p className="mt-1 mb-0 text-[25px] font-semibold tracking-[-0.04em] text-text-strong">
-              {formatNumber(recipientCount)}
-            </p>
-            <p className="mt-1 mb-0 text-[10px] leading-4 text-text-muted">
-              Охват по каналам проверяется отдельно по email, chat_id и VK ID.
-            </p>
-          </div>
-        </aside>
+        <CampaignSummary
+          currentStep={currentStep}
+          audienceLabel={audienceLabel}
+          recipientCount={recipientCount}
+          campaignName={campaignName}
+          channels={channels}
+          providers={providers}
+          blockers={evaluation?.blockers.length ? evaluation.blockers : clientBlockers}
+        />
       </div>
+    </div>
+  );
+}
 
-      {notice && (
-        <div className="fixed right-4 bottom-4 z-[170] w-[min(340px,calc(100vw-32px))]">
-          <ToastSurface
-            tone="success"
-            title={notice}
-            description="Настройки кампании сохранены для текущей демонстрационной сессии."
-            onDismiss={() => setNotice(null)}
-          />
-        </div>
-      )}
+function resolvedSeed(params: URLSearchParams) {
+  return ["campaign", "draft", "duplicate", "template", "audience", "segment", "contact", "channel", "name"]
+    .some((key) => params.has(key));
+}
+
+function countAudienceReachable(contacts: AudienceContact[], channel: CampaignChannel) {
+  return contacts.filter((contact) => {
+    if (contact.status !== "active") return false;
+    if (channel === "email") {
+      return contact.emailConsent !== false && Boolean(contact.email);
+    }
+    if (channel === "telegram") {
+      return Boolean(contact.telegramChatId && contact.telegramConsent);
+    }
+    return Boolean(contact.vkUserId && contact.vkConsent);
+  }).length;
+}
+
+function hydrateFromApiCampaign(
+  item: CampaignRecord,
+  plans: DeliveryPlanRecord[],
+  setters: {
+    setCampaignId: (value: string | null) => void;
+    setCampaignName: (value: string) => void;
+    setAudienceType: (value: "none" | "segment" | "contacts") => void;
+    setSegmentId: (value: string) => void;
+    setContactIds: (value: string[]) => void;
+    setSubject: (value: string) => void;
+    setPreviewText: (value: string) => void;
+    setEmailBodyText: (value: string) => void;
+    setEmailBuilderDocument: (value: EmailBuilderDocumentInput | null) => void;
+    setMessengerMessage: (value: string) => void;
+    setChannels: (value: CampaignChannel[]) => void;
+    setProviders: React.Dispatch<React.SetStateAction<Record<CampaignChannel, IntegrationProviderId>>>;
+    setSenderName: (value: string) => void;
+    setSenderEmail: (value: string) => void;
+  },
+) {
+  setters.setCampaignId(item.id);
+  setters.setCampaignName(item.name);
+  setters.setAudienceType(item.audienceType);
+  if (item.segmentId) setters.setSegmentId(item.segmentId);
+  setters.setContactIds(item.contactIds);
+  setters.setSubject(item.subject);
+  setters.setPreviewText(item.previewText);
+  setters.setEmailBodyText(item.emailBodyText);
+  setters.setEmailBuilderDocument(item.emailBuilderDocument);
+  setters.setMessengerMessage(item.messengerMessage);
+  setters.setSenderName(item.senderName);
+  setters.setSenderEmail(item.senderEmail);
+  if (item.deliveryChannels.length > 0) {
+    setters.setChannels(item.deliveryChannels);
+    if (plans.length > 0) {
+      setters.setProviders((current) => ({
+        ...current,
+        ...Object.fromEntries(plans.map((plan) => [plan.channel, plan.providerId])),
+      }));
+    }
+  }
+}
+
+function StepIntro({ number, title, description }: { number: number; title: string; description: string }) {
+  return (
+    <div>
+      <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-primary">Шаг {number}</p>
+      <h2 className="mt-1 text-[22px] font-semibold tracking-[-0.03em] text-text-strong">{title}</h2>
+      <p className="mt-2 max-w-2xl text-[13px] leading-5 text-text-muted">{description}</p>
     </div>
   );
 }
@@ -1415,780 +924,313 @@ function CampaignWizardState({
 function AudienceStep({
   audienceType,
   onAudienceTypeChange,
+  segments,
   selectedSegmentId,
   onSegmentChange,
-  savedListId,
-  onSavedListChange,
-  selectedContactIds,
+  contacts,
+  contactIds,
   onToggleContact,
-  explicitCount,
-  excludeUnsubscribed,
-  excludeBounced,
-  excludePreviouslyContacted,
-  onExcludeUnsubscribed,
-  onExcludeBounced,
-  onExcludePreviouslyContacted,
 }: {
-  audienceType: AudienceType;
-  onAudienceTypeChange: (value: AudienceType) => void;
+  audienceType: "none" | "segment" | "contacts";
+  onAudienceTypeChange: (value: "segment" | "contacts") => void;
+  segments: AudienceSegment[];
   selectedSegmentId: string;
   onSegmentChange: (value: string) => void;
-  savedListId: string;
-  onSavedListChange: (value: string) => void;
-  selectedContactIds: string[];
+  contacts: AudienceContact[];
+  contactIds: string[];
   onToggleContact: (id: string) => void;
-  explicitCount: number;
-  excludeUnsubscribed: boolean;
-  excludeBounced: boolean;
-  excludePreviouslyContacted: boolean;
-  onExcludeUnsubscribed: (value: boolean) => void;
-  onExcludeBounced: (value: boolean) => void;
-  onExcludePreviouslyContacted: (value: boolean) => void;
 }) {
   return (
     <div>
-      <StepHeading
-        eyebrow="Шаг 1"
-        title="Кто должен получить эту кампанию?"
-        description="Выберите готовую аудиторию или используйте контакты из базы."
-      />
-      <div className="mt-6 grid gap-2 sm:grid-cols-2">
-        {audienceOptions.map(({ value, label, description, icon: Icon }) => {
-          const selected = audienceType === value;
+      <StepIntro number={1} title="Выберите аудиторию" description="Используйте сохранённый сегмент или выберите конкретные контакты. Охват по каждому каналу посчитается отдельно." />
+      <div className="mt-6 grid gap-3 sm:grid-cols-2">
+        {([
+          { value: "segment" as const, title: "Сегмент", text: "Динамическая аудитория по сохранённым правилам", icon: UsersRound },
+          { value: "contacts" as const, title: "Контакты", text: "Точный список получателей для этой кампании", icon: UserRound },
+        ]).map((option) => {
+          const Icon = option.icon;
+          const selected = audienceType === option.value;
           return (
             <button
-              key={value}
+              key={option.value}
               type="button"
               aria-pressed={selected}
-              onClick={() => onAudienceTypeChange(value)}
+              onClick={() => onAudienceTypeChange(option.value)}
               className={cn(
-                "flex items-start gap-3 rounded-[11px] border p-3.5 text-left transition-[border-color,background-color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
-                selected
-                  ? "border-primary/35 bg-primary-subtle/45 shadow-[0_0_0_1px_color-mix(in_srgb,var(--primary)_12%,transparent)]"
-                  : "border-border hover:border-border-strong hover:bg-surface-subtle/55",
+                "flex min-h-28 items-start gap-3 rounded-xl border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
+                selected ? "border-primary/40 bg-primary-subtle" : "border-border hover:border-border-strong",
               )}
             >
-              <span
+              <span className={cn("grid size-10 shrink-0 place-items-center rounded-xl", selected ? "bg-primary text-white" : "bg-surface-subtle text-text-muted")}>
+                <Icon aria-hidden="true" className="size-4.5" />
+              </span>
+              <span>
+                <span className="block text-[14px] font-semibold text-text-strong">{option.title}</span>
+                <span className="mt-1 block text-[12px] leading-5 text-text-muted">{option.text}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {audienceType === "segment" ? (
+        <div className="mt-6 grid gap-3">
+          {segments.map((segment) => {
+            const selected = selectedSegmentId === segment.id;
+            return (
+              <button
+                key={segment.id}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => onSegmentChange(segment.id)}
                 className={cn(
-                  "grid size-8 shrink-0 place-items-center rounded-[9px]",
-                  selected ? "bg-primary text-white" : "bg-surface-subtle text-text-muted",
+                  "flex items-center gap-3 rounded-xl border p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
+                  selected ? "border-primary/40 bg-primary-subtle/60" : "border-border hover:border-border-strong",
                 )}
               >
-                <Icon aria-hidden="true" className="size-4" />
-              </span>
-              <span className="min-w-0">
-                <span className="flex items-center gap-2 text-[12px] font-semibold text-text-strong">
-                  {label}
-                  {selected && <Check aria-hidden="true" className="size-3.5 text-primary" />}
+                <span className={cn("grid size-6 place-items-center rounded-full border", selected ? "border-primary bg-primary text-white" : "border-border-strong")}>
+                  {selected ? <Check aria-hidden="true" className="size-3.5" /> : null}
                 </span>
-                <span className="mt-0.5 block text-[10px] leading-4 text-text-muted">
-                  {description}
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13px] font-semibold text-text-strong">{segment.name}</span>
+                  <span className="mt-0.5 block text-[12px] text-text-muted">{segment.description || "Сохранённая аудитория"}</span>
                 </span>
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="mt-5 rounded-[12px] border border-border bg-surface-subtle/35 p-4">
-        {audienceType === "segment" && (
-          <div>
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="m-0 text-[12px] font-semibold text-text-strong">Выберите сегмент</h3>
-                <p className="mt-0.5 mb-0 text-[10px] text-text-muted">Количество обновляется при изменении правил сегмента.</p>
-              </div>
-              <Badge variant="accent">Динамический</Badge>
-            </div>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {segments.slice(0, 6).map((segment) => (
-                <button
-                  key={segment.id}
-                  type="button"
-                  aria-pressed={selectedSegmentId === segment.id}
-                  onClick={() => onSegmentChange(segment.id)}
-                  className={cn(
-                    "flex items-center justify-between gap-3 rounded-[9px] border bg-surface p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
-                    selectedSegmentId === segment.id
-                      ? "border-primary/35"
-                      : "border-border hover:border-border-strong",
-                  )}
-                >
-                  <span className="min-w-0">
-                    <span className="block truncate text-[11px] font-semibold text-text-strong">{segment.name}</span>
-                    <span className="mt-0.5 block text-[9px] text-text-muted">
-                      Контактов: {formatNumber(segment.contactCount)}
-                    </span>
-                  </span>
-                  <span
-                    className={cn(
-                      "grid size-4 shrink-0 place-items-center rounded-full border",
-                      selectedSegmentId === segment.id
-                        ? "border-primary bg-primary text-white"
-                        : "border-border-strong",
-                    )}
-                  >
-                    {selectedSegmentId === segment.id && <Check className="size-2.5" strokeWidth={3} />}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {audienceType === "saved-list" && (
-          <FormField label="Сохранённый список" htmlFor="campaign-saved-list">
-            <Select
-              id="campaign-saved-list"
-              value={savedListId}
-              onChange={(event) => onSavedListChange(event.target.value)}
-              options={savedLists.map((list) => ({
-                value: list.id,
-                label: `${list.name} — контактов: ${formatNumber(list.count)}`,
-              }))}
-            />
-          </FormField>
-        )}
-
-        {audienceType === "custom-filter" && (
-          <div>
-            <div className="flex flex-wrap items-center gap-2 text-[10px]">
-              <span className="font-semibold text-text-muted">ГДЕ</span>
-              {[
-                ["Должность", "равно", "Юрист"],
-                ["Город", "равно", "Москва"],
-                ["Статус", "равно", "Активный"],
-              ].map((rule, index) => (
-                <React.Fragment key={rule[0]}>
-                  {index > 0 && <Badge variant="accent">И</Badge>}
-                  <span className="rounded-[8px] border border-border bg-surface px-2.5 py-1.5 text-text">
-                    {rule.join(" · ")}
-                  </span>
-                </React.Fragment>
-              ))}
-            </div>
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
-              <div>
-                <p className="m-0 text-[10px] text-text-muted">Подходящая аудитория</p>
-                <p className="mt-0.5 mb-0 text-[17px] font-semibold text-text-strong">843 контакта</p>
-              </div>
-              <Link href="/contacts?filter=lawyers-moscow-active" className={buttonVariants({ variant: "secondary", size: "sm" })}>
-                Изменить в контактах
-              </Link>
-            </div>
-          </div>
-        )}
-
-        {audienceType === "contacts" && (
-          <div>
-            {explicitCount > 0 && selectedContactIds.length === 0 && (
-              <Alert tone="info" title={`Получено из контактов: ${formatNumber(explicitCount)}`}>
-                Выбранная группа контактов добавлена в эту кампанию.
-              </Alert>
-            )}
-            <p className={cn("mb-2 text-[10px] text-text-muted", explicitCount > 0 && "mt-4")}>
-              Добавьте или удалите отдельные контакты
-            </p>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {contacts.slice(0, 6).map((contact) => {
-                const selected = selectedContactIds.includes(contact.id);
-                return (
-                  <button
-                    key={contact.id}
-                    type="button"
-                    aria-pressed={selected}
-                    onClick={() => onToggleContact(contact.id)}
-                    className={cn(
-                      "flex items-center gap-2.5 rounded-[9px] border bg-surface p-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
-                      selected ? "border-primary/35 bg-primary-subtle/25" : "border-border hover:border-border-strong",
-                    )}
-                  >
-                    <span
-                      className="grid size-7 shrink-0 place-items-center rounded-full text-[9px] font-semibold text-white"
-                      style={{ backgroundColor: contact.avatarColor }}
-                    >
-                      {contact.firstName[0]}
-                      {contact.lastName[0]}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[10px] font-semibold text-text-strong">{contact.fullName}</span>
-                      <span className="block truncate text-[9px] text-text-muted">{contact.email}</span>
-                    </span>
-                    <span
-                      className={cn(
-                        "grid size-4 shrink-0 place-items-center rounded-[5px] border",
-                        selected ? "border-primary bg-primary text-white" : "border-border-strong",
-                      )}
-                    >
-                      {selected && <Check className="size-2.5" strokeWidth={3} />}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="mt-6 border-t border-border pt-5">
-        <h3 className="m-0 text-[12px] font-semibold text-text-strong">Защита аудитории</h3>
-        <p className="mt-1 mb-4 text-[10px] text-text-muted">Эти проверки повторятся непосредственно перед отправкой.</p>
-        <div className="grid gap-4">
-          <ProtectionToggle
-            label="Исключить отписавшихся"
-            description="Обязательно для каждой кампании"
-            checked={excludeUnsubscribed}
-            onCheckedChange={onExcludeUnsubscribed}
-          />
-          <ProtectionToggle
-            label="Исключить недоставляемые адреса"
-            description="Защищает репутацию отправителя"
-            checked={excludeBounced}
-            onCheckedChange={onExcludeBounced}
-          />
-          <ProtectionToggle
-            label="Исключить недавних получателей"
-            description="Не отправлять тем, кто получал письма за последние 14 дней"
-            checked={excludePreviouslyContacted}
-            onCheckedChange={onExcludePreviouslyContacted}
-          />
+                <strong className="text-[14px] tabular-nums text-text-strong">{formatNumber(segment.contactCount)}</strong>
+              </button>
+            );
+          })}
         </div>
-      </div>
-    </div>
-  );
-}
-
-function ContentStep({
-  selectedChannels,
-  onToggleChannel,
-  recipientCount,
-  channelCoverage,
-  coverageIsExact,
-  messengerMessage,
-  onMessengerMessageChange,
-  contentMode,
-  onContentModeChange,
-  selectedTemplateId,
-  onTemplateChange,
-  selectedDuplicateId,
-  onDuplicateChange,
-  subject,
-  setSubject,
-  previewText,
-  setPreviewText,
-  editorHref,
-  templateLibraryHref,
-  onBeforeEditorNavigation,
-}: {
-  selectedChannels: CampaignChannel[];
-  onToggleChannel: (channel: CampaignChannel) => void;
-  recipientCount: number;
-  channelCoverage: Partial<Record<CampaignChannel, number>>;
-  coverageIsExact: boolean;
-  messengerMessage: string;
-  onMessengerMessageChange: (value: string) => void;
-  contentMode: ContentMode;
-  onContentModeChange: (value: ContentMode) => void;
-  selectedTemplateId: string;
-  onTemplateChange: (value: string) => void;
-  selectedDuplicateId: string;
-  onDuplicateChange: (value: string) => void;
-  subject: string;
-  setSubject: (value: string) => void;
-  previewText: string;
-  setPreviewText: (value: string) => void;
-  editorHref: string;
-  templateLibraryHref: string;
-  onBeforeEditorNavigation: () => void;
-}) {
-  const [aiGenerated, setAiGenerated] = React.useState(false);
-  return (
-    <div>
-      <StepHeading
-        eyebrow="Шаг 2"
-        title="Где и что отправить?"
-        description="Выберите один или несколько каналов. Один контакт может получить разные версии сообщения."
-      />
-      <div className="mt-6 grid gap-3 lg:grid-cols-3">
-        {campaignChannelDefinitions.map((channel) => {
-          const selected = selectedChannels.includes(channel.id);
-          const Icon = channelIcons[channel.id];
-          const coverage = channelCoverage[channel.id] ?? 0;
-          return (
-            <button
-              key={channel.id}
-              type="button"
-              aria-pressed={selected}
-              onClick={() => onToggleChannel(channel.id)}
-              className={cn(
-                "rounded-[11px] border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
-                selected
-                  ? "border-primary/35 bg-primary-subtle/40"
-                  : "border-border hover:border-border-strong hover:bg-surface-subtle/55",
-              )}
-            >
-              <span className="flex items-start justify-between gap-3">
-                <span
-                  className={cn(
-                    "grid size-9 place-items-center rounded-[10px]",
-                    selected ? "bg-primary text-white" : "bg-surface-subtle text-text-muted",
-                  )}
-                >
-                  <Icon aria-hidden="true" className="size-4" />
+      ) : audienceType === "contacts" ? (
+        <fieldset className="mt-6">
+          <legend className="text-[13px] font-semibold text-text-strong">Контакты рабочего пространства</legend>
+          <div className="mt-3 max-h-80 divide-y divide-border overflow-y-auto rounded-xl border border-border">
+            {contacts.map((contact) => (
+              <label key={contact.id} className="flex cursor-pointer items-center gap-3 px-4 py-3 hover:bg-surface-subtle">
+                <input
+                  type="checkbox"
+                  checked={contactIds.includes(contact.id)}
+                  onChange={() => onToggleContact(contact.id)}
+                  className="size-4 accent-[var(--primary)]"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13px] font-medium text-text-strong">{contact.fullName}</span>
+                  <span className="block truncate text-[11px] text-text-muted">{contact.email}{contact.companyName ? ` · ${contact.companyName}` : ""}</span>
                 </span>
-                <span
-                  className={cn(
-                    "grid size-5 place-items-center rounded-full border",
-                    selected
-                      ? "border-primary bg-primary text-white"
-                      : "border-border-strong bg-surface",
-                  )}
-                >
-                  {selected && <Check aria-hidden="true" className="size-3" strokeWidth={3} />}
-                </span>
-              </span>
-              <span className="mt-3 block text-[12px] font-semibold text-text-strong">
-                {channel.label}
-              </span>
-              <span className="mt-1 block min-h-8 text-[9px] leading-4 text-text-muted">
-                {channel.description}
-              </span>
-              <span className="mt-2 block text-[9px] font-medium text-text">
-                Нужно: {channel.identityLabel}
-              </span>
-              <span className="mt-3 flex items-center justify-between gap-2 border-t border-border/80 pt-3 text-[9px]">
-                <span className="text-text-subtle">
-                  {coverageIsExact ? "Точный охват" : "Охват в демобазе"}
-                </span>
-                <span className="font-semibold text-text-strong">
-                  {formatNumber(coverage)} / {formatNumber(recipientCount)}
-                </span>
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      <Alert
-        tone="info"
-        title={coverageIsExact ? "Охват проверен по выбранным контактам" : "Охват показан как демооценка"}
-        className="mt-4"
-      >
-        {coverageIsExact
-          ? "Учтены активные email, сохранённые Telegram chat_id и разрешения на сообщения ВК."
-          : `После синхронизации контактов ${BRAND_NAME} пересчитает точный охват по email, Telegram chat_id и VK ID с учётом разрешений.`}
-      </Alert>
-
-      {selectedChannels.includes("email") && (
-        <div className="mt-7 border-t border-border pt-6">
-          <div className="mb-3">
-            <h3 className="m-0 text-[13px] font-semibold text-text-strong">Письмо</h3>
-            <p className="mt-0.5 mb-0 text-[10px] text-text-muted">Выберите основу и сохраните персонализацию.</p>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2">
-        {contentOptions.map(({ value, label, description, icon: Icon }) => (
-          <button
-            key={value}
-            type="button"
-            aria-pressed={contentMode === value}
-            onClick={() => onContentModeChange(value)}
-            className={cn(
-              "flex items-start gap-3 rounded-[11px] border p-3.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
-              contentMode === value
-                ? "border-primary/35 bg-primary-subtle/40"
-                : "border-border hover:border-border-strong hover:bg-surface-subtle/55",
-            )}
-          >
-            <span
-              className={cn(
-                "grid size-8 shrink-0 place-items-center rounded-[9px]",
-                contentMode === value ? "bg-primary text-white" : "bg-surface-subtle text-text-muted",
-              )}
-            >
-              <Icon aria-hidden="true" className="size-4" />
-            </span>
-            <span>
-              <span className="block text-[12px] font-semibold text-text-strong">{label}</span>
-              <span className="mt-0.5 block text-[10px] leading-4 text-text-muted">{description}</span>
-            </span>
-          </button>
-        ))}
-          </div>
-        </div>
-      )}
-
-      {selectedChannels.includes("email") && contentMode === "template" && (
-        <div className="mt-6">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div>
-              <h3 className="m-0 text-[12px] font-semibold text-text-strong">Выберите шаблон</h3>
-              <p className="mt-0.5 mb-0 text-[10px] text-text-muted">Каждый блок можно редактировать.</p>
-            </div>
-            <Link
-              href={templateLibraryHref}
-              onClick={onBeforeEditorNavigation}
-              className="text-[10px] font-semibold text-primary hover:text-primary-hover"
-            >
-              Открыть библиотеку
-            </Link>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {templates.slice(0, 6).map((template) => (
-              <TemplateChoice
-                key={template.id}
-                template={template}
-                selected={selectedTemplateId === template.id}
-                onSelect={() => onTemplateChange(template.id)}
-              />
+                {contact.status && contact.status !== "active" ? <Badge variant="warning">Недоступен</Badge> : null}
+              </label>
             ))}
           </div>
-        </div>
+        </fieldset>
+      ) : (
+        <Alert tone="info" title="Аудитория пока не выбрана" className="mt-6">
+          Выберите сегмент или конкретные контакты. Черновик можно сохранить и без аудитории.
+        </Alert>
       )}
 
-      {selectedChannels.includes("email") && contentMode === "duplicate" && (
-        <div className="mt-6 grid gap-2">
-          {campaigns.slice(0, 5).map((campaign) => (
-            <button
-              key={campaign.id}
-              type="button"
-              onClick={() => onDuplicateChange(campaign.id)}
-              aria-pressed={selectedDuplicateId === campaign.id}
-              className={cn(
-                "flex items-center justify-between gap-4 rounded-[10px] border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
-                selectedDuplicateId === campaign.id
-                  ? "border-primary/35 bg-primary-subtle/35"
-                  : "border-border hover:border-border-strong",
-              )}
-            >
-              <span className="min-w-0">
-                <span className="block truncate text-[11px] font-semibold text-text-strong">{campaign.name}</span>
-                <span className="mt-0.5 block truncate text-[9px] text-text-muted">{campaign.subject}</span>
-              </span>
-              <Badge variant={selectedDuplicateId === campaign.id ? "accent" : "neutral"}>
-                {campaignStatusLabels[campaign.status]}
-              </Badge>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {selectedChannels.includes("email") && (contentMode === "scratch" || contentMode === "ai") && (
-        <div className="mt-6 rounded-[12px] border border-border bg-surface-subtle/40 p-4">
-          {contentMode === "ai" && (
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h3 className="m-0 text-[12px] font-semibold text-text-strong">Черновик с ИИ {BRAND_NAME}</h3>
-                <p className="mt-0.5 mb-0 text-[10px] text-text-muted">Краткий первый вариант с учётом выбранной аудитории.</p>
-              </div>
-              <Button
-                size="sm"
-                variant="secondary"
-                leadingIcon={<Bot className="size-3.5" />}
-                onClick={() => {
-                  setSubject("Персональное приглашение для {{company}}");
-                  setPreviewText("Одна веская причина присоединиться к обсуждению в сентябре.");
-                  setAiGenerated(true);
-                }}
-              >
-                {aiGenerated ? "Создать заново" : "Создать черновик"}
-              </Button>
-            </div>
-          )}
-          <div className="grid gap-4">
-            <FormField label="Тема письма" htmlFor="content-subject">
-              <Input id="content-subject" value={subject} onChange={(event) => setSubject(event.target.value)} />
-            </FormField>
-            <FormField label="Текст предпросмотра" htmlFor="content-preview">
-              <Input id="content-preview" value={previewText} onChange={(event) => setPreviewText(event.target.value)} />
-            </FormField>
-          </div>
-        </div>
-      )}
-
-      {selectedChannels.includes("email") && <div className="mt-6 flex flex-col gap-3 rounded-[12px] border border-primary/15 bg-primary-subtle/35 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <span className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-primary text-white">
-            <PencilLine aria-hidden="true" className="size-4" />
-          </span>
-          <div>
-            <p className="m-0 text-[11px] font-semibold text-text-strong">Готовы доработать письмо?</p>
-            <p className="mt-0.5 mb-0 text-[10px] text-text-muted">Откройте редактор, а затем вернитесь к выбору отправителя.</p>
-          </div>
-        </div>
-        <a
-          href={editorHref}
-          onClick={onBeforeEditorNavigation}
-          className={buttonVariants({ variant: "primary", size: "sm" })}
-        >
-          Открыть редактор писем
-          <ArrowRight aria-hidden="true" className="size-3.5" />
-        </a>
-      </div>}
-
-      {selectedChannels.some((channel) => channel !== "email") && (
-        <div className="mt-7 border-t border-border pt-6">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h3 className="m-0 text-[13px] font-semibold text-text-strong">
-                Текст для {selectedChannels.filter((channel) => channel !== "email").map((channel) => getCampaignChannelDefinition(channel).shortLabel).join(" и ")}
-              </h3>
-              <p className="mt-0.5 mb-0 text-[10px] text-text-muted">
-                Общая текстовая версия. Переменные {"{{first_name}}"} и {"{{company}}"} сохранятся.
-              </p>
-            </div>
-            <Badge variant="accent">Деморежим</Badge>
-          </div>
-          <FormField
-            label="Сообщение"
-            htmlFor="messenger-message"
-            hint={`${formatNumber(messengerMessage.length)} / ${formatNumber(MESSENGER_MESSAGE_MAX_LENGTH)} символов`}
-            className="mt-4"
-          >
-            <Textarea
-              id="messenger-message"
-              rows={6}
-              maxLength={MESSENGER_MESSAGE_MAX_LENGTH}
-              value={messengerMessage}
-              onChange={(event) => onMessengerMessageChange(event.target.value)}
-              placeholder="Напишите короткое сообщение…"
-            />
-          </FormField>
-          <div className="mt-3 flex items-start gap-3 rounded-[10px] border border-border bg-surface-subtle/40 p-3.5">
-            <MessageCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-primary" />
-            <div>
-              <p className="m-0 text-[10px] font-semibold text-text-strong">Предпросмотр сообщения</p>
-              <p className="mt-1 mb-0 whitespace-pre-wrap text-[10px] leading-5 text-text-muted">
-                {messengerMessage || "Здесь появится текст для мессенджеров."}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+      <Alert tone="info" title="Неактивные контакты исключаются автоматически" className="mt-6">
+        Сервер не включает в охват отписавшихся, контакты с ошибками доставки и некорректными адресами; дополнительные переключатели не нужны.
+      </Alert>
     </div>
   );
 }
 
-function SenderStep({
-  selectedChannels,
-  channelProviders,
-  onProviderChange,
-  channelCoverage,
-  recipientCount,
-  channelConsentConfirmed,
-  onChannelConsentConfirmedChange,
-  senderName,
-  senderEmail,
+function MessageStep({
+  campaignName,
+  onCampaignNameChange,
   subject,
-  previewText,
-  onSenderNameChange,
-  onSenderEmailChange,
   onSubjectChange,
+  previewText,
   onPreviewTextChange,
+  emailBodyText,
+  onEmailBodyTextChange,
+  messengerMessage,
+  onMessengerMessageChange,
   editorHref,
-  onBeforeEditorNavigation,
 }: {
-  selectedChannels: CampaignChannel[];
-  channelProviders: Record<CampaignChannel, string>;
-  onProviderChange: (channel: CampaignChannel, provider: string) => void;
-  channelCoverage: Partial<Record<CampaignChannel, number>>;
-  recipientCount: number;
-  channelConsentConfirmed: boolean;
-  onChannelConsentConfirmedChange: (value: boolean) => void;
-  senderName: string;
-  senderEmail: string;
+  campaignName: string;
+  onCampaignNameChange: (value: string) => void;
   subject: string;
-  previewText: string;
-  onSenderNameChange: (value: string) => void;
-  onSenderEmailChange: (value: string) => void;
   onSubjectChange: (value: string) => void;
+  previewText: string;
   onPreviewTextChange: (value: string) => void;
+  emailBodyText: string;
+  onEmailBodyTextChange: (value: string) => void;
+  messengerMessage: string;
+  onMessengerMessageChange: (value: string) => void;
   editorHref: string;
-  onBeforeEditorNavigation: () => void;
 }) {
-  const consentStatements = [
-    selectedChannels.includes("email")
-      ? "Подтверждаю законное основание для email-рассылки и исключение отписавшихся контактов."
-      : null,
-    selectedChannels.includes("telegram")
-      ? "Для Telegram сохранены chat_id и разрешение боту."
-      : null,
-    selectedChannels.includes("vk")
-      ? "Для ВКонтакте сохранены VK ID и разрешение сообществу."
-      : null,
-  ].filter((statement): statement is string => Boolean(statement));
-  const consentDescription = `${consentStatements.join(" ")} Недоступные контакты исключаются отдельно по каждому выбранному каналу.`;
-
   return (
     <div>
-      <StepHeading
-        eyebrow="Шаг 3"
-        title="Через какие платформы отправить?"
-        description="Выберите провайдера для каждого канала. В деморежиме ключи и внешние API не используются."
-      />
+      <StepIntro number={2} title="Подготовьте сообщение" description="Создайте email-версию и короткий вариант для мессенджеров. На следующем шаге выберите, какие версии отправлять." />
+      <div className="mt-6">
+        <FormField label="Название кампании" htmlFor="campaign-name" required hint="Видно только внутри MAILFLOW.">
+          <Input id="campaign-name" value={campaignName} onChange={(event) => onCampaignNameChange(event.target.value)} />
+        </FormField>
+      </div>
+      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+        <section className="rounded-xl border border-border p-5" aria-labelledby="email-message-title">
+          <div className="flex items-center gap-3">
+            <span className="grid size-9 place-items-center rounded-xl bg-primary-subtle text-primary"><Mail aria-hidden="true" className="size-4" /></span>
+            <div>
+              <h3 id="email-message-title" className="text-[15px] font-semibold text-text-strong">Email</h3>
+              <p className="mt-0.5 text-[11px] text-text-muted">Тема, прехедер и основной текст</p>
+            </div>
+          </div>
+          <div className="mt-5 space-y-4">
+            <FormField label="Тема письма" htmlFor="campaign-subject">
+              <Input id="campaign-subject" value={subject} onChange={(event) => onSubjectChange(event.target.value)} placeholder="Короткая и конкретная тема" />
+            </FormField>
+            <FormField label="Прехедер" htmlFor="campaign-preheader" hint="Необязательная строка во входящих">
+              <Input id="campaign-preheader" value={previewText} onChange={(event) => onPreviewTextChange(event.target.value)} placeholder="Краткое описание письма" />
+            </FormField>
+            <FormField label="Текст письма" htmlFor="campaign-email-message" hint={`${emailBodyText.length} символов`}>
+              <Textarea id="campaign-email-message" rows={8} value={emailBodyText} onChange={(event) => onEmailBodyTextChange(event.target.value)} placeholder="Здравствуйте, {{first_name}}…" />
+            </FormField>
+            <Link href={editorHref} className={buttonVariants({ variant: "secondary", size: "sm" })}>
+              <PencilLine aria-hidden="true" className="size-3.5" />
+              Открыть визуальный редактор
+            </Link>
+          </div>
+        </section>
 
-      <div className="mt-6 grid gap-3">
-        {selectedChannels.map((channelId) => {
-          const channel = getCampaignChannelDefinition(channelId);
-          const Icon = channelIcons[channelId];
-          const provider = getCampaignChannelProvider(
-            channelId,
-            channelProviders[channelId],
-          );
+        <section className="rounded-xl border border-border p-5" aria-labelledby="messenger-message-title">
+          <div className="flex items-center gap-3">
+            <span className="grid size-9 place-items-center rounded-xl bg-info-subtle text-info"><MessageCircle aria-hidden="true" className="size-4" /></span>
+            <div>
+              <h3 id="messenger-message-title" className="text-[15px] font-semibold text-text-strong">Telegram и ВКонтакте</h3>
+              <p className="mt-0.5 text-[11px] text-text-muted">Один короткий вариант для выбранных мессенджеров</p>
+            </div>
+          </div>
+          <div className="mt-5">
+            <FormField label="Текст сообщения" htmlFor="campaign-messenger-message" hint={`${messengerMessage.length} из 4 000 символов`}>
+              <Textarea id="campaign-messenger-message" rows={11} maxLength={4000} value={messengerMessage} onChange={(event) => onMessengerMessageChange(event.target.value)} placeholder="Здравствуйте, {{first_name}}…" />
+            </FormField>
+          </div>
+        </section>
+      </div>
+      <p className="mt-4 text-[12px] leading-5 text-text-muted">
+        Переменная <code className="rounded bg-surface-subtle px-1.5 py-0.5">{"{{first_name}}"}</code> подставит имя контакта перед отправкой.
+      </p>
+    </div>
+  );
+}
+
+function ChannelsStep({
+  channels,
+  onToggleChannel,
+  providers,
+  onProviderChange,
+  integrationByProvider,
+  coverage,
+  recipientCount,
+  senderName,
+  senderEmail,
+  onSenderNameChange,
+  onSenderEmailChange,
+  audienceType,
+}: {
+  channels: CampaignChannel[];
+  onToggleChannel: (channel: CampaignChannel) => void;
+  providers: Record<CampaignChannel, IntegrationProviderId>;
+  onProviderChange: (channel: CampaignChannel, providerId: IntegrationProviderId) => void;
+  integrationByProvider: Partial<Record<IntegrationProviderId, IntegrationSnapshot>>;
+  coverage: Record<CampaignChannel, number>;
+  recipientCount: number;
+  senderName: string;
+  senderEmail: string;
+  onSenderNameChange: (value: string) => void;
+  onSenderEmailChange: (value: string) => void;
+  audienceType: "none" | "segment" | "contacts";
+}) {
+  return (
+    <div>
+      <StepIntro number={3} title="Настройте маршруты доставки" description="Для каждого канала выберите провайдера. Точный охват и блокеры рассчитает сервер на шаге готовности." />
+      <div className="mt-6 space-y-3">
+        {campaignChannelDefinitions.map((channel) => {
+          const selected = channels.includes(channel.id);
+          const providerId = providers[channel.id];
+          const provider = getCampaignChannelProvider(channel.id, providerId);
+          const connection = integrationByProvider[providerId]?.status ?? "disconnected";
+          const Icon = channelIcons[channel.id];
           return (
-            <div key={channelId} className="rounded-[12px] border border-border p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="flex items-start gap-3">
-                  <span className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-primary-subtle text-primary">
-                    <Icon aria-hidden="true" className="size-4" />
+            <article key={channel.id} className={cn("rounded-xl border p-4 sm:p-5", selected ? "border-primary/35 bg-primary-subtle/25" : "border-border") }>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                <button
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => onToggleChannel(channel.id)}
+                  className="flex min-w-0 flex-1 items-center gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                >
+                  <span className={cn("grid size-10 shrink-0 place-items-center rounded-xl", selected ? "bg-primary text-white" : "bg-surface-subtle text-text-muted")}><Icon aria-hidden="true" className="size-4" /></span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-2">
+                      <span className="text-[14px] font-semibold text-text-strong">{channel.label}</span>
+                      <Badge variant={selected ? "accent" : "neutral"}>{selected ? "Выбран" : "Выключен"}</Badge>
+                    </span>
+                    <span className="mt-1 block text-[12px] text-text-muted">
+                      {audienceType === "segment"
+                        ? "Точный охват рассчитает сервер"
+                        : `Доступно: ${formatNumber(coverage[channel.id])} из ${formatNumber(recipientCount)}`}
+                    </span>
                   </span>
-                  <div>
-                    <h3 className="m-0 text-[12px] font-semibold text-text-strong">
-                      {channel.label}
-                    </h3>
-                    <p className="mt-0.5 mb-0 text-[9px] text-text-muted">
-                      Доступно контактов: {formatNumber(channelCoverage[channelId] ?? 0)} из {formatNumber(recipientCount)}
-                    </p>
+                </button>
+
+                {selected ? (
+                  <div className="grid gap-2 sm:min-w-72 sm:grid-cols-[1fr_auto] sm:items-end">
+                    <FormField label="Провайдер" htmlFor={`campaign-provider-${channel.id}`}>
+                      <Select
+                        id={`campaign-provider-${channel.id}`}
+                        value={providerId}
+                        onChange={(event) => onProviderChange(channel.id, event.target.value as IntegrationProviderId)}
+                        options={campaignChannelProviders[channel.id].map((item) => ({ value: item.id, label: item.label }))}
+                      />
+                    </FormField>
+                    <Link
+                      href={`/integrations?channel=${channel.id}&provider=${providerId}`}
+                      className={buttonVariants({ variant: connection === "connected" ? "ghost" : "secondary", size: "sm" })}
+                    >
+                      <Settings2 aria-hidden="true" className="size-3.5" />
+                      {connection === "connected" ? "Открыть" : "Настроить"}
+                    </Link>
                   </div>
+                ) : null}
+              </div>
+
+              {selected ? (
+                <div className="mt-4 flex flex-col gap-2 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-[12px] leading-5 text-text-muted">{provider?.description}</p>
+                  <Badge variant={connection === "connected" ? "success" : connection === "needs_attention" ? "warning" : "neutral"} dot className="w-fit shrink-0">
+                    {connectionLabels[connection]}
+                  </Badge>
                 </div>
-                <Badge variant="warning" dot>Не подключён</Badge>
-              </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,220px)_1fr] sm:items-end">
-                <FormField label="Провайдер" htmlFor={`channel-provider-${channelId}`}>
-                  <Select
-                    id={`channel-provider-${channelId}`}
-                    value={channelProviders[channelId]}
-                    onChange={(event) => onProviderChange(channelId, event.target.value)}
-                    options={campaignChannelProviders[channelId].map((item) => ({
-                      value: item.id,
-                      label: item.label,
-                    }))}
-                  />
-                </FormField>
-                <div className="rounded-[9px] bg-surface-subtle/55 px-3 py-2.5">
-                  <p className="m-0 text-[9px] font-medium text-text-strong">
-                    {provider?.description}
-                  </p>
-                  {channelId === "email" && channelProviders[channelId] === "vk-workspace" && (
-                    <p className="mt-1 mb-0 text-[9px] leading-4 text-text-muted">
-                      В мастере маршрут работает через SMTP только после серверного подключения.
-                    </p>
-                  )}
-                </div>
-              </div>
-              <div className="mt-3 flex items-start gap-2 border-t border-border pt-3">
-                <ShieldCheck aria-hidden="true" className="mt-0.5 size-3.5 shrink-0 text-primary" />
-                <p className="m-0 text-[9px] leading-4 text-text-muted">{channel.consentHint}</p>
-              </div>
-            </div>
+              ) : null}
+            </article>
           );
         })}
       </div>
 
-      {selectedChannels.includes("email") && <div className="mt-7 border-t border-border pt-6">
-        <div className="mb-3">
-          <h3 className="m-0 text-[13px] font-semibold text-text-strong">Отправитель email</h3>
-          <p className="mt-0.5 mb-0 text-[10px] text-text-muted">Выберите проверенный адрес и проверьте вид письма.</p>
-        </div>
-      <div className="grid gap-2 sm:grid-cols-2">
-        {senderProfiles.map((profile) => {
-          const selected = senderEmail === profile.email;
-          return (
-            <button
-              key={profile.id}
-              type="button"
-              aria-pressed={selected}
-              onClick={() => {
-                onSenderNameChange(profile.name);
-                onSenderEmailChange(profile.email);
-              }}
-              className={cn(
-                "flex items-center gap-3 rounded-[10px] border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
-                selected ? "border-primary/35 bg-primary-subtle/35" : "border-border hover:border-border-strong",
-              )}
-            >
-              <span className="grid size-8 shrink-0 place-items-center rounded-full bg-primary-subtle text-[10px] font-semibold text-primary">
-                {profile.name
-                  .split(" ")
-                  .map((part) => part[0])
-                  .slice(0, 2)
-                  .join("")}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[11px] font-semibold text-text-strong">{profile.name}</span>
-                <span className="block truncate text-[9px] text-text-muted">{profile.email}</span>
-              </span>
-              {selected && <CheckCircle2 aria-hidden="true" className="size-4 text-success" />}
-            </button>
-          );
-        })}
-      </div>
-      <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        <FormField label="Имя отправителя" htmlFor="sender-name" required>
-          <Input id="sender-name" value={senderName} onChange={(event) => onSenderNameChange(event.target.value)} />
-        </FormField>
-        <FormField label="Адрес отправителя" htmlFor="sender-email" required hint="Проверенный домен отправки">
-          <Input id="sender-email" type="email" value={senderEmail} onChange={(event) => onSenderEmailChange(event.target.value)} />
-        </FormField>
-      </div>
-      <div className="mt-6 border-t border-border pt-5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h3 className="m-0 text-[12px] font-semibold text-text-strong">Предпросмотр во входящих</h3>
-            <p className="mt-0.5 mb-0 text-[10px] text-text-muted">Проверьте тему и текст предпросмотра.</p>
+      {channels.includes("email") ? (
+        <section className="mt-6 rounded-xl border border-border p-5" aria-labelledby="sender-title">
+          <h3 id="sender-title" className="text-[15px] font-semibold text-text-strong">Отправитель email</h3>
+          <p className="mt-1 text-[12px] text-text-muted">Адрес должен быть подтверждён у выбранного провайдера.</p>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <FormField label="Имя отправителя" htmlFor="sender-name" required>
+              <Input id="sender-name" value={senderName} onChange={(event) => onSenderNameChange(event.target.value)} />
+            </FormField>
+            <FormField label="Email отправителя" htmlFor="sender-email" required>
+              <Input id="sender-email" type="email" value={senderEmail} onChange={(event) => onSenderEmailChange(event.target.value)} placeholder="mailing@company.ru" />
+            </FormField>
           </div>
-          <a
-            href={editorHref}
-            onClick={onBeforeEditorNavigation}
-            className="text-[10px] font-semibold text-primary hover:text-primary-hover"
-          >
-            Изменить содержимое письма
-          </a>
-        </div>
-        <div className="mt-4 grid gap-4">
-          <FormField label="Тема письма" htmlFor="sender-subject" required>
-            <Input id="sender-subject" value={subject} onChange={(event) => onSubjectChange(event.target.value)} />
-          </FormField>
-          <FormField label="Текст предпросмотра" htmlFor="sender-preview">
-            <Input id="sender-preview" value={previewText} onChange={(event) => onPreviewTextChange(event.target.value)} />
-          </FormField>
-        </div>
-        <div className="mt-4 rounded-[10px] border border-border bg-surface-subtle/45 p-3.5">
-          <div className="flex items-start gap-3">
-            <span className="grid size-8 shrink-0 place-items-center rounded-full bg-primary text-[10px] font-semibold text-white">
-              {senderName
-                .split(" ")
-                .map((part) => part[0])
-                .slice(0, 2)
-                .join("") || "MF"}
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between gap-3">
-                <p className="m-0 truncate text-[11px] font-semibold text-text-strong">{senderName || "Отправитель"}</p>
-                <span className="text-[9px] text-text-subtle">09:41</span>
-              </div>
-              <p className="mt-0.5 mb-0 truncate text-[10px] font-medium text-text">{subject || "Тема вашего письма"}</p>
-              <p className="mt-0.5 mb-0 truncate text-[9px] text-text-muted">{previewText || "Здесь появится текст предпросмотра."}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-      </div>}
+        </section>
+      ) : null}
 
-      <div className="mt-6 rounded-[11px] border border-primary/15 bg-primary-subtle/35 p-4">
-        <div className="flex items-center justify-between gap-4">
+      <div className="mt-6 flex items-start gap-3 rounded-xl border border-border bg-surface-subtle p-4">
+        <ShieldCheck aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-primary" />
+        <div className="flex items-start gap-3">
           <div>
-            <p className="m-0 text-[11px] font-semibold text-text-strong">
-              Согласия и доступность проверены
-            </p>
-            <p className="mt-1 mb-0 max-w-2xl text-[9px] leading-4 text-text-muted">
-              {consentDescription}
-            </p>
+            <p className="text-[13px] font-semibold text-text-strong">Согласия проверяет сервер</p>
+            <p className="mt-1 text-[12px] leading-5 text-text-muted">В финальный охват попадут только active-контакты с email-согласием, Telegram chat_id или VK ID и согласием для соответствующего канала.</p>
           </div>
-          <Switch
-            checked={channelConsentConfirmed}
-            onCheckedChange={onChannelConsentConfirmedChange}
-            label="Подтвердить согласие"
-          />
         </div>
       </div>
     </div>
@@ -2197,279 +1239,122 @@ function SenderStep({
 
 function ReviewStep({
   campaignName,
-  setCampaignName,
   audienceLabel,
   recipientCount,
-  contentLabel,
-  senderName,
-  senderEmail,
-  subject,
-  selectedChannels,
-  channelProviders,
-  channelCoverage,
-  messengerMessage,
-  channelConsentConfirmed,
-  exclusions,
-  sendMode,
-  onSendModeChange,
-  scheduleDate,
-  scheduleTime,
-  onScheduleDateChange,
-  onScheduleTimeChange,
+  channels,
+  providers,
+  coverage,
+  coveragePending,
+  clientBlockers,
+  evaluation,
 }: {
   campaignName: string;
-  setCampaignName: (value: string) => void;
   audienceLabel: string;
   recipientCount: number;
-  contentLabel: string;
-  senderName: string;
-  senderEmail: string;
-  subject: string;
-  selectedChannels: CampaignChannel[];
-  channelProviders: Record<CampaignChannel, string>;
-  channelCoverage: Partial<Record<CampaignChannel, number>>;
-  messengerMessage: string;
-  channelConsentConfirmed: boolean;
-  exclusions: { unsubscribed: boolean; bounced: boolean; previouslyContacted: boolean };
-  sendMode: SendMode;
-  onSendModeChange: (value: SendMode) => void;
-  scheduleDate: string;
-  scheduleTime: string;
-  onScheduleDateChange: (value: string) => void;
-  onScheduleTimeChange: (value: string) => void;
+  channels: CampaignChannel[];
+  providers: Record<CampaignChannel, IntegrationProviderId>;
+  coverage: Partial<Record<CampaignChannel, number>>;
+  coveragePending: boolean;
+  clientBlockers: string[];
+  evaluation: Evaluation | null;
 }) {
+  const blockers = evaluation?.blockers.length ? evaluation.blockers : clientBlockers;
   return (
     <div>
-      <StepHeading
-        eyebrow="Шаг 4"
-        title="Проверьте перед запуском"
-        description="Проверьте аудиторию, каналы и время. В деморежиме ни одно письмо или сообщение не отправляется."
-      />
-      <div className="mt-6">
-        <FormField label="Название кампании" htmlFor="review-campaign-name" required>
-          <Input id="review-campaign-name" value={campaignName} onChange={(event) => setCampaignName(event.target.value)} />
-        </FormField>
-      </div>
-      <div className="mt-5 divide-y divide-border rounded-[12px] border border-border">
-        <ReviewRow icon={<UsersRound className="size-4" />} label="Аудитория" value={audienceLabel} meta={`Получателей: ${formatNumber(recipientCount)}`} />
-        <ReviewRow
-          icon={<Cable className="size-4" />}
-          label="Каналы и охват"
-          value={selectedChannels.map((channel) => getCampaignChannelDefinition(channel).shortLabel).join(" · ")}
-          meta={selectedChannels.map((channel) => `${getCampaignChannelDefinition(channel).shortLabel}: ${formatNumber(channelCoverage[channel] ?? 0)}`).join(" · ")}
-        />
-        <ReviewRow
-          icon={<ShieldCheck className="size-4" />}
-          label="Провайдеры"
-          value={selectedChannels.map((channel) => getCampaignChannelProvider(channel, channelProviders[channel])?.label ?? "Не выбран").join(" · ")}
-          meta="Деморежим: учётные данные не подключены"
-        />
-        {selectedChannels.includes("email") && (
-          <ReviewRow icon={<MailCheck className="size-4" />} label="Письмо" value={contentLabel} meta={subject} />
-        )}
-        {selectedChannels.some((channel) => channel !== "email") && (
+      <StepIntro number={4} title="Проверьте готовность" description="Сервер рассчитает точный охват, проверит согласия, подключения и сохранит план. Внешняя отправка на этом шаге не выполняется." />
+      <div className="mt-6 divide-y divide-border rounded-xl border border-border">
+        <ReviewRow label="Кампания" value={campaignName || "Без названия"} />
+        <ReviewRow label="Аудитория" value={`${audienceLabel} · ${formatNumber(recipientCount)} получателей`} />
+        {channels.map((channel) => (
           <ReviewRow
-            icon={<MessageCircle className="size-4" />}
-            label="Сообщение для мессенджеров"
-            value={
-              messengerMessage.trim().length > 96
-                ? `${messengerMessage.trim().slice(0, 93)}…`
-                : messengerMessage.trim() || "Текст не задан"
-            }
-            meta={`${messengerMessage.length} символов`}
+            key={channel}
+            label={getCampaignChannelDefinition(channel).shortLabel}
+            value={coveragePending
+              ? `${integrationProviderById[providers[channel]].name} · охват после проверки`
+              : `${integrationProviderById[providers[channel]].name} · доступно ${formatNumber(coverage[channel] ?? 0)}`}
           />
-        )}
-        {selectedChannels.includes("email") && (
-          <ReviewRow icon={<UserRound className="size-4" />} label="Отправитель email" value={senderName} meta={senderEmail} />
-        )}
+        ))}
       </div>
 
-      <div className="mt-6">
-        <h3 className="m-0 text-[12px] font-semibold text-text-strong">Режим демозапуска</h3>
-        <p className="mt-1 mb-3 text-[10px] text-text-muted">Выберите, когда {BRAND_NAME} должен создать план обработки получателей.</p>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {[
-            { value: "now" as const, label: "Создать сейчас", description: "Сохранить демоплан сразу", icon: Send },
-            { value: "schedule" as const, label: "Запланировать демо", description: "Выбрать дату и время плана", icon: CalendarClock },
-          ].map(({ value, label, description, icon: Icon }) => (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={sendMode === value}
-              onClick={() => onSendModeChange(value)}
-              className={cn(
-                "flex items-start gap-3 rounded-[10px] border p-3.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
-                sendMode === value ? "border-primary/35 bg-primary-subtle/35" : "border-border hover:border-border-strong",
-              )}
-            >
-              <span className={cn("grid size-8 place-items-center rounded-[9px]", sendMode === value ? "bg-primary text-white" : "bg-surface-subtle text-text-muted")}>
-                <Icon aria-hidden="true" className="size-4" />
-              </span>
-              <span>
-                <span className="block text-[11px] font-semibold text-text-strong">{label}</span>
-                <span className="mt-0.5 block text-[9px] text-text-muted">{description}</span>
-              </span>
-            </button>
-          ))}
-        </div>
-        {sendMode === "schedule" && (
-          <div className="mt-3 grid gap-3 rounded-[10px] border border-border bg-surface-subtle/35 p-4 sm:grid-cols-2">
-            <FormField label="Дата" htmlFor="schedule-date">
-              <Input id="schedule-date" type="date" min="2026-08-12" value={scheduleDate} onChange={(event) => onScheduleDateChange(event.target.value)} />
-            </FormField>
-            <FormField label="Время" htmlFor="schedule-time" hint="Саратов (UTC+4)">
-              <Input id="schedule-time" type="time" value={scheduleTime} onChange={(event) => onScheduleTimeChange(event.target.value)} />
-            </FormField>
+      <Alert tone="info" title="Запуск выполняется отдельно" className="mt-6">
+        Проверка только фиксирует готовую версию. После неё откройте кампанию и нажмите
+        «Начать отправку». Автоматического запуска по расписанию в текущей версии нет.
+      </Alert>
+
+      <section className={cn("mt-6 rounded-xl border p-5", blockers.length ? "border-warning/30 bg-warning-subtle" : "border-success/25 bg-success-subtle")} aria-labelledby="blockers-title">
+        <div className="flex items-center gap-3">
+          {blockers.length ? <CircleAlert aria-hidden="true" className="size-5 text-warning" /> : <CheckCircle2 aria-hidden="true" className="size-5 text-success" />}
+          <div>
+            <h3 id="blockers-title" className="text-[14px] font-semibold text-text-strong">{blockers.length ? `Блокеров: ${blockers.length}` : "Предварительная проверка пройдена"}</h3>
+            <p className="mt-1 text-[12px] text-text-muted">{evaluation ? "Результат серверной проверки" : "Предварительная проверка формы"}</p>
           </div>
-        )}
-      </div>
-
-      <div className="mt-6 rounded-[11px] border border-warning/15 bg-warning-subtle/55 p-4">
-        <div className="flex items-center gap-2 text-[11px] font-semibold text-warning">
-          <ShieldCheck aria-hidden="true" className="size-4" />
-          Конфигурация готова к демозапуску
         </div>
-        <ul className="mt-3 grid gap-2 text-[10px] text-text sm:grid-cols-2">
-          <li className="flex items-center gap-2"><Check className="size-3 text-warning" />Каналы и провайдеры выбраны</li>
-          <li className="flex items-center gap-2"><Check className="size-3 text-warning" />Внешние ключи не подключены</li>
-          {selectedChannels.includes("email") && <li className="flex items-center gap-2"><Check className="size-3 text-warning" />Письмо и тема готовы</li>}
-          {selectedChannels.some((channel) => channel !== "email") && <li className="flex items-center gap-2"><Check className="size-3 text-warning" />Текст для мессенджеров готов</li>}
-          {channelConsentConfirmed && <li className="flex items-center gap-2"><Check className="size-3 text-warning" />Согласие аудитории подтверждено</li>}
-          {exclusions.unsubscribed && <li className="flex items-center gap-2"><Check className="size-3 text-success" />Отписавшиеся исключены</li>}
-          {exclusions.bounced && <li className="flex items-center gap-2"><Check className="size-3 text-success" />Недоставляемые адреса исключены</li>}
-          {exclusions.previouslyContacted && <li className="flex items-center gap-2"><Check className="size-3 text-success" />Недавние получатели исключены</li>}
-        </ul>
-      </div>
+        {blockers.length ? (
+          <ul className="mt-4 space-y-2 text-[12px] leading-5 text-text">
+            {blockers.map((blocker) => <li key={blocker} className="flex gap-2"><CircleDashed aria-hidden="true" className="mt-1 size-3.5 shrink-0" />{blocker}</li>)}
+          </ul>
+        ) : (
+          <p className="mt-3 text-[12px] leading-5 text-text">Нажмите «Проверить готовность»: сервер рассчитает финальный охват и сохранит план. Внешняя отправка не выполняется.</p>
+        )}
+      </section>
     </div>
   );
 }
 
-function StepHeading({
-  eyebrow,
-  title,
-  description,
+function ReviewRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col gap-1 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:gap-5">
+      <span className="text-[12px] font-medium text-text-muted">{label}</span>
+      <span className="text-[13px] font-semibold text-text-strong sm:text-right">{value}</span>
+    </div>
+  );
+}
+
+function CampaignSummary({
+  currentStep,
+  audienceLabel,
+  recipientCount,
+  campaignName,
+  channels,
+  providers,
+  blockers,
 }: {
-  eyebrow: string;
-  title: string;
-  description: string;
+  currentStep: number;
+  audienceLabel: string;
+  recipientCount: number;
+  campaignName: string;
+  channels: CampaignChannel[];
+  providers: Record<CampaignChannel, IntegrationProviderId>;
+  blockers: string[];
 }) {
   return (
-    <div>
-      <p className="section-eyebrow">{eyebrow}</p>
-      <h2 className="mt-1 mb-0 text-[20px] font-semibold tracking-[-0.025em] text-text-strong">{title}</h2>
-      <p className="mt-1.5 mb-0 max-w-xl text-[12px] leading-5 text-text-muted">{description}</p>
-    </div>
-  );
-}
-
-function ProtectionToggle({
-  label,
-  description,
-  checked,
-  onCheckedChange,
-}: {
-  label: string;
-  description: string;
-  checked: boolean;
-  onCheckedChange: (checked: boolean) => void;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-4">
-      <div>
-        <p className="m-0 text-[11px] font-medium text-text-strong">{label}</p>
-        <p className="mt-0.5 mb-0 text-[9px] text-text-muted">{description}</p>
+    <aside className="card p-5 xl:sticky xl:top-5" aria-label="Сводка кампании">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-[15px] font-semibold text-text-strong">Сводка</h2>
+        <Badge variant={blockers.length === 0 ? "success" : "warning"} dot>{blockers.length === 0 ? "Готово" : `Блокеров: ${blockers.length}`}</Badge>
       </div>
-      <Switch checked={checked} onCheckedChange={onCheckedChange} label={label} />
-    </div>
+      <dl className="mt-5 space-y-4">
+        <SummaryRow icon={<Send aria-hidden="true" className="size-4" />} label="Кампания" value={campaignName || "Не названа"} />
+        <SummaryRow icon={<UsersRound aria-hidden="true" className="size-4" />} label="Аудитория" value={`${audienceLabel} · ${formatNumber(recipientCount)}`} />
+        <SummaryRow icon={<ShieldCheck aria-hidden="true" className="size-4" />} label="Маршруты" value={channels.length ? channels.map((channel) => `${getCampaignChannelDefinition(channel).shortLabel}: ${integrationProviderById[providers[channel]].name}`).join("; ") : "Не выбраны"} />
+      </dl>
+      <div className="mt-5 rounded-xl bg-surface-subtle p-4">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-subtle">Сейчас</p>
+        <p className="mt-1 text-[14px] font-semibold text-text-strong">Шаг {currentStep + 1} из 4 · {steps[currentStep].label}</p>
+        <p className="mt-2 text-[11px] leading-5 text-text-muted">Черновик формы восстанавливается в этом браузере. Бизнес-данные считаются сохранёнными только после ответа API.</p>
+      </div>
+    </aside>
   );
 }
 
-function SummaryItem({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-}) {
+function SummaryRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
     <div className="flex gap-3">
-      <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-[8px] bg-surface-subtle text-text-muted">
-        {icon}
-      </span>
-      <div className="min-w-0">
-        <dt className="text-[9px] font-medium text-text-subtle">{label}</dt>
-        <dd className="mt-0.5 mb-0 truncate text-[11px] font-semibold text-text-strong">{value}</dd>
-      </div>
+      <dt className="grid size-8 shrink-0 place-items-center rounded-xl bg-primary-subtle text-primary">{icon}</dt>
+      <dd className="min-w-0">
+        <span className="block text-[11px] font-medium text-text-muted">{label}</span>
+        <span className="mt-1 block text-[12px] leading-5 font-semibold text-text-strong">{value}</span>
+      </dd>
     </div>
-  );
-}
-
-function ReviewRow({
-  icon,
-  label,
-  value,
-  meta,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  meta: string;
-}) {
-  return (
-    <div className="flex items-start gap-3 p-4">
-      <span className="grid size-8 shrink-0 place-items-center rounded-[9px] bg-primary-subtle text-primary">{icon}</span>
-      <div className="min-w-0 flex-1">
-        <p className="m-0 text-[9px] font-medium text-text-subtle">{label}</p>
-        <p className="mt-0.5 mb-0 text-[11px] font-semibold text-text-strong">{value}</p>
-        <p className="mt-0.5 mb-0 truncate text-[9px] text-text-muted">{meta}</p>
-      </div>
-      <CheckCircle2 aria-hidden="true" className="mt-1 size-4 shrink-0 text-success" />
-    </div>
-  );
-}
-
-function TemplateChoice({
-  template,
-  selected,
-  onSelect,
-}: {
-  template: (typeof templates)[number];
-  selected: boolean;
-  onSelect: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={selected}
-      onClick={onSelect}
-      className={cn(
-        "group overflow-hidden rounded-[11px] border bg-surface text-left transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
-        selected ? "border-primary/45 shadow-[0_0_0_1px_var(--primary-muted)]" : "border-border hover:border-border-strong",
-      )}
-    >
-      <span
-        className="relative flex h-24 flex-col items-center justify-center overflow-hidden p-4"
-        style={{ backgroundColor: template.backgroundColor }}
-      >
-        <span className="absolute inset-x-5 top-4 h-1 rounded-full bg-white/75" />
-        <span className="mt-2 h-2 w-2/3 rounded-full" style={{ backgroundColor: template.accentColor }} />
-        <span className="mt-2 h-1.5 w-4/5 rounded-full bg-white/90" />
-        <span className="mt-1.5 h-1.5 w-3/5 rounded-full bg-white/75" />
-        <span className="mt-3 h-4 w-16 rounded-[5px]" style={{ backgroundColor: template.accentColor }} />
-        {selected && (
-          <span className="absolute top-2 right-2 grid size-5 place-items-center rounded-full bg-primary text-white shadow-sm">
-            <Check className="size-3" strokeWidth={3} />
-          </span>
-        )}
-      </span>
-      <span className="block border-t border-border p-3">
-        <span className="block truncate text-[10px] font-semibold text-text-strong">{template.name}</span>
-        <span className="mt-0.5 block text-[9px] text-text-muted">
-          {templateCategoryLabels[template.category]}
-        </span>
-      </span>
-    </button>
   );
 }

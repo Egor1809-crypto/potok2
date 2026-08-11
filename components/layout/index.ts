@@ -8,11 +8,10 @@ export { MobileNavigation } from "./mobile-navigation";
 export {
   getProductSection,
   isProductRouteActive,
+  primaryProductRoutes,
   productNavigation,
   productRoutes,
   quickCreateRoutes,
 } from "./navigation";
 export type { ProductNavGroup, ProductNavItem } from "./navigation";
 export { Topbar } from "./topbar";
-export { WorkspaceSwitcher } from "./workspace-switcher";
-export type { WorkspaceOption } from "./workspace-switcher";

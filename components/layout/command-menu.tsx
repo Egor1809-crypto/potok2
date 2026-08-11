@@ -3,13 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, CornerDownLeft, Search, X } from "lucide-react";
+import { ArrowRight, Search, X } from "lucide-react";
 
 import { IconButton } from "@/components/ui/button";
 import { cn } from "@/components/ui/utils";
 import { BRAND_NAME } from "@/config/brand";
 
-import { productRoutes, quickCreateRoutes } from "./navigation";
+import { primaryProductRoutes, quickCreateRoutes } from "./navigation";
 import { containTabFocus } from "./focus-management";
 
 type CommandMenuProps = {
@@ -17,7 +17,7 @@ type CommandMenuProps = {
   onOpenChange: (open: boolean) => void;
 };
 
-const commandRoutes = [...quickCreateRoutes, ...productRoutes];
+const commandRoutes = [...quickCreateRoutes, ...primaryProductRoutes];
 
 function formatResultsCount(count: number) {
   const remainder100 = count % 100;
@@ -93,7 +93,7 @@ export function CommandMenu({ open, onOpenChange }: CommandMenuProps) {
       role="dialog"
       aria-modal="true"
       aria-labelledby="command-menu-title"
-      className="fixed inset-0 z-[90] flex items-start justify-center px-3 pt-[9vh] sm:px-6 sm:pt-[13vh]"
+      className="fixed inset-0 z-[90] flex items-start justify-center px-3 pt-[9vh] sm:px-6 sm:pt-[12vh]"
     >
       <button
         type="button"
@@ -102,7 +102,7 @@ export function CommandMenu({ open, onOpenChange }: CommandMenuProps) {
         onClick={() => onOpenChange(false)}
         className="absolute inset-0 cursor-default bg-slate-950/30 backdrop-blur-[2px] motion-safe:animate-[mf-fade-in_150ms_ease-out]"
       />
-      <div className="relative flex max-h-[72vh] w-full max-w-[620px] flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-[0_24px_80px_rgba(15,23,42,0.22)] motion-safe:animate-[mf-slide-up_180ms_cubic-bezier(0.2,0.8,0.2,1)]">
+      <div className="relative flex max-h-[76dvh] w-full max-w-[520px] flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-[0_24px_80px_rgba(15,23,42,0.22)] motion-safe:animate-[mf-slide-up_180ms_cubic-bezier(0.2,0.8,0.2,1)] sm:max-h-[460px]">
         <h2 id="command-menu-title" className="sr-only">
           Поиск в {BRAND_NAME}
         </h2>
@@ -111,7 +111,7 @@ export function CommandMenu({ open, onOpenChange }: CommandMenuProps) {
             event.preventDefault();
             goToFirstResult();
           }}
-          className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-4"
+          className="flex h-[52px] shrink-0 items-center gap-3 border-b border-border px-4"
         >
           <Search aria-hidden="true" className="size-[18px] shrink-0 text-text-subtle" />
           <label htmlFor="mailflow-command-search" className="sr-only">
@@ -124,8 +124,8 @@ export function CommandMenu({ open, onOpenChange }: CommandMenuProps) {
             autoComplete="off"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Найти раздел или действие…"
-            className="h-full min-w-0 flex-1 border-0 bg-transparent p-0 text-[15px] text-text-strong outline-none placeholder:text-text-subtle"
+            placeholder="Найти раздел…"
+            className="h-full min-w-0 flex-1 border-0 bg-transparent p-0 text-[14px] text-text-strong outline-none placeholder:text-text-subtle"
           />
           {query ? (
             <IconButton
@@ -156,23 +156,23 @@ export function CommandMenu({ open, onOpenChange }: CommandMenuProps) {
                     <Link
                       href={route.href}
                       onClick={() => onOpenChange(false)}
-                      className="group flex items-center gap-3 rounded-xl px-2.5 py-2.5 outline-none transition hover:bg-surface-subtle focus-visible:bg-primary-subtle"
+                      className="group flex items-center gap-3 rounded-xl px-2.5 py-2 outline-none transition hover:bg-surface-subtle focus-visible:bg-primary-subtle"
                     >
                       <span
                         className={cn(
-                          "grid size-9 shrink-0 place-items-center rounded-[10px] border",
+                          "grid size-8 shrink-0 place-items-center rounded-[9px] border",
                           index === 0 && !query
                             ? "border-primary/15 bg-primary-subtle text-primary"
                             : "border-border bg-surface text-text-muted",
                         )}
                       >
-                        <Icon aria-hidden="true" className="size-4" strokeWidth={1.8} />
+                        <Icon aria-hidden="true" className="size-3.5" strokeWidth={1.8} />
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[13px] font-medium text-text-strong">
+                        <span className="block truncate text-[12px] font-medium text-text-strong">
                           {route.label}
                         </span>
-                        <span className="block truncate text-[11px] text-text-subtle">
+                        <span className="block truncate text-[10px] text-text-subtle">
                           {route.description}
                         </span>
                       </span>
@@ -197,13 +197,6 @@ export function CommandMenu({ open, onOpenChange }: CommandMenuProps) {
           )}
         </div>
 
-        <div className="flex h-10 shrink-0 items-center justify-between border-t border-border/70 bg-surface-subtle/70 px-3.5 text-[10px] text-text-subtle">
-          <span>Навигация клавиатурой или мышью</span>
-          <span className="flex items-center gap-1">
-            <CornerDownLeft aria-hidden="true" className="size-3" />
-            Enter — открыть
-          </span>
-        </div>
       </div>
     </div>
   );

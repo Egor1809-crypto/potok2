@@ -5,7 +5,6 @@ import {
   useEffect,
   useMemo,
   useReducer,
-  useRef,
   useState,
   useSyncExternalStore,
 } from "react";
@@ -147,6 +146,14 @@ function isBuilderDocument(value: unknown): value is BuilderDocument {
   );
 }
 
+function documentToPlainText(document: BuilderDocument) {
+  return document.blocks
+    .filter((block) => !["logo", "image", "divider", "spacer", "social"].includes(block.type))
+    .map((block) => block.content.trim())
+    .filter(Boolean)
+    .join("\n\n");
+}
+
 function parseWizardBuilderSnapshot(snapshot: string) {
   if (!snapshot) return {};
   try {
@@ -250,7 +257,6 @@ function EmailBuilderWorkspace({
   handoffStorageKey,
 }: EmailBuilderWorkspaceProps) {
   const toast = useToast();
-  const timersRef = useRef<number[]>([]);
   const initialTemplate = useMemo(
     () => templates.find((template) => template.id === templateId) ?? templates[0],
     [templateId],
@@ -273,19 +279,11 @@ function EmailBuilderWorkspace({
   const [previewMode, setPreviewMode] = useState<PreviewMode>("desktop");
   const [mobilePanel, setMobilePanel] = useState<BuilderPanel>("canvas");
   const [dirty, setDirty] = useState(false);
-  const [sendingTest, setSendingTest] = useState(false);
 
   const document = history.present;
   const selectedBlock =
     document.blocks.find((block) => block.id === selectedBlockId) ??
     document.blocks[0];
-
-  useEffect(
-    () => () => {
-      timersRef.current.forEach((timer) => window.clearTimeout(timer));
-    },
-    [],
-  );
 
   const mutateDocument = useCallback(
     (update: (current: BuilderDocument) => BuilderDocument) => {
@@ -384,10 +382,11 @@ function EmailBuilderWorkspace({
   }, []);
 
   const persistDraft = useCallback(() => {
+    const emailBodyText = documentToPlainText(document);
     try {
       window.localStorage.setItem(
         "mailflow:email-draft",
-        JSON.stringify({ campaignName, document }),
+        JSON.stringify({ campaignName, document, emailBodyText }),
       );
     } catch {
       // Saving remains successful for the current demo session.
@@ -405,6 +404,7 @@ function EmailBuilderWorkspace({
               name: campaignName,
               subject: document.subject,
               previewText: document.previewText,
+              emailBodyText,
               builderDocument: document,
             }),
           );
@@ -418,21 +418,8 @@ function EmailBuilderWorkspace({
 
   const save = useCallback(() => {
     persistDraft();
-    toast.success("Черновик сохранён", "Письмо сохранено в этом демо-пространстве.");
+    toast.success("Черновик сохранён", "Изменения будут переданы в мастер кампании.");
   }, [persistDraft, toast]);
-
-  const sendTest = () => {
-    if (sendingTest) return;
-    setSendingTest(true);
-    const timer = window.setTimeout(() => {
-      setSendingTest(false);
-      toast.success(
-        "Тестовое письмо отправлено",
-        "Персонализированный предпросмотр отправлен на egor@mailflow.example.",
-      );
-    }, 850);
-    timersRef.current.push(timer);
-  };
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -470,10 +457,8 @@ function EmailBuilderWorkspace({
         canUndo={history.past.length > 0}
         canRedo={history.future.length > 0}
         dirty={dirty}
-        sendingTest={sendingTest}
         onUndo={undo}
         onRedo={redo}
-        onSendTest={sendTest}
         onSave={save}
         onContinue={persistDraft}
         continueHref={continueHref}

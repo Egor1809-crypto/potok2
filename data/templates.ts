@@ -393,6 +393,7 @@ export const templates: EmailTemplate[] = [
         id: "product-image",
         type: "image",
         content: `Предпросмотр рабочего пространства ${BRAND_NAME}`,
+        href: "https://mailflow-outreach.isakovegor820.chatgpt.site/og.png",
         alignment: "center",
       },
       {

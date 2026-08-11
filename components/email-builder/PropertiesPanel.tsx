@@ -40,7 +40,6 @@ const personalizationFields = [
   { label: "Компания", token: "{{company}}", example: "Лекс Групп" },
   { label: "Должность", token: "{{position}}", example: "Старший партнёр" },
   { label: "Город", token: "{{city}}", example: "Москва" },
-  { label: "Своё поле", token: "{{custom_field}}", example: "Ваше значение" },
 ];
 
 type PropertiesPanelProps = {
@@ -181,6 +180,26 @@ export function PropertiesPanel({
                     id="builder-button-link"
                     type="url"
                     value={block.href ?? ""}
+                    onChange={(event) => onUpdateBlock({ href: event.target.value })}
+                    className="pl-8 text-[11px]"
+                  />
+                </div>
+              </FormField>
+            ) : null}
+            {block.type === "image" ? (
+              <FormField
+                label="HTTPS-ссылка на изображение"
+                htmlFor="builder-image-link"
+                hint="Изображение попадёт в фактический HTML письма только по этому адресу."
+              >
+                <div className="relative">
+                  <Link2 aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-text-subtle" />
+                  <Input
+                    id="builder-image-link"
+                    type="url"
+                    required
+                    value={block.href ?? ""}
+                    placeholder="https://example.ru/image.jpg"
                     onChange={(event) => onUpdateBlock({ href: event.target.value })}
                     className="pl-8 text-[11px]"
                   />

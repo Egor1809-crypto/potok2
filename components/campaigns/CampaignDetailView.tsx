@@ -1,1207 +1,614 @@
+import Link from "next/link";
 import {
+  AlertTriangle,
   ArrowLeft,
   ArrowRight,
-  Cable,
-  CalendarClock,
+  BarChart3,
   Check,
   CircleDashed,
+  Clock3,
   Copy,
   FileEdit,
   Mail,
-  MailCheck,
+  MessageCircle,
   MousePointerClick,
+  RefreshCw,
   Reply,
   SearchX,
   Send,
+  SendHorizontal,
   ShieldCheck,
-  UserRound,
+  Trash2,
   UsersRound,
 } from "lucide-react";
-import Link from "next/link";
 
 import { PageHeader } from "@/components/shared/PageHeader";
-import { MetricCard } from "@/components/shared/MetricCard";
-import { Alert } from "@/components/ui/alert";
-import { Avatar } from "@/components/ui/avatar";
-import { Badge, StatusBadge, type StatusTone } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { Separator } from "@/components/ui/separator";
-import { campaigns } from "@/data/mockCampaigns";
-import {
-  getCampaignById,
-  getSegmentById,
-  getTemplateById,
-} from "@/data/selectors";
-import type { Campaign, EmailBlock, EmailTemplate } from "@/types";
-import { BRAND_NAME } from "@/config/brand";
+import { Alert, Badge, Button, buttonVariants, cn } from "@/components/ui";
 import {
   deliveryChannelById,
   integrationProviderById,
+  type DeliveryChannelId,
 } from "@/config/integrations";
-import { campaignStatusLabels } from "./campaignLabels";
-import type { CampaignDeliveryPlan } from "./campaignChannels";
+import type {
+  CampaignEventRecord,
+  CampaignRecord,
+  CampaignStatus,
+  DeliveryJobRecord,
+  DeliveryPlanRecord,
+} from "@/types/api";
 
 export type CampaignDetailViewProps = {
   campaignId?: string;
-  campaign?: Campaign;
-  deliveryPlan?: CampaignDeliveryPlan | null;
+  campaign?: CampaignRecord | null;
+  deliveryPlans?: DeliveryPlanRecord[];
+  events?: CampaignEventRecord[];
+  deliveryJob?: DeliveryJobRecord | null;
+  apiMode?: "loading" | "online" | "offline";
+  onReload?: () => void;
+  onDispatch?: () => void;
+  onDelete?: () => void;
+  dispatching?: boolean;
+  deleting?: boolean;
+  dispatchNotice?: string | null;
 };
 
-const numberFormatter = new Intl.NumberFormat("ru-RU");
-
-const dateFormatter = new Intl.DateTimeFormat("ru-RU", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  timeZone: "UTC",
-});
-
-const dateTimeFormatter = new Intl.DateTimeFormat("ru-RU", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  hour: "numeric",
-  minute: "2-digit",
-  timeZone: "UTC",
-  timeZoneName: "short",
-});
-
-const statusTones: Record<Campaign["status"], StatusTone> = {
-  draft: "draft",
-  scheduled: "scheduled",
-  sending: "sending",
-  completed: "active",
+type DetailCampaign = {
+  id: string;
+  name: string;
+  subject: string;
+  previewText: string;
+  emailBodyText: string;
+  messengerMessage: string;
+  deliveryChannels: DeliveryChannelId[];
+  audience: string;
+  status: CampaignStatus;
+  statusReason: string;
+  senderName: string;
+  senderEmail: string;
+  metrics: {
+    recipients: number;
+    sent: number;
+    delivered: number;
+    opened: number;
+    clicked: number;
+    replies: number;
+    bounced: number;
+    unsubscribed: number;
+  };
+  createdAt: string;
+  updatedAt: string;
+  scheduledAt: string | null;
+  sentAt: string | null;
 };
 
-const deliveryChannelLabels = {
-  email: "Email",
-  telegram: "Telegram",
-  vk: "ВКонтакте",
-} as const;
+const statusMeta: Record<CampaignStatus, {
+  label: string;
+  badge: "neutral" | "warning" | "success" | "info" | "accent";
+  title: string;
+  description: string;
+}> = {
+  draft: {
+    label: "Черновик",
+    badge: "neutral",
+    title: "Кампания ещё настраивается",
+    description: "Завершите четыре шага и проверьте готовность на сервере.",
+  },
+  blocked: {
+    label: "Есть блокеры",
+    badge: "warning",
+    title: "Проверка готовности выявила блокеры",
+    description: "Исправьте причины ниже и повторите проверку. Сообщения не отправлены.",
+  },
+  ready: {
+    label: "Готова",
+    badge: "success",
+    title: "Все проверки пройдены",
+    description: "Аудитория, сообщения и подключения готовы к обработке.",
+  },
+  scheduled: {
+    label: "Запланирована",
+    badge: "info",
+    title: "План сохранён по расписанию",
+    description: "Маршруты проверены; внешний адаптер отправки этим API не запускался.",
+  },
+  sending: {
+    label: "Отправляется",
+    badge: "accent",
+    title: "Провайдеры обрабатывают получателей",
+    description: "Статусы доставки будут обновляться по мере обработки каналов.",
+  },
+  completed: {
+    label: "Обработка завершена",
+    badge: "success",
+    title: "Обращения к провайдерам завершены",
+    description: "Ниже учтены только принятые провайдерами сообщения; доставка и реакции не подтверждены.",
+  },
+  cancelled: {
+    label: "Отменена",
+    badge: "neutral",
+    title: "Кампания отменена",
+    description: "Чтобы использовать настройки повторно, создайте копию кампании.",
+  },
+};
+
+const lifecycleSteps = ["Черновик", "Проверка", "Готовность", "Отправка", "Результат"];
 
 function formatNumber(value: number) {
-  return numberFormatter.format(value);
+  return new Intl.NumberFormat("ru-RU").format(value);
 }
 
-function formatPercent(value: number) {
-  return `${value.toLocaleString("ru-RU", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+function campaignSummary(campaign: DetailCampaign) {
+  const value = campaign.subject || campaign.messengerMessage || "Сообщение ещё не подготовлено";
+  return value.length > 160 ? `${value.slice(0, 157).trimEnd()}…` : value;
 }
 
-function formatDate(value: string | null) {
-  return value ? dateFormatter.format(new Date(value)) : "Не задано";
+function formatPercent(value: number, total: number) {
+  if (!total) return "—";
+  return `${((value / total) * 100).toLocaleString("ru-RU", { maximumFractionDigits: 1 })}%`;
 }
 
 function formatDateTime(value: string | null) {
-  return value ? dateTimeFormatter.format(new Date(value)) : "Не задано";
+  if (!value) return "Не задано";
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "UTC",
+  }).format(new Date(value));
 }
 
-function createCampaignWizardHref({
-  campaign,
-  name,
-  deliveryPlan,
-  step,
-  copy = false,
-}: {
-  campaign: Campaign;
-  name: string;
-  deliveryPlan?: CampaignDeliveryPlan | null;
-  step?: "content" | "review";
-  copy?: boolean;
-}) {
-  if (campaign.id.startsWith("campaign-demo-")) {
-    const params = new URLSearchParams({ resume: campaign.id });
-    if (copy) params.set("copy", "1");
-    if (step) params.set("step", step);
-    return `/campaigns/new?${params.toString()}`;
-  }
-
-  const params = new URLSearchParams({
-    name,
-    count: String(campaign.metrics.recipients),
-    audienceType: campaign.segmentId ? "segment" : "contacts",
-  });
-
-  if (campaign.segmentId) {
-    params.set("segment", campaign.segmentId);
-    params.set("audience", campaign.segmentId);
-  } else {
-    params.set("source", "contacts");
-  }
-  if (campaign.templateId) params.set("template", campaign.templateId);
-
-  const routes = deliveryPlan?.channels ??
-    (campaign.deliveryChannels ?? ["email"]).map((channel) => ({
-      channel,
-      provider: undefined,
-    }));
-  routes.forEach(({ channel, provider }) => {
-    params.append("channel", channel);
-    if (provider) params.set(`provider_${channel}`, provider);
-  });
-  if (deliveryPlan?.messengerMessage) {
-    params.set("message", deliveryPlan.messengerMessage);
-  }
-  if (deliveryPlan?.consentConfirmed) params.set("consent", "1");
-  if (step) params.set("step", step);
-
-  return `/campaigns/new?${params.toString()}`;
+function normalizeCampaign(campaign: CampaignRecord): DetailCampaign {
+  return {
+    id: campaign.id,
+    name: campaign.name,
+    subject: campaign.subject,
+    previewText: campaign.previewText,
+    emailBodyText: campaign.emailBodyText,
+    messengerMessage: campaign.messengerMessage,
+    deliveryChannels: campaign.deliveryChannels,
+    audience: campaign.audienceLabel,
+    status: campaign.status,
+    statusReason: campaign.statusReason,
+    senderName: campaign.senderName,
+    senderEmail: campaign.senderEmail,
+    metrics: campaign.metrics,
+    createdAt: campaign.createdAt,
+    updatedAt: campaign.updatedAt,
+    scheduledAt: campaign.scheduledAt,
+    sentAt: campaign.sentAt,
+  };
 }
 
-/**
- * Campaign reporting and launch context in one view. Supplying a campaign is
- * useful for previews/tests; supplying an id resolves against the shared mock
- * dataset. With neither prop, the primary demo campaign is shown.
- */
+function lifecycleIndex(status: CampaignStatus) {
+  if (status === "draft") return 0;
+  if (status === "blocked") return 1;
+  if (status === "ready" || status === "scheduled") return 2;
+  if (status === "sending") return 3;
+  if (status === "completed") return 4;
+  return 0;
+}
+
 export function CampaignDetailView({
   campaignId,
   campaign,
-  deliveryPlan,
+  deliveryPlans = [],
+  events = [],
+  deliveryJob = null,
+  apiMode = "online",
+  onReload,
+  onDispatch,
+  onDelete,
+  dispatching = false,
+  deleting = false,
+  dispatchNotice = null,
 }: CampaignDetailViewProps) {
-  const currentCampaign =
-    campaign ??
-    (campaignId === undefined
-      ? campaigns[0]
-      : getCampaignById(campaignId));
-
-  if (!currentCampaign) {
-    return <CampaignNotFound />;
+  if (!campaign) {
+    if (apiMode === "loading") return <CampaignLoading />;
+    if (apiMode === "offline") return <CampaignLoadError onReload={onReload} />;
+    return <CampaignNotFound campaignId={campaignId} onReload={onReload} />;
   }
 
-  const template = currentCampaign.templateId
-    ? getTemplateById(currentCampaign.templateId)
-    : undefined;
-  const segment = currentCampaign.segmentId
-    ? getSegmentById(currentCampaign.segmentId)
-    : undefined;
-  const hasPerformance = currentCampaign.metrics.sent > 0;
-  const configuredChannels = deliveryPlan?.channels.map(({ channel }) => channel) ??
-    currentCampaign.deliveryChannels ?? ["email"];
-  const hasEmail = configuredChannels.includes("email");
+  const item = normalizeCampaign(campaign);
+  const meta = statusMeta[item.status];
+  const blockedPlans = deliveryPlans.filter((plan) => plan.status === "blocked");
+  const blockers = Array.from(new Set([
+    ...(item.status === "blocked" && item.statusReason ? [item.statusReason] : []),
+    ...blockedPlans.map((plan) => plan.statusReason).filter(Boolean),
+  ]));
+  const currentLifecycleIndex = lifecycleIndex(item.status);
+  const editable = item.status === "draft" || item.status === "blocked" || item.status === "ready" || item.status === "scheduled";
+  const canDispatch = item.status === "ready" && !deliveryJob && Boolean(onDispatch);
+  const canDelete = !["sending", "completed"].includes(item.status) && Boolean(onDelete);
 
   return (
-    <div className="space-y-6">
-      <Link
-        href="/campaigns"
-        className="group inline-flex items-center gap-1.5 text-[12px] font-medium text-text-muted transition-colors hover:text-text-strong"
-      >
-        <ArrowLeft
-          aria-hidden="true"
-          className="size-3.5 transition-transform group-hover:-translate-x-0.5"
-        />
+    <div className="mx-auto max-w-6xl space-y-6 pb-10">
+      <Link href="/campaigns" className="inline-flex items-center gap-1.5 text-[13px] font-medium text-text-muted hover:text-text-strong">
+        <ArrowLeft aria-hidden="true" className="size-4" />
         Все кампании
       </Link>
 
       <PageHeader
-        eyebrow="Обзор кампании"
-        title={currentCampaign.name}
-        meta={
-          <StatusBadge
-            status={statusTones[currentCampaign.status]}
-            label={campaignStatusLabels[currentCampaign.status]}
-          />
+        eyebrow="Кампания"
+        title={item.name}
+        description={campaignSummary(item)}
+        meta={<Badge variant={meta.badge} dot>{meta.label}</Badge>}
+        action={
+          <>
+            <Link href={`/campaigns/new?duplicate=${encodeURIComponent(item.id)}`} className={buttonVariants({ variant: "secondary" })}>
+              <Copy aria-hidden="true" className="size-4" />
+              Создать копию
+            </Link>
+            {canDelete ? (
+              <Button
+                variant="danger"
+                onClick={onDelete}
+                loading={deleting}
+                loadingText="Удаляем…"
+                leadingIcon={<Trash2 aria-hidden="true" className="size-4" />}
+              >
+                Удалить
+              </Button>
+            ) : null}
+            {canDispatch ? (
+              <Button
+                onClick={onDispatch}
+                loading={dispatching}
+                loadingText="Запускаем…"
+                leadingIcon={<SendHorizontal aria-hidden="true" className="size-4" />}
+              >
+                Начать отправку
+              </Button>
+            ) : null}
+            {editable ? (
+              <Link href={`/campaigns/new?campaign=${encodeURIComponent(item.id)}&step=${item.status === "blocked" ? "review" : "audience"}`} className={buttonVariants({ variant: "primary" })}>
+                <FileEdit aria-hidden="true" className="size-4" />
+                {item.status === "blocked" ? "Исправить блокеры" : "Редактировать"}
+              </Link>
+            ) : (
+              <Link href={`/analytics?campaign=${encodeURIComponent(item.id)}`} className={buttonVariants({ variant: "primary" })}>
+                <BarChart3 aria-hidden="true" className="size-4" />
+                Открыть аналитику
+              </Link>
+            )}
+          </>
         }
-        description={
-          hasEmail ? (
-            <span>
-              <span className="text-text-subtle">Тема:</span>{" "}
-              <span className="font-medium text-text">{currentCampaign.subject}</span>
-            </span>
-          ) : (
-            <span>
-              <span className="text-text-subtle">Каналы:</span>{" "}
-              <span className="font-medium text-text">
-                {configuredChannels.map((channel) => deliveryChannelLabels[channel]).join(" · ")}
-              </span>
-            </span>
-          )
-        }
-        action={(
-          <CampaignActions
-            campaign={currentCampaign}
-            deliveryPlan={deliveryPlan}
-          />
-        )}
       />
 
-      <CampaignStatusNotice campaign={currentCampaign} />
+      <Alert tone={item.status === "blocked" ? "warning" : item.status === "cancelled" ? "warning" : "info"} title={meta.title}>
+        {item.statusReason || meta.description}
+        {item.status === "scheduled" ? ` Время в плане: ${formatDateTime(item.scheduledAt)}.` : ""}
+      </Alert>
 
-      <section aria-labelledby="campaign-performance-heading" className="space-y-3">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h2
-              id="campaign-performance-heading"
-              className="m-0 text-[15px] font-semibold tracking-[-0.015em] text-text-strong"
-            >
-              Эффективность
-            </h2>
-            <p className="mt-1 mb-0 text-[12px] text-text-muted">
-              {hasPerformance
-                ? "Актуальные данные о качестве доставки и вовлечённости аудитории."
-                : "Отчёт начнёт заполняться после отправки первых сообщений."}
-            </p>
+      <Lifecycle status={item.status} currentIndex={currentLifecycleIndex} />
+
+      <DispatchPanel
+        campaign={item}
+        plans={deliveryPlans}
+        deliveryJob={deliveryJob}
+        canDispatch={canDispatch}
+        dispatching={dispatching}
+        dispatchNotice={dispatchNotice}
+        onDispatch={onDispatch}
+      />
+
+      {blockers.length ? (
+        <section className="rounded-xl border border-warning/30 bg-warning-subtle p-5" aria-labelledby="campaign-blockers-title">
+          <div className="flex items-center gap-3">
+            <AlertTriangle aria-hidden="true" className="size-5 text-warning" />
+            <div>
+              <h2 id="campaign-blockers-title" className="text-[15px] font-semibold text-text-strong">Что мешает готовности</h2>
+              <p className="mt-1 text-[12px] text-text-muted">Исправьте каждый пункт и повторите серверную проверку.</p>
+            </div>
           </div>
-          {currentCampaign.sentAt ? (
-            <span className="text-[11px] text-text-subtle">
-              Отправлено {formatDateTime(currentCampaign.sentAt)}
-            </span>
-          ) : null}
+          <ul className="mt-4 grid gap-2 text-[12px] leading-5 text-text sm:grid-cols-2">
+            {blockers.map((blocker) => <li key={blocker} className="flex gap-2 rounded-lg bg-surface/70 p-3"><CircleDashed aria-hidden="true" className="mt-1 size-3.5 shrink-0 text-warning" />{blocker}</li>)}
+          </ul>
+        </section>
+      ) : null}
+
+      <Metrics campaign={item} />
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="space-y-5">
+          <Content campaign={item} />
+          <DeliveryRoutes campaign={item} plans={deliveryPlans} />
         </div>
-
-        <PerformanceSummary campaign={currentCampaign} />
-
-        {hasPerformance ? (
-          <PerformanceVisuals campaign={currentCampaign} />
-        ) : (
-          <PreSendPerformance
-            campaign={currentCampaign}
-            deliveryPlan={deliveryPlan}
-            hasEmail={hasEmail}
-          />
-        )}
-      </section>
-
-      <section
-        aria-label="Контент и настройки кампании"
-        className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_360px]"
-      >
-        {hasEmail ? (
-          <ContentPreview campaign={currentCampaign} template={template} />
-        ) : (
-          <MessengerContentPreview
-            campaign={currentCampaign}
-            deliveryPlan={deliveryPlan}
-            channels={configuredChannels}
-          />
-        )}
-
-        <aside className="space-y-4">
-          <CampaignDetails campaign={currentCampaign} />
-          {deliveryPlan ? <DeliveryPlanDetails plan={deliveryPlan} /> : null}
-          <AudienceDetails campaign={currentCampaign} segmentName={segment?.name} />
-          {hasEmail ? <SenderDetails campaign={currentCampaign} /> : null}
+        <aside className="space-y-5">
+          <CampaignFacts campaign={item} />
+          <Audience campaign={item} />
+          <EventHistory events={events} />
         </aside>
-      </section>
-    </div>
-  );
-}
-
-function CampaignActions({
-  campaign,
-  deliveryPlan,
-}: {
-  campaign: Campaign;
-  deliveryPlan?: CampaignDeliveryPlan | null;
-}) {
-  const isDemoCampaign = campaign.id.startsWith("campaign-demo-");
-  const analyticsHref = `/analytics?campaign=${encodeURIComponent(campaign.id)}&demoName=${encodeURIComponent(campaign.name)}`;
-  const demoContinueHref = createCampaignWizardHref({
-    campaign,
-    name: campaign.name,
-    deliveryPlan,
-    step: "content",
-  });
-  const demoDuplicateHref = createCampaignWizardHref({
-    campaign,
-    name: `${campaign.name} — копия`,
-    deliveryPlan,
-    copy: true,
-  });
-  const primaryAction = {
-    draft: {
-      label: "Продолжить редактирование",
-      href: isDemoCampaign ? demoContinueHref : `/campaigns/new?draft=${campaign.id}`,
-      icon: <FileEdit aria-hidden="true" className="size-3.5" />,
-    },
-    scheduled: {
-      label: isDemoCampaign ? "Открыть аналитику" : "Проверить расписание",
-      href: isDemoCampaign ? analyticsHref : `/campaigns/new?campaign=${campaign.id}&step=review`,
-      icon: isDemoCampaign
-        ? <ArrowRight aria-hidden="true" className="size-3.5" />
-        : <CalendarClock aria-hidden="true" className="size-3.5" />,
-    },
-    sending: {
-      label: "Открыть текущий отчёт",
-      href: analyticsHref,
-      icon: <ArrowRight aria-hidden="true" className="size-3.5" />,
-    },
-    completed: {
-      label: "Открыть полный отчёт",
-      href: analyticsHref,
-      icon: <ArrowRight aria-hidden="true" className="size-3.5" />,
-    },
-  }[campaign.status];
-
-  return (
-    <>
-      <Link
-        href={isDemoCampaign
-          ? demoDuplicateHref
-          : `/campaigns/new?duplicate=${campaign.id}`}
-        className="btn btn-secondary"
-      >
-        <Copy aria-hidden="true" className="size-3.5" />
-        Дублировать
-      </Link>
-      <Link href={primaryAction.href} className="btn btn-primary">
-        {primaryAction.icon}
-        {primaryAction.label}
-      </Link>
-    </>
-  );
-}
-
-function CampaignStatusNotice({ campaign }: { campaign: Campaign }) {
-  if (campaign.status === "completed") return null;
-
-  if (campaign.status === "sending") {
-    const sendProgress = campaign.metrics.recipients
-      ? (campaign.metrics.sent / campaign.metrics.recipients) * 100
-      : 0;
-
-    return (
-      <Alert tone="info" title="Кампания отправляется" className="items-center">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-5">
-          <p className="m-0 flex-1">
-            Обработано получателей: {formatNumber(campaign.metrics.sent)} из{" "}
-            {formatNumber(campaign.metrics.recipients)}.
-          </p>
-          <Progress
-            aria-label="Ход отправки кампании"
-            value={campaign.metrics.sent}
-            max={campaign.metrics.recipients}
-            className="w-full min-w-48 sm:w-56"
-            size="sm"
-          />
-          <span className="shrink-0 text-[11px] font-semibold tabular-nums text-info">
-            {Math.round(sendProgress)}%
-          </span>
-        </div>
-      </Alert>
-    );
-  }
-
-  if (campaign.status === "scheduled") {
-    return (
-      <Alert tone="info" title="Готова и запланирована">
-        Получателей: <strong>{formatNumber(campaign.metrics.recipients)}</strong>. Отправка
-        начнётся {formatDateTime(campaign.scheduledAt)}.
-      </Alert>
-    );
-  }
-
-  return (
-    <Alert tone="warning" title="Черновик сохранён">
-      Аудитория, контент и выбранные каналы сохранены. Когда будете готовы запланировать или начать
-      отправку, завершите этап проверки.
-    </Alert>
-  );
-}
-
-function PerformanceSummary({ campaign }: { campaign: Campaign }) {
-  const { metrics } = campaign;
-  const hasPerformance = metrics.sent > 0;
-
-  const items = [
-    {
-      label: "Аудитория",
-      value: formatNumber(metrics.recipients),
-      change: metrics.sent > 0 ? `Отправлено: ${formatNumber(metrics.sent)}` : "Готово",
-      icon: <UsersRound aria-hidden="true" className="size-4" />,
-    },
-    {
-      label: "Доставлено",
-      value: hasPerformance ? formatNumber(metrics.delivered) : "—",
-      change: hasPerformance ? formatPercent(metrics.deliveryRate) : undefined,
-      icon: <ShieldCheck aria-hidden="true" className="size-4" />,
-    },
-    {
-      label: "Открыто",
-      value: hasPerformance ? formatNumber(metrics.opened) : "—",
-      change: hasPerformance ? formatPercent(metrics.openRate) : undefined,
-      icon: <MailCheck aria-hidden="true" className="size-4" />,
-    },
-    {
-      label: "Переходы",
-      value: hasPerformance ? formatNumber(metrics.clicked) : "—",
-      change: hasPerformance ? formatPercent(metrics.clickRate) : undefined,
-      icon: <MousePointerClick aria-hidden="true" className="size-4" />,
-    },
-    {
-      label: "Ответы",
-      value: hasPerformance ? formatNumber(metrics.replies) : "—",
-      change: hasPerformance ? formatPercent(metrics.replyRate) : undefined,
-      icon: <Reply aria-hidden="true" className="size-4" />,
-    },
-  ];
-
-  return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-      {items.map((item) => (
-        <MetricCard
-          key={item.label}
-          label={item.label}
-          value={item.value}
-          change={item.change}
-          icon={item.icon}
-          className="p-4 sm:p-5"
-        />
-      ))}
-    </div>
-  );
-}
-
-function PerformanceVisuals({ campaign }: { campaign: Campaign }) {
-  const { metrics } = campaign;
-  const stages = [
-    {
-      label: "Отправлено",
-      value: metrics.sent,
-      rate: "100%",
-      tone: "primary" as const,
-    },
-    {
-      label: "Доставлено",
-      value: metrics.delivered,
-      rate: formatPercent(metrics.deliveryRate),
-      tone: "success" as const,
-    },
-    {
-      label: "Открыто",
-      value: metrics.opened,
-      rate: formatPercent(metrics.openRate),
-      tone: "primary" as const,
-    },
-    {
-      label: "Переходы",
-      value: metrics.clicked,
-      rate: formatPercent(metrics.clickRate),
-      tone: "primary" as const,
-    },
-    {
-      label: "Ответы",
-      value: metrics.replies,
-      rate: formatPercent(metrics.replyRate),
-      tone: "success" as const,
-    },
-  ];
-
-  const deliveredShare = Math.min(100, metrics.deliveryRate);
-  const bouncedShare = metrics.sent
-    ? Math.min(100 - deliveredShare, (metrics.bounced / metrics.sent) * 100)
-    : 0;
-  const pending = Math.max(0, metrics.sent - metrics.delivered - metrics.bounced);
-  const deliveryRing = `conic-gradient(var(--success) 0 ${deliveredShare}%, var(--danger) ${deliveredShare}% ${deliveredShare + bouncedShare}%, var(--surface-inset) ${deliveredShare + bouncedShare}% 100%)`;
-
-  return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(300px,.65fr)]">
-      <Card>
-        <CardHeader className="border-b border-border pb-4">
-          <CardTitle>Путь вовлечения</CardTitle>
-          <CardDescription>
-            Конверсия от доставленного письма до содержательного ответа.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          {stages.map((stage) => (
-            <div key={stage.label}>
-              <div className="mb-2 flex items-center justify-between gap-4">
-                <span className="text-[12px] font-medium text-text-strong">
-                  {stage.label}
-                </span>
-                <span className="text-[11px] tabular-nums text-text-muted">
-                  <strong className="font-semibold text-text-strong">
-                    {formatNumber(stage.value)}
-                  </strong>{" "}
-                  · {stage.rate}
-                </span>
-              </div>
-              <Progress
-                label={`${stage.label}: ${formatNumber(stage.value)}`}
-                aria-label={`${stage.label}: ${formatNumber(stage.value)}`}
-                value={stage.value}
-                max={metrics.sent}
-                tone={stage.tone}
-              />
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="border-b border-border pb-4">
-          <CardTitle>Качество доставки</CardTitle>
-          <CardDescription>Попадание обработанных сообщений во входящие.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex justify-center py-2">
-            <div
-              role="img"
-              aria-label={`Доля доставленных писем: ${formatPercent(metrics.deliveryRate)}`}
-              className="grid size-40 place-items-center rounded-full"
-              style={{ background: deliveryRing }}
-            >
-              <div className="grid size-[118px] place-items-center rounded-full bg-surface text-center shadow-[inset_0_0_0_1px_var(--border)]">
-                <div>
-                  <p className="m-0 text-[27px] leading-none font-semibold tracking-[-0.04em] text-text-strong">
-                    {formatPercent(metrics.deliveryRate)}
-                  </p>
-                  <p className="mt-1.5 mb-0 text-[10px] text-text-muted">Доставлено</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-5 grid grid-cols-3 gap-2">
-            <DeliveryLegendItem
-              label="Доставлено"
-              value={metrics.delivered}
-              dotClassName="bg-success"
-            />
-            <DeliveryLegendItem
-              label="Возвраты"
-              value={metrics.bounced}
-              dotClassName="bg-danger"
-            />
-            <DeliveryLegendItem
-              label="В ожидании"
-              value={pending}
-              dotClassName="bg-surface-inset ring-1 ring-border-strong"
-            />
-          </div>
-
-          <div className="mt-4 flex items-center justify-between rounded-[10px] bg-surface-subtle px-3 py-2.5 text-[11px]">
-            <span className="text-text-muted">Отписались</span>
-            <span className="font-semibold tabular-nums text-text-strong">
-              {formatNumber(metrics.unsubscribed)}
-            </span>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function DeliveryLegendItem({
-  label,
-  value,
-  dotClassName,
-}: {
-  label: string;
-  value: number;
-  dotClassName: string;
-}) {
-  return (
-    <div className="rounded-[10px] bg-surface-subtle p-3">
-      <span className={`block size-1.5 rounded-full ${dotClassName}`} />
-      <p className="mt-2 mb-0 text-[13px] font-semibold tabular-nums text-text-strong">
-        {formatNumber(value)}
-      </p>
-      <p className="mt-0.5 mb-0 text-[9px] text-text-muted">{label}</p>
-    </div>
-  );
-}
-
-function PreSendPerformance({
-  campaign,
-  deliveryPlan,
-  hasEmail,
-}: {
-  campaign: Campaign;
-  deliveryPlan?: CampaignDeliveryPlan | null;
-  hasEmail: boolean;
-}) {
-  const isScheduled = campaign.status === "scheduled";
-  const isDraft = campaign.status === "draft";
-  const isDemoCampaign = campaign.id.startsWith("campaign-demo-");
-  const Icon = isScheduled ? CalendarClock : isDraft ? FileEdit : Send;
-  const title = isScheduled
-    ? "Всё готово к запуску"
-    : isDraft
-      ? "Показатели появятся после отправки"
-      : "Событий доставки пока нет";
-  const description = isScheduled
-    ? `${BRAND_NAME} начнёт собирать данные о доставке и вовлечённости после запланированной отправки ${formatDateTime(campaign.scheduledAt)}.`
-    : isDraft
-      ? "Завершите проверку аудитории, контента и маршрутов доставки. После запуска отчёт заполнится автоматически."
-      : "По этой кампании пока нет данных об отправке. Проверьте настройки перед повторной попыткой.";
-
-  const providerNames = deliveryPlan?.channels
-    .map(({ provider }) => integrationProviderById[provider]?.name ?? provider)
-    .join(" · ");
-  const actionHref = isDemoCampaign
-    ? createCampaignWizardHref({
-        campaign,
-        name: campaign.name,
-        deliveryPlan,
-        step: isDraft ? "content" : "review",
-      })
-    : isDraft
-      ? `/campaigns/new?draft=${campaign.id}`
-      : `/campaigns/new?campaign=${campaign.id}&step=review`;
-
-  const checks = [
-    {
-      label: "Аудитория выбрана",
-      detail: `Получателей: ${formatNumber(campaign.metrics.recipients)}`,
-      complete: campaign.metrics.recipients > 0,
-    },
-    {
-      label: hasEmail ? "Контент письма готов" : "Текст сообщения готов",
-      detail: hasEmail
-        ? campaign.subject || "Нужно указать тему"
-        : deliveryPlan?.messengerMessage || campaign.previewText || "Нужен текст сообщения",
-      complete: hasEmail
-        ? Boolean(campaign.subject)
-        : Boolean(deliveryPlan?.messengerMessage || campaign.previewText),
-    },
-    {
-      label: hasEmail ? "Отправитель настроен" : "Провайдеры выбраны",
-      detail: hasEmail
-        ? campaign.senderEmail || "Нужно указать отправителя"
-        : providerNames || "Нужно выбрать маршруты доставки",
-      complete: hasEmail ? Boolean(campaign.senderEmail) : Boolean(providerNames),
-    },
-    {
-      label: isScheduled ? "Время отправки подтверждено" : "Запланировать или отправить",
-      detail: isScheduled ? formatDateTime(campaign.scheduledAt) : "Не запланировано",
-      complete: Boolean(campaign.scheduledAt),
-    },
-  ];
-
-  return (
-    <Card className="overflow-hidden">
-      <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(360px,.75fr)]">
-        <div className="flex min-h-72 flex-col items-center justify-center bg-[radial-gradient(circle_at_50%_10%,var(--primary-subtle),transparent_52%)] px-6 py-12 text-center">
-          <span className="grid size-12 place-items-center rounded-[14px] border border-primary/10 bg-primary-subtle text-primary shadow-[var(--shadow-xs)]">
-            <Icon aria-hidden="true" className="size-5" />
-          </span>
-          <h3 className="mt-5 mb-0 text-[17px] font-semibold tracking-[-0.02em] text-text-strong">
-            {title}
-          </h3>
-          <p className="mt-2 mb-0 max-w-lg text-[12px] leading-5 text-text-muted">
-            {description}
-          </p>
-          <Link
-            href={actionHref}
-            className="btn btn-secondary mt-5"
-          >
-            {isDraft ? "Продолжить настройку" : "Проверить кампанию"}
-            <ArrowRight aria-hidden="true" className="size-3.5" />
-          </Link>
-        </div>
-
-        <div className="border-t border-border px-5 py-6 lg:border-t-0 lg:border-l lg:px-6">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="m-0 text-[13px] font-semibold text-text-strong">
-                Готовность к запуску
-              </p>
-              <p className="mt-1 mb-0 text-[11px] text-text-muted">
-                {checks.filter((check) => check.complete).length} из {checks.length}{" "}
-                проверок выполнено
-              </p>
-            </div>
-            <Badge variant={isScheduled ? "success" : "warning"} dot>
-              {isScheduled ? "Готово" : "В процессе"}
-            </Badge>
-          </div>
-          <div className="mt-5 space-y-1">
-            {checks.map((check) => (
-              <div
-                key={check.label}
-                className="flex items-start gap-3 rounded-[10px] px-2 py-3"
-              >
-                <span
-                  className={`mt-0.5 grid size-5 shrink-0 place-items-center rounded-full ${
-                    check.complete
-                      ? "bg-success-subtle text-success"
-                      : "bg-surface-subtle text-text-subtle"
-                  }`}
-                >
-                  {check.complete ? (
-                    <Check aria-hidden="true" className="size-3" strokeWidth={2.5} />
-                  ) : (
-                    <CircleDashed aria-hidden="true" className="size-3" />
-                  )}
-                </span>
-                <div className="min-w-0">
-                  <p className="m-0 text-[11px] font-medium text-text-strong">
-                    {check.label}
-                  </p>
-                  <p className="mt-0.5 mb-0 truncate text-[10px] text-text-muted">
-                    {check.detail}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
-    </Card>
+    </div>
   );
 }
 
-function ContentPreview({
-  campaign,
-  template,
-}: {
-  campaign: Campaign;
-  template?: EmailTemplate;
-}) {
+function Lifecycle({ status, currentIndex }: { status: CampaignStatus; currentIndex: number }) {
   return (
-    <Card className="min-w-0 overflow-hidden">
-      <CardHeader className="flex-row items-start justify-between gap-4 border-b border-border pb-4">
+    <section className="card p-5 sm:p-6" aria-labelledby="lifecycle-title">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <CardTitle>Контент письма</CardTitle>
-          <CardDescription>
-            Предпросмотр кампании с выбранным контентом и персонализацией.
-          </CardDescription>
+          <h2 id="lifecycle-title" className="text-[15px] font-semibold text-text-strong">Жизненный цикл</h2>
+          <p className="mt-1 text-[12px] text-text-muted">Статус меняется только после выполненного бизнес-действия.</p>
         </div>
-        <Badge variant={template ? "accent" : "neutral"}>
-          {template?.name ?? "Собственное письмо"}
-        </Badge>
-      </CardHeader>
-      <CardContent className="bg-surface-subtle p-3 sm:p-5">
-        <div className="overflow-hidden rounded-[12px] border border-border bg-surface shadow-[var(--shadow-sm)]">
-          <div className="grid gap-2 border-b border-border bg-surface px-4 py-4 text-[11px] sm:grid-cols-[58px_1fr] sm:px-5">
-            <span className="text-text-subtle">От</span>
-            <span className="truncate font-medium text-text-strong">
-              {campaign.senderName}{" "}
-              <span className="font-normal text-text-muted">
-                &lt;{campaign.senderEmail}&gt;
-              </span>
-            </span>
-            <span className="text-text-subtle">Кому</span>
-            <span className="truncate text-text">
-              {campaign.audience} · Контактов: {formatNumber(campaign.metrics.recipients)}
-            </span>
-            <span className="text-text-subtle">Тема</span>
-            <span className="font-semibold text-text-strong">{campaign.subject}</span>
-          </div>
-
-          <div className="bg-[#f5f6f9] px-3 py-5 sm:px-6 sm:py-8">
-            <div
-              className="mx-auto max-w-[590px] overflow-hidden rounded-[10px] border border-[#e5e7ec] bg-white shadow-[0_8px_24px_rgba(24,27,45,0.06)]"
-              style={{
-                backgroundColor: template?.backgroundColor ?? "#ffffff",
-              }}
-            >
-              {template ? (
-                <div className="px-7 py-9 sm:px-12 sm:py-12">
-                  {template.blocks.map((block) => (
-                    <EmailPreviewBlock
-                      key={block.id}
-                      block={block}
-                      accentColor={template.accentColor}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="px-7 py-12 text-center sm:px-12">
-                  <span className="mx-auto grid size-10 place-items-center rounded-[12px] bg-surface-subtle text-text-muted">
-                    <Mail aria-hidden="true" className="size-4" />
-                  </span>
-                  <h3 className="mt-4 mb-0 text-[18px] font-semibold tracking-[-0.02em] text-[#20222b]">
-                    {campaign.subject}
-                  </h3>
-                  <p className="mt-2 mb-0 text-[12px] leading-6 text-[#707582]">
-                    {campaign.previewText ||
-                      "Текст этого письма недоступен в текущем предпросмотре."}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 border-t border-border px-4 py-3 text-[10px] text-text-muted sm:px-5">
-            <Mail aria-hidden="true" className="size-3.5" />
-            <span className="truncate">Предпросмотр: {campaign.previewText}</span>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function MessengerContentPreview({
-  campaign,
-  deliveryPlan,
-  channels,
-}: {
-  campaign: Campaign;
-  deliveryPlan?: CampaignDeliveryPlan | null;
-  channels: Array<"email" | "telegram" | "vk">;
-}) {
-  const messengerChannels = channels.filter((channel) => channel !== "email");
-  const message = deliveryPlan?.messengerMessage || campaign.previewText;
-
-  return (
-    <Card className="min-w-0 overflow-hidden">
-      <CardHeader className="flex-row items-start justify-between gap-4 border-b border-border pb-4">
-        <div>
-          <CardTitle>Сообщение для мессенджеров</CardTitle>
-          <CardDescription>
-            Предпросмотр текста для выбранных каналов и персонализации.
-          </CardDescription>
-        </div>
-        <div className="flex flex-wrap justify-end gap-1.5">
-          {messengerChannels.map((channel) => (
-            <Badge key={channel} variant="accent">
-              {deliveryChannelLabels[channel]}
-            </Badge>
-          ))}
-        </div>
-      </CardHeader>
-      <CardContent className="bg-surface-subtle p-4 sm:p-6">
-        <div className="mx-auto max-w-[620px] rounded-[18px] border border-border bg-surface p-4 shadow-[var(--shadow-sm)] sm:p-6">
-          <div className="flex items-center gap-3 border-b border-border pb-4">
-            <span className="grid size-9 place-items-center rounded-full bg-primary text-[10px] font-semibold text-white">
-              {BRAND_NAME.slice(0, 2)}
-            </span>
-            <div>
-              <p className="m-0 text-[11px] font-semibold text-text-strong">
-                {BRAND_NAME} · канал кампании
-              </p>
-              <p className="mt-0.5 mb-0 text-[9px] text-text-muted">
-                Демопросмотр — без внешней отправки
-              </p>
-            </div>
-          </div>
-          <div className="mt-5 flex justify-end">
-            <div className="max-w-[88%] rounded-[16px_16px_4px_16px] bg-primary px-4 py-3 text-white shadow-sm">
-              <p className="m-0 whitespace-pre-wrap text-[12px] leading-5">
-                {message || "Текст сообщения ещё не сохранён."}
-              </p>
-              <p className="mt-2 mb-0 text-right text-[8px] text-white/70">
-                Персонализация применится перед отправкой
-              </p>
-            </div>
-          </div>
-          <div className="mt-5 rounded-[10px] border border-warning/20 bg-warning-subtle px-3 py-2.5 text-[9px] leading-4 text-warning">
-            Реальная отправка начнётся только после подключения бота или сообщества и повторной проверки согласий.
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function EmailPreviewBlock({
-  block,
-  accentColor,
-}: {
-  block: EmailBlock;
-  accentColor: string;
-}) {
-  const alignment = block.alignment ?? "left";
-  const alignmentClass = {
-    left: "text-left",
-    center: "text-center",
-    right: "text-right",
-  }[alignment];
-
-  if (block.type === "divider") {
-    return <div className="my-6 h-px bg-black/10" />;
-  }
-
-  if (block.type === "spacer") {
-    return <div aria-hidden="true" className="h-6" />;
-  }
-
-  if (block.type === "logo") {
-    return (
-      <p
-        className={`mt-0 mb-8 text-[10px] font-bold tracking-[0.16em] ${alignmentClass}`}
-        style={{ color: accentColor }}
-      >
-        {block.content}
-      </p>
-    );
-  }
-
-  if (block.type === "heading") {
-    return (
-      <h3
-        className={`mt-0 mb-4 text-[25px] leading-[1.15] font-semibold tracking-[-0.035em] text-[#1d2029] sm:text-[30px] ${alignmentClass}`}
-      >
-        {block.content}
-      </h3>
-    );
-  }
-
-  if (block.type === "button") {
-    return (
-      <div className={`my-7 ${alignmentClass}`}>
-        <span
-          className="inline-flex min-h-10 items-center justify-center rounded-[8px] px-5 text-[11px] font-semibold text-white shadow-sm"
-          style={{ backgroundColor: accentColor }}
-        >
-          {block.label ?? block.content}
-        </span>
+        {status === "blocked" ? <Badge variant="warning">Остановлена на проверке</Badge> : null}
       </div>
-    );
-  }
-
-  if (block.type === "footer") {
-    return (
-      <p
-        className={`mt-8 mb-0 border-t border-black/10 pt-5 text-[9px] leading-5 text-[#8a8e99] ${alignmentClass}`}
-      >
-        {block.content}
-      </p>
-    );
-  }
-
-  return (
-    <p
-      className={`mt-0 mb-4 text-[11px] leading-6 text-[#5e6370] ${alignmentClass}`}
-    >
-      {block.content}
-    </p>
-  );
-}
-
-function CampaignDetails({ campaign }: { campaign: Campaign }) {
-  const rows = [
-    {
-      label: "Каналы",
-      value: (campaign.deliveryChannels ?? ["email"])
-        .map((channel) => deliveryChannelLabels[channel])
-        .join(" · "),
-    },
-    { label: "Владелец", value: campaign.owner },
-    { label: "Создана", value: formatDate(campaign.createdAt) },
-    {
-      label: campaign.sentAt ? "Отправлена" : "Запланирована",
-      value: formatDateTime(campaign.sentAt ?? campaign.scheduledAt),
-    },
-  ];
-
-  return (
-    <Card>
-      <CardHeader className="border-b border-border pb-4">
-        <CardTitle>Данные кампании</CardTitle>
-      </CardHeader>
-      <CardContent className="py-2">
-        <div className="flex items-center justify-between gap-4 py-3">
-          <span className="text-[11px] text-text-muted">Статус</span>
-          <StatusBadge
-            status={statusTones[campaign.status]}
-            label={campaignStatusLabels[campaign.status]}
-          />
-        </div>
-        {rows.map((row) => (
-          <div key={row.label}>
-            <Separator />
-            <div className="flex items-start justify-between gap-6 py-3 text-[11px]">
-              <span className="shrink-0 text-text-muted">{row.label}</span>
-              <span className="text-right font-medium text-text-strong">
-                {row.value}
-              </span>
-            </div>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
-  );
-}
-
-function DeliveryPlanDetails({ plan }: { plan: CampaignDeliveryPlan }) {
-  const messengerChannels = plan.channels.filter(
-    ({ channel }) => channel !== "email",
-  );
-
-  return (
-    <Card>
-      <CardHeader className="border-b border-border pb-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <CardTitle>Маршрут доставки</CardTitle>
-            <CardDescription className="mt-1">
-              Сохранённая конфигурация без внешней отправки
-            </CardDescription>
-          </div>
-          <Badge variant="accent" dot>
-            Демо
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3 p-4">
-        {plan.channels.map(({ channel, provider, estimatedCoverage }) => {
-          const channelDefinition = deliveryChannelById[channel];
-          const providerDefinition = integrationProviderById[provider];
+      <ol className="mt-5 grid gap-2 sm:grid-cols-5" aria-label="Жизненный цикл кампании">
+        {lifecycleSteps.map((label, index) => {
+          const complete = index < currentIndex;
+          const current = index === currentIndex;
           return (
-            <div
-              key={channel}
-              className="flex items-center gap-3 rounded-[10px] border border-border bg-surface-subtle/45 p-3"
-            >
-              <span className="grid size-8 shrink-0 place-items-center rounded-[9px] bg-primary-subtle text-primary">
-                <Cable aria-hidden="true" className="size-3.5" />
+            <li key={label} aria-current={current ? "step" : undefined} className={cn("flex items-center gap-2 rounded-xl border px-3 py-3 sm:flex-col sm:items-start", current ? "border-primary/40 bg-primary-subtle" : complete ? "border-success/25 bg-success-subtle" : "border-border bg-surface-subtle/40")}>
+              <span className={cn("grid size-6 place-items-center rounded-full text-[10px] font-semibold", current ? "bg-primary text-white" : complete ? "bg-success text-white" : "bg-surface text-text-subtle")}>
+                {complete ? <Check aria-hidden="true" className="size-3.5" /> : index + 1}
               </span>
-              <div className="min-w-0 flex-1">
-                <p className="m-0 text-[11px] font-semibold text-text-strong">
-                  {channelDefinition?.shortLabel ?? channel}
-                </p>
-                <p className="mt-0.5 mb-0 truncate text-[9px] text-text-muted">
-                  {providerDefinition?.name ?? provider}
-                </p>
-              </div>
-              <span className="shrink-0 text-right">
-                <span className="block text-[10px] font-semibold tabular-nums text-text-strong">
-                  {formatNumber(estimatedCoverage)}
-                </span>
-                <span className="block text-[8px] text-text-subtle">
-                  доступно
-                </span>
-              </span>
-            </div>
+              <span className="text-[12px] font-semibold text-text-strong">{label}</span>
+            </li>
           );
         })}
-
-        {messengerChannels.length > 0 ? (
-          <div className="rounded-[10px] border border-border p-3">
-            <p className="m-0 text-[9px] font-semibold uppercase tracking-[0.08em] text-text-subtle">
-              Текст для мессенджеров
-            </p>
-            <p className="mt-2 mb-0 line-clamp-4 whitespace-pre-wrap text-[10px] leading-4.5 text-text">
-              {plan.messengerMessage || "Текст не сохранён"}
-            </p>
-          </div>
-        ) : null}
-
-        <p className="m-0 flex items-start gap-2 text-[9px] leading-4 text-text-muted">
-          <ShieldCheck
-            aria-hidden="true"
-            className="mt-0.5 size-3.5 shrink-0 text-success"
-          />
-          {plan.consentConfirmed
-            ? "Проверка согласий отмечена в демоплане. Реальная проверка выполняется перед отправкой."
-            : "Согласия аудитории ещё не подтверждены."}
-        </p>
-      </CardContent>
-    </Card>
+      </ol>
+    </section>
   );
 }
 
-function AudienceDetails({
+function DispatchPanel({
   campaign,
-  segmentName,
+  plans,
+  deliveryJob,
+  canDispatch,
+  dispatching,
+  dispatchNotice,
+  onDispatch,
 }: {
-  campaign: Campaign;
-  segmentName?: string;
+  campaign: DetailCampaign;
+  plans: DeliveryPlanRecord[];
+  deliveryJob: DeliveryJobRecord | null;
+  canDispatch: boolean;
+  dispatching: boolean;
+  dispatchNotice: string | null;
+  onDispatch?: () => void;
 }) {
-  return (
-    <Card>
-      <CardContent className="p-5">
-        <div className="flex items-start gap-3">
-          <span className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-primary-subtle text-primary">
-            <UsersRound aria-hidden="true" className="size-4" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="m-0 text-[10px] font-medium uppercase tracking-[0.08em] text-text-subtle">
-                  Аудитория
-                </p>
-                <p className="mt-1 mb-0 truncate text-[13px] font-semibold text-text-strong">
-                  {campaign.audience}
-                </p>
-              </div>
-              <Badge variant={segmentName ? "success" : "outline"}>
-                {segmentName ? "Динамическая" : "Список"}
-              </Badge>
-            </div>
-            <p className="mt-2 mb-0 text-[11px] text-text-muted">
-              Получателей: {formatNumber(campaign.metrics.recipients)}
-              {segmentName ? ` · ${segmentName}` : ""}
-            </p>
-            {campaign.segmentId ? (
-              <Link
-                href="/segments"
-                className="mt-3 inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:text-primary-hover"
-              >
-                Открыть сегмент
-                <ArrowRight aria-hidden="true" className="size-3" />
-              </Link>
-            ) : null}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+  if (campaign.status !== "ready" && !deliveryJob && !dispatchNotice) return null;
+  const automatic = plans.filter(
+    (plan) => integrationProviderById[plan.providerId].deliveryMode === "automatic",
   );
-}
-
-function SenderDetails({ campaign }: { campaign: Campaign }) {
-  return (
-    <Card>
-      <CardContent className="p-5">
-        <div className="flex items-center gap-3">
-          <Avatar name={campaign.senderName} size="lg" />
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <p className="m-0 truncate text-[13px] font-semibold text-text-strong">
-                {campaign.senderName}
-              </p>
-              <span title="Проверенный отправитель">
-                <Check
-                  aria-label="Проверенный отправитель"
-                  className="size-3.5 rounded-full bg-success p-0.5 text-white"
-                  strokeWidth={3}
-                />
-              </span>
-            </div>
-            <p className="mt-0.5 mb-0 truncate text-[11px] text-text-muted">
-              {campaign.senderEmail}
-            </p>
-          </div>
-        </div>
-        <div className="mt-4 flex items-center gap-2 rounded-[10px] bg-success-subtle px-3 py-2.5 text-[10px] text-success">
-          <UserRound aria-hidden="true" className="size-3.5" />
-          Личность отправителя подтверждена
-        </div>
-      </CardContent>
-    </Card>
+  const manual = plans.filter(
+    (plan) => integrationProviderById[plan.providerId].deliveryMode === "manual_export",
   );
-}
-
-function CampaignNotFound() {
   return (
-    <div className="space-y-6">
-      <Link
-        href="/campaigns"
-        className="group inline-flex items-center gap-1.5 text-[12px] font-medium text-text-muted transition-colors hover:text-text-strong"
-      >
-        <ArrowLeft
-          aria-hidden="true"
-          className="size-3.5 transition-transform group-hover:-translate-x-0.5"
-        />
-        Все кампании
-      </Link>
-      <Card>
-        <CardContent className="flex min-h-[420px] flex-col items-center justify-center px-6 py-16 text-center">
-          <span className="grid size-12 place-items-center rounded-[14px] border border-border bg-surface-subtle text-text-muted shadow-[var(--shadow-xs)]">
-            <SearchX aria-hidden="true" className="size-5" />
-          </span>
-          <h1 className="mt-5 mb-0 text-[20px] font-semibold tracking-[-0.025em] text-text-strong">
-            Кампания не найдена
-          </h1>
-          <p className="mt-2 mb-0 max-w-sm text-[12px] leading-5 text-text-muted">
-            Возможно, кампания удалена или ссылка устарела. Остальные кампании
-            по-прежнему доступны.
+    <section className="card p-5 sm:p-6" aria-labelledby="dispatch-title">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="max-w-3xl">
+          <h2 id="dispatch-title" className="text-[16px] font-semibold text-text-strong">
+            Явный запуск
+          </h2>
+          <p className="mt-1 text-[12px] leading-5 text-text-muted">
+            «Начать отправку» ещё раз проверит зафиксированную аудиторию, адреса,
+            согласия и серверные подключения. Проверка готовности сама ничего не отправляет.
           </p>
-          <Link href="/campaigns" className="btn btn-primary mt-6">
-            Вернуться к кампаниям
-            <ArrowRight aria-hidden="true" className="size-3.5" />
-          </Link>
-        </CardContent>
-      </Card>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-border bg-surface-subtle p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-subtle">Автоматически</p>
+              <p className="mt-1 text-[12px] leading-5 text-text-strong">
+                {automatic.length
+                  ? automatic.map((plan) => integrationProviderById[plan.providerId].name).join(", ")
+                  : "Нет автоматических маршрутов"}
+              </p>
+            </div>
+            <div className="rounded-xl border border-border bg-surface-subtle p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-subtle">Вручную</p>
+              <p className="mt-1 text-[12px] leading-5 text-text-strong">
+                {manual.length
+                  ? "VK WorkSpace: скачать CSV и завершить запуск в его интерфейсе"
+                  : "Ручных маршрутов нет"}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="flex shrink-0 flex-col gap-2">
+          {canDispatch ? (
+            <Button
+              onClick={onDispatch}
+              loading={dispatching}
+              loadingText="Запускаем…"
+              leadingIcon={<SendHorizontal aria-hidden="true" className="size-4" />}
+            >
+              Начать отправку
+            </Button>
+          ) : null}
+          {manual.length ? (
+            <a
+              href={`/api/campaigns/export?id=${encodeURIComponent(campaign.id)}`}
+              className={buttonVariants({ variant: "secondary" })}
+            >
+              Скачать CSV для VK WorkSpace
+            </a>
+          ) : null}
+        </div>
+      </div>
+      {deliveryJob ? (
+        <Alert
+          tone={deliveryJob.status === "completed" ? "success" : deliveryJob.status === "failed" ? "danger" : "warning"}
+          title="Результат задания"
+          className="mt-5"
+        >
+          {deliveryJob.statusMessage} Принято: {formatNumber(deliveryJob.acceptedCount)};
+          отклонено: {formatNumber(deliveryJob.rejectedCount)}; неопределённо: {formatNumber(deliveryJob.ambiguousCount)};
+          вручную: {formatNumber(deliveryJob.manualCount)}.
+        </Alert>
+      ) : dispatchNotice ? (
+        <Alert tone="warning" title="Запуск не завершён" className="mt-5">
+          {dispatchNotice}
+        </Alert>
+      ) : null}
+    </section>
+  );
+}
+
+function Metrics({ campaign }: { campaign: DetailCampaign }) {
+  const metrics = [
+    { label: "Получатели", value: formatNumber(campaign.metrics.recipients), meta: "В аудитории", icon: UsersRound },
+    { label: "Принято провайдером", value: campaign.metrics.sent ? formatNumber(campaign.metrics.sent) : "—", meta: formatPercent(campaign.metrics.sent, campaign.metrics.recipients), icon: Send },
+    { label: "Доставлено", value: campaign.metrics.delivered ? formatNumber(campaign.metrics.delivered) : "—", meta: formatPercent(campaign.metrics.delivered, campaign.metrics.sent), icon: ShieldCheck },
+    { label: "Открыто", value: campaign.metrics.opened ? formatNumber(campaign.metrics.opened) : "—", meta: formatPercent(campaign.metrics.opened, campaign.metrics.delivered), icon: Mail },
+    { label: "Переходы", value: campaign.metrics.clicked ? formatNumber(campaign.metrics.clicked) : "—", meta: formatPercent(campaign.metrics.clicked, campaign.metrics.delivered), icon: MousePointerClick },
+    { label: "Ответы", value: campaign.metrics.replies ? formatNumber(campaign.metrics.replies) : "—", meta: formatPercent(campaign.metrics.replies, campaign.metrics.delivered), icon: Reply },
+  ];
+  return (
+    <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6" aria-label="Показатели кампании">
+      {metrics.map((metric) => {
+        const Icon = metric.icon;
+        return (
+          <article key={metric.label} className="card p-4">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[11px] font-medium text-text-muted">{metric.label}</span>
+              <Icon aria-hidden="true" className="size-4 text-text-subtle" />
+            </div>
+            <p className="mt-2 text-[21px] font-semibold tracking-[-0.04em] text-text-strong">{metric.value}</p>
+            <p className="mt-1 text-[10px] text-text-subtle">{metric.meta}</p>
+          </article>
+        );
+      })}
+    </section>
+  );
+}
+
+function Content({ campaign }: { campaign: DetailCampaign }) {
+  const hasEmail = campaign.deliveryChannels.includes("email");
+  const messengerChannels = campaign.deliveryChannels.filter((channel) => channel !== "email");
+  return (
+    <section className="card overflow-hidden" aria-labelledby="campaign-content-title">
+      <div className="border-b border-border px-5 py-4 sm:px-6">
+        <h2 id="campaign-content-title" className="text-[16px] font-semibold text-text-strong">Сообщения</h2>
+        <p className="mt-1 text-[12px] text-text-muted">Фактический контент, сохранённый в кампании.</p>
+      </div>
+      <div className={cn("grid gap-4 p-5 sm:p-6", hasEmail && messengerChannels.length ? "lg:grid-cols-2" : "grid-cols-1")}>
+        {hasEmail ? (
+          <article className="rounded-xl border border-border p-5">
+            <div className="flex items-center gap-3"><span className="grid size-9 place-items-center rounded-xl bg-primary-subtle text-primary"><Mail aria-hidden="true" className="size-4" /></span><div><h3 className="text-[14px] font-semibold text-text-strong">Email</h3><p className="mt-0.5 text-[11px] text-text-muted">{campaign.subject || "Без темы"}</p></div></div>
+            {campaign.previewText ? <p className="mt-4 text-[11px] text-text-muted"><strong>Прехедер:</strong> {campaign.previewText}</p> : null}
+            <p className="mt-4 whitespace-pre-wrap text-[13px] leading-6 text-text">{campaign.emailBodyText || "Текст письма не добавлен."}</p>
+            <div className="mt-5 border-t border-border pt-4 text-[11px] text-text-muted"><strong className="font-semibold text-text-strong">От:</strong> {campaign.senderName} · {campaign.senderEmail}</div>
+          </article>
+        ) : null}
+        {messengerChannels.length ? (
+          <article className="rounded-xl border border-border p-5">
+            <div className="flex items-center gap-3"><span className="grid size-9 place-items-center rounded-xl bg-info-subtle text-info"><MessageCircle aria-hidden="true" className="size-4" /></span><div><h3 className="text-[14px] font-semibold text-text-strong">Мессенджеры</h3><p className="mt-0.5 text-[11px] text-text-muted">{messengerChannels.map((channel) => deliveryChannelById[channel].shortLabel).join(" · ")}</p></div></div>
+            <div className="mt-5 flex justify-end"><p className="max-w-[92%] whitespace-pre-wrap rounded-[16px_16px_4px_16px] bg-primary px-4 py-3 text-[13px] leading-6 text-white">{campaign.messengerMessage || "Текст сообщения не добавлен."}</p></div>
+          </article>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function DeliveryRoutes({ campaign, plans }: { campaign: DetailCampaign; plans: DeliveryPlanRecord[] }) {
+  return (
+    <section className="card overflow-hidden" aria-labelledby="delivery-routes-title">
+      <div className="border-b border-border px-5 py-4 sm:px-6">
+        <h2 id="delivery-routes-title" className="text-[16px] font-semibold text-text-strong">Маршруты доставки</h2>
+        <p className="mt-1 text-[12px] text-text-muted">Отдельный план, охват и статус для каждого канала.</p>
+      </div>
+      <div className="divide-y divide-border">
+        {campaign.deliveryChannels.map((channel) => {
+          const plan = plans.find((item) => item.channel === channel);
+          const provider = plan ? integrationProviderById[plan.providerId] : null;
+          const Icon = channel === "email" ? Mail : channel === "telegram" ? SendHorizontal : MessageCircle;
+          return (
+            <article key={channel} className="grid gap-3 px-5 py-4 sm:grid-cols-[40px_minmax(0,1fr)_140px_140px] sm:items-center sm:px-6">
+              <span className="grid size-9 place-items-center rounded-xl bg-primary-subtle text-primary"><Icon aria-hidden="true" className="size-4" /></span>
+              <div><h3 className="text-[13px] font-semibold text-text-strong">{deliveryChannelById[channel].shortLabel}</h3><p className="mt-1 text-[11px] text-text-muted">{provider?.name ?? "Провайдер будет выбран при настройке"}</p>{plan?.statusReason ? <p className="mt-1 text-[11px] leading-4 text-warning">{plan.statusReason}</p> : null}</div>
+              <div><p className="text-[10px] uppercase tracking-[0.08em] text-text-subtle">Охват</p><p className="mt-1 text-[13px] font-semibold text-text-strong">{plan ? `${formatNumber(plan.eligibleCount)} доступно` : "Не рассчитан"}</p></div>
+              <Badge variant={plan?.status === "ready" ? "success" : plan?.status === "blocked" ? "warning" : "neutral"} dot className="w-fit sm:justify-self-end">{plan?.status === "ready" ? "Готов" : plan?.status === "blocked" ? "Заблокирован" : "Черновик"}</Badge>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function CampaignFacts({ campaign }: { campaign: DetailCampaign }) {
+  const rows = [
+    ["Статус", statusMeta[campaign.status].label],
+    ["Создана", formatDateTime(campaign.createdAt)],
+    ["Обновлена", formatDateTime(campaign.updatedAt)],
+    [campaign.sentAt ? "Отправлена" : "Запланирована", formatDateTime(campaign.sentAt ?? campaign.scheduledAt)],
+  ];
+  return (
+    <section className="card p-5" aria-labelledby="campaign-facts-title">
+      <h2 id="campaign-facts-title" className="text-[15px] font-semibold text-text-strong">Данные кампании</h2>
+      <dl className="mt-4 divide-y divide-border">
+        {rows.map(([label, value]) => <div key={label} className="flex items-start justify-between gap-5 py-3 text-[12px]"><dt className="text-text-muted">{label}</dt><dd className="text-right font-semibold text-text-strong">{value}</dd></div>)}
+      </dl>
+    </section>
+  );
+}
+
+function Audience({ campaign }: { campaign: DetailCampaign }) {
+  return (
+    <section className="card p-5" aria-labelledby="campaign-audience-title">
+      <div className="flex items-start gap-3">
+        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary-subtle text-primary"><UsersRound aria-hidden="true" className="size-4" /></span>
+        <div><h2 id="campaign-audience-title" className="text-[14px] font-semibold text-text-strong">{campaign.audience}</h2><p className="mt-1 text-[12px] text-text-muted">Получателей: {formatNumber(campaign.metrics.recipients)}</p><Link href="/segments" className="mt-3 inline-flex items-center gap-1 text-[12px] font-semibold text-primary hover:text-primary-hover">Открыть аудитории <ArrowRight aria-hidden="true" className="size-3.5" /></Link></div>
+      </div>
+    </section>
+  );
+}
+
+function EventHistory({ events }: { events: CampaignEventRecord[] }) {
+  const recent = [...events].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt)).slice(0, 5);
+  return (
+    <section className="card p-5" aria-labelledby="campaign-history-title">
+      <h2 id="campaign-history-title" className="text-[15px] font-semibold text-text-strong">История действий</h2>
+      {recent.length ? (
+        <ol className="mt-4 space-y-4">
+          {recent.map((event) => <li key={event.id} className="flex gap-3"><span className="mt-1 grid size-6 shrink-0 place-items-center rounded-full bg-surface-subtle text-text-muted"><Clock3 aria-hidden="true" className="size-3" /></span><div><p className="text-[12px] leading-5 text-text-strong">{event.message}</p><time className="mt-0.5 block text-[10px] text-text-subtle">{formatDateTime(event.occurredAt)}</time></div></li>)}
+        </ol>
+      ) : <p className="mt-3 text-[12px] leading-5 text-text-muted">События появятся после сохранения и проверки кампании.</p>}
+    </section>
+  );
+}
+
+function CampaignLoading() {
+  return (
+    <div className="mx-auto max-w-6xl py-16 text-center">
+      <RefreshCw aria-hidden="true" className="mx-auto size-6 animate-spin text-primary" />
+      <p className="mt-3 text-[13px] text-text-muted">Загружаем кампанию…</p>
+    </div>
+  );
+}
+
+function CampaignLoadError({ onReload }: { onReload?: () => void }) {
+  return (
+    <div className="mx-auto max-w-3xl py-10">
+      <section className="card p-8 text-center sm:p-12">
+        <span className="mx-auto grid size-12 place-items-center rounded-xl bg-danger-subtle text-danger"><AlertTriangle aria-hidden="true" className="size-5" /></span>
+        <h1 className="mt-5 text-[22px] font-semibold text-text-strong">Не удалось загрузить кампанию</h1>
+        <p className="mx-auto mt-2 max-w-md text-[13px] leading-5 text-text-muted">Сервер рабочего пространства не ответил. MAILFLOW не подменяет кампанию локальной копией.</p>
+        <div className="mt-6 flex flex-col justify-center gap-2 sm:flex-row">
+          <Link href="/campaigns" className={buttonVariants({ variant: "secondary" })}>Все кампании</Link>
+          {onReload ? <Button onClick={onReload} leadingIcon={<RefreshCw className="size-4" />}>Повторить загрузку</Button> : null}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function CampaignNotFound({ campaignId, onReload }: { campaignId?: string; onReload?: () => void }) {
+  return (
+    <div className="mx-auto max-w-3xl py-10">
+      <section className="card p-8 text-center sm:p-12">
+        <span className="mx-auto grid size-12 place-items-center rounded-xl bg-surface-subtle text-text-muted"><SearchX aria-hidden="true" className="size-5" /></span>
+        <h1 className="mt-5 text-[22px] font-semibold text-text-strong">Кампания не найдена</h1>
+        <p className="mx-auto mt-2 max-w-md text-[13px] leading-5 text-text-muted">{campaignId ? `Кампания «${campaignId}» отсутствует в рабочем пространстве.` : "В ссылке не указан идентификатор кампании."}</p>
+        <div className="mt-6 flex flex-col justify-center gap-2 sm:flex-row">
+          <Link href="/campaigns" className={buttonVariants({ variant: "primary" })}>Все кампании</Link>
+          {onReload ? <Button variant="secondary" onClick={onReload} leadingIcon={<RefreshCw className="size-4" />}>Повторить загрузку</Button> : null}
+        </div>
+      </section>
     </div>
   );
 }
