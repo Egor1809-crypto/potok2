@@ -13,6 +13,12 @@ import {
   Share2,
   Space,
   Type,
+  BadgeCheck,
+  ChartNoAxesColumnIncreasing,
+  ContactRound,
+  PackageOpen,
+  Quote,
+  Sparkles,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -37,6 +43,12 @@ export const blockLibrary: BlockLibraryItem[] = [
   { type: "social", label: "Соцсети", description: "Ссылки на соцсети", icon: Share2 },
   { type: "logo", label: "Логотип", description: "Знак бренда", icon: GalleryHorizontal },
   { type: "footer", label: "Подвал", description: "Служебный текст", icon: PanelBottom },
+  { type: "hero", label: "Обложка", description: "Главный экран письма", icon: Sparkles },
+  { type: "quote", label: "Цитата", description: "Отзыв или мнение", icon: Quote },
+  { type: "checklist", label: "Список", description: "Преимущества по пунктам", icon: BadgeCheck },
+  { type: "stats", label: "Показатели", description: "Цифры и результаты", icon: ChartNoAxesColumnIncreasing },
+  { type: "product", label: "Карточка", description: "Продукт или услуга", icon: PackageOpen },
+  { type: "signature", label: "Подпись", description: "Отправитель и контакты", icon: ContactRound },
 ];
 
 export const getBlockLabel = (type: EmailBlockType) =>

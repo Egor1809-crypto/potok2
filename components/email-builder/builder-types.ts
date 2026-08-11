@@ -121,6 +121,54 @@ const blockDefaults: Record<
     fontSize: 11,
     borderRadius: 0,
   },
+  hero: {
+    paddingTop: 34,
+    paddingBottom: 34,
+    backgroundColor: "#f3f2ff",
+    textColor: "#171927",
+    fontSize: 34,
+    borderRadius: 16,
+  },
+  quote: {
+    paddingTop: 22,
+    paddingBottom: 22,
+    backgroundColor: "#f8f8fb",
+    textColor: "#303447",
+    fontSize: 18,
+    borderRadius: 12,
+  },
+  checklist: {
+    paddingTop: 18,
+    paddingBottom: 18,
+    backgroundColor: "transparent",
+    textColor: "#374151",
+    fontSize: 15,
+    borderRadius: 10,
+  },
+  stats: {
+    paddingTop: 20,
+    paddingBottom: 20,
+    backgroundColor: "#f7f8fc",
+    textColor: "#111827",
+    fontSize: 14,
+    borderRadius: 12,
+  },
+  product: {
+    paddingTop: 20,
+    paddingBottom: 20,
+    backgroundColor: "#f8f8fb",
+    textColor: "#1f2937",
+    fontSize: 15,
+    borderRadius: 14,
+  },
+  signature: {
+    paddingTop: 18,
+    paddingBottom: 24,
+    backgroundColor: "transparent",
+    textColor: "#475569",
+    fontSize: 13,
+    borderRadius: 10,
+  },
 };
 
 const initialContent: Record<EmailBlockType, Pick<EmailBlock, "content" | "label" | "href">> = {
@@ -155,6 +203,36 @@ const initialContent: Record<EmailBlockType, Pick<EmailBlock, "content" | "label
   },
   footer: {
     content: `${BRAND_NAME} · Настроить подписку · Отписаться`,
+    label: undefined,
+    href: undefined,
+  },
+  hero: {
+    content: "Главная идея письма|Коротко объясните ценность предложения",
+    label: undefined,
+    href: undefined,
+  },
+  quote: {
+    content: "Цитата клиента или важная мысль|Имя, должность",
+    label: undefined,
+    href: undefined,
+  },
+  checklist: {
+    content: "Первое преимущество|Второе преимущество|Понятный следующий шаг",
+    label: undefined,
+    href: undefined,
+  },
+  stats: {
+    content: "42%|Рост откликов|3×|Быстрее запуск",
+    label: undefined,
+    href: undefined,
+  },
+  product: {
+    content: "Название предложения|Короткое описание пользы|от 9 900 ₽",
+    label: "Узнать подробнее",
+    href: "https://mailflow.example",
+  },
+  signature: {
+    content: "Егор Сабалин|Основатель MAILFLOW|egor@example.ru",
     label: undefined,
     href: undefined,
   },

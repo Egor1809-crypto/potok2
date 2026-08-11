@@ -33,6 +33,8 @@ import { cn } from "@/components/ui/utils";
 
 import type { BuilderBlock, BuilderDocument } from "./builder-types";
 import { getBlockLabel } from "./BlockLibrary";
+import { ImageAssetPicker } from "./ImageAssetPicker";
+import { AiEmailAssistant } from "./AiEmailAssistant";
 
 const personalizationFields = [
   { label: "Имя", token: "{{first_name}}", example: "Иван" },
@@ -65,7 +67,7 @@ export function PropertiesPanel({
   const canEditContent = !["divider", "spacer"].includes(block.type);
   const supportsTypography = !["image", "divider", "spacer"].includes(block.type);
   const supportsAlignment = !["divider", "spacer"].includes(block.type);
-  const supportsRadius = ["button", "image", "columns"].includes(block.type);
+  const supportsRadius = ["button", "image", "columns", "hero", "quote", "stats", "product", "signature"].includes(block.type);
 
   const updateContent = (content: string) => {
     onUpdateBlock(
@@ -122,6 +124,7 @@ export function PropertiesPanel({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto scrollbar-subtle">
+        <AiEmailAssistant block={block} document={document} onUpdateBlock={onUpdateBlock} onUpdateDocument={onUpdateDocument} />
         {canEditContent ? (
           <PropertySection
             icon={Type}
@@ -159,6 +162,8 @@ export function PropertiesPanel({
                   ? "Разделите столбцы вертикальной чертой (|)."
                   : block.type === "image"
                     ? "Опишите изображение для получателей, использующих экранные дикторы."
+                    : ["hero", "quote", "checklist", "stats", "product", "signature"].includes(block.type)
+                      ? "Разделяйте части блока вертикальной чертой (|)."
                     : "Изменения сразу появятся в предпросмотре."
               }
             >
@@ -172,7 +177,7 @@ export function PropertiesPanel({
               />
             </FormField>
 
-            {block.type === "button" ? (
+            {block.type === "button" || block.type === "product" ? (
               <FormField label="Целевая ссылка" htmlFor="builder-button-link">
                 <div className="relative">
                   <Link2 aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-text-subtle" />
@@ -186,18 +191,25 @@ export function PropertiesPanel({
                 </div>
               </FormField>
             ) : null}
-            {block.type === "image" ? (
+            {block.type === "image" || block.type === "logo" ? (
+              <ImageAssetPicker
+                kind={block.type === "logo" ? "logo" : "photo"}
+                value={block.href}
+                onSelect={(href, filename) => onUpdateBlock({ href, ...(block.content ? {} : { content: filename }) })}
+              />
+            ) : null}
+            {block.type === "image" || block.type === "logo" ? (
               <FormField
-                label="HTTPS-ссылка на изображение"
+                label="Или HTTPS-ссылка"
                 htmlFor="builder-image-link"
-                hint="Изображение попадёт в фактический HTML письма только по этому адресу."
+                hint="Можно использовать уже размещённое изображение."
               >
                 <div className="relative">
                   <Link2 aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-text-subtle" />
                   <Input
                     id="builder-image-link"
                     type="url"
-                    required
+                    required={block.type === "image"}
                     value={block.href ?? ""}
                     placeholder="https://example.ru/image.jpg"
                     onChange={(event) => onUpdateBlock({ href: event.target.value })}

@@ -22,6 +22,13 @@
       "when": 1786460197216,
       "tag": "0002_amazing_anthem",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1786465925787,
+      "tag": "0003_concerned_pride",
+      "breakpoints": true
     }
   ]
 }

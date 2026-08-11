@@ -16,7 +16,13 @@ export type EmailBlockType =
   | "divider"
   | "spacer"
   | "social"
-  | "footer";
+  | "footer"
+  | "hero"
+  | "quote"
+  | "checklist"
+  | "stats"
+  | "product"
+  | "signature";
 
 export interface EmailBlock {
   id: string;

@@ -152,7 +152,13 @@ export type EmailBuilderBlockInput = {
     | "divider"
     | "spacer"
     | "social"
-    | "footer";
+    | "footer"
+    | "hero"
+    | "quote"
+    | "checklist"
+    | "stats"
+    | "product"
+    | "signature";
   content: string;
   label?: string;
   href?: string;
@@ -189,6 +195,49 @@ export type EmailTemplateRecord = {
   emailBodyText: string;
   createdAt: string;
   updatedAt: string;
+};
+
+export type EmailAssetRecord = {
+  id: string;
+  workspaceId: string;
+  filename: string;
+  mimeType: "image/jpeg" | "image/png" | "image/gif";
+  size: number;
+  kind: "photo" | "logo";
+  url: string;
+  createdAt: string;
+};
+
+export type EmailAssetsListResponse = { assets: EmailAssetRecord[] };
+export type EmailAssetMutationResponse = { asset: EmailAssetRecord };
+
+export type EmailAiAction =
+  | "compose"
+  | "rewrite"
+  | "shorten"
+  | "subject"
+  | "cta";
+
+export type EmailAiRequest = {
+  action: EmailAiAction;
+  goal: string;
+  audience?: string;
+  tone?: "business" | "friendly" | "expert" | "concise";
+  currentSubject?: string;
+  currentPreviewText?: string;
+  currentText?: string;
+};
+
+export type EmailAiSuggestion = {
+  subject: string;
+  previewText: string;
+  body: string;
+  cta: string;
+};
+
+export type EmailAiResponse = {
+  configured: boolean;
+  suggestion?: EmailAiSuggestion;
 };
 
 export type CampaignRecord = {

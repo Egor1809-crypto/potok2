@@ -15,6 +15,12 @@ const BLOCK_TYPES = new Set<EmailBuilderBlockInput["type"]>([
   "spacer",
   "social",
   "footer",
+  "hero",
+  "quote",
+  "checklist",
+  "stats",
+  "product",
+  "signature",
 ]);
 const COLOR = /^#[0-9a-f]{6}$/i;
 
@@ -52,7 +58,10 @@ function safeHttpsUrl(value: unknown, field: string, required: boolean) {
   const raw = text(value, field, 2_000);
   try {
     const url = new URL(raw);
-    if (url.protocol !== "https:") throw new Error("https required");
+    const localDevelopmentUrl =
+      url.protocol === "http:" &&
+      (url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]");
+    if (url.protocol !== "https:" && !localDevelopmentUrl) throw new Error("https required");
     return url.toString();
   } catch {
     throw new ApiRequestError(`Поле «${field}» должно содержать HTTPS-ссылку.`);
@@ -77,7 +86,7 @@ export function parseEmailBuilderDocument(
     if (alignment !== "left" && alignment !== "center" && alignment !== "right") {
       throw new ApiRequestError(`Некорректное выравнивание блока ${index + 1}.`);
     }
-    const href = type === "button"
+    const href = type === "button" || type === "product"
       ? safeHttpsUrl(block.href, `Ссылка кнопки ${index + 1}`, true)
       : type === "image"
         ? safeHttpsUrl(block.href, `Ссылка изображения ${index + 1}`, true)
@@ -130,9 +139,13 @@ function blockHtml(block: EmailBuilderBlockInput, accent: string) {
   let content = "";
   if (block.type === "heading") {
     content = `<h1 style="margin:0;font-family:Arial,sans-serif;font-size:${block.fontSize}px;line-height:1.15;color:${block.textColor};">${lineBreaks(block.content)}</h1>`;
-  } else if (block.type === "text" || block.type === "footer" || block.type === "logo") {
+  } else if (block.type === "text" || block.type === "footer" || block.type === "logo" || block.type === "signature") {
     const weight = block.type === "logo" ? "font-weight:700;letter-spacing:.12em;" : "";
-    content = `<div style="margin:0;font-family:Arial,sans-serif;font-size:${block.fontSize}px;line-height:1.65;color:${block.textColor};${weight}">${lineBreaks(block.content)}</div>`;
+    if (block.type === "logo" && block.href) {
+      content = `<img src="${escapeHtml(block.href)}" alt="${escapeHtml(block.content)}" style="display:inline-block;max-width:220px;max-height:88px;width:auto;height:auto;border:0;">`;
+    } else {
+      content = `<div style="margin:0;font-family:Arial,sans-serif;font-size:${block.fontSize}px;line-height:1.65;color:${block.textColor};${weight}">${lineBreaks(block.content)}</div>`;
+    }
   } else if (block.type === "button") {
     content = `<a href="${escapeHtml(block.href ?? "")}" style="display:inline-block;padding:12px 22px;border-radius:${block.borderRadius}px;background:${accent};color:${block.textColor};font-family:Arial,sans-serif;font-size:${block.fontSize}px;font-weight:700;text-decoration:none;">${lineBreaks(block.label || block.content)}</a>`;
   } else if (block.type === "image") {
@@ -146,6 +159,20 @@ function blockHtml(block: EmailBuilderBlockInput, accent: string) {
     content = "&nbsp;";
   } else if (block.type === "social") {
     content = `<div style="font-family:Arial,sans-serif;font-size:${block.fontSize}px;line-height:1.6;color:${block.textColor};">${block.content.split("|").map((item) => escapeHtml(item.trim())).filter(Boolean).join(" &nbsp;·&nbsp; ")}</div>`;
+  } else if (block.type === "hero") {
+    const [title = "", subtitle = ""] = block.content.split("|");
+    content = `<div style="padding:28px;border-radius:${block.borderRadius}px;background:${block.backgroundColor === "transparent" ? "#f3f2ff" : block.backgroundColor};"><div style="font-family:Arial,sans-serif;font-size:${block.fontSize}px;font-weight:700;line-height:1.12;color:${block.textColor};">${lineBreaks(title)}</div><div style="margin-top:12px;font-family:Arial,sans-serif;font-size:16px;line-height:1.55;color:${block.textColor};opacity:.78;">${lineBreaks(subtitle)}</div></div>`;
+  } else if (block.type === "quote") {
+    const [quote = "", author = ""] = block.content.split("|");
+    content = `<blockquote style="margin:0;padding:20px;border-left:4px solid ${accent};border-radius:${block.borderRadius}px;background:${block.backgroundColor === "transparent" ? "#f8f8fb" : block.backgroundColor};font-family:Arial,sans-serif;color:${block.textColor};"><div style="font-size:${block.fontSize}px;line-height:1.55;">“${lineBreaks(quote)}”</div><div style="margin-top:10px;font-size:13px;font-weight:700;">${lineBreaks(author)}</div></blockquote>`;
+  } else if (block.type === "checklist") {
+    content = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0">${block.content.split("|").filter(Boolean).map((item) => `<tr><td width="28" valign="top" style="padding:5px 0;color:${accent};font-weight:700;">✓</td><td style="padding:5px 0;font-family:Arial,sans-serif;font-size:${block.fontSize}px;line-height:1.5;color:${block.textColor};">${lineBreaks(item.trim())}</td></tr>`).join("")}</table>`;
+  } else if (block.type === "stats") {
+    const items = block.content.split("|");
+    content = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>${[0, 2].map((index) => `<td width="50%" style="padding:16px;text-align:center;border-radius:${block.borderRadius}px;background:${block.backgroundColor === "transparent" ? "#f7f8fc" : block.backgroundColor};font-family:Arial,sans-serif;"><div style="font-size:28px;font-weight:700;color:${accent};">${lineBreaks(items[index] ?? "")}</div><div style="margin-top:5px;font-size:${block.fontSize}px;color:${block.textColor};">${lineBreaks(items[index + 1] ?? "")}</div></td>${index === 0 ? '<td width="12"></td>' : ''}`).join("")}</tr></table>`;
+  } else if (block.type === "product") {
+    const [name = "", description = "", price = ""] = block.content.split("|");
+    content = `<div style="padding:22px;border:1px solid #e5e7eb;border-radius:${block.borderRadius}px;background:${block.backgroundColor === "transparent" ? "#ffffff" : block.backgroundColor};font-family:Arial,sans-serif;color:${block.textColor};"><div style="font-size:20px;font-weight:700;">${lineBreaks(name)}</div><div style="margin-top:8px;font-size:${block.fontSize}px;line-height:1.55;">${lineBreaks(description)}</div><div style="margin-top:14px;font-size:18px;font-weight:700;">${lineBreaks(price)}</div><a href="${escapeHtml(block.href ?? "")}" style="display:inline-block;margin-top:16px;padding:10px 18px;border-radius:8px;background:${accent};color:#fff;text-decoration:none;font-size:13px;font-weight:700;">${lineBreaks(block.label || "Узнать подробнее")}</a></div>`;
   }
   return `<tr><td style="${wrapper}">${content}</td></tr>`;
 }
@@ -167,6 +194,11 @@ export function emailDocumentPlainText(
     if (block.type === "button") return [block.label || block.content];
     if (block.type === "columns") {
       return block.content.split("|").map((value) => value.trim());
+    }
+    if (["hero", "quote", "checklist", "stats", "product", "signature"].includes(block.type)) {
+      const parts = block.content.split("|").map((value) => value.trim()).filter(Boolean);
+      if (block.type === "product" && block.label) parts.push(block.label);
+      return parts;
     }
     return [block.content];
   });

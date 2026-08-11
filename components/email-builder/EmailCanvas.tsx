@@ -251,6 +251,12 @@ function BlockContent({
   selected: boolean;
 }) {
   if (block.type === "logo") {
+    if (block.href) {
+      return (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={block.href} alt={block.content} className="inline-block max-h-20 max-w-[220px] object-contain" />
+      );
+    }
     return (
       <div
         className="inline-flex items-center gap-2 font-semibold tracking-[0.12em]"
@@ -306,6 +312,17 @@ function BlockContent({
   }
 
   if (block.type === "image") {
+    if (block.href) {
+      return (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={block.href}
+          alt={block.content}
+          className="block h-auto w-full object-cover"
+          style={{ borderRadius: block.borderRadius }}
+        />
+      );
+    }
     return (
       <div
         className="relative overflow-hidden border border-black/5 p-4 text-left"
@@ -393,6 +410,75 @@ function BlockContent({
             {item}
           </span>
         ))}
+      </div>
+    );
+  }
+
+  if (block.type === "hero") {
+    const [title, subtitle] = block.content.split("|");
+    return (
+      <div className="rounded-2xl p-6" style={{ backgroundColor: block.backgroundColor === "transparent" ? `${accentColor}12` : block.backgroundColor, borderRadius: block.borderRadius }}>
+        <h2 className="m-0 font-bold tracking-[-0.035em]" style={{ fontSize: compact ? Math.min(block.fontSize, 29) : block.fontSize, lineHeight: 1.1 }}>{renderTokens(title || "Главная идея письма")}</h2>
+        <p className="mb-0 mt-3 whitespace-pre-wrap opacity-75" style={{ fontSize: 16, lineHeight: 1.55 }}>{renderTokens(subtitle || "Коротко объясните ценность предложения")}</p>
+      </div>
+    );
+  }
+
+  if (block.type === "quote") {
+    const [quote, author] = block.content.split("|");
+    return (
+      <blockquote className="m-0 rounded-xl border-l-4 p-5 text-left" style={{ borderLeftColor: accentColor, backgroundColor: block.backgroundColor === "transparent" ? "#f8f8fb" : block.backgroundColor, borderRadius: block.borderRadius }}>
+        <p className="m-0 italic" style={{ fontSize: block.fontSize, lineHeight: 1.55 }}>“{renderTokens(quote || "Цитата клиента или важная мысль")}”</p>
+        <footer className="mt-2 text-[12px] font-semibold opacity-70">{renderTokens(author || "Имя, должность")}</footer>
+      </blockquote>
+    );
+  }
+
+  if (block.type === "checklist") {
+    return (
+      <ul className="m-0 grid list-none gap-2 p-0 text-left">
+        {block.content.split("|").filter(Boolean).map((item, index) => (
+          <li key={`${item}-${index}`} className="flex items-start gap-2" style={{ fontSize: block.fontSize }}>
+            <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full text-[11px] font-bold text-white" style={{ backgroundColor: accentColor }}>✓</span>
+            <span className="leading-5">{renderTokens(item.trim())}</span>
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
+  if (block.type === "stats") {
+    const items = block.content.split("|");
+    return (
+      <div className="grid grid-cols-2 gap-3">
+        {[0, 2].map((index) => (
+          <div key={index} className="rounded-xl p-4 text-center" style={{ backgroundColor: block.backgroundColor === "transparent" ? "#f7f8fc" : block.backgroundColor, borderRadius: block.borderRadius }}>
+            <strong className="block text-[26px]" style={{ color: accentColor }}>{renderTokens(items[index] || "—")}</strong>
+            <span className="mt-1 block opacity-70" style={{ fontSize: block.fontSize }}>{renderTokens(items[index + 1] || "Показатель")}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (block.type === "product") {
+    const [name, description, price] = block.content.split("|");
+    return (
+      <div className="rounded-xl border border-black/10 p-5 text-left" style={{ backgroundColor: block.backgroundColor === "transparent" ? "#fff" : block.backgroundColor, borderRadius: block.borderRadius }}>
+        <strong className="block text-[19px]">{renderTokens(name || "Название предложения")}</strong>
+        <p className="mb-0 mt-2 opacity-75" style={{ fontSize: block.fontSize, lineHeight: 1.55 }}>{renderTokens(description || "Короткое описание пользы")}</p>
+        <strong className="mt-3 block text-[17px]">{renderTokens(price || "Цена")}</strong>
+        <span className="mt-4 inline-flex rounded-lg px-4 py-2 text-[12px] font-semibold text-white" style={{ backgroundColor: accentColor }}>{renderTokens(block.label || "Узнать подробнее")}</span>
+      </div>
+    );
+  }
+
+  if (block.type === "signature") {
+    const [name, position, contact] = block.content.split("|");
+    return (
+      <div className="inline-flex items-center gap-3 text-left">
+        <span className="grid size-10 shrink-0 place-items-center rounded-full text-sm font-bold text-white" style={{ backgroundColor: accentColor }}>{(name || "М").slice(0, 1)}</span>
+        <span><strong className="block">{renderTokens(name || "Имя отправителя")}</strong><span className="block opacity-70">{renderTokens(position || "Должность")}</span><span className="block text-[11px] opacity-55">{renderTokens(contact || "Контакты")}</span></span>
       </div>
     );
   }

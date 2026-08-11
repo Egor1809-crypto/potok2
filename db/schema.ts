@@ -227,6 +227,31 @@ export const emailTemplates = sqliteTable(
   ],
 );
 
+export const emailAssets = sqliteTable(
+  "email_assets",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    objectKey: text("object_key").notNull(),
+    filename: text("filename").notNull(),
+    mimeType: text("mime_type")
+      .$type<"image/jpeg" | "image/png" | "image/gif">()
+      .notNull(),
+    size: integer("size").notNull(),
+    kind: text("kind").$type<"photo" | "logo">().notNull(),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("idx_email_assets_object_key").on(table.objectKey),
+    index("idx_email_assets_workspace_created").on(
+      table.workspaceId,
+      table.createdAt,
+    ),
+  ],
+);
+
 export const campaigns = sqliteTable(
   "campaigns",
   {

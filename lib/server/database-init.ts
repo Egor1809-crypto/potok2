@@ -106,6 +106,16 @@ const schemaStatements = [
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
+  `CREATE TABLE IF NOT EXISTS email_assets (
+    id TEXT PRIMARY KEY NOT NULL,
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    object_key TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    mime_type TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
   `CREATE TABLE IF NOT EXISTS campaigns (
     id TEXT PRIMARY KEY NOT NULL,
     workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
@@ -215,6 +225,8 @@ const schemaStatements = [
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_integrations_workspace_provider ON integrations(workspace_id, provider_id)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_email_templates_workspace_name_key ON email_templates(workspace_id, name_key)`,
   `CREATE INDEX IF NOT EXISTS idx_email_templates_workspace_updated ON email_templates(workspace_id, updated_at)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_email_assets_object_key ON email_assets(object_key)`,
+  `CREATE INDEX IF NOT EXISTS idx_email_assets_workspace_created ON email_assets(workspace_id, created_at)`,
   `CREATE INDEX IF NOT EXISTS idx_campaigns_workspace_status_updated ON campaigns(workspace_id, status, updated_at)`,
   `CREATE INDEX IF NOT EXISTS idx_campaigns_segment ON campaigns(segment_id)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_campaign_versions_number ON campaign_versions(campaign_id, version)`,
@@ -458,6 +470,22 @@ async function seedDatabase(request: Request) {
     }
     await db.insert(systemState).values({
       key: "email-template-library-v1",
+      value: "seeded",
+      updatedAt: now,
+    });
+  }
+
+  const [expandedTemplateLibraryState] = await db
+    .select()
+    .from(systemState)
+    .where(eq(systemState.key, "email-template-library-v2"))
+    .limit(1);
+  if (!expandedTemplateLibraryState) {
+    for (const template of starterEmailTemplateValues().filter((item) => item.id.startsWith("template-v2-"))) {
+      await db.insert(emailTemplates).values({ ...template, workspaceId: WORKSPACE_ID }).onConflictDoNothing();
+    }
+    await db.insert(systemState).values({
+      key: "email-template-library-v2",
       value: "seeded",
       updatedAt: now,
     });
