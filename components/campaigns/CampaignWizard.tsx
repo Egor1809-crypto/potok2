@@ -8,14 +8,18 @@ import {
   CalendarClock,
   Check,
   CheckCircle2,
+  Cable,
   Copy,
   FileText,
   Filter,
   Mail,
   MailCheck,
+  MessageCircle,
   PencilLine,
   Save,
   Send,
+  SendHorizontal,
+  ShieldCheck,
   Sparkles,
   UserRound,
   UsersRound,
@@ -27,8 +31,10 @@ import { contacts } from "@/data/mockContacts";
 import { segments } from "@/data/mockSegments";
 import { templates } from "@/data/templates";
 import { createCampaignMetrics } from "@/data/helpers";
+import { countReachableContacts } from "@/data/contactChannels";
 import type { Campaign, CampaignWizardStep, TemplateCategory } from "@/types";
 import { BRAND_NAME } from "@/config/brand";
+import { INTEGRATION_DEMO_ROUTES_STORAGE_KEY } from "@/config/integrations";
 import {
   Alert,
   Badge,
@@ -38,15 +44,88 @@ import {
   Select,
   Stepper,
   Switch,
+  Textarea,
   ToastSurface,
   buttonVariants,
   cn,
 } from "@/components/ui";
+import {
+  campaignChannelDefinitions,
+  campaignChannelProviders,
+  defaultCampaignChannelProvider,
+  estimateCampaignChannelCoverage,
+  getCampaignChannelDefinition,
+  getCampaignChannelProvider,
+  type CampaignChannel,
+} from "@/components/campaigns/campaignChannels";
+import type { BuilderDocument } from "@/components/email-builder/builder-types";
 
 type AudienceType = "segment" | "saved-list" | "custom-filter" | "contacts";
 type ContentMode = "scratch" | "template" | "duplicate" | "ai";
 type SendMode = "now" | "schedule";
 type SubmitState = "idle" | "processing" | "success";
+
+type SavedCampaignWizardDraft = {
+  name?: string;
+  audienceType?: AudienceType;
+  segmentId?: string | null;
+  savedListId?: string;
+  companyId?: string | null;
+  contactIds?: string[];
+  recipientCount?: number;
+  contentMode?: ContentMode;
+  templateId?: string | null;
+  duplicateCampaignId?: string | null;
+  senderName?: string;
+  senderEmail?: string;
+  subject?: string;
+  previewText?: string;
+  channels?: CampaignChannel[];
+  providers?: Partial<Record<CampaignChannel, string>>;
+  messengerMessage?: string;
+  channelConsentConfirmed?: boolean;
+  excludeUnsubscribed?: boolean;
+  excludeBounced?: boolean;
+  excludePreviouslyContacted?: boolean;
+  sendMode?: SendMode;
+  scheduleDate?: string;
+  scheduleTime?: string;
+  builderDocument?: BuilderDocument;
+};
+
+const MESSENGER_MESSAGE_MAX_LENGTH = 4_000;
+const CAMPAIGN_WIZARD_DRAFT_STORAGE_KEY = "mailflow:campaign-wizard-draft";
+const CAMPAIGN_WIZARD_HANDOFF_STORAGE_PREFIX =
+  "mailflow:campaign-wizard-handoff:";
+const CAMPAIGN_WIZARD_RESUME_STORAGE_PREFIX =
+  "mailflow:campaign-wizard-resume:";
+const meaningfulCampaignQueryKeys = new Set([
+  "audience",
+  "audienceType",
+  "builderDraft",
+  "campaign",
+  "channel",
+  "company",
+  "consent",
+  "contact",
+  "count",
+  "draft",
+  "duplicate",
+  "filter",
+  "handoff",
+  "message",
+  "name",
+  "provider_email",
+  "provider_telegram",
+  "provider_vk",
+  "resume",
+  "copy",
+  "savedList",
+  "segment",
+  "source",
+  "step",
+  "template",
+]);
 
 export type CampaignWizardSearchParams = Record<
   string,
@@ -59,8 +138,8 @@ export interface CampaignWizardProps {
 
 const wizardSteps: { value: CampaignWizardStep; label: string; description: string }[] = [
   { value: "audience", label: "Аудитория", description: "Выберите получателей" },
-  { value: "content", label: "Письмо", description: "Подготовьте письмо" },
-  { value: "sender", label: "Отправитель", description: "Настройте отправку" },
+  { value: "content", label: "Каналы", description: "Подготовьте сообщения" },
+  { value: "sender", label: "Провайдеры", description: "Выберите платформы" },
   { value: "review", label: "Проверка", description: "Проверьте и запустите" },
 ];
 
@@ -128,6 +207,15 @@ const contentOptions: {
   },
 ];
 
+const channelIcons: Record<
+  CampaignChannel,
+  React.ComponentType<{ className?: string }>
+> = {
+  email: Mail,
+  telegram: SendHorizontal,
+  vk: MessageCircle,
+};
+
 const savedLists = [
   { id: "list-priority-partners", name: "Приоритетные партнёры", count: 612 },
   { id: "list-event-speakers", name: "Спикеры мероприятий", count: 96 },
@@ -185,6 +273,55 @@ function getServerBuilderDraftSnapshot() {
   return "";
 }
 
+function getCampaignWizardSnapshot(storageKey: string | null) {
+  if (!storageKey) return "";
+  try {
+    return window.localStorage.getItem(storageKey) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function getServerCampaignWizardSnapshot() {
+  return "";
+}
+
+function safeStorageToken(value: string | null) {
+  if (!value || !/^[a-zA-Z0-9_-]{1,160}$/.test(value)) return null;
+  return value;
+}
+
+function getDemoRoutesSnapshot() {
+  try {
+    return window.localStorage.getItem(INTEGRATION_DEMO_ROUTES_STORAGE_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function getServerDemoRoutesSnapshot() {
+  return "";
+}
+
+function hasMeaningfulCampaignQuery(params: URLSearchParams) {
+  return Array.from(params.keys()).some((key) =>
+    meaningfulCampaignQueryKeys.has(key),
+  );
+}
+
+function parseSavedCampaignWizardDraft(
+  snapshot: string,
+): SavedCampaignWizardDraft | null {
+  if (!snapshot) return null;
+
+  try {
+    const value = JSON.parse(snapshot) as SavedCampaignWizardDraft;
+    return value && typeof value === "object" ? value : null;
+  } catch {
+    return null;
+  }
+}
+
 function serializeParams(
   input: CampaignWizardSearchParams | URLSearchParams | undefined,
 ): string | null {
@@ -200,17 +337,6 @@ function serializeParams(
 
 function formatNumber(value: number): string {
   return new Intl.NumberFormat("ru-RU").format(value);
-}
-
-const campaignDateFormatter = new Intl.DateTimeFormat("ru-RU", {
-  day: "numeric",
-  month: "long",
-  year: "numeric",
-  timeZone: "UTC",
-});
-
-function formatCampaignDate(value: string): string {
-  return campaignDateFormatter.format(new Date(`${value}T12:00:00Z`));
 }
 
 function stepFromQuery(value: string | null): number {
@@ -232,6 +358,53 @@ function parseContactIds(params: URLSearchParams): string[] {
     .filter(Boolean);
 }
 
+function parseCampaignChannels(
+  params: URLSearchParams,
+  fallback: CampaignChannel[] = ["email"],
+): CampaignChannel[] {
+  const channels = params
+    .getAll("channel")
+    .flatMap((value) => value.split(","))
+    .filter((value): value is CampaignChannel =>
+      campaignChannelDefinitions.some((channel) => channel.id === value),
+    );
+  return channels.length > 0
+    ? Array.from(new Set(channels))
+    : fallback.length > 0
+      ? [...fallback]
+      : ["email"];
+}
+
+function getInitialProvider(
+  params: URLSearchParams,
+  channel: CampaignChannel,
+  demoRoutesSnapshot: string,
+  restoredProvider?: string,
+): string {
+  const requested = params.get(`provider_${channel}`);
+  if (campaignChannelProviders[channel].some(
+    (provider) => provider.id === requested,
+  )) return requested!;
+
+  if (campaignChannelProviders[channel].some(
+    (provider) => provider.id === restoredProvider,
+  )) return restoredProvider!;
+
+  try {
+    const demoRoutes = JSON.parse(demoRoutesSnapshot) as Partial<
+      Record<CampaignChannel, string | null>
+    >;
+    const savedProvider = demoRoutes[channel];
+    if (campaignChannelProviders[channel].some(
+      (provider) => provider.id === savedProvider,
+    )) return savedProvider!;
+  } catch {
+    // Fall through to the recommended provider.
+  }
+
+  return defaultCampaignChannelProvider[channel];
+}
+
 export function CampaignWizard({ searchParams }: CampaignWizardProps) {
   const browserSearch = React.useSyncExternalStore(
     subscribeToLocation,
@@ -243,16 +416,43 @@ export function CampaignWizard({ searchParams }: CampaignWizardProps) {
     getBuilderDraftSnapshot,
     getServerBuilderDraftSnapshot,
   );
+  const demoRoutesSnapshot = React.useSyncExternalStore(
+    subscribeToBuilderDraft,
+    getDemoRoutesSnapshot,
+    getServerDemoRoutesSnapshot,
+  );
   const providedSearch = serializeParams(searchParams);
   const resolvedSearch = providedSearch ?? browserSearch.replace(/^\?/, "");
+  const resolvedParams = new URLSearchParams(resolvedSearch);
+  const restoreSavedDraft = !hasMeaningfulCampaignQuery(resolvedParams);
+  const handoffToken = safeStorageToken(resolvedParams.get("handoff"));
+  const resumeCampaignId = safeStorageToken(resolvedParams.get("resume"));
+  const restoreStorageKey = handoffToken
+    ? `${CAMPAIGN_WIZARD_HANDOFF_STORAGE_PREFIX}${handoffToken}`
+    : resumeCampaignId
+      ? `${CAMPAIGN_WIZARD_RESUME_STORAGE_PREFIX}${resumeCampaignId}`
+      : restoreSavedDraft
+        ? CAMPAIGN_WIZARD_DRAFT_STORAGE_KEY
+        : null;
+  const getRestoreSnapshot = React.useCallback(
+    () => getCampaignWizardSnapshot(restoreStorageKey),
+    [restoreStorageKey],
+  );
+  const campaignWizardDraftSnapshot = React.useSyncExternalStore(
+    subscribeToBuilderDraft,
+    getRestoreSnapshot,
+    getServerCampaignWizardSnapshot,
+  );
 
   return (
     <CampaignWizardState
       key={`${resolvedSearch || "campaign-wizard-default"}:${
         resolvedSearch.includes("builderDraft=1") ? builderDraftSnapshot : ""
-      }`}
-      params={new URLSearchParams(resolvedSearch)}
+      }:${demoRoutesSnapshot}:${campaignWizardDraftSnapshot}`}
+      params={resolvedParams}
       builderDraftSnapshot={builderDraftSnapshot}
+      demoRoutesSnapshot={demoRoutesSnapshot}
+      campaignWizardDraftSnapshot={campaignWizardDraftSnapshot}
     />
   );
 }
@@ -260,26 +460,39 @@ export function CampaignWizard({ searchParams }: CampaignWizardProps) {
 function CampaignWizardState({
   params,
   builderDraftSnapshot,
+  demoRoutesSnapshot,
+  campaignWizardDraftSnapshot,
 }: {
   params: URLSearchParams;
   builderDraftSnapshot: string;
+  demoRoutesSnapshot: string;
+  campaignWizardDraftSnapshot: string;
 }) {
+  const generatedHandoffId = React.useId().replace(/[^a-zA-Z0-9_-]/g, "");
+  const requestedHandoffToken = safeStorageToken(params.get("handoff"));
+  const handoffToken =
+    requestedHandoffToken ??
+    `wizard-${generatedHandoffId || "current"}`;
+  const handoffStorageKey =
+    `${CAMPAIGN_WIZARD_HANDOFF_STORAGE_PREFIX}${handoffToken}`;
   const builderDraft = (() => {
     if (params.get("builderDraft") !== "1" || !builderDraftSnapshot) return null;
     try {
       return JSON.parse(builderDraftSnapshot) as {
         campaignName?: string;
-        document?: {
-          templateId?: string;
-          subject?: string;
-          previewText?: string;
-          blocks?: unknown[];
-        };
+        document?: BuilderDocument;
       };
     } catch {
       return null;
     }
   })();
+  const savedWizardDraft = parseSavedCampaignWizardDraft(
+    campaignWizardDraftSnapshot,
+  );
+  const resumeCampaignId = safeStorageToken(params.get("resume"));
+  const copyRestoredCampaign = Boolean(
+    resumeCampaignId && params.get("copy") === "1",
+  );
   const duplicateId = params.get("duplicate");
   const sourceCampaign = campaigns.find(
     (campaign) =>
@@ -292,16 +505,31 @@ function CampaignWizardState({
       segment.name.toLocaleLowerCase() === audienceQuery.toLocaleLowerCase(),
   );
   const queryContactIds = parseContactIds(params);
-  const queryCompany = companies.find((company) => company.id === params.get("company"));
+  const queryCompany = companies.find(
+    (company) =>
+      company.id === (params.get("company") ?? savedWizardDraft?.companyId),
+  );
   const companyContactIds = queryCompany
     ? contacts
         .filter((contact) => contact.companyId === queryCompany.id)
         .map((contact) => contact.id)
     : [];
-  const seededContactIds = queryContactIds.length > 0 ? queryContactIds : companyContactIds;
+  const savedContactIds = Array.isArray(savedWizardDraft?.contactIds)
+    ? savedWizardDraft.contactIds.filter((id): id is string => typeof id === "string")
+    : [];
+  const seededContactIds = queryContactIds.length > 0
+    ? queryContactIds
+    : companyContactIds.length > 0
+      ? companyContactIds
+      : savedContactIds;
   const queryCount = Math.max(0, Number.parseInt(params.get("count") ?? "0", 10) || 0);
   const queryFilter = params.get("filter") === "lawyers-moscow-active";
   const queryAudienceType = audienceTypeFromQuery(params.get("audienceType"));
+  const savedAudienceType = audienceOptions.some(
+    (option) => option.value === savedWizardDraft?.audienceType,
+  )
+    ? savedWizardDraft!.audienceType!
+    : null;
   const fromContacts =
     params.get("source") === "contacts" || seededContactIds.length > 0;
   const queryTemplate = templates.find(
@@ -311,7 +539,25 @@ function CampaignWizardState({
   const duplicateTemplate = templates.find(
     (template) => template.id === sourceCampaign?.templateId,
   );
-  const startingTemplate = queryTemplate ?? duplicateTemplate ?? templates[0];
+  const savedTemplate = templates.find(
+    (template) => template.id === savedWizardDraft?.templateId,
+  );
+  const startingTemplate =
+    queryTemplate ?? duplicateTemplate ?? savedTemplate ?? templates[0];
+  const savedRecipientCount =
+    typeof savedWizardDraft?.recipientCount === "number" &&
+    Number.isFinite(savedWizardDraft.recipientCount)
+      ? Math.max(0, savedWizardDraft.recipientCount)
+      : 0;
+  const savedChannels = Array.isArray(savedWizardDraft?.channels)
+    ? Array.from(
+        new Set(
+          savedWizardDraft.channels.filter((value): value is CampaignChannel =>
+            campaignChannelDefinitions.some((channel) => channel.id === value),
+          ),
+        ),
+      )
+    : undefined;
 
   const [currentStep, setCurrentStep] = React.useState(() =>
     stepFromQuery(params.get("step")),
@@ -322,10 +568,14 @@ function CampaignWizardState({
       ? duplicateId
         ? `${sourceCampaign.name} — копия`
         : sourceCampaign.name
-      : params.get("name")?.trim() || "Кампания без названия"),
+      : params.get("name")?.trim() ||
+        (copyRestoredCampaign && savedWizardDraft?.name
+          ? `${savedWizardDraft.name} — копия`
+          : savedWizardDraft?.name) ||
+        "Кампания без названия"),
   );
   const [audienceType, setAudienceType] = React.useState<AudienceType>(() =>
-    queryAudienceType ?? (queryFilter
+    queryAudienceType ?? savedAudienceType ?? (queryFilter
       ? "custom-filter"
       : querySegment || sourceCampaign?.segmentId
       ? "segment"
@@ -334,58 +584,138 @@ function CampaignWizardState({
         : "segment"),
   );
   const [selectedSegmentId, setSelectedSegmentId] = React.useState(
-    params.get("segment") ?? querySegment?.id ?? sourceCampaign?.segmentId ?? segments[0]?.id ?? "",
+    params.get("segment") ??
+      querySegment?.id ??
+      sourceCampaign?.segmentId ??
+      savedWizardDraft?.segmentId ??
+      segments[0]?.id ??
+      "",
   );
   const [savedListId, setSavedListId] = React.useState(
     savedLists.some((list) => list.id === params.get("savedList"))
       ? params.get("savedList")!
-      : savedLists[0].id,
+      : savedLists.some((list) => list.id === savedWizardDraft?.savedListId)
+        ? savedWizardDraft!.savedListId!
+        : savedLists[0].id,
   );
   const [selectedContactIds, setSelectedContactIds] = React.useState<string[]>(
     seededContactIds,
   );
   const [explicitCount, setExplicitCount] = React.useState(
-    queryCount || queryCompany?.contactsCount || (sourceCampaign && !sourceCampaign.segmentId ? sourceCampaign.metrics.recipients : 0),
+    queryCount ||
+      queryCompany?.contactsCount ||
+      (sourceCampaign && !sourceCampaign.segmentId
+        ? sourceCampaign.metrics.recipients
+        : 0) ||
+      savedRecipientCount,
   );
-  const [excludeUnsubscribed, setExcludeUnsubscribed] = React.useState(true);
-  const [excludeBounced, setExcludeBounced] = React.useState(true);
-  const [excludePreviouslyContacted, setExcludePreviouslyContacted] = React.useState(false);
+  const [excludeUnsubscribed, setExcludeUnsubscribed] = React.useState(
+    savedWizardDraft?.excludeUnsubscribed ?? true,
+  );
+  const [excludeBounced, setExcludeBounced] = React.useState(
+    savedWizardDraft?.excludeBounced ?? true,
+  );
+  const [excludePreviouslyContacted, setExcludePreviouslyContacted] = React.useState(
+    savedWizardDraft?.excludePreviouslyContacted ?? false,
+  );
+  const [selectedChannels, setSelectedChannels] = React.useState<CampaignChannel[]>(
+    () =>
+      parseCampaignChannels(
+        params,
+        sourceCampaign?.deliveryChannels ?? savedChannels,
+      ),
+  );
+  const [channelProviders, setChannelProviders] = React.useState<
+    Record<CampaignChannel, string>
+  >(() => ({
+    email: getInitialProvider(
+      params,
+      "email",
+      demoRoutesSnapshot,
+      savedWizardDraft?.providers?.email,
+    ),
+    telegram: getInitialProvider(
+      params,
+      "telegram",
+      demoRoutesSnapshot,
+      savedWizardDraft?.providers?.telegram,
+    ),
+    vk: getInitialProvider(
+      params,
+      "vk",
+      demoRoutesSnapshot,
+      savedWizardDraft?.providers?.vk,
+    ),
+  }));
+  const [messengerMessage, setMessengerMessage] = React.useState(
+    params.get("message")?.trim() ??
+      savedWizardDraft?.messengerMessage ??
+      "Здравствуйте, {{first_name}}! Делимся коротким обновлением от нашей команды.",
+  );
+  const [channelConsentConfirmed, setChannelConsentConfirmed] = React.useState(
+    params.get("consent") === "1" ||
+      savedWizardDraft?.channelConsentConfirmed === true,
+  );
   const [contentMode, setContentMode] = React.useState<ContentMode>(
-    builderDraft
-      ? builderDraft.document?.templateId
-        ? "template"
-        : "scratch"
-      : sourceCampaign
+    sourceCampaign
         ? "duplicate"
-        : "template",
+        : savedWizardDraft?.contentMode
+          ? params.get("template") &&
+            params.get("template") !== savedWizardDraft.templateId
+            ? "template"
+            : savedWizardDraft.contentMode
+          : builderDraft
+            ? builderDraft.document?.templateId
+              ? "template"
+              : "scratch"
+            : savedWizardDraft
+              ? savedTemplate
+                ? "template"
+                : "scratch"
+          : "template",
   );
   const [selectedTemplateId, setSelectedTemplateId] = React.useState(
-    builderDraft?.document?.templateId ?? startingTemplate?.id ?? "",
+    savedWizardDraft
+      ? templates.find((template) => template.id === params.get("template"))?.id ??
+        savedTemplate?.id ??
+        ""
+      : builderDraft?.document?.templateId ?? startingTemplate?.id ?? "",
   );
   const [selectedDuplicateId, setSelectedDuplicateId] = React.useState(
-    sourceCampaign?.id ?? campaigns[0]?.id ?? "",
+    sourceCampaign?.id ??
+      savedWizardDraft?.duplicateCampaignId ??
+      campaigns[0]?.id ??
+      "",
   );
   const [senderName, setSenderName] = React.useState(
-    sourceCampaign?.senderName ?? senderProfiles[0].name,
+    sourceCampaign?.senderName ?? savedWizardDraft?.senderName ?? senderProfiles[0].name,
   );
   const [senderEmail, setSenderEmail] = React.useState(
-    sourceCampaign?.senderEmail ?? senderProfiles[0].email,
+    sourceCampaign?.senderEmail ?? savedWizardDraft?.senderEmail ?? senderProfiles[0].email,
   );
   const [subject, setSubject] = React.useState(
     builderDraft?.document?.subject ??
       sourceCampaign?.subject ??
+      savedWizardDraft?.subject ??
       startingTemplate?.subject ??
       "Полезное обновление для {{first_name}}",
   );
   const [previewText, setPreviewText] = React.useState(
     builderDraft?.document?.previewText ??
       sourceCampaign?.previewText ??
+      savedWizardDraft?.previewText ??
       startingTemplate?.previewText ??
       "Короткое сообщение от нашей команды.",
   );
-  const [sendMode, setSendMode] = React.useState<SendMode>("schedule");
-  const [scheduleDate, setScheduleDate] = React.useState("2026-08-13");
-  const [scheduleTime, setScheduleTime] = React.useState("09:00");
+  const [sendMode, setSendMode] = React.useState<SendMode>(
+    savedWizardDraft?.sendMode === "now" ? "now" : "schedule",
+  );
+  const [scheduleDate, setScheduleDate] = React.useState(
+    savedWizardDraft?.scheduleDate || "2026-08-13",
+  );
+  const [scheduleTime, setScheduleTime] = React.useState(
+    savedWizardDraft?.scheduleTime || "09:00",
+  );
   const [submitState, setSubmitState] = React.useState<SubmitState>("idle");
   const [createdCampaignId, setCreatedCampaignId] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -426,6 +756,29 @@ function CampaignWizardState({
     return `Выбрано контактов: ${formatNumber(recipientCount)}`;
   })();
 
+  const hasExactChannelCoverage =
+    audienceType === "contacts" &&
+    selectedContacts.length > 0 &&
+    selectedContacts.length === recipientCount;
+  const channelCoverage = Object.fromEntries(
+    campaignChannelDefinitions.map((channel) => [
+      channel.id,
+      hasExactChannelCoverage
+        ? countReachableContacts(selectedContacts, channel.id)
+        : estimateCampaignChannelCoverage(channel.id, recipientCount),
+    ]),
+  ) as Record<CampaignChannel, number>;
+  const channelLabel = selectedChannels
+    .map((channel) => getCampaignChannelDefinition(channel).shortLabel)
+    .join(" · ");
+  const providerLabel = selectedChannels
+    .map(
+      (channel) =>
+        getCampaignChannelProvider(channel, channelProviders[channel])?.label ??
+        "Не выбран",
+    )
+    .join(" · ");
+
   const selectTemplate = (templateId: string) => {
     const template = templates.find((item) => item.id === templateId);
     setSelectedTemplateId(templateId);
@@ -460,45 +813,110 @@ function CampaignWizardState({
     );
   };
 
-  const campaignStateParams = new URLSearchParams({
-    count: String(recipientCount),
-    audience: audienceLabel,
-    audienceType,
-    name: campaignName,
-  });
-  if (audienceType === "segment" && selectedSegmentId) {
-    campaignStateParams.set("segment", selectedSegmentId);
-  }
-  if (audienceType === "saved-list" && savedListId) {
-    campaignStateParams.set("savedList", savedListId);
-  }
-  if (audienceType === "custom-filter") {
-    campaignStateParams.set("filter", "lawyers-moscow-active");
-  }
-  if (audienceType === "contacts") {
-    campaignStateParams.set("source", "contacts");
-    selectedContactIds.forEach((id) => campaignStateParams.append("contact", id));
-  }
-  if (queryCompany) campaignStateParams.set("company", queryCompany.id);
-  if (selectedTemplateId) campaignStateParams.set("template", selectedTemplateId);
+  const toggleChannel = (channel: CampaignChannel) => {
+    setError(null);
+    setSelectedChannels((current) => {
+      if (current.includes(channel)) {
+        if (current.length === 1) {
+          setError("Оставьте хотя бы один канал для кампании.");
+          return current;
+        }
+        return current.filter((item) => item !== channel);
+      }
+      return [...current, channel];
+    });
+  };
 
-  const editorReturnParams = new URLSearchParams(campaignStateParams);
-  editorReturnParams.set("step", "sender");
-  editorReturnParams.set("builderDraft", "1");
+  const restoredBuilderDocument =
+    builderDraft?.document ?? savedWizardDraft?.builderDocument;
+  const builderDocument =
+    restoredBuilderDocument &&
+    (contentMode === "scratch" ||
+      contentMode === "ai" ||
+      restoredBuilderDocument.templateId === selectedTemplateId)
+      ? {
+          ...restoredBuilderDocument,
+          subject,
+          previewText,
+        }
+      : undefined;
+
+  const wizardSnapshot: SavedCampaignWizardDraft = {
+    name: campaignName,
+    audienceType,
+    segmentId: audienceType === "segment" ? selectedSegmentId : null,
+    savedListId,
+    companyId: queryCompany?.id ?? null,
+    contactIds: selectedContactIds,
+    recipientCount,
+    contentMode,
+    templateId: selectedTemplateId || null,
+    duplicateCampaignId: selectedDuplicateId || null,
+    senderName,
+    senderEmail,
+    subject,
+    previewText,
+    channels: selectedChannels,
+    providers: channelProviders,
+    messengerMessage,
+    channelConsentConfirmed,
+    excludeUnsubscribed,
+    excludeBounced,
+    excludePreviouslyContacted,
+    sendMode,
+    scheduleDate,
+    scheduleTime,
+    builderDocument,
+  };
+  const wizardSnapshotJson = JSON.stringify(wizardSnapshot);
+
+  const persistWizardSnapshot = (storageKey: string) => {
+    try {
+      window.localStorage.setItem(storageKey, wizardSnapshotJson);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  React.useEffect(() => {
+    if (requestedHandoffToken && !campaignWizardDraftSnapshot) return;
+    try {
+      window.localStorage.setItem(handoffStorageKey, wizardSnapshotJson);
+    } catch {
+      // Navigation remains usable with the current in-memory state.
+    }
+  }, [
+    campaignWizardDraftSnapshot,
+    handoffStorageKey,
+    requestedHandoffToken,
+    wizardSnapshotJson,
+  ]);
+
+  const editorReturnParams = new URLSearchParams({
+    handoff: handoffToken,
+    step: "sender",
+    builderDraft: "1",
+  });
+  if (selectedTemplateId) editorReturnParams.set("template", selectedTemplateId);
   const editorQuery = new URLSearchParams({
     campaign: campaignName,
+    handoff: handoffToken,
     returnTo: `/campaigns/new?${editorReturnParams.toString()}`,
   });
   if (selectedTemplateId) editorQuery.set("template", selectedTemplateId);
   const editorHref = `/email-builder?${editorQuery.toString()}`;
 
-  const libraryBackParams = new URLSearchParams(campaignStateParams);
-  libraryBackParams.set("step", "content");
-  libraryBackParams.delete("builderDraft");
-  const libraryContinueParams = new URLSearchParams(campaignStateParams);
-  libraryContinueParams.set("step", "sender");
-  libraryContinueParams.set("builderDraft", "1");
-  libraryContinueParams.delete("template");
+  const libraryBackParams = new URLSearchParams({
+    handoff: handoffToken,
+    step: "content",
+  });
+  if (selectedTemplateId) libraryBackParams.set("template", selectedTemplateId);
+  const libraryContinueParams = new URLSearchParams({
+    handoff: handoffToken,
+    step: "sender",
+    builderDraft: "1",
+  });
   const libraryQuery = new URLSearchParams({
     campaign: campaignName,
     backTo: `/campaigns/new?${libraryBackParams.toString()}`,
@@ -512,22 +930,59 @@ function CampaignWizardState({
       return false;
     }
     if (currentStep === 1) {
-      if (contentMode === "template" && !selectedTemplateId) {
+      if (selectedChannels.length === 0) {
+        setError("Выберите хотя бы один канал.");
+        return false;
+      }
+      if (
+        selectedChannels.includes("email") &&
+        contentMode === "template" &&
+        !selectedTemplateId
+      ) {
         setError("Выберите шаблон, чтобы продолжить.");
         return false;
       }
-      if (contentMode === "duplicate" && !selectedDuplicateId) {
+      if (
+        selectedChannels.includes("email") &&
+        contentMode === "duplicate" &&
+        !selectedDuplicateId
+      ) {
         setError("Выберите кампанию для дублирования.");
+        return false;
+      }
+      if (
+        selectedChannels.some((channel) => channel !== "email") &&
+        !messengerMessage.trim()
+      ) {
+        setError("Добавьте текст для Telegram или ВКонтакте.");
+        return false;
+      }
+      if (
+        selectedChannels.some((channel) => channel !== "email") &&
+        messengerMessage.length > MESSENGER_MESSAGE_MAX_LENGTH
+      ) {
+        setError(
+          `Сократите текст для мессенджеров до ${formatNumber(MESSENGER_MESSAGE_MAX_LENGTH)} символов.`,
+        );
         return false;
       }
     }
     if (currentStep === 2) {
-      if (!senderName.trim() || !/^\S+@\S+\.\S+$/.test(senderEmail)) {
+      if (
+        selectedChannels.includes("email") &&
+        (!senderName.trim() || !/^\S+@\S+\.\S+$/.test(senderEmail))
+      ) {
         setError("Укажите имя отправителя и корректный адрес электронной почты.");
         return false;
       }
-      if (!subject.trim()) {
+      if (selectedChannels.includes("email") && !subject.trim()) {
         setError("Добавьте тему письма перед проверкой.");
+        return false;
+      }
+      if (!channelConsentConfirmed) {
+        setError(
+          "Подтвердите согласие аудитории и наличие идентификаторов для выбранных каналов.",
+        );
         return false;
       }
     }
@@ -546,8 +1001,30 @@ function CampaignWizardState({
   };
 
   const submitCampaign = () => {
+    if (!channelConsentConfirmed) {
+      setError(
+        "Подтвердите согласие аудитории в настройках провайдеров.",
+      );
+      return;
+    }
+    if (
+      selectedChannels.some((channel) => channel !== "email") &&
+      !messengerMessage.trim()
+    ) {
+      setError("Добавьте текст для Telegram или ВКонтакте.");
+      return;
+    }
+    if (
+      selectedChannels.some((channel) => channel !== "email") &&
+      messengerMessage.length > MESSENGER_MESSAGE_MAX_LENGTH
+    ) {
+      setError(
+        `Сократите текст для мессенджеров до ${formatNumber(MESSENGER_MESSAGE_MAX_LENGTH)} символов.`,
+      );
+      return;
+    }
     if (sendMode === "schedule" && (!scheduleDate || !scheduleTime)) {
-      setError("Выберите дату и время отправки кампании.");
+      setError("Выберите дату и время демоплана кампании.");
       return;
     }
     setError(null);
@@ -556,8 +1033,6 @@ function CampaignWizardState({
     submitTimerRef.current = setTimeout(() => {
       const now = new Date().toISOString();
       const generatedId = `campaign-demo-${Date.now()}`;
-      const sent = sendMode === "now" ? Math.max(1, Math.round(recipientCount * 0.12)) : 0;
-      const delivered = Math.round(sent * 0.982);
       const demoCampaign: Campaign = {
         id: generatedId,
         name: campaignName,
@@ -566,30 +1041,65 @@ function CampaignWizardState({
         audience: audienceLabel,
         segmentId: audienceType === "segment" ? selectedSegmentId : null,
         templateId: selectedTemplateId || null,
-        status: sendMode === "schedule" ? "scheduled" : "sending",
+        deliveryChannels: selectedChannels,
+        status: "draft",
         senderName,
         senderEmail,
         owner: "Егор Сабалин",
         metrics: createCampaignMetrics({
           recipients: recipientCount,
-          sent,
-          delivered,
-          opened: Math.round(delivered * 0.36),
-          clicked: Math.round(delivered * 0.08),
-          replies: Math.round(delivered * 0.01),
-          bounced: Math.max(0, sent - delivered),
+          sent: 0,
+          delivered: 0,
+          opened: 0,
+          clicked: 0,
+          replies: 0,
+          bounced: 0,
           unsubscribed: 0,
         }),
         createdAt: now,
         scheduledAt: sendMode === "schedule"
           ? new Date(`${scheduleDate}T${scheduleTime}:00+04:00`).toISOString()
           : now,
-        sentAt: sendMode === "now" ? now : null,
+        sentAt: null,
       };
 
       try {
         window.localStorage.setItem(`mailflow:campaign:${generatedId}`, JSON.stringify(demoCampaign));
         window.localStorage.setItem("mailflow:last-campaign", JSON.stringify(demoCampaign));
+        window.localStorage.setItem(
+          `${CAMPAIGN_WIZARD_RESUME_STORAGE_PREFIX}${generatedId}`,
+          wizardSnapshotJson,
+        );
+        const savedCampaigns = (() => {
+          try {
+            const value = JSON.parse(
+              window.localStorage.getItem("mailflow:demo-campaigns") ?? "[]",
+            ) as Campaign[];
+            return Array.isArray(value) ? value : [];
+          } catch {
+            return [];
+          }
+        })();
+        window.localStorage.setItem(
+          "mailflow:demo-campaigns",
+          JSON.stringify([
+            demoCampaign,
+            ...savedCampaigns.filter((item) => item.id !== generatedId),
+          ].slice(0, 20)),
+        );
+        window.localStorage.setItem(
+          `mailflow:campaign-delivery:${generatedId}`,
+          JSON.stringify({
+            demo: true,
+            channels: selectedChannels.map((channel) => ({
+              channel,
+              provider: channelProviders[channel],
+              estimatedCoverage: channelCoverage[channel] ?? 0,
+            })),
+            messengerMessage,
+            consentConfirmed: channelConsentConfirmed,
+          }),
+        );
         setCreatedCampaignId(generatedId);
       } catch {
         setCreatedCampaignId(
@@ -601,23 +1111,7 @@ function CampaignWizardState({
   };
 
   const saveDraft = () => {
-    try {
-      window.localStorage.setItem("mailflow:campaign-wizard-draft", JSON.stringify({
-        name: campaignName,
-        audienceType,
-        segmentId: audienceType === "segment" ? selectedSegmentId : null,
-        contactIds: selectedContactIds,
-        recipientCount,
-        templateId: selectedTemplateId || null,
-        senderName,
-        senderEmail,
-        subject,
-        previewText,
-        updatedAt: new Date().toISOString(),
-      }));
-    } catch {
-      // The demo remains usable when storage is unavailable.
-    }
+    persistWizardSnapshot(CAMPAIGN_WIZARD_DRAFT_STORAGE_KEY);
     setNotice("Черновик сохранён");
     if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
     noticeTimerRef.current = setTimeout(() => setNotice(null), 2800);
@@ -633,17 +1127,16 @@ function CampaignWizardState({
             <span className="mx-auto grid size-14 place-items-center rounded-full bg-success-subtle text-success ring-8 ring-success-subtle/45">
               <CheckCircle2 aria-hidden="true" className="size-7" />
             </span>
-            <Badge variant="success" className="mt-6">
-              {sendMode === "schedule" ? "Запланирована" : "Отправляется"}
+            <Badge variant="accent" className="mt-6">
+              Демозапуск создан
             </Badge>
             <h1 className="mt-3 mb-0 text-[25px] font-semibold tracking-[-0.035em] text-text-strong sm:text-[29px]">
-              {sendMode === "schedule" ? "Кампания запланирована" : "Кампания отправляется"}
+              План кампании сохранён
             </h1>
             <p className="mx-auto mt-2 mb-0 max-w-md text-[13px] leading-5 text-text-muted">
-              Кампания «{campaignName}» готова. Получателей: {formatNumber(recipientCount)}.
-              {sendMode === "schedule"
-                ? ` Отправка начнётся ${formatCampaignDate(scheduleDate)} в ${scheduleTime}.`
-                : " Статистика будет обновляться по мере поступления ответов."}
+              Ни одно письмо или сообщение не отправлено. Кампания «{campaignName}»
+              сохранена как демонстрационный план на {formatNumber(recipientCount)} контактов.
+              Реальный запуск станет доступен после подключения выбранных провайдеров.
             </p>
             <div className="mt-7 flex flex-wrap justify-center gap-2">
               <Link href="/campaigns" className={buttonVariants({ variant: "secondary" })}>
@@ -661,13 +1154,8 @@ function CampaignWizardState({
           <div className="grid border-t border-border bg-surface-subtle/45 sm:grid-cols-3">
             {[
               ["Аудитория", audienceLabel],
-              ["Отправитель", senderName],
-              [
-                "Отправка",
-                sendMode === "schedule"
-                  ? `${formatCampaignDate(scheduleDate)} · ${scheduleTime}`
-                  : "Сейчас",
-              ],
+              ["Каналы", channelLabel],
+              ["Статус", "Ожидает подключения"],
             ].map(([label, value]) => (
               <div key={label} className="border-b border-border p-4 last:border-b-0 sm:border-r sm:border-b-0 sm:last:border-r-0">
                 <p className="m-0 text-[10px] font-medium text-text-subtle">{label}</p>
@@ -700,7 +1188,7 @@ function CampaignWizardState({
             <Badge variant="accent">Деморежим</Badge>
           </div>
           <p className="mt-1.5 mb-0 text-[13px] text-text-muted">
-            Настройте аудиторию, письмо и отправку в одном окне.
+            Настройте единую кампанию для email, Telegram и ВКонтакте.
           </p>
         </div>
         <Button
@@ -750,6 +1238,13 @@ function CampaignWizardState({
           )}
           {currentStep === 1 && (
             <ContentStep
+              selectedChannels={selectedChannels}
+              onToggleChannel={toggleChannel}
+              recipientCount={recipientCount}
+              channelCoverage={channelCoverage}
+              coverageIsExact={hasExactChannelCoverage}
+              messengerMessage={messengerMessage}
+              onMessengerMessageChange={setMessengerMessage}
               contentMode={contentMode}
               onContentModeChange={(value) => {
                 setContentMode(value);
@@ -766,10 +1261,25 @@ function CampaignWizardState({
               setPreviewText={setPreviewText}
               editorHref={editorHref}
               templateLibraryHref={templateLibraryHref}
+              onBeforeEditorNavigation={() =>
+                persistWizardSnapshot(handoffStorageKey)
+              }
             />
           )}
           {currentStep === 2 && (
             <SenderStep
+              selectedChannels={selectedChannels}
+              channelProviders={channelProviders}
+              onProviderChange={(channel, provider) =>
+                setChannelProviders((current) => ({
+                  ...current,
+                  [channel]: provider,
+                }))
+              }
+              channelCoverage={channelCoverage}
+              recipientCount={recipientCount}
+              channelConsentConfirmed={channelConsentConfirmed}
+              onChannelConsentConfirmedChange={setChannelConsentConfirmed}
               senderName={senderName}
               senderEmail={senderEmail}
               subject={subject}
@@ -779,6 +1289,9 @@ function CampaignWizardState({
               onSubjectChange={setSubject}
               onPreviewTextChange={setPreviewText}
               editorHref={editorHref}
+              onBeforeEditorNavigation={() =>
+                persistWizardSnapshot(handoffStorageKey)
+              }
             />
           )}
           {currentStep === 3 && (
@@ -799,6 +1312,11 @@ function CampaignWizardState({
               senderName={senderName}
               senderEmail={senderEmail}
               subject={subject}
+              selectedChannels={selectedChannels}
+              channelProviders={channelProviders}
+              channelCoverage={channelCoverage}
+              messengerMessage={messengerMessage}
+              channelConsentConfirmed={channelConsentConfirmed}
               exclusions={{
                 unsubscribed: excludeUnsubscribed,
                 bounced: excludeBounced,
@@ -836,7 +1354,7 @@ function CampaignWizardState({
             ) : (
               <Button
                 loading={submitState === "processing"}
-                loadingText={sendMode === "schedule" ? "Планируем…" : "Запускаем отправку…"}
+                loadingText="Сохраняем демоплан…"
                 leadingIcon={
                   sendMode === "schedule" ? (
                     <CalendarClock className="size-4" />
@@ -846,7 +1364,7 @@ function CampaignWizardState({
                 }
                 onClick={submitCampaign}
               >
-                {sendMode === "schedule" ? "Запланировать кампанию" : "Отправить кампанию"}
+                {sendMode === "schedule" ? "Создать демоплан" : "Сохранить демозапуск"}
               </Button>
             )}
           </footer>
@@ -862,19 +1380,11 @@ function CampaignWizardState({
           <dl className="mt-5 grid gap-4">
             <SummaryItem icon={<UsersRound className="size-3.5" />} label="Аудитория" value={audienceLabel} />
             <SummaryItem
-              icon={<Mail className="size-3.5" />}
-              label="Письмо"
-              value={
-                contentMode === "template"
-                  ? selectedTemplate?.name ?? "Выберите шаблон"
-                  : contentMode === "duplicate"
-                    ? selectedDuplicate?.name ?? "Выберите кампанию"
-                    : contentMode === "ai"
-                      ? "Черновик с ИИ"
-                      : "С нуля"
-              }
+              icon={<Cable className="size-3.5" />}
+              label="Каналы"
+              value={channelLabel}
             />
-            <SummaryItem icon={<UserRound className="size-3.5" />} label="Отправитель" value={senderName} />
+            <SummaryItem icon={<ShieldCheck className="size-3.5" />} label="Провайдеры" value={providerLabel} />
           </dl>
           <div className="mt-5 rounded-[11px] bg-primary-subtle/55 p-4">
             <p className="m-0 text-[10px] font-medium text-primary">Получателей</p>
@@ -882,7 +1392,7 @@ function CampaignWizardState({
               {formatNumber(recipientCount)}
             </p>
             <p className="mt-1 mb-0 text-[10px] leading-4 text-text-muted">
-              Исключения будут применены непосредственно перед отправкой.
+              Охват по каналам проверяется отдельно по email, chat_id и VK ID.
             </p>
           </div>
         </aside>
@@ -1149,6 +1659,13 @@ function AudienceStep({
 }
 
 function ContentStep({
+  selectedChannels,
+  onToggleChannel,
+  recipientCount,
+  channelCoverage,
+  coverageIsExact,
+  messengerMessage,
+  onMessengerMessageChange,
   contentMode,
   onContentModeChange,
   selectedTemplateId,
@@ -1161,7 +1678,15 @@ function ContentStep({
   setPreviewText,
   editorHref,
   templateLibraryHref,
+  onBeforeEditorNavigation,
 }: {
+  selectedChannels: CampaignChannel[];
+  onToggleChannel: (channel: CampaignChannel) => void;
+  recipientCount: number;
+  channelCoverage: Partial<Record<CampaignChannel, number>>;
+  coverageIsExact: boolean;
+  messengerMessage: string;
+  onMessengerMessageChange: (value: string) => void;
   contentMode: ContentMode;
   onContentModeChange: (value: ContentMode) => void;
   selectedTemplateId: string;
@@ -1174,16 +1699,93 @@ function ContentStep({
   setPreviewText: (value: string) => void;
   editorHref: string;
   templateLibraryHref: string;
+  onBeforeEditorNavigation: () => void;
 }) {
   const [aiGenerated, setAiGenerated] = React.useState(false);
   return (
     <div>
       <StepHeading
         eyebrow="Шаг 2"
-        title="Как создать письмо?"
-        description="Выберите основу, а затем доработайте письмо в редакторе."
+        title="Где и что отправить?"
+        description="Выберите один или несколько каналов. Один контакт может получить разные версии сообщения."
       />
-      <div className="mt-6 grid gap-2 sm:grid-cols-2">
+      <div className="mt-6 grid gap-3 lg:grid-cols-3">
+        {campaignChannelDefinitions.map((channel) => {
+          const selected = selectedChannels.includes(channel.id);
+          const Icon = channelIcons[channel.id];
+          const coverage = channelCoverage[channel.id] ?? 0;
+          return (
+            <button
+              key={channel.id}
+              type="button"
+              aria-pressed={selected}
+              onClick={() => onToggleChannel(channel.id)}
+              className={cn(
+                "rounded-[11px] border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
+                selected
+                  ? "border-primary/35 bg-primary-subtle/40"
+                  : "border-border hover:border-border-strong hover:bg-surface-subtle/55",
+              )}
+            >
+              <span className="flex items-start justify-between gap-3">
+                <span
+                  className={cn(
+                    "grid size-9 place-items-center rounded-[10px]",
+                    selected ? "bg-primary text-white" : "bg-surface-subtle text-text-muted",
+                  )}
+                >
+                  <Icon aria-hidden="true" className="size-4" />
+                </span>
+                <span
+                  className={cn(
+                    "grid size-5 place-items-center rounded-full border",
+                    selected
+                      ? "border-primary bg-primary text-white"
+                      : "border-border-strong bg-surface",
+                  )}
+                >
+                  {selected && <Check aria-hidden="true" className="size-3" strokeWidth={3} />}
+                </span>
+              </span>
+              <span className="mt-3 block text-[12px] font-semibold text-text-strong">
+                {channel.label}
+              </span>
+              <span className="mt-1 block min-h-8 text-[9px] leading-4 text-text-muted">
+                {channel.description}
+              </span>
+              <span className="mt-2 block text-[9px] font-medium text-text">
+                Нужно: {channel.identityLabel}
+              </span>
+              <span className="mt-3 flex items-center justify-between gap-2 border-t border-border/80 pt-3 text-[9px]">
+                <span className="text-text-subtle">
+                  {coverageIsExact ? "Точный охват" : "Охват в демобазе"}
+                </span>
+                <span className="font-semibold text-text-strong">
+                  {formatNumber(coverage)} / {formatNumber(recipientCount)}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <Alert
+        tone="info"
+        title={coverageIsExact ? "Охват проверен по выбранным контактам" : "Охват показан как демооценка"}
+        className="mt-4"
+      >
+        {coverageIsExact
+          ? "Учтены активные email, сохранённые Telegram chat_id и разрешения на сообщения ВК."
+          : `После синхронизации контактов ${BRAND_NAME} пересчитает точный охват по email, Telegram chat_id и VK ID с учётом разрешений.`}
+      </Alert>
+
+      {selectedChannels.includes("email") && (
+        <div className="mt-7 border-t border-border pt-6">
+          <div className="mb-3">
+            <h3 className="m-0 text-[13px] font-semibold text-text-strong">Письмо</h3>
+            <p className="mt-0.5 mb-0 text-[10px] text-text-muted">Выберите основу и сохраните персонализацию.</p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
         {contentOptions.map(({ value, label, description, icon: Icon }) => (
           <button
             key={value}
@@ -1211,16 +1813,22 @@ function ContentStep({
             </span>
           </button>
         ))}
-      </div>
+          </div>
+        </div>
+      )}
 
-      {contentMode === "template" && (
+      {selectedChannels.includes("email") && contentMode === "template" && (
         <div className="mt-6">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
               <h3 className="m-0 text-[12px] font-semibold text-text-strong">Выберите шаблон</h3>
               <p className="mt-0.5 mb-0 text-[10px] text-text-muted">Каждый блок можно редактировать.</p>
             </div>
-            <Link href={templateLibraryHref} className="text-[10px] font-semibold text-primary hover:text-primary-hover">
+            <Link
+              href={templateLibraryHref}
+              onClick={onBeforeEditorNavigation}
+              className="text-[10px] font-semibold text-primary hover:text-primary-hover"
+            >
               Открыть библиотеку
             </Link>
           </div>
@@ -1237,7 +1845,7 @@ function ContentStep({
         </div>
       )}
 
-      {contentMode === "duplicate" && (
+      {selectedChannels.includes("email") && contentMode === "duplicate" && (
         <div className="mt-6 grid gap-2">
           {campaigns.slice(0, 5).map((campaign) => (
             <button
@@ -1264,7 +1872,7 @@ function ContentStep({
         </div>
       )}
 
-      {(contentMode === "scratch" || contentMode === "ai") && (
+      {selectedChannels.includes("email") && (contentMode === "scratch" || contentMode === "ai") && (
         <div className="mt-6 rounded-[12px] border border-border bg-surface-subtle/40 p-4">
           {contentMode === "ai" && (
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -1297,7 +1905,7 @@ function ContentStep({
         </div>
       )}
 
-      <div className="mt-6 flex flex-col gap-3 rounded-[12px] border border-primary/15 bg-primary-subtle/35 p-4 sm:flex-row sm:items-center sm:justify-between">
+      {selectedChannels.includes("email") && <div className="mt-6 flex flex-col gap-3 rounded-[12px] border border-primary/15 bg-primary-subtle/35 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <span className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-primary text-white">
             <PencilLine aria-hidden="true" className="size-4" />
@@ -1307,16 +1915,67 @@ function ContentStep({
             <p className="mt-0.5 mb-0 text-[10px] text-text-muted">Откройте редактор, а затем вернитесь к выбору отправителя.</p>
           </div>
         </div>
-        <a href={editorHref} className={buttonVariants({ variant: "primary", size: "sm" })}>
+        <a
+          href={editorHref}
+          onClick={onBeforeEditorNavigation}
+          className={buttonVariants({ variant: "primary", size: "sm" })}
+        >
           Открыть редактор писем
           <ArrowRight aria-hidden="true" className="size-3.5" />
         </a>
-      </div>
+      </div>}
+
+      {selectedChannels.some((channel) => channel !== "email") && (
+        <div className="mt-7 border-t border-border pt-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="m-0 text-[13px] font-semibold text-text-strong">
+                Текст для {selectedChannels.filter((channel) => channel !== "email").map((channel) => getCampaignChannelDefinition(channel).shortLabel).join(" и ")}
+              </h3>
+              <p className="mt-0.5 mb-0 text-[10px] text-text-muted">
+                Общая текстовая версия. Переменные {"{{first_name}}"} и {"{{company}}"} сохранятся.
+              </p>
+            </div>
+            <Badge variant="accent">Деморежим</Badge>
+          </div>
+          <FormField
+            label="Сообщение"
+            htmlFor="messenger-message"
+            hint={`${formatNumber(messengerMessage.length)} / ${formatNumber(MESSENGER_MESSAGE_MAX_LENGTH)} символов`}
+            className="mt-4"
+          >
+            <Textarea
+              id="messenger-message"
+              rows={6}
+              maxLength={MESSENGER_MESSAGE_MAX_LENGTH}
+              value={messengerMessage}
+              onChange={(event) => onMessengerMessageChange(event.target.value)}
+              placeholder="Напишите короткое сообщение…"
+            />
+          </FormField>
+          <div className="mt-3 flex items-start gap-3 rounded-[10px] border border-border bg-surface-subtle/40 p-3.5">
+            <MessageCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-primary" />
+            <div>
+              <p className="m-0 text-[10px] font-semibold text-text-strong">Предпросмотр сообщения</p>
+              <p className="mt-1 mb-0 whitespace-pre-wrap text-[10px] leading-5 text-text-muted">
+                {messengerMessage || "Здесь появится текст для мессенджеров."}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 function SenderStep({
+  selectedChannels,
+  channelProviders,
+  onProviderChange,
+  channelCoverage,
+  recipientCount,
+  channelConsentConfirmed,
+  onChannelConsentConfirmedChange,
   senderName,
   senderEmail,
   subject,
@@ -1326,7 +1985,15 @@ function SenderStep({
   onSubjectChange,
   onPreviewTextChange,
   editorHref,
+  onBeforeEditorNavigation,
 }: {
+  selectedChannels: CampaignChannel[];
+  channelProviders: Record<CampaignChannel, string>;
+  onProviderChange: (channel: CampaignChannel, provider: string) => void;
+  channelCoverage: Partial<Record<CampaignChannel, number>>;
+  recipientCount: number;
+  channelConsentConfirmed: boolean;
+  onChannelConsentConfirmedChange: (value: boolean) => void;
   senderName: string;
   senderEmail: string;
   subject: string;
@@ -1336,15 +2003,93 @@ function SenderStep({
   onSubjectChange: (value: string) => void;
   onPreviewTextChange: (value: string) => void;
   editorHref: string;
+  onBeforeEditorNavigation: () => void;
 }) {
+  const consentStatements = [
+    selectedChannels.includes("email")
+      ? "Подтверждаю законное основание для email-рассылки и исключение отписавшихся контактов."
+      : null,
+    selectedChannels.includes("telegram")
+      ? "Для Telegram сохранены chat_id и разрешение боту."
+      : null,
+    selectedChannels.includes("vk")
+      ? "Для ВКонтакте сохранены VK ID и разрешение сообществу."
+      : null,
+  ].filter((statement): statement is string => Boolean(statement));
+  const consentDescription = `${consentStatements.join(" ")} Недоступные контакты исключаются отдельно по каждому выбранному каналу.`;
+
   return (
     <div>
       <StepHeading
         eyebrow="Шаг 3"
-        title="От чьего имени отправить письмо?"
-        description="Выберите проверенного отправителя и проверьте вид письма во входящих."
+        title="Через какие платформы отправить?"
+        description="Выберите провайдера для каждого канала. В деморежиме ключи и внешние API не используются."
       />
-      <div className="mt-6 grid gap-2 sm:grid-cols-2">
+
+      <div className="mt-6 grid gap-3">
+        {selectedChannels.map((channelId) => {
+          const channel = getCampaignChannelDefinition(channelId);
+          const Icon = channelIcons[channelId];
+          const provider = getCampaignChannelProvider(
+            channelId,
+            channelProviders[channelId],
+          );
+          return (
+            <div key={channelId} className="rounded-[12px] border border-border p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-primary-subtle text-primary">
+                    <Icon aria-hidden="true" className="size-4" />
+                  </span>
+                  <div>
+                    <h3 className="m-0 text-[12px] font-semibold text-text-strong">
+                      {channel.label}
+                    </h3>
+                    <p className="mt-0.5 mb-0 text-[9px] text-text-muted">
+                      Доступно контактов: {formatNumber(channelCoverage[channelId] ?? 0)} из {formatNumber(recipientCount)}
+                    </p>
+                  </div>
+                </div>
+                <Badge variant="warning" dot>Не подключён</Badge>
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,220px)_1fr] sm:items-end">
+                <FormField label="Провайдер" htmlFor={`channel-provider-${channelId}`}>
+                  <Select
+                    id={`channel-provider-${channelId}`}
+                    value={channelProviders[channelId]}
+                    onChange={(event) => onProviderChange(channelId, event.target.value)}
+                    options={campaignChannelProviders[channelId].map((item) => ({
+                      value: item.id,
+                      label: item.label,
+                    }))}
+                  />
+                </FormField>
+                <div className="rounded-[9px] bg-surface-subtle/55 px-3 py-2.5">
+                  <p className="m-0 text-[9px] font-medium text-text-strong">
+                    {provider?.description}
+                  </p>
+                  {channelId === "email" && channelProviders[channelId] === "vk-workspace" && (
+                    <p className="mt-1 mb-0 text-[9px] leading-4 text-text-muted">
+                      В мастере маршрут работает через SMTP только после серверного подключения.
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="mt-3 flex items-start gap-2 border-t border-border pt-3">
+                <ShieldCheck aria-hidden="true" className="mt-0.5 size-3.5 shrink-0 text-primary" />
+                <p className="m-0 text-[9px] leading-4 text-text-muted">{channel.consentHint}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {selectedChannels.includes("email") && <div className="mt-7 border-t border-border pt-6">
+        <div className="mb-3">
+          <h3 className="m-0 text-[13px] font-semibold text-text-strong">Отправитель email</h3>
+          <p className="mt-0.5 mb-0 text-[10px] text-text-muted">Выберите проверенный адрес и проверьте вид письма.</p>
+        </div>
+      <div className="grid gap-2 sm:grid-cols-2">
         {senderProfiles.map((profile) => {
           const selected = senderEmail === profile.email;
           return (
@@ -1391,7 +2136,11 @@ function SenderStep({
             <h3 className="m-0 text-[12px] font-semibold text-text-strong">Предпросмотр во входящих</h3>
             <p className="mt-0.5 mb-0 text-[10px] text-text-muted">Проверьте тему и текст предпросмотра.</p>
           </div>
-          <a href={editorHref} className="text-[10px] font-semibold text-primary hover:text-primary-hover">
+          <a
+            href={editorHref}
+            onClick={onBeforeEditorNavigation}
+            className="text-[10px] font-semibold text-primary hover:text-primary-hover"
+          >
             Изменить содержимое письма
           </a>
         </div>
@@ -1423,6 +2172,25 @@ function SenderStep({
           </div>
         </div>
       </div>
+      </div>}
+
+      <div className="mt-6 rounded-[11px] border border-primary/15 bg-primary-subtle/35 p-4">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="m-0 text-[11px] font-semibold text-text-strong">
+              Согласия и доступность проверены
+            </p>
+            <p className="mt-1 mb-0 max-w-2xl text-[9px] leading-4 text-text-muted">
+              {consentDescription}
+            </p>
+          </div>
+          <Switch
+            checked={channelConsentConfirmed}
+            onCheckedChange={onChannelConsentConfirmedChange}
+            label="Подтвердить согласие"
+          />
+        </div>
+      </div>
     </div>
   );
 }
@@ -1436,6 +2204,11 @@ function ReviewStep({
   senderName,
   senderEmail,
   subject,
+  selectedChannels,
+  channelProviders,
+  channelCoverage,
+  messengerMessage,
+  channelConsentConfirmed,
   exclusions,
   sendMode,
   onSendModeChange,
@@ -1452,6 +2225,11 @@ function ReviewStep({
   senderName: string;
   senderEmail: string;
   subject: string;
+  selectedChannels: CampaignChannel[];
+  channelProviders: Record<CampaignChannel, string>;
+  channelCoverage: Partial<Record<CampaignChannel, number>>;
+  messengerMessage: string;
+  channelConsentConfirmed: boolean;
   exclusions: { unsubscribed: boolean; bounced: boolean; previouslyContacted: boolean };
   sendMode: SendMode;
   onSendModeChange: (value: SendMode) => void;
@@ -1465,7 +2243,7 @@ function ReviewStep({
       <StepHeading
         eyebrow="Шаг 4"
         title="Проверьте перед запуском"
-        description="Проверьте аудиторию, письмо и время отправки. В деморежиме письма не отправляются."
+        description="Проверьте аудиторию, каналы и время. В деморежиме ни одно письмо или сообщение не отправляется."
       />
       <div className="mt-6">
         <FormField label="Название кампании" htmlFor="review-campaign-name" required>
@@ -1474,17 +2252,45 @@ function ReviewStep({
       </div>
       <div className="mt-5 divide-y divide-border rounded-[12px] border border-border">
         <ReviewRow icon={<UsersRound className="size-4" />} label="Аудитория" value={audienceLabel} meta={`Получателей: ${formatNumber(recipientCount)}`} />
-        <ReviewRow icon={<MailCheck className="size-4" />} label="Письмо" value={contentLabel} meta={subject} />
-        <ReviewRow icon={<UserRound className="size-4" />} label="Отправитель" value={senderName} meta={senderEmail} />
+        <ReviewRow
+          icon={<Cable className="size-4" />}
+          label="Каналы и охват"
+          value={selectedChannels.map((channel) => getCampaignChannelDefinition(channel).shortLabel).join(" · ")}
+          meta={selectedChannels.map((channel) => `${getCampaignChannelDefinition(channel).shortLabel}: ${formatNumber(channelCoverage[channel] ?? 0)}`).join(" · ")}
+        />
+        <ReviewRow
+          icon={<ShieldCheck className="size-4" />}
+          label="Провайдеры"
+          value={selectedChannels.map((channel) => getCampaignChannelProvider(channel, channelProviders[channel])?.label ?? "Не выбран").join(" · ")}
+          meta="Деморежим: учётные данные не подключены"
+        />
+        {selectedChannels.includes("email") && (
+          <ReviewRow icon={<MailCheck className="size-4" />} label="Письмо" value={contentLabel} meta={subject} />
+        )}
+        {selectedChannels.some((channel) => channel !== "email") && (
+          <ReviewRow
+            icon={<MessageCircle className="size-4" />}
+            label="Сообщение для мессенджеров"
+            value={
+              messengerMessage.trim().length > 96
+                ? `${messengerMessage.trim().slice(0, 93)}…`
+                : messengerMessage.trim() || "Текст не задан"
+            }
+            meta={`${messengerMessage.length} символов`}
+          />
+        )}
+        {selectedChannels.includes("email") && (
+          <ReviewRow icon={<UserRound className="size-4" />} label="Отправитель email" value={senderName} meta={senderEmail} />
+        )}
       </div>
 
       <div className="mt-6">
-        <h3 className="m-0 text-[12px] font-semibold text-text-strong">Отправка</h3>
-        <p className="mt-1 mb-3 text-[10px] text-text-muted">Выберите, когда {BRAND_NAME} должен начать обработку получателей.</p>
+        <h3 className="m-0 text-[12px] font-semibold text-text-strong">Режим демозапуска</h3>
+        <p className="mt-1 mb-3 text-[10px] text-text-muted">Выберите, когда {BRAND_NAME} должен создать план обработки получателей.</p>
         <div className="grid gap-2 sm:grid-cols-2">
           {[
-            { value: "now" as const, label: "Отправить сейчас", description: "Начать отправку сразу", icon: Send },
-            { value: "schedule" as const, label: "Запланировать", description: "Выбрать дату и время", icon: CalendarClock },
+            { value: "now" as const, label: "Создать сейчас", description: "Сохранить демоплан сразу", icon: Send },
+            { value: "schedule" as const, label: "Запланировать демо", description: "Выбрать дату и время плана", icon: CalendarClock },
           ].map(({ value, label, description, icon: Icon }) => (
             <button
               key={value}
@@ -1518,14 +2324,17 @@ function ReviewStep({
         )}
       </div>
 
-      <div className="mt-6 rounded-[11px] border border-success/15 bg-success-subtle/55 p-4">
-        <div className="flex items-center gap-2 text-[11px] font-semibold text-success">
-          <CheckCircle2 aria-hidden="true" className="size-4" />
-          Всё готово к запуску
+      <div className="mt-6 rounded-[11px] border border-warning/15 bg-warning-subtle/55 p-4">
+        <div className="flex items-center gap-2 text-[11px] font-semibold text-warning">
+          <ShieldCheck aria-hidden="true" className="size-4" />
+          Конфигурация готова к демозапуску
         </div>
         <ul className="mt-3 grid gap-2 text-[10px] text-text sm:grid-cols-2">
-          <li className="flex items-center gap-2"><Check className="size-3 text-success" />Домен отправки проверен</li>
-          <li className="flex items-center gap-2"><Check className="size-3 text-success" />Письмо и тема готовы</li>
+          <li className="flex items-center gap-2"><Check className="size-3 text-warning" />Каналы и провайдеры выбраны</li>
+          <li className="flex items-center gap-2"><Check className="size-3 text-warning" />Внешние ключи не подключены</li>
+          {selectedChannels.includes("email") && <li className="flex items-center gap-2"><Check className="size-3 text-warning" />Письмо и тема готовы</li>}
+          {selectedChannels.some((channel) => channel !== "email") && <li className="flex items-center gap-2"><Check className="size-3 text-warning" />Текст для мессенджеров готов</li>}
+          {channelConsentConfirmed && <li className="flex items-center gap-2"><Check className="size-3 text-warning" />Согласие аудитории подтверждено</li>}
           {exclusions.unsubscribed && <li className="flex items-center gap-2"><Check className="size-3 text-success" />Отписавшиеся исключены</li>}
           {exclusions.bounced && <li className="flex items-center gap-2"><Check className="size-3 text-success" />Недоставляемые адреса исключены</li>}
           {exclusions.previouslyContacted && <li className="flex items-center gap-2"><Check className="size-3 text-success" />Недавние получатели исключены</li>}

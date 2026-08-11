@@ -1,6 +1,7 @@
 import {
   ArrowLeft,
   ArrowRight,
+  Cable,
   CalendarClock,
   Check,
   CircleDashed,
@@ -40,11 +41,17 @@ import {
 } from "@/data/selectors";
 import type { Campaign, EmailBlock, EmailTemplate } from "@/types";
 import { BRAND_NAME } from "@/config/brand";
+import {
+  deliveryChannelById,
+  integrationProviderById,
+} from "@/config/integrations";
 import { campaignStatusLabels } from "./campaignLabels";
+import type { CampaignDeliveryPlan } from "./campaignChannels";
 
 export type CampaignDetailViewProps = {
   campaignId?: string;
   campaign?: Campaign;
+  deliveryPlan?: CampaignDeliveryPlan | null;
 };
 
 const numberFormatter = new Intl.NumberFormat("ru-RU");
@@ -73,6 +80,12 @@ const statusTones: Record<Campaign["status"], StatusTone> = {
   completed: "active",
 };
 
+const deliveryChannelLabels = {
+  email: "Email",
+  telegram: "Telegram",
+  vk: "ВКонтакте",
+} as const;
+
 function formatNumber(value: number) {
   return numberFormatter.format(value);
 }
@@ -89,6 +102,58 @@ function formatDateTime(value: string | null) {
   return value ? dateTimeFormatter.format(new Date(value)) : "Не задано";
 }
 
+function createCampaignWizardHref({
+  campaign,
+  name,
+  deliveryPlan,
+  step,
+  copy = false,
+}: {
+  campaign: Campaign;
+  name: string;
+  deliveryPlan?: CampaignDeliveryPlan | null;
+  step?: "content" | "review";
+  copy?: boolean;
+}) {
+  if (campaign.id.startsWith("campaign-demo-")) {
+    const params = new URLSearchParams({ resume: campaign.id });
+    if (copy) params.set("copy", "1");
+    if (step) params.set("step", step);
+    return `/campaigns/new?${params.toString()}`;
+  }
+
+  const params = new URLSearchParams({
+    name,
+    count: String(campaign.metrics.recipients),
+    audienceType: campaign.segmentId ? "segment" : "contacts",
+  });
+
+  if (campaign.segmentId) {
+    params.set("segment", campaign.segmentId);
+    params.set("audience", campaign.segmentId);
+  } else {
+    params.set("source", "contacts");
+  }
+  if (campaign.templateId) params.set("template", campaign.templateId);
+
+  const routes = deliveryPlan?.channels ??
+    (campaign.deliveryChannels ?? ["email"]).map((channel) => ({
+      channel,
+      provider: undefined,
+    }));
+  routes.forEach(({ channel, provider }) => {
+    params.append("channel", channel);
+    if (provider) params.set(`provider_${channel}`, provider);
+  });
+  if (deliveryPlan?.messengerMessage) {
+    params.set("message", deliveryPlan.messengerMessage);
+  }
+  if (deliveryPlan?.consentConfirmed) params.set("consent", "1");
+  if (step) params.set("step", step);
+
+  return `/campaigns/new?${params.toString()}`;
+}
+
 /**
  * Campaign reporting and launch context in one view. Supplying a campaign is
  * useful for previews/tests; supplying an id resolves against the shared mock
@@ -97,6 +162,7 @@ function formatDateTime(value: string | null) {
 export function CampaignDetailView({
   campaignId,
   campaign,
+  deliveryPlan,
 }: CampaignDetailViewProps) {
   const currentCampaign =
     campaign ??
@@ -115,6 +181,9 @@ export function CampaignDetailView({
     ? getSegmentById(currentCampaign.segmentId)
     : undefined;
   const hasPerformance = currentCampaign.metrics.sent > 0;
+  const configuredChannels = deliveryPlan?.channels.map(({ channel }) => channel) ??
+    currentCampaign.deliveryChannels ?? ["email"];
+  const hasEmail = configuredChannels.includes("email");
 
   return (
     <div className="space-y-6">
@@ -139,12 +208,26 @@ export function CampaignDetailView({
           />
         }
         description={
-          <span>
-            <span className="text-text-subtle">Тема:</span>{" "}
-            <span className="font-medium text-text">{currentCampaign.subject}</span>
-          </span>
+          hasEmail ? (
+            <span>
+              <span className="text-text-subtle">Тема:</span>{" "}
+              <span className="font-medium text-text">{currentCampaign.subject}</span>
+            </span>
+          ) : (
+            <span>
+              <span className="text-text-subtle">Каналы:</span>{" "}
+              <span className="font-medium text-text">
+                {configuredChannels.map((channel) => deliveryChannelLabels[channel]).join(" · ")}
+              </span>
+            </span>
+          )
         }
-        action={<CampaignActions campaign={currentCampaign} />}
+        action={(
+          <CampaignActions
+            campaign={currentCampaign}
+            deliveryPlan={deliveryPlan}
+          />
+        )}
       />
 
       <CampaignStatusNotice campaign={currentCampaign} />
@@ -176,7 +259,11 @@ export function CampaignDetailView({
         {hasPerformance ? (
           <PerformanceVisuals campaign={currentCampaign} />
         ) : (
-          <PreSendPerformance campaign={currentCampaign} />
+          <PreSendPerformance
+            campaign={currentCampaign}
+            deliveryPlan={deliveryPlan}
+            hasEmail={hasEmail}
+          />
         )}
       </section>
 
@@ -184,25 +271,52 @@ export function CampaignDetailView({
         aria-label="Контент и настройки кампании"
         className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_360px]"
       >
-        <ContentPreview campaign={currentCampaign} template={template} />
+        {hasEmail ? (
+          <ContentPreview campaign={currentCampaign} template={template} />
+        ) : (
+          <MessengerContentPreview
+            campaign={currentCampaign}
+            deliveryPlan={deliveryPlan}
+            channels={configuredChannels}
+          />
+        )}
 
         <aside className="space-y-4">
           <CampaignDetails campaign={currentCampaign} />
+          {deliveryPlan ? <DeliveryPlanDetails plan={deliveryPlan} /> : null}
           <AudienceDetails campaign={currentCampaign} segmentName={segment?.name} />
-          <SenderDetails campaign={currentCampaign} />
+          {hasEmail ? <SenderDetails campaign={currentCampaign} /> : null}
         </aside>
       </section>
     </div>
   );
 }
 
-function CampaignActions({ campaign }: { campaign: Campaign }) {
+function CampaignActions({
+  campaign,
+  deliveryPlan,
+}: {
+  campaign: Campaign;
+  deliveryPlan?: CampaignDeliveryPlan | null;
+}) {
   const isDemoCampaign = campaign.id.startsWith("campaign-demo-");
   const analyticsHref = `/analytics?campaign=${encodeURIComponent(campaign.id)}&demoName=${encodeURIComponent(campaign.name)}`;
+  const demoContinueHref = createCampaignWizardHref({
+    campaign,
+    name: campaign.name,
+    deliveryPlan,
+    step: "content",
+  });
+  const demoDuplicateHref = createCampaignWizardHref({
+    campaign,
+    name: `${campaign.name} — копия`,
+    deliveryPlan,
+    copy: true,
+  });
   const primaryAction = {
     draft: {
       label: "Продолжить редактирование",
-      href: `/campaigns/new?draft=${campaign.id}`,
+      href: isDemoCampaign ? demoContinueHref : `/campaigns/new?draft=${campaign.id}`,
       icon: <FileEdit aria-hidden="true" className="size-3.5" />,
     },
     scheduled: {
@@ -228,7 +342,7 @@ function CampaignActions({ campaign }: { campaign: Campaign }) {
     <>
       <Link
         href={isDemoCampaign
-          ? `/campaigns/new?count=${campaign.metrics.recipients}&name=${encodeURIComponent(`${campaign.name} — копия`)}${campaign.templateId ? `&template=${encodeURIComponent(campaign.templateId)}` : ""}`
+          ? demoDuplicateHref
           : `/campaigns/new?duplicate=${campaign.id}`}
         className="btn btn-secondary"
       >
@@ -284,7 +398,7 @@ function CampaignStatusNotice({ campaign }: { campaign: Campaign }) {
 
   return (
     <Alert tone="warning" title="Черновик сохранён">
-      Аудитория и контент письма сохранены. Когда будете готовы запланировать или начать
+      Аудитория, контент и выбранные каналы сохранены. Когда будете готовы запланировать или начать
       отправку, завершите этап проверки.
     </Alert>
   );
@@ -494,9 +608,18 @@ function DeliveryLegendItem({
   );
 }
 
-function PreSendPerformance({ campaign }: { campaign: Campaign }) {
+function PreSendPerformance({
+  campaign,
+  deliveryPlan,
+  hasEmail,
+}: {
+  campaign: Campaign;
+  deliveryPlan?: CampaignDeliveryPlan | null;
+  hasEmail: boolean;
+}) {
   const isScheduled = campaign.status === "scheduled";
   const isDraft = campaign.status === "draft";
+  const isDemoCampaign = campaign.id.startsWith("campaign-demo-");
   const Icon = isScheduled ? CalendarClock : isDraft ? FileEdit : Send;
   const title = isScheduled
     ? "Всё готово к запуску"
@@ -506,8 +629,22 @@ function PreSendPerformance({ campaign }: { campaign: Campaign }) {
   const description = isScheduled
     ? `${BRAND_NAME} начнёт собирать данные о доставке и вовлечённости после запланированной отправки ${formatDateTime(campaign.scheduledAt)}.`
     : isDraft
-      ? "Завершите проверку аудитории, контента и отправителя. После запуска отчёт заполнится автоматически."
+      ? "Завершите проверку аудитории, контента и маршрутов доставки. После запуска отчёт заполнится автоматически."
       : "По этой кампании пока нет данных об отправке. Проверьте настройки перед повторной попыткой.";
+
+  const providerNames = deliveryPlan?.channels
+    .map(({ provider }) => integrationProviderById[provider]?.name ?? provider)
+    .join(" · ");
+  const actionHref = isDemoCampaign
+    ? createCampaignWizardHref({
+        campaign,
+        name: campaign.name,
+        deliveryPlan,
+        step: isDraft ? "content" : "review",
+      })
+    : isDraft
+      ? `/campaigns/new?draft=${campaign.id}`
+      : `/campaigns/new?campaign=${campaign.id}&step=review`;
 
   const checks = [
     {
@@ -516,14 +653,20 @@ function PreSendPerformance({ campaign }: { campaign: Campaign }) {
       complete: campaign.metrics.recipients > 0,
     },
     {
-      label: "Контент письма готов",
-      detail: campaign.subject || "Нужно указать тему",
-      complete: Boolean(campaign.subject),
+      label: hasEmail ? "Контент письма готов" : "Текст сообщения готов",
+      detail: hasEmail
+        ? campaign.subject || "Нужно указать тему"
+        : deliveryPlan?.messengerMessage || campaign.previewText || "Нужен текст сообщения",
+      complete: hasEmail
+        ? Boolean(campaign.subject)
+        : Boolean(deliveryPlan?.messengerMessage || campaign.previewText),
     },
     {
-      label: "Отправитель настроен",
-      detail: campaign.senderEmail || "Нужно указать отправителя",
-      complete: Boolean(campaign.senderEmail),
+      label: hasEmail ? "Отправитель настроен" : "Провайдеры выбраны",
+      detail: hasEmail
+        ? campaign.senderEmail || "Нужно указать отправителя"
+        : providerNames || "Нужно выбрать маршруты доставки",
+      complete: hasEmail ? Boolean(campaign.senderEmail) : Boolean(providerNames),
     },
     {
       label: isScheduled ? "Время отправки подтверждено" : "Запланировать или отправить",
@@ -546,11 +689,7 @@ function PreSendPerformance({ campaign }: { campaign: Campaign }) {
             {description}
           </p>
           <Link
-            href={
-              isDraft
-                ? `/campaigns/new?draft=${campaign.id}`
-                : `/campaigns/new?campaign=${campaign.id}&step=review`
-            }
+            href={actionHref}
             className="btn btn-secondary mt-5"
           >
             {isDraft ? "Продолжить настройку" : "Проверить кампанию"}
@@ -691,6 +830,69 @@ function ContentPreview({
   );
 }
 
+function MessengerContentPreview({
+  campaign,
+  deliveryPlan,
+  channels,
+}: {
+  campaign: Campaign;
+  deliveryPlan?: CampaignDeliveryPlan | null;
+  channels: Array<"email" | "telegram" | "vk">;
+}) {
+  const messengerChannels = channels.filter((channel) => channel !== "email");
+  const message = deliveryPlan?.messengerMessage || campaign.previewText;
+
+  return (
+    <Card className="min-w-0 overflow-hidden">
+      <CardHeader className="flex-row items-start justify-between gap-4 border-b border-border pb-4">
+        <div>
+          <CardTitle>Сообщение для мессенджеров</CardTitle>
+          <CardDescription>
+            Предпросмотр текста для выбранных каналов и персонализации.
+          </CardDescription>
+        </div>
+        <div className="flex flex-wrap justify-end gap-1.5">
+          {messengerChannels.map((channel) => (
+            <Badge key={channel} variant="accent">
+              {deliveryChannelLabels[channel]}
+            </Badge>
+          ))}
+        </div>
+      </CardHeader>
+      <CardContent className="bg-surface-subtle p-4 sm:p-6">
+        <div className="mx-auto max-w-[620px] rounded-[18px] border border-border bg-surface p-4 shadow-[var(--shadow-sm)] sm:p-6">
+          <div className="flex items-center gap-3 border-b border-border pb-4">
+            <span className="grid size-9 place-items-center rounded-full bg-primary text-[10px] font-semibold text-white">
+              {BRAND_NAME.slice(0, 2)}
+            </span>
+            <div>
+              <p className="m-0 text-[11px] font-semibold text-text-strong">
+                {BRAND_NAME} · канал кампании
+              </p>
+              <p className="mt-0.5 mb-0 text-[9px] text-text-muted">
+                Демопросмотр — без внешней отправки
+              </p>
+            </div>
+          </div>
+          <div className="mt-5 flex justify-end">
+            <div className="max-w-[88%] rounded-[16px_16px_4px_16px] bg-primary px-4 py-3 text-white shadow-sm">
+              <p className="m-0 whitespace-pre-wrap text-[12px] leading-5">
+                {message || "Текст сообщения ещё не сохранён."}
+              </p>
+              <p className="mt-2 mb-0 text-right text-[8px] text-white/70">
+                Персонализация применится перед отправкой
+              </p>
+            </div>
+          </div>
+          <div className="mt-5 rounded-[10px] border border-warning/20 bg-warning-subtle px-3 py-2.5 text-[9px] leading-4 text-warning">
+            Реальная отправка начнётся только после подключения бота или сообщества и повторной проверки согласий.
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function EmailPreviewBlock({
   block,
   accentColor,
@@ -768,6 +970,12 @@ function EmailPreviewBlock({
 
 function CampaignDetails({ campaign }: { campaign: Campaign }) {
   const rows = [
+    {
+      label: "Каналы",
+      value: (campaign.deliveryChannels ?? ["email"])
+        .map((channel) => deliveryChannelLabels[channel])
+        .join(" · "),
+    },
     { label: "Владелец", value: campaign.owner },
     { label: "Создана", value: formatDate(campaign.createdAt) },
     {
@@ -800,6 +1008,83 @@ function CampaignDetails({ campaign }: { campaign: Campaign }) {
             </div>
           </div>
         ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+function DeliveryPlanDetails({ plan }: { plan: CampaignDeliveryPlan }) {
+  const messengerChannels = plan.channels.filter(
+    ({ channel }) => channel !== "email",
+  );
+
+  return (
+    <Card>
+      <CardHeader className="border-b border-border pb-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <CardTitle>Маршрут доставки</CardTitle>
+            <CardDescription className="mt-1">
+              Сохранённая конфигурация без внешней отправки
+            </CardDescription>
+          </div>
+          <Badge variant="accent" dot>
+            Демо
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3 p-4">
+        {plan.channels.map(({ channel, provider, estimatedCoverage }) => {
+          const channelDefinition = deliveryChannelById[channel];
+          const providerDefinition = integrationProviderById[provider];
+          return (
+            <div
+              key={channel}
+              className="flex items-center gap-3 rounded-[10px] border border-border bg-surface-subtle/45 p-3"
+            >
+              <span className="grid size-8 shrink-0 place-items-center rounded-[9px] bg-primary-subtle text-primary">
+                <Cable aria-hidden="true" className="size-3.5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="m-0 text-[11px] font-semibold text-text-strong">
+                  {channelDefinition?.shortLabel ?? channel}
+                </p>
+                <p className="mt-0.5 mb-0 truncate text-[9px] text-text-muted">
+                  {providerDefinition?.name ?? provider}
+                </p>
+              </div>
+              <span className="shrink-0 text-right">
+                <span className="block text-[10px] font-semibold tabular-nums text-text-strong">
+                  {formatNumber(estimatedCoverage)}
+                </span>
+                <span className="block text-[8px] text-text-subtle">
+                  доступно
+                </span>
+              </span>
+            </div>
+          );
+        })}
+
+        {messengerChannels.length > 0 ? (
+          <div className="rounded-[10px] border border-border p-3">
+            <p className="m-0 text-[9px] font-semibold uppercase tracking-[0.08em] text-text-subtle">
+              Текст для мессенджеров
+            </p>
+            <p className="mt-2 mb-0 line-clamp-4 whitespace-pre-wrap text-[10px] leading-4.5 text-text">
+              {plan.messengerMessage || "Текст не сохранён"}
+            </p>
+          </div>
+        ) : null}
+
+        <p className="m-0 flex items-start gap-2 text-[9px] leading-4 text-text-muted">
+          <ShieldCheck
+            aria-hidden="true"
+            className="mt-0.5 size-3.5 shrink-0 text-success"
+          />
+          {plan.consentConfirmed
+            ? "Проверка согласий отмечена в демоплане. Реальная проверка выполняется перед отправкой."
+            : "Согласия аудитории ещё не подтверждены."}
+        </p>
       </CardContent>
     </Card>
   );

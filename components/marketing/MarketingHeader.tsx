@@ -18,10 +18,11 @@ export function MarketingHeader() {
           <span className="text-[15px] font-semibold tracking-[.12em] text-[#171825]">{BRAND_NAME}</span>
         </Link>
 
-        <nav className="hidden items-center gap-8 md:flex" aria-label="Главная навигация">
+        <nav className="hidden items-center gap-6 xl:flex" aria-label="Главная навигация">
           {[
             ["Продукт", "#product"],
             ["Решения", "#solutions"],
+            ["Интеграции", "/integrations"],
             ["Шаблоны", "#templates"],
             ["Тарифы", "#pricing"],
           ].map(([label, href]) => (
@@ -31,14 +32,14 @@ export function MarketingHeader() {
           ))}
         </nav>
 
-        <div className="hidden items-center gap-2 md:flex">
+        <div className="hidden items-center gap-2 xl:flex">
           <Link href="/login" className="btn btn-ghost">Войти</Link>
           <Link href="/register" className="btn btn-primary gap-2">Попробовать бесплатно <ArrowRight size={15} /></Link>
         </div>
 
         <button
           type="button"
-          className="grid size-10 place-items-center rounded-lg text-[#454754] md:hidden"
+          className="grid size-10 place-items-center rounded-lg text-[#454754] xl:hidden"
           aria-label={open ? "Закрыть меню" : "Открыть меню"}
           aria-expanded={open}
           onClick={() => setOpen((value) => !value)}
@@ -48,11 +49,12 @@ export function MarketingHeader() {
       </div>
 
       {open && (
-        <div className="border-t border-black/[0.06] bg-white px-5 py-5 md:hidden">
+        <div className="border-t border-black/[0.06] bg-white px-5 py-5 xl:hidden">
           <nav className="mx-auto flex max-w-xl flex-col gap-1" aria-label="Мобильная навигация">
             {[
               ["Продукт", "#product"],
               ["Решения", "#solutions"],
+              ["Интеграции", "/integrations"],
               ["Шаблоны", "#templates"],
               ["Тарифы", "#pricing"],
             ].map(([label, href]) => (

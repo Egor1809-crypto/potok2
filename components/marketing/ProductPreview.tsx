@@ -5,7 +5,9 @@ import {
   ContactRound,
   LayoutDashboard,
   Mail,
+  MessageCircle,
   Search,
+  SendHorizontal,
   Sparkles,
   UsersRound,
 } from "lucide-react";
@@ -110,6 +112,12 @@ export function ProductPreview() {
         <div className="flex items-center justify-between"><div><p className="text-[11px] font-semibold text-[#2a2b37]">Фильтр контактов</p><p className="mt-0.5 text-[9px] text-[#989aa6]">Все условия должны совпасть</p></div><span className="rounded-md bg-[#eeedff] px-2 py-1 text-[8px] font-semibold text-[#5b55da]">И</span></div>
         <div className="mt-3 space-y-2">
           {["Роль · равно · Юрист", "Город · равно · Москва", "Статус · равно · Активен"].map((filter) => <div key={filter} className="rounded-lg border border-[#e6e7ec] bg-[#fafafb] px-3 py-2 text-[9px] font-medium text-[#535562]">{filter}</div>)}
+        </div>
+        <div className="mt-3 flex items-center gap-1.5" aria-label="Каналы кампании">
+          {[[Mail, "Email"], [SendHorizontal, "Telegram"], [MessageCircle, "ВКонтакте"]].map(([Icon, label]) => {
+            const ChannelIcon = Icon as typeof Mail;
+            return <span key={label as string} className="flex items-center gap-1 rounded-md border border-[#e1e0fb] bg-[#f7f6ff] px-2 py-1 text-[7px] font-semibold text-[#5b55d8]"><ChannelIcon size={9} />{label as string}</span>;
+          })}
         </div>
         <div className="mt-4 flex items-center justify-between border-t border-[#ececf1] pt-3"><div><p className="text-[8px] text-[#9698a5]">Найдена аудитория</p><p className="text-[15px] font-semibold text-[#262733]">843 контакта</p></div><button className="rounded-lg bg-[#625cf6] px-3 py-2 text-[9px] font-semibold text-white">Создать кампанию</button></div>
       </div>

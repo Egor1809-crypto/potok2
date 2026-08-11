@@ -7,15 +7,18 @@ import {
   BarChart3,
   CalendarClock,
   Copy,
+  Mail,
   MailPlus,
+  MessageCircle,
   MoreHorizontal,
   Pause,
   Play,
   Send,
+  SendHorizontal,
   UsersRound,
 } from "lucide-react";
 import { campaigns as mockCampaigns } from "@/data/mockCampaigns";
-import type { Campaign, CampaignStatus } from "@/types";
+import type { Campaign, CampaignDeliveryChannel, CampaignStatus } from "@/types";
 import { PageHeader } from "@/components/shared";
 import {
   Badge,
@@ -64,6 +67,15 @@ const statusTone: Record<
   completed: "success",
 };
 
+const deliveryChannelMeta: Record<
+  CampaignDeliveryChannel,
+  { label: string; icon: typeof Mail; className: string }
+> = {
+  email: { label: "Email", icon: Mail, className: "bg-primary-subtle text-primary" },
+  telegram: { label: "Telegram", icon: SendHorizontal, className: "bg-info-subtle text-info" },
+  vk: { label: "ВКонтакте", icon: MessageCircle, className: "bg-[#eaf3ff] text-[#1671d9]" },
+};
+
 function formatDate(value: string | null): string {
   if (!value) return "—";
   return new Intl.DateTimeFormat("ru-RU", {
@@ -78,6 +90,25 @@ function formatNumber(value: number): string {
   return formatCampaignNumber(value);
 }
 
+function subscribeToCampaignStorage(onStoreChange: () => void) {
+  window.addEventListener("storage", onStoreChange);
+  return () => window.removeEventListener("storage", onStoreChange);
+}
+
+function getSavedCampaignsSnapshot() {
+  try {
+    return window.localStorage.getItem("mailflow:demo-campaigns") ??
+      window.localStorage.getItem("mailflow:last-campaign") ??
+      "";
+  } catch {
+    return "";
+  }
+}
+
+function getServerCampaignSnapshot() {
+  return "";
+}
+
 export interface CampaignsViewProps {
   items?: Campaign[];
   initialTab?: CampaignsTab;
@@ -87,11 +118,39 @@ export function CampaignsView({
   items = mockCampaigns,
   initialTab = "all",
 }: CampaignsViewProps) {
+  const savedCampaignsSnapshot = React.useSyncExternalStore(
+    subscribeToCampaignStorage,
+    getSavedCampaignsSnapshot,
+    getServerCampaignSnapshot,
+  );
   const [activeTab, setActiveTab] = React.useState<CampaignsTab>(initialTab);
   const [search, setSearch] = React.useState("");
   const [actionCampaign, setActionCampaign] = React.useState<Campaign | null>(null);
   const [notice, setNotice] = React.useState<string | null>(null);
   const noticeTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const savedDemoCampaigns = React.useMemo(() => {
+    if (!savedCampaignsSnapshot) return [];
+    try {
+      const parsed = JSON.parse(savedCampaignsSnapshot) as Campaign | Campaign[];
+      const campaignItems = Array.isArray(parsed) ? parsed : [parsed];
+      return campaignItems.filter(
+        (campaign) => campaign?.id && campaign?.name && campaign?.metrics,
+      );
+    } catch {
+      return [];
+    }
+  }, [savedCampaignsSnapshot]);
+
+  const displayItems = React.useMemo(
+    () => [
+      ...savedDemoCampaigns.filter(
+        (savedCampaign) => !items.some((campaign) => campaign.id === savedCampaign.id),
+      ),
+      ...items,
+    ],
+    [items, savedDemoCampaigns],
+  );
 
   React.useEffect(
     () => () => {
@@ -108,7 +167,7 @@ export function CampaignsView({
 
   const filteredCampaigns = React.useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
-    return items.filter((campaign) => {
+    return displayItems.filter((campaign) => {
       const matchesTab = activeTab === "all" || campaign.status === activeTab;
       const matchesSearch =
         !query ||
@@ -118,11 +177,11 @@ export function CampaignsView({
           .includes(query);
       return matchesTab && matchesSearch;
     });
-  }, [activeTab, items, search]);
+  }, [activeTab, displayItems, search]);
 
   const statusCounts = React.useMemo(
     () =>
-      items.reduce<Record<CampaignsTab, number>>(
+      displayItems.reduce<Record<CampaignsTab, number>>(
         (counts, campaign) => {
           counts.all += 1;
           counts[campaign.status] += 1;
@@ -130,15 +189,15 @@ export function CampaignsView({
         },
         { all: 0, draft: 0, scheduled: 0, sending: 0, completed: 0 },
       ),
-    [items],
+    [displayItems],
   );
 
-  const delivered = items.reduce(
+  const delivered = displayItems.reduce(
     (total, campaign) => total + campaign.metrics.delivered,
     0,
   );
   const averageOpenRate =
-    items.filter((campaign) => campaign.metrics.delivered > 0).reduce(
+    displayItems.filter((campaign) => campaign.metrics.delivered > 0).reduce(
       (total, campaign, _, completed) =>
         total + campaign.metrics.openRate / completed.length,
       0,
@@ -150,7 +209,7 @@ export function CampaignsView({
         eyebrow="Коммуникации"
         title="Кампании"
         description="Создавайте адресные рассылки, управляйте расписанием и отслеживайте каждый диалог."
-        meta={`Кампаний: ${items.length}`}
+        meta={`Кампаний: ${displayItems.length}`}
         action={
           <Link href="/campaigns/new" className={buttonVariants({ variant: "primary" })}>
             <MailPlus aria-hidden="true" className="size-4" />
@@ -231,11 +290,12 @@ export function CampaignsView({
 
         {filteredCampaigns.length > 0 ? (
           <TableContainer className="rounded-none border-0 shadow-none">
-            <Table className="min-w-[980px]">
+            <Table className="min-w-[1080px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Кампания</TableHead>
                   <TableHead>Аудитория</TableHead>
+                  <TableHead>Каналы</TableHead>
                   <TableHead>Получатели</TableHead>
                   <TableHead>Отправлено</TableHead>
                   <TableHead>Открытия</TableHead>
@@ -273,6 +333,24 @@ export function CampaignsView({
                       <span className="inline-flex items-center gap-1.5 text-[11px] text-text">
                         <UsersRound aria-hidden="true" className="size-3.5 text-text-subtle" />
                         {campaign.audience}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="flex items-center gap-1">
+                        {(campaign.deliveryChannels ?? ["email"]).map((channel) => {
+                          const meta = deliveryChannelMeta[channel];
+                          const ChannelIcon = meta.icon;
+                          return (
+                            <span
+                              key={channel}
+                              title={meta.label}
+                              aria-label={meta.label}
+                              className={`grid size-7 place-items-center rounded-[8px] ${meta.className}`}
+                            >
+                              <ChannelIcon aria-hidden="true" className="size-3.5" />
+                            </span>
+                          );
+                        })}
                       </span>
                     </TableCell>
                     <TableCell className="tabular-nums">
@@ -337,7 +415,7 @@ export function CampaignsView({
         )}
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-5 py-3 text-[11px] text-text-muted">
           <span>
-            Показано {filteredCampaigns.length} из {items.length} кампаний
+            Показано {filteredCampaigns.length} из {displayItems.length} кампаний
           </span>
           <span>Обновлено несколько секунд назад</span>
         </div>
@@ -368,7 +446,9 @@ export function CampaignsView({
               <ArrowRight aria-hidden="true" className="size-4 text-text-subtle group-hover:text-primary" />
             </a>
             <a
-              href={`/campaigns/new?duplicate=${encodeURIComponent(actionCampaign.id)}`}
+              href={actionCampaign.id.startsWith("campaign-demo-")
+                ? `/campaigns/new?resume=${encodeURIComponent(actionCampaign.id)}&copy=1`
+                : `/campaigns/new?duplicate=${encodeURIComponent(actionCampaign.id)}`}
               className="group flex items-center justify-between rounded-[10px] border border-border p-3.5 transition-colors hover:border-primary/25 hover:bg-primary-subtle/40"
             >
               <span className="flex items-center gap-3">

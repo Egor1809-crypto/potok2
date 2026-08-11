@@ -28,7 +28,7 @@ test("server-renders the finished MAILFLOW landing page", async () => {
   const html = await response.text();
   assert.match(html, /MAILFLOW/);
   assert.match(html, /Деловые рассылки/);
-  assert.match(html, /Наконец-то порядок/);
+  assert.match(html, /Во всех нужных каналах/);
   assert.match(html, /Попробовать бесплатно/);
   assert.match(html, /Все деловые связи/);
   assert.match(html, /<html[^>]+lang="ru"/);
@@ -48,6 +48,7 @@ test("all key product routes render without a dead end", async () => {
     "/campaigns",
     "/campaigns/new?audience=segment-moscow-lawyers&count=843",
     "/campaigns/campaign-legal-conference",
+    "/integrations",
     "/email-builder?template=template-legal-conference",
     "/templates",
     "/analytics",
@@ -60,6 +61,18 @@ test("all key product routes render without a dead end", async () => {
     const html = await response.text();
     assert.doesNotMatch(html, /page not found|internal server error/i, pathname);
   }
+});
+
+test("multichannel integrations render with an explicit safe demo boundary", async () => {
+  const response = await render("/integrations");
+  assert.equal(response.status, 200);
+
+  const html = await response.text();
+  assert.match(html, /VK WorkSpace/);
+  assert.match(html, /Telegram/);
+  assert.match(html, /ВКонтакте/);
+  assert.match(html, /Безопасный деморежим/);
+  assert.match(html, /сообщения контактам не уходят/);
 });
 
 test("starter artifacts are replaced with project metadata and assets", async () => {

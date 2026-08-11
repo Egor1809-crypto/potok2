@@ -2,6 +2,7 @@
 
 import { Switch } from "@/components/ui";
 import { BRAND_NAME, workspaceConfig } from "@/config/brand";
+import { integrationProviders } from "@/config/integrations";
 import {
   BadgeCheck,
   BellRing,
@@ -23,6 +24,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 
 type Section =
   | "Workspace"
@@ -420,43 +422,46 @@ function SettingsContent({ section }: { section: Section }) {
   }
 
   if (section === "Integrations") {
-    const integrations = [
-      ["Google Таблицы", "Синхронизация контактов из общих таблиц", "G", "#2f9d59", true],
-      ["Salesforce", "Синхронизация контактов и активности", "S", "#2493d1", false],
-      ["HubSpot", "Синхронизация записей CRM и ответственных", "H", "#ef7a45", false],
-      ["Zapier", "Подключение к тысячам сервисов", "Z", "#ff6b35", true],
-    ] as const;
-
     return (
       <div>
-        <h3 className="text-[13px] font-semibold">Доступные интеграции</h3>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h3 className="text-[13px] font-semibold">Каналы рассылок</h3>
+            <p className="mt-1 max-w-xl text-[9px] leading-4 text-[var(--text-tertiary)]">
+              Подключите корпоративную почту, ботов и сообщения сообщества. Ключи
+              хранятся только на сервере; сейчас доступна безопасная демонстрация.
+            </p>
+          </div>
+          <Link href="/integrations" className="btn btn-primary shrink-0">
+            Открыть центр интеграций
+          </Link>
+        </div>
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          {integrations.map(([name, description, initial, color, connected]) => (
+          {integrationProviders.map((provider) => (
             <div
-              key={name}
+              key={provider.id}
               className="rounded-xl border border-[var(--border)] p-4"
             >
               <div className="flex items-center gap-3">
                 <span
                   className="grid size-9 place-items-center rounded-lg text-sm font-bold text-white"
-                  style={{ backgroundColor: color }}
+                  style={{ backgroundColor: provider.accent }}
                 >
-                  {initial}
+                  {provider.initials}
                 </span>
                 <div className="flex-1">
-                  <p className="text-[11px] font-semibold">{name}</p>
+                  <p className="text-[11px] font-semibold">{provider.name}</p>
                   <p className="text-[9px] text-[var(--text-tertiary)]">
-                    {description}
+                    {provider.channelIds
+                      .map((channel) => channel === "email" ? "Email" : channel === "telegram" ? "Telegram" : "ВКонтакте")
+                      .join(" · ")}
                   </p>
                 </div>
+                <span className="badge badge-neutral">Демо</span>
               </div>
-              <button
-                className={`btn mt-4 w-full ${
-                  connected ? "btn-secondary" : "btn-primary"
-                }`}
-              >
-                {connected ? "Управлять" : "Подключить"}
-              </button>
+              <p className="mt-3 text-[9px] leading-4 text-[var(--text-secondary)]">
+                {provider.summary}
+              </p>
             </div>
           ))}
         </div>

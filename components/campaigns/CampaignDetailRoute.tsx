@@ -5,6 +5,7 @@ import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { campaigns } from "@/data/mockCampaigns";
 import type { Campaign, CampaignStatus } from "@/types";
 import { CampaignDetailView } from "./CampaignDetailView";
+import type { CampaignDeliveryPlan } from "./campaignChannels";
 
 export function CampaignDetailRoute() {
   const params = useParams<{ id?: string }>();
@@ -22,6 +23,20 @@ export function CampaignDetailRoute() {
     getStoredSnapshot,
     () => "",
   );
+  const getDeliverySnapshot = useCallback(
+    () => campaignId
+      ? window.localStorage.getItem(`mailflow:campaign-delivery:${campaignId}`) ?? ""
+      : "",
+    [campaignId],
+  );
+  const deliverySnapshot = useSyncExternalStore(
+    (onStoreChange) => {
+      window.addEventListener("storage", onStoreChange);
+      return () => window.removeEventListener("storage", onStoreChange);
+    },
+    getDeliverySnapshot,
+    () => "",
+  );
   const storedCampaign = useMemo(() => {
     if (!storedSnapshot) return null;
     try {
@@ -30,6 +45,17 @@ export function CampaignDetailRoute() {
       return null;
     }
   }, [storedSnapshot]);
+  const deliveryPlan = useMemo(() => {
+    if (!deliverySnapshot) return null;
+    try {
+      const value = JSON.parse(deliverySnapshot) as CampaignDeliveryPlan;
+      return value?.demo === true && Array.isArray(value.channels)
+        ? value
+        : null;
+    } catch {
+      return null;
+    }
+  }, [deliverySnapshot]);
 
   const demoName = searchParams.get("demoName");
   const requestedStatus = searchParams.get("demoStatus");
@@ -43,5 +69,11 @@ export function CampaignDetailRoute() {
     : undefined;
   const campaign = storedCampaign ?? queryCampaign;
 
-  return <CampaignDetailView campaignId={campaignId} campaign={campaign} />;
+  return (
+    <CampaignDetailView
+      campaignId={campaignId}
+      campaign={campaign}
+      deliveryPlan={deliveryPlan}
+    />
+  );
 }

@@ -2,7 +2,7 @@
 
 import { contacts } from "@/data/mockContacts";
 import type { Contact } from "@/types";
-import { Check, ChevronDown, Columns3, Download, Filter, ListFilter, MailPlus, MoreHorizontal, Plus, Search, Tag, Trash2, Upload, X } from "lucide-react";
+import { Check, ChevronDown, Columns3, Download, Filter, ListFilter, Mail, MailPlus, MessageCircle, MoreHorizontal, Plus, Search, SendHorizontal, Tag, Trash2, Upload, X } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { ContactDrawer } from "./ContactDrawer";
@@ -84,6 +84,12 @@ export function ContactsView() {
     () => campaignHref(selectedIds, filtersApplied),
     [filtersApplied, selectedIds],
   );
+  const audienceSize = filtersApplied ? FILTERED_CONTACT_COUNT : 24_821;
+  const channelCoverage = [
+    { label: "Email", count: Math.round(audienceSize * 0.96), Icon: Mail, tone: "bg-[#eeedff] text-[#5c56d7]" },
+    { label: "Telegram", count: Math.round(audienceSize * 0.54), Icon: SendHorizontal, tone: "bg-[#e8f6ff] text-[#227fae]" },
+    { label: "ВКонтакте", count: Math.round(audienceSize * 0.47), Icon: MessageCircle, tone: "bg-[#eaf3ff] text-[#1671d9]" },
+  ];
 
   const notify = (message: string) => { setToast(message); window.setTimeout(() => setToast(null), 2400); };
   const toggleAll = () => setSelected(current => { const next = new Set(current); if (allSelected) visible.forEach(c=>next.delete(c.id)); else visible.forEach(c=>next.add(c.id)); return next; });
@@ -104,6 +110,24 @@ export function ContactsView() {
           <button className="btn btn-ghost px-2" aria-label="Другие действия с контактами"><MoreHorizontal size={16}/></button>
 
           {filterOpen && <FilterPanel applied={filtersApplied} onApply={()=>{setFilterOverride(true);setFilterOpen(false)}} onClear={()=>{setFilterOverride(false);setFilterOpen(false)}} />}
+        </div>
+
+        <div className="flex flex-col gap-3 border-b border-[var(--border)] bg-[#fcfcfe] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-2" aria-label="Доступность каналов для текущей аудитории">
+            <span
+              className="mr-1 text-[9px] font-semibold text-[var(--text-tertiary)]"
+              title="Демооценка по текущей аудитории; точный охват пересчитывается перед запуском"
+            >
+              Демооценка охвата
+            </span>
+            {channelCoverage.map(({ label, count, Icon, tone }) => (
+              <span key={label} className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-white px-2.5 py-1.5 text-[9px] font-medium">
+                <span className={`grid size-5 place-items-center rounded-md ${tone}`}><Icon aria-hidden="true" size={10} /></span>
+                {label} · {formatContactCount(count)}
+              </span>
+            ))}
+          </div>
+          <Link href="/integrations" className="shrink-0 text-[9px] font-semibold text-[#5d57dc] hover:text-[#4943bc]">Настроить каналы →</Link>
         </div>
 
         <div className="overflow-x-auto"><table className="w-full min-w-[1060px] text-left"><thead><tr className="bg-[var(--surface-subtle)] text-[9px] font-semibold uppercase tracking-[.075em] text-[var(--text-tertiary)]"><th className="w-12 px-4 py-3"><button onClick={toggleAll} aria-label="Выбрать все видимые контакты" className={`grid size-4 place-items-center rounded-[4px] border ${allSelected?"border-[#625cf6] bg-[#625cf6] text-white":"border-[#cfd1da] bg-white"}`}>{allSelected&&<Check size={10} strokeWidth={3}/>}</button></th><th className="px-3 py-3">Имя</th><th className="px-3 py-3">Эл. почта</th><th className="px-3 py-3">Компания</th><th className="px-3 py-3">Должность</th><th className="px-3 py-3">Категория</th><th className="px-3 py-3">Местоположение</th><th className="px-3 py-3">Теги</th><th className="px-3 py-3">Статус</th><th className="px-3 py-3">Последний контакт</th></tr></thead><tbody>{visible.map(contact=><tr key={contact.id} className={`border-t border-[var(--border)] transition-colors hover:bg-[var(--surface-subtle)] ${selected.has(contact.id)?"bg-[#faf9ff]":""}`}><td className="px-4 py-3"><button onClick={()=>toggle(contact.id)} aria-label={`Выбрать ${contact.fullName}`} className={`grid size-4 place-items-center rounded-[4px] border ${selected.has(contact.id)?"border-[#625cf6] bg-[#625cf6] text-white":"border-[#cfd1da] bg-white"}`}>{selected.has(contact.id)&&<Check size={10} strokeWidth={3}/>}</button></td><td className="px-3 py-3"><button onClick={()=>setDrawerContact(contact)} className="flex items-center gap-2.5 text-left"><span className="grid size-8 shrink-0 place-items-center rounded-full text-[9px] font-semibold text-white" style={{backgroundColor:contact.avatarColor}}>{contact.firstName[0]}{contact.lastName[0]}</span><span><span className="block text-[10px] font-semibold text-[var(--text-primary)] hover:text-[#625cf6]">{contact.fullName}</span><span className="mt-0.5 block text-[8px] text-[var(--text-tertiary)]">Рейтинг {contact.engagementScore}</span></span></button></td><td className="px-3 py-3 text-[10px] text-[var(--text-secondary)]">{contact.email}</td><td className="px-3 py-3 text-[10px] font-medium">{contact.companyName}</td><td className="max-w-[150px] truncate px-3 py-3 text-[10px] text-[var(--text-secondary)]">{contact.role}</td><td className="px-3 py-3"><span className="badge badge-neutral">{contactCategoryLabels[contact.category]}</span></td><td className="px-3 py-3 text-[10px] text-[var(--text-secondary)]">{contact.city}</td><td className="px-3 py-3"><div className="flex gap-1">{contact.tags.slice(0,2).map(tag=><span key={tag} className="badge badge-info">{contactTagLabels[tag]}</span>)}{contact.tags.length>2&&<span className="badge badge-neutral">+{contact.tags.length-2}</span>}</div></td><td className="px-3 py-3"><span className={`badge ${contact.status==="active"?"badge-success":contact.status==="unsubscribed"?"badge-neutral":contact.status==="bounced"?"badge-warning":"badge-danger"}`}><span className="size-1.5 rounded-full bg-current"/>{contactStatusLabels[contact.status]}</span></td><td className="px-3 py-3 text-[9px] text-[var(--text-tertiary)]">{contact.lastContactedAt?shortContactDateFormatter.format(new Date(contact.lastContactedAt)):"Никогда"}</td></tr>)}</tbody></table></div>

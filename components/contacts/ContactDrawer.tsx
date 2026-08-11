@@ -2,7 +2,8 @@
 
 import type { Contact } from "@/types";
 import { contactActivities, contactNotes } from "@/data/mockContacts";
-import { Building2, Check, ExternalLink, Mail, MapPin, MessageSquare, MousePointer2, Phone, Plus, Reply, Send, Tag, X } from "lucide-react";
+import { getContactChannelEndpoints } from "@/data/contactChannels";
+import { Building2, Check, ExternalLink, Mail, MapPin, MessageCircle, MessageSquare, MousePointer2, Phone, Plus, Reply, Send, SendHorizontal, Tag, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { useDrawerAccessibility } from "@/components/shared/useDrawerAccessibility";
 import {
@@ -33,6 +34,7 @@ export function ContactDrawer({ contact, onClose, embedded = false }: { contact:
   useDrawerAccessibility(panelRef, onClose, !embedded);
   const activities = contactActivities.filter(item => item.contactId === contact.id);
   const notes = contactNotes.filter(item => item.contactId === contact.id);
+  const channelEndpoints = getContactChannelEndpoints(contact);
   const displayedActivities = activities.length ? activities : [
     { id: "fallback-1", type: "email_opened" as const, title: "Кампания открыта", detail: "Открыто письмо «Обновление для партнёров за III квартал».", occurredAt: "2026-08-10T09:20:00Z" },
     { id: "fallback-2", type: "email_sent" as const, title: "Письмо доставлено", detail: "Письмо «Обновление для партнёров за III квартал» доставлено.", occurredAt: "2026-08-10T09:12:00Z" },
@@ -59,6 +61,38 @@ export function ContactDrawer({ contact, onClose, embedded = false }: { contact:
         <div className="p-5 sm:p-7">
           {tab === "overview" && <div className="space-y-6">
             <section><h2 className="text-[11px] font-semibold uppercase tracking-[.07em] text-[var(--text-tertiary)]">Данные контакта</h2><div className="mt-3 overflow-hidden rounded-xl border border-[var(--border)]">{[[Mail,"Эл. почта",contact.email],[Phone,"Телефон",contact.phone],[Building2,"Компания",contact.companyName],[MapPin,"Местоположение",`${contact.city}, ${contact.country}`]].map(([Icon,label,value])=>{const DetailIcon=Icon as typeof Mail;return <div key={label as string} className="grid grid-cols-[28px_112px_1fr] items-center border-b border-[var(--border)] px-4 py-3 last:border-0"><DetailIcon size={14} className="text-[var(--text-tertiary)]"/><span className="text-[10px] text-[var(--text-tertiary)]">{label as string}</span><span className="truncate text-[10px] font-medium">{value as string}</span></div>})}</div></section>
+            <section>
+              <div className="flex items-end justify-between gap-4">
+                <div>
+                  <h2 className="text-[11px] font-semibold uppercase tracking-[.07em] text-[var(--text-tertiary)]">Каналы связи</h2>
+                  <p className="mt-1 text-[9px] text-[var(--text-tertiary)]">Доступность и согласие проверяются отдельно для каждого канала.</p>
+                </div>
+                <a href="/integrations" className="shrink-0 text-[10px] font-semibold text-[#5c56d7]">Настроить</a>
+              </div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                {channelEndpoints.map((endpoint) => {
+                  const ChannelIcon = endpoint.channel === "email" ? Mail : endpoint.channel === "telegram" ? SendHorizontal : MessageCircle;
+                  const ready = endpoint.status === "ready";
+                  return (
+                    <a
+                      key={endpoint.channel}
+                      href={ready ? `/campaigns/new?contact=${contact.id}&channel=${endpoint.channel}` : "/integrations"}
+                      title={endpoint.hint}
+                      className="group rounded-xl border border-[var(--border)] p-3 outline-none transition hover:border-[#c9c6ff] hover:bg-[#faf9ff] focus-visible:ring-2 focus-visible:ring-[#625cf6]/30"
+                    >
+                      <span className="flex items-center justify-between gap-2">
+                        <span className={`grid size-7 place-items-center rounded-lg ${ready ? "bg-[#eeedff] text-[#5c56d7]" : "bg-[var(--surface-subtle)] text-[var(--text-tertiary)]"}`}>
+                          <ChannelIcon aria-hidden="true" size={13} />
+                        </span>
+                        <span className={`size-1.5 rounded-full ${ready ? "bg-[#46a16c]" : "bg-[#c6c8d1]"}`} />
+                      </span>
+                      <p className="mt-2 text-[10px] font-semibold">{endpoint.label}</p>
+                      <p className="mt-0.5 truncate text-[8px] text-[var(--text-tertiary)]">{endpoint.address ?? endpoint.statusLabel}</p>
+                    </a>
+                  );
+                })}
+              </div>
+            </section>
             <section className="grid grid-cols-3 gap-2">{[["Вовлечённость",`${contact.engagementScore}/100`],["Кампании","12"],["Ответы","6"]].map(([label,value])=><div key={label} className="rounded-xl bg-[var(--surface-subtle)] p-3"><p className="text-[9px] text-[var(--text-tertiary)]">{label}</p><p className="mt-1 text-[16px] font-semibold tracking-[-.03em]">{value}</p></div>)}</section>
             <section><div className="flex items-center justify-between"><h2 className="text-[11px] font-semibold uppercase tracking-[.07em] text-[var(--text-tertiary)]">Недавняя активность</h2><button onClick={()=>setTab("activity")} className="text-[10px] font-semibold text-[#5c56d7]">Показать всё</button></div><ActivityList activities={displayedActivities.slice(0,3)} /></section>
           </div>}

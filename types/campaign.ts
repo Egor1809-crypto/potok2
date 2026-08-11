@@ -1,4 +1,5 @@
 export type CampaignStatus = "draft" | "scheduled" | "sending" | "completed";
+export type CampaignDeliveryChannel = "email" | "telegram" | "vk";
 
 export interface CampaignMetrics {
   recipients: number;
@@ -20,6 +21,7 @@ export interface Campaign {
   name: string;
   subject: string;
   previewText: string;
+  deliveryChannels?: CampaignDeliveryChannel[];
   audience: string;
   segmentId: string | null;
   templateId: string | null;

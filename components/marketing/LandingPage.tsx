@@ -11,7 +11,7 @@ const footerGroups = [
     links: [
       ["Контакты", "/contacts"],
       ["Кампании", "/campaigns"],
-      ["Редактор писем", "/email-builder"],
+      ["Каналы и интеграции", "/integrations"],
       ["Аналитика", "/analytics"],
     ],
   },
@@ -47,10 +47,10 @@ export function LandingPage() {
             Спокойный порядок в каждой коммуникации
           </div>
           <h1 className="mx-auto max-w-[930px] text-[clamp(3.4rem,8.2vw,7.3rem)] font-medium leading-[.91] tracking-[-.065em] text-[#181923]">
-            Деловые рассылки.<br /><span className="text-[#625cf6]">Наконец-то порядок.</span>
+            Деловые рассылки.<br /><span className="text-[#625cf6]">Во всех нужных каналах.</span>
           </h1>
           <p className="mx-auto mt-8 max-w-[650px] text-[17px] leading-7 text-[#686a78] sm:text-[19px] sm:leading-8">
-            Храните контакты, создавайте персональные письма и запускайте точные кампании в одном пространстве.
+            Храните контакты и запускайте персональные кампании по email, в Telegram и ВКонтакте — через VK WorkSpace и подключённые сервисы.
           </p>
           <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link href="/register" className="btn btn-primary min-h-12 w-full justify-center gap-2 px-5 text-[14px] sm:w-auto">Попробовать бесплатно <ArrowRight size={16} /></Link>

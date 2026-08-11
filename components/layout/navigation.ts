@@ -1,6 +1,7 @@
 import {
   BarChart3,
   Building2,
+  Cable,
   ContactRound,
   FileText,
   LayoutDashboard,
@@ -67,10 +68,17 @@ export const productNavigation: ProductNavGroup[] = [
     items: [
       {
         label: "Кампании",
-        description: "Черновики, расписание и результаты рассылок",
+        description: "Email, Telegram и ВКонтакте в одной кампании",
         href: "/campaigns",
         icon: Megaphone,
-        keywords: ["почта", "отправить", "рассылка"],
+        keywords: ["почта", "telegram", "вконтакте", "отправить", "рассылка"],
+      },
+      {
+        label: "Каналы и интеграции",
+        description: "VK WorkSpace, Telegram, ВКонтакте и сервисы отправки",
+        href: "/integrations",
+        icon: Cable,
+        keywords: ["vk workspace", "telegram", "вконтакте", "unisender", "sendpulse", "smtp", "api"],
       },
       {
         label: "Редактор писем",

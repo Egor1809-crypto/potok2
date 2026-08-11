@@ -38,6 +38,26 @@ export type EmailBuilderViewProps = {
   continueHref?: string;
 };
 
+type EmailBuilderWorkspaceProps = EmailBuilderViewProps & {
+  restoredDocument?: BuilderDocument;
+  handoffStorageKey?: string;
+};
+
+const CAMPAIGN_WIZARD_HANDOFF_STORAGE_PREFIX =
+  "mailflow:campaign-wizard-handoff:";
+const emailBlockTypes = new Set<EmailBlockType>([
+  "logo",
+  "heading",
+  "text",
+  "image",
+  "button",
+  "columns",
+  "divider",
+  "spacer",
+  "social",
+  "footer",
+]);
+
 function subscribeToLocation(onStoreChange: () => void) {
   window.addEventListener("popstate", onStoreChange);
   return () => window.removeEventListener("popstate", onStoreChange);
@@ -51,9 +71,105 @@ function getServerSearch() {
   return "";
 }
 
+function subscribeToStorage(onStoreChange: () => void) {
+  window.addEventListener("storage", onStoreChange);
+  return () => window.removeEventListener("storage", onStoreChange);
+}
+
+function getServerStorageSnapshot() {
+  return "";
+}
+
 function safeCampaignReturnPath(value: string | null): string | undefined {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return undefined;
   return value;
+}
+
+function safeStorageToken(value: string | null): string | undefined {
+  if (!value || !/^[a-zA-Z0-9_-]{1,160}$/.test(value)) return undefined;
+  return value;
+}
+
+function handoffTokenFromReturnPath(path: string | undefined) {
+  if (!path) return undefined;
+  try {
+    const target = new URL(path, "https://mailflow.local");
+    return safeStorageToken(target.searchParams.get("handoff"));
+  } catch {
+    return undefined;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isBuilderBlock(value: unknown): value is BuilderBlock {
+  if (!isRecord(value)) return false;
+  const alignment = value.alignment;
+  return (
+    typeof value.id === "string" &&
+    typeof value.type === "string" &&
+    emailBlockTypes.has(value.type as EmailBlockType) &&
+    typeof value.content === "string" &&
+    (alignment === undefined ||
+      alignment === "left" ||
+      alignment === "center" ||
+      alignment === "right") &&
+    (value.href === undefined || typeof value.href === "string") &&
+    (value.label === undefined || typeof value.label === "string") &&
+    isFiniteNumber(value.paddingTop) &&
+    isFiniteNumber(value.paddingBottom) &&
+    typeof value.backgroundColor === "string" &&
+    typeof value.textColor === "string" &&
+    isFiniteNumber(value.fontSize) &&
+    isFiniteNumber(value.borderRadius)
+  );
+}
+
+function isBuilderDocument(value: unknown): value is BuilderDocument {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.templateId === "string" &&
+    typeof value.subject === "string" &&
+    typeof value.previewText === "string" &&
+    typeof value.accentColor === "string" &&
+    typeof value.bodyBackground === "string" &&
+    typeof value.workspaceBackground === "string" &&
+    isFiniteNumber(value.contentWidth) &&
+    Array.isArray(value.blocks) &&
+    value.blocks.length > 0 &&
+    value.blocks.every(isBuilderBlock)
+  );
+}
+
+function parseWizardBuilderSnapshot(snapshot: string) {
+  if (!snapshot) return {};
+  try {
+    const value: unknown = JSON.parse(snapshot);
+    if (!isRecord(value)) return {};
+    return {
+      campaignName: typeof value.name === "string" ? value.name : undefined,
+      document: isBuilderDocument(value.builderDocument)
+        ? value.builderDocument
+        : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
+function storageSnapshotFingerprint(snapshot: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < snapshot.length; index += 1) {
+    hash ^= snapshot.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `${snapshot.length}-${hash >>> 0}`;
 }
 
 export function EmailBuilderView(props: EmailBuilderViewProps) {
@@ -63,18 +179,51 @@ export function EmailBuilderView(props: EmailBuilderViewProps) {
     getServerSearch,
   );
   const query = useMemo(() => new URLSearchParams(browserSearch), [browserSearch]);
-  const resolvedTemplateId = props.templateId ?? query.get("template") ?? undefined;
+  const requestedTemplateId = props.templateId ?? query.get("template") ?? undefined;
+  const requestedContinueHref =
+    props.continueHref ?? safeCampaignReturnPath(query.get("returnTo"));
+  const handoffToken =
+    safeStorageToken(query.get("handoff")) ??
+    handoffTokenFromReturnPath(requestedContinueHref);
+  const handoffStorageKey = handoffToken
+    ? `${CAMPAIGN_WIZARD_HANDOFF_STORAGE_PREFIX}${handoffToken}`
+    : undefined;
+  const getHandoffSnapshot = useCallback(() => {
+    if (!handoffStorageKey) return "";
+    try {
+      return window.localStorage.getItem(handoffStorageKey) ?? "";
+    } catch {
+      return "";
+    }
+  }, [handoffStorageKey]);
+  const handoffSnapshot = useSyncExternalStore(
+    subscribeToStorage,
+    getHandoffSnapshot,
+    getServerStorageSnapshot,
+  );
+  const restoredState = useMemo(
+    () => parseWizardBuilderSnapshot(handoffSnapshot),
+    [handoffSnapshot],
+  );
+  const restoredDocument =
+    restoredState.document &&
+    (!requestedTemplateId ||
+      restoredState.document.templateId === requestedTemplateId)
+      ? restoredState.document
+      : undefined;
+  const resolvedTemplateId =
+    requestedTemplateId ?? restoredDocument?.templateId;
   const resolvedTemplate = templates.find(
     (template) => template.id === resolvedTemplateId,
   );
   const resolvedCampaignName =
     props.campaignName ??
     query.get("campaign") ??
+    restoredState.campaignName ??
     resolvedTemplate?.name ??
     "Кампания без названия";
   const resolvedContinueHref =
-    props.continueHref ??
-    safeCampaignReturnPath(query.get("returnTo")) ??
+    requestedContinueHref ??
     `/campaigns/new?step=sender&builderDraft=1${
       resolvedTemplateId ? `&template=${encodeURIComponent(resolvedTemplateId)}` : ""
     }`;
@@ -82,10 +231,12 @@ export function EmailBuilderView(props: EmailBuilderViewProps) {
   return (
     <ToastProvider>
       <EmailBuilderWorkspace
-        key={`${resolvedTemplateId ?? "default"}:${resolvedCampaignName}:${resolvedContinueHref}`}
+        key={`${resolvedTemplateId ?? "default"}:${resolvedCampaignName}:${resolvedContinueHref}:${storageSnapshotFingerprint(handoffSnapshot)}`}
         templateId={resolvedTemplateId}
         campaignName={resolvedCampaignName}
         continueHref={resolvedContinueHref}
+        restoredDocument={restoredDocument}
+        handoffStorageKey={handoffStorageKey}
       />
     </ToastProvider>
   );
@@ -95,7 +246,9 @@ function EmailBuilderWorkspace({
   templateId,
   campaignName: initialCampaignName = "Приглашение на юридическую конференцию",
   continueHref = "/campaigns/new?step=sender",
-}: EmailBuilderViewProps) {
+  restoredDocument,
+  handoffStorageKey,
+}: EmailBuilderWorkspaceProps) {
   const toast = useToast();
   const timersRef = useRef<number[]>([]);
   const initialTemplate = useMemo(
@@ -103,8 +256,8 @@ function EmailBuilderWorkspace({
     [templateId],
   );
   const initialDocument = useMemo(
-    () => documentFromTemplate(initialTemplate),
-    [initialTemplate],
+    () => restoredDocument ?? documentFromTemplate(initialTemplate),
+    [initialTemplate, restoredDocument],
   );
   const [history, dispatch] = useReducer(
     historyReducer,
@@ -239,8 +392,29 @@ function EmailBuilderWorkspace({
     } catch {
       // Saving remains successful for the current demo session.
     }
+    if (handoffStorageKey) {
+      try {
+        const storedValue: unknown = JSON.parse(
+          window.localStorage.getItem(handoffStorageKey) ?? "{}",
+        );
+        if (isRecord(storedValue)) {
+          window.localStorage.setItem(
+            handoffStorageKey,
+            JSON.stringify({
+              ...storedValue,
+              name: campaignName,
+              subject: document.subject,
+              previewText: document.previewText,
+              builderDocument: document,
+            }),
+          );
+        }
+      } catch {
+        // The global builder draft still preserves the current demo edit.
+      }
+    }
     setDirty(false);
-  }, [campaignName, document]);
+  }, [campaignName, document, handoffStorageKey]);
 
   const save = useCallback(() => {
     persistDraft();
