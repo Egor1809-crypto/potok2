@@ -16,6 +16,7 @@ import type {
   IntegrationConnectionStatus,
   SegmentRule,
 } from "@/types/api";
+import type { TemplateCategory } from "@/types/template";
 import type {
   DeliveryChannelId,
   IntegrationProviderId,
@@ -190,6 +191,38 @@ export const integrations = sqliteTable(
     uniqueIndex("idx_integrations_workspace_provider").on(
       table.workspaceId,
       table.providerId,
+    ),
+  ],
+);
+
+export const emailTemplates = sqliteTable(
+  "email_templates",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    nameKey: text("name_key").notNull(),
+    description: text("description").notNull().default(""),
+    category: text("category").$type<TemplateCategory>().notNull(),
+    subject: text("subject").notNull(),
+    previewText: text("preview_text").notNull().default(""),
+    builderDocument: text("builder_document", { mode: "json" })
+      .$type<EmailBuilderDocumentInput>()
+      .notNull(),
+    emailBodyHtml: text("email_body_html").notNull(),
+    emailBodyText: text("email_body_text").notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("idx_email_templates_workspace_name_key").on(
+      table.workspaceId,
+      table.nameKey,
+    ),
+    index("idx_email_templates_workspace_updated").on(
+      table.workspaceId,
+      table.updatedAt,
     ),
   ],
 );

@@ -15,20 +15,13 @@ import {
   ShieldCheck,
   X,
 } from "lucide-react";
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 
 import { useDrawerAccessibility } from "@/components/shared/useDrawerAccessibility";
 import type { Contact as LegacyContact } from "@/types";
 import type { ContactRecord } from "@/types/api";
 
 type ContactLike = ContactRecord | LegacyContact;
-
-const date = new Intl.DateTimeFormat("ru-RU", {
-  day: "numeric",
-  month: "long",
-  year: "numeric",
-  timeZone: "UTC",
-});
 
 const statusLabels = {
   active: "Активен",
@@ -46,16 +39,35 @@ export function ContactDrawer({
   onClose,
   onEdit,
   embedded = false,
+  timezone = "Europe/Moscow",
 }: {
   contact: ContactLike;
   onClose?: () => void;
   onEdit?: (contact: ContactRecord) => void;
   embedded?: boolean;
+  timezone?: string;
 }) {
   const panelRef = useRef<HTMLElement>(null);
   useDrawerAccessibility(panelRef, onClose, !embedded);
 
   const stored = isStoredContact(contact);
+  const dateFormatter = useMemo(() => {
+    try {
+      return new Intl.DateTimeFormat("ru-RU", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+        timeZone: timezone,
+      });
+    } catch {
+      return new Intl.DateTimeFormat("ru-RU", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+        timeZone: "Europe/Moscow",
+      });
+    }
+  }, [timezone]);
   const jobTitle = stored ? contact.jobTitle : contact.role;
   const updatedAt = stored ? contact.updatedAt : contact.createdAt;
   const channels = stored
@@ -63,9 +75,9 @@ export function ContactDrawer({
         {
           id: "email",
           label: "Email",
-          address: contact.email,
+          address: contact.email || "Адрес не указан",
           ready: Boolean(contact.email && contact.emailConsent && contact.status === "active"),
-          reason: !contact.emailConsent ? "Нет согласия" : contact.status !== "active" ? "Контакт недоступен" : "Готов к отправке",
+          reason: !contact.email ? "Email не указан" : contact.status !== "active" ? "Контакт недоступен" : !contact.emailConsent ? "Нет согласия" : "Готов к отправке",
           Icon: Mail,
         },
         {
@@ -156,7 +168,7 @@ export function ContactDrawer({
           </section>
 
           <section className="mt-8 rounded-xl bg-[var(--surface-subtle)] p-4">
-            <div className="flex gap-3"><ShieldCheck aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-[var(--text-muted)]" /><div><h2 className="text-[11px] font-semibold">Состояние данных</h2><p className="mt-1 text-[10px] leading-5 text-[var(--text-muted)]">Контакт обновлён {date.format(new Date(updatedAt))}. Перед запуском кампания повторно проверит статус и согласия.</p></div></div>
+            <div className="flex gap-3"><ShieldCheck aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-[var(--text-muted)]" /><div><h2 className="text-[11px] font-semibold">Состояние данных</h2><p className="mt-1 text-[10px] leading-5 text-[var(--text-muted)]">Контакт обновлён {dateFormatter.format(new Date(updatedAt))}. Перед запуском кампания повторно проверит статус и согласия.</p></div></div>
           </section>
         </div>
       </section>

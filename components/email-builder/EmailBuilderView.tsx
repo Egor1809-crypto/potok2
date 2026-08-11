@@ -5,15 +5,36 @@ import {
   useEffect,
   useMemo,
   useReducer,
+  useRef,
   useState,
   useSyncExternalStore,
 } from "react";
+import Link from "next/link";
 import { Blocks, SlidersHorizontal, SquareDashedMousePointer } from "lucide-react";
 
-import { templates } from "@/data/templates";
-import type { EmailBlockType } from "@/types";
-import { ToastProvider, useToast } from "@/components/ui";
+import type { EmailBlockType, TemplateCategory } from "@/types";
+import type {
+  ApiError,
+  EmailTemplateMutationResponse,
+  EmailTemplateRecord,
+} from "@/types/api";
+import {
+  Alert,
+  FormField,
+  Input,
+  Select,
+  ToastProvider,
+  buttonVariants,
+  useToast,
+} from "@/components/ui";
 import { cn } from "@/components/ui/utils";
+import { overlayEmailDocumentMetadata } from "@/lib/campaign-email-draft";
+import {
+  campaignHandoffStorageKey,
+  normalizeCampaignHandoffToken,
+  readCampaignHandoffSnapshot,
+  writeCampaignHandoffSnapshot,
+} from "@/lib/campaign-handoff";
 
 import { BlockLibrary, blockLibrary } from "./BlockLibrary";
 import { BuilderTopbar, MobilePreviewToggle } from "./BuilderTopbar";
@@ -21,9 +42,11 @@ import { EmailCanvas } from "./EmailCanvas";
 import { PropertiesPanel } from "./PropertiesPanel";
 import {
   cloneBlock,
+  createBlankDocument,
   createBlock,
+  createPlainTextDocument,
   createHistory,
-  documentFromTemplate,
+  documentFromApiTemplate,
   historyReducer,
   type BuilderBlock,
   type BuilderDocument,
@@ -38,13 +61,13 @@ export type EmailBuilderViewProps = {
 };
 
 type EmailBuilderWorkspaceProps = EmailBuilderViewProps & {
-  restoredDocument?: BuilderDocument;
+  initialDocument: BuilderDocument;
   handoffStorageKey?: string;
+  handoffToken?: string;
+  mode: "campaign" | "template";
+  templateRecord?: EmailTemplateRecord | null;
 };
 
-const CAMPAIGN_WIZARD_HANDOFF_STORAGE_PREFIX =
-  "mailflow:campaign-wizard-handoff:";
-const EMAIL_BUILDER_DRAFT_STORAGE_KEY = "mailflow:email-draft";
 const emailBlockTypes = new Set<EmailBlockType>([
   "logo",
   "heading",
@@ -85,16 +108,11 @@ function safeCampaignReturnPath(value: string | null): string | undefined {
   return value;
 }
 
-function safeStorageToken(value: string | null): string | undefined {
-  if (!value || !/^[a-zA-Z0-9_-]{1,160}$/.test(value)) return undefined;
-  return value;
-}
-
 function handoffTokenFromReturnPath(path: string | undefined) {
   if (!path) return undefined;
   try {
     const target = new URL(path, "https://mailflow.local");
-    return safeStorageToken(target.searchParams.get("handoff"));
+    return normalizeCampaignHandoffToken(target.searchParams.get("handoff"));
   } catch {
     return undefined;
   }
@@ -167,8 +185,18 @@ function parseWizardBuilderSnapshot(snapshot: string) {
           : typeof value.campaignName === "string"
             ? value.campaignName
             : undefined,
+      subject: typeof value.subject === "string" ? value.subject : undefined,
+      previewText: typeof value.previewText === "string" ? value.previewText : undefined,
+      emailBodyText: typeof value.emailBodyText === "string" ? value.emailBodyText : undefined,
+      templateId: value.templateId === null
+        ? null
+        : typeof value.templateId === "string"
+          ? value.templateId
+          : undefined,
       document: isBuilderDocument(value.builderDocument)
         ? value.builderDocument
+        : isBuilderDocument(value.emailBuilderDocument)
+          ? value.emailBuilderDocument
         : isBuilderDocument(value.document)
           ? value.document
           : undefined,
@@ -194,24 +222,28 @@ export function EmailBuilderView(props: EmailBuilderViewProps) {
     getServerSearch,
   );
   const query = useMemo(() => new URLSearchParams(browserSearch), [browserSearch]);
-  const requestedTemplateId = props.templateId ?? query.get("template") ?? undefined;
+  const createNew = query.get("new") === "1";
+  const requestedTemplateId = createNew
+    ? undefined
+    : props.templateId ?? query.get("template") ?? undefined;
   const requestedContinueHref =
     props.continueHref ?? safeCampaignReturnPath(query.get("returnTo"));
   const handoffToken =
-    safeStorageToken(query.get("handoff")) ??
+    normalizeCampaignHandoffToken(query.get("handoff")) ??
     handoffTokenFromReturnPath(requestedContinueHref);
   const handoffStorageKey = handoffToken
-    ? `${CAMPAIGN_WIZARD_HANDOFF_STORAGE_PREFIX}${handoffToken}`
+    ? campaignHandoffStorageKey(handoffToken)
     : undefined;
-  const browserDraftStorageKey =
-    handoffStorageKey ?? EMAIL_BUILDER_DRAFT_STORAGE_KEY;
   const getBrowserDraftSnapshot = useCallback(() => {
+    if (!handoffStorageKey) return "";
     try {
-      return window.localStorage.getItem(browserDraftStorageKey) ?? "";
+      return handoffToken
+        ? readCampaignHandoffSnapshot(window.sessionStorage, handoffToken) ?? ""
+        : "";
     } catch {
       return "";
     }
-  }, [browserDraftStorageKey]);
+  }, [handoffStorageKey, handoffToken]);
   const browserDraftSnapshot = useSyncExternalStore(
     subscribeToStorage,
     getBrowserDraftSnapshot,
@@ -221,38 +253,122 @@ export function EmailBuilderView(props: EmailBuilderViewProps) {
     () => parseWizardBuilderSnapshot(browserDraftSnapshot),
     [browserDraftSnapshot],
   );
+  const campaignMode = Boolean(handoffStorageKey || requestedContinueHref);
   const restoredDocument =
+    campaignMode &&
+    !createNew &&
     restoredState.document &&
     (!requestedTemplateId ||
       restoredState.document.templateId === requestedTemplateId)
       ? restoredState.document
       : undefined;
-  const resolvedTemplateId =
-    requestedTemplateId ?? restoredDocument?.templateId;
-  const resolvedTemplate = templates.find(
-    (template) => template.id === resolvedTemplateId,
+  const [templateRecord, setTemplateRecord] = useState<EmailTemplateRecord | null>(null);
+  const [templateLoadState, setTemplateLoadState] = useState<"loading" | "ready" | "error">(
+    requestedTemplateId ? "loading" : "ready",
   );
+
+  useEffect(() => {
+    if (!requestedTemplateId) {
+      const frame = window.requestAnimationFrame(() => {
+        setTemplateRecord(null);
+        setTemplateLoadState("ready");
+      });
+      return () => window.cancelAnimationFrame(frame);
+    }
+    const controller = new AbortController();
+    const frame = window.requestAnimationFrame(() => setTemplateLoadState("loading"));
+    void fetch(`/api/templates?id=${encodeURIComponent(requestedTemplateId)}`, {
+      headers: { Accept: "application/json" },
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const body = await response.json() as EmailTemplateMutationResponse | ApiError;
+        if (!response.ok || !("template" in body)) {
+          throw new Error("error" in body ? body.error : "Шаблон не загружен.");
+        }
+        setTemplateRecord(body.template);
+        setTemplateLoadState("ready");
+      })
+      .catch((error: unknown) => {
+        if (error instanceof Error && error.name === "AbortError") return;
+        setTemplateRecord(null);
+        setTemplateLoadState("error");
+      });
+    return () => {
+      window.cancelAnimationFrame(frame);
+      controller.abort();
+    };
+  }, [requestedTemplateId]);
+
+  const resolvedTemplateId = createNew
+    ? undefined
+    : requestedTemplateId ??
+      (restoredState.templateId !== undefined
+        ? restoredState.templateId ?? undefined
+        : restoredDocument?.templateId || undefined);
   const resolvedCampaignName =
     props.campaignName ??
     query.get("campaign") ??
-    (restoredDocument ? restoredState.campaignName : undefined) ??
-    resolvedTemplate?.name ??
-    "Кампания без названия";
+    (campaignMode ? restoredState.campaignName : undefined) ??
+    templateRecord?.name ??
+    (campaignMode ? "Кампания без названия" : "Новый email-шаблон");
   const resolvedContinueHref =
     requestedContinueHref ??
-    `/campaigns/new?step=sender&builderDraft=1${
-      resolvedTemplateId ? `&template=${encodeURIComponent(resolvedTemplateId)}` : ""
-    }`;
+    (campaignMode
+      ? `/campaigns/new?step=message&builderDraft=1${
+          resolvedTemplateId ? `&template=${encodeURIComponent(resolvedTemplateId)}` : ""
+        }`
+      : "/templates");
+
+  if (templateLoadState === "loading") {
+    return <div className="card grid min-h-[560px] place-items-center p-8 text-center text-[13px] text-text-muted">Загружаем шаблон с сервера…</div>;
+  }
+  if (templateLoadState === "error") {
+    return (
+      <div className="card mx-auto max-w-xl p-6">
+        <Alert tone="danger" title="Шаблон не загружен">
+          Запись не найдена или сервер временно недоступен. Локальная копия не показывается как серверная.
+        </Alert>
+        <Link href="/templates" className={buttonVariants({ variant: "primary", className: "mt-4" })}>Вернуться к шаблонам</Link>
+      </div>
+    );
+  }
+
+  const baseDocument = createNew
+    ? createBlankDocument()
+    : restoredDocument ??
+    (campaignMode && restoredState.emailBodyText
+      ? createPlainTextDocument({
+          templateId: resolvedTemplateId ?? "",
+          subject: restoredState.subject ?? templateRecord?.subject ?? "Тема письма",
+          previewText: restoredState.previewText ?? templateRecord?.previewText ?? "",
+          text: restoredState.emailBodyText,
+        })
+      : templateRecord
+        ? documentFromApiTemplate(templateRecord)
+        : createBlankDocument());
+  const metadataDocument = campaignMode && restoredState.templateId === null
+    ? { ...baseDocument, templateId: "" }
+    : baseDocument;
+  const initialDocument = campaignMode && !createNew
+    ? overlayEmailDocumentMetadata(metadataDocument, {
+        subject: restoredState.subject,
+        previewText: restoredState.previewText,
+      })
+    : metadataDocument;
 
   return (
     <ToastProvider>
       <EmailBuilderWorkspace
-        key={`${resolvedTemplateId ?? "default"}:${resolvedCampaignName}:${resolvedContinueHref}:${storageSnapshotFingerprint(browserDraftSnapshot)}`}
+        key={`${createNew ? "blank" : resolvedTemplateId ?? "new"}:${resolvedCampaignName}:${resolvedContinueHref}:${campaignMode ? storageSnapshotFingerprint(browserDraftSnapshot) : "server"}`}
         templateId={resolvedTemplateId}
         campaignName={resolvedCampaignName}
         continueHref={resolvedContinueHref}
-        restoredDocument={restoredDocument}
+        initialDocument={initialDocument}
         handoffStorageKey={handoffStorageKey}
+        handoffToken={handoffToken}
+        mode={campaignMode ? "campaign" : "template"}
+        templateRecord={templateRecord}
       />
     </ToastProvider>
   );
@@ -260,20 +376,15 @@ export function EmailBuilderView(props: EmailBuilderViewProps) {
 
 function EmailBuilderWorkspace({
   templateId,
-  campaignName: initialCampaignName = "Приглашение на юридическую конференцию",
-  continueHref = "/campaigns/new?step=sender",
-  restoredDocument,
+  campaignName: initialCampaignName = "Новый email-шаблон",
+  continueHref = "/templates",
+  initialDocument,
   handoffStorageKey,
+  handoffToken,
+  mode,
+  templateRecord,
 }: EmailBuilderWorkspaceProps) {
   const toast = useToast();
-  const initialTemplate = useMemo(
-    () => templates.find((template) => template.id === templateId) ?? templates[0],
-    [templateId],
-  );
-  const initialDocument = useMemo(
-    () => restoredDocument ?? documentFromTemplate(initialTemplate),
-    [initialTemplate, restoredDocument],
-  );
   const [history, dispatch] = useReducer(
     historyReducer,
     initialDocument,
@@ -285,21 +396,33 @@ function EmailBuilderWorkspace({
       "",
   );
   const [campaignName, setCampaignName] = useState(initialCampaignName);
+  const [templateDescription, setTemplateDescription] = useState(templateRecord?.description ?? "");
+  const [templateCategory, setTemplateCategory] = useState<TemplateCategory>(templateRecord?.category ?? "Business");
+  const [savedTemplateId, setSavedTemplateId] = useState(templateRecord?.id ?? templateId ?? null);
+  const [templateRevision, setTemplateRevision] = useState(templateRecord?.updatedAt ?? null);
+  const [savingTemplate, setSavingTemplate] = useState(false);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("desktop");
   const [mobilePanel, setMobilePanel] = useState<BuilderPanel>("canvas");
-  const [dirty, setDirty] = useState(!restoredDocument);
+  const [dirty, setDirty] = useState(mode === "template" ? !templateRecord : true);
+  const editRevisionRef = useRef(0);
+  const savingTemplateRef = useRef(false);
 
   const document = history.present;
   const selectedBlock =
     document.blocks.find((block) => block.id === selectedBlockId) ??
     document.blocks[0];
 
+  const markDirty = useCallback(() => {
+    editRevisionRef.current += 1;
+    setDirty(true);
+  }, []);
+
   const mutateDocument = useCallback(
     (update: (current: BuilderDocument) => BuilderDocument) => {
       dispatch({ type: "update", update });
-      setDirty(true);
+      markDirty();
     },
-    [],
+    [markDirty],
   );
 
   const updateBlock = (blockId: string, patch: Partial<BuilderBlock>) => {
@@ -382,39 +505,35 @@ function EmailBuilderWorkspace({
 
   const undo = useCallback(() => {
     dispatch({ type: "undo" });
-    setDirty(true);
-  }, []);
+    markDirty();
+  }, [markDirty]);
 
   const redo = useCallback(() => {
     dispatch({ type: "redo" });
-    setDirty(true);
-  }, []);
+    markDirty();
+  }, [markDirty]);
 
   const persistDraft = useCallback(() => {
     const emailBodyText = documentToPlainText(document);
-    let savedToBrowser = true;
-    try {
-      window.localStorage.setItem(
-        EMAIL_BUILDER_DRAFT_STORAGE_KEY,
-        JSON.stringify({ campaignName, document, emailBodyText }),
-      );
-    } catch {
-      savedToBrowser = false;
-    }
-    if (handoffStorageKey) {
+    let savedToBrowser = Boolean(handoffStorageKey && handoffToken);
+    if (handoffStorageKey && handoffToken) {
       try {
-        const storedValue: unknown = JSON.parse(
-          window.localStorage.getItem(handoffStorageKey) ?? "{}",
-        );
+        const serialized = handoffToken
+          ? readCampaignHandoffSnapshot(window.sessionStorage, handoffToken)
+          : undefined;
+        if (!serialized) throw new Error("Campaign handoff source is missing");
+        const storedValue: unknown = JSON.parse(serialized);
         if (isRecord(storedValue)) {
-          window.localStorage.setItem(
-            handoffStorageKey,
+          writeCampaignHandoffSnapshot(
+            window.sessionStorage,
+            handoffToken,
             JSON.stringify({
               ...storedValue,
               name: campaignName,
               subject: document.subject,
               previewText: document.previewText,
               emailBodyText,
+              templateId: document.templateId || null,
               builderDocument: document,
             }),
           );
@@ -427,9 +546,80 @@ function EmailBuilderWorkspace({
     }
     if (savedToBrowser) setDirty(false);
     return savedToBrowser;
-  }, [campaignName, document, handoffStorageKey]);
+  }, [campaignName, document, handoffStorageKey, handoffToken]);
+
+  const saveTemplate = useCallback(async () => {
+    if (savingTemplateRef.current) return;
+    if (!campaignName.trim()) {
+      toast.warning("Нужно название", "Укажите понятное название шаблона.");
+      return;
+    }
+    if (savedTemplateId && !templateRevision) {
+      toast.warning("Версия шаблона неизвестна", "Перезагрузите редактор перед сохранением.");
+      return;
+    }
+    const submittedEditRevision = editRevisionRef.current;
+    savingTemplateRef.current = true;
+    setSavingTemplate(true);
+    try {
+      const response = await fetch("/api/templates", {
+        method: savedTemplateId ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          ...(savedTemplateId
+            ? { id: savedTemplateId, expectedUpdatedAt: templateRevision }
+            : {}),
+          name: campaignName.trim(),
+          description: templateDescription.trim(),
+          category: templateCategory,
+          subject: document.subject.trim(),
+          previewText: document.previewText.trim(),
+          builderDocument: document,
+        }),
+      });
+      const body = await response.json() as EmailTemplateMutationResponse | ApiError;
+      if (!response.ok || !("template" in body)) {
+        throw new Error("error" in body
+          ? [body.error, ...(body.details ?? [])].join(" ")
+          : "Сервер не сохранил шаблон.");
+      }
+      setSavedTemplateId(body.template.id);
+      setTemplateRevision(body.template.updatedAt);
+      const hasNewerLocalChanges = editRevisionRef.current !== submittedEditRevision;
+      if (!hasNewerLocalChanges) {
+        setCampaignName(body.template.name);
+        setTemplateDescription(body.template.description);
+        setTemplateCategory(body.template.category);
+        dispatch({ type: "reset", document: documentFromApiTemplate(body.template) });
+        setDirty(false);
+      }
+      window.history.replaceState(
+        {},
+        "",
+        `/email-builder?template=${encodeURIComponent(body.template.id)}`,
+      );
+      toast.success(
+        "Шаблон сохранён",
+        hasNewerLocalChanges
+          ? "Версия на момент нажатия сохранена. Более новые правки остаются в редакторе и требуют повторного сохранения."
+          : "HTML и текстовая версия повторно собраны на сервере.",
+      );
+    } catch (error) {
+      toast.warning(
+        "Шаблон не сохранён",
+        error instanceof Error ? error.message : "Повторите попытку.",
+      );
+    } finally {
+      savingTemplateRef.current = false;
+      setSavingTemplate(false);
+    }
+  }, [campaignName, document, savedTemplateId, templateCategory, templateDescription, templateRevision, toast]);
 
   const save = useCallback(() => {
+    if (mode === "template") {
+      void saveTemplate();
+      return;
+    }
     if (!persistDraft()) {
       toast.warning(
         "Не удалось записать черновик",
@@ -438,12 +628,10 @@ function EmailBuilderWorkspace({
       return;
     }
     toast.success(
-      "Сохранено в браузере",
-      handoffStorageKey
-        ? "Мастер кампании получит черновик; серверная версия появится после сохранения кампании."
-        : "Это локальный черновик: серверная копия не создавалась.",
+      "Черновик подготовлен",
+      "Мастер кампании получит макет; долговечная копия появится после сохранения кампании.",
     );
-  }, [handoffStorageKey, persistDraft, toast]);
+  }, [mode, persistDraft, saveTemplate, toast]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -452,7 +640,7 @@ function EmailBuilderWorkspace({
         target.matches("input, textarea, select") || target.isContentEditable;
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
         event.preventDefault();
-        save();
+        void save();
       }
       if (!editing && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
         event.preventDefault();
@@ -464,9 +652,28 @@ function EmailBuilderWorkspace({
     return () => window.document.removeEventListener("keydown", onKeyDown);
   }, [redo, save, undo]);
 
+  useEffect(() => {
+    if (!dirty) return;
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+    };
+    window.addEventListener("beforeunload", warnBeforeUnload);
+    return () => window.removeEventListener("beforeunload", warnBeforeUnload);
+  }, [dirty]);
+
+  const continueFromEditor = useCallback((event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (mode === "campaign") {
+      if (!persistDraft()) event.preventDefault();
+      return;
+    }
+    if (dirty && !window.confirm("Выйти без сохранения? Несохранённые изменения шаблона будут потеряны.")) {
+      event.preventDefault();
+    }
+  }, [dirty, mode, persistDraft]);
+
   const setCampaignNameDirty = (name: string) => {
     setCampaignName(name);
-    setDirty(true);
+    markDirty();
   };
 
   if (!selectedBlock) return null;
@@ -481,13 +688,54 @@ function EmailBuilderWorkspace({
         canUndo={history.past.length > 0}
         canRedo={history.future.length > 0}
         dirty={dirty}
-        campaignHandoff={Boolean(handoffStorageKey)}
+        campaignHandoff={mode === "campaign"}
+        nameLabel={mode === "template" ? "Название шаблона" : "Название кампании"}
+        saveLabel={mode === "template" ? "Сохранить шаблон" : "Сохранить черновик"}
+        saving={savingTemplate}
+        continueLabel={mode === "template" ? "К библиотеке" : "Применить к кампании"}
+        statusText={mode === "template" ? "Шаблон сохранён на сервере" : undefined}
+        dirtyText={mode === "template" ? "Изменения не сохранены на сервере" : "Изменения не переданы в мастер кампании"}
         onUndo={undo}
         onRedo={redo}
         onSave={save}
-        onContinue={persistDraft}
+        onContinue={continueFromEditor}
         continueHref={continueHref}
       />
+
+      {mode === "template" ? (
+        <div className="grid gap-3 border-b border-border bg-surface-subtle/45 px-4 py-3 md:grid-cols-[190px_minmax(260px,1fr)] md:items-end">
+          <FormField label="Категория" htmlFor="builder-template-category">
+            <Select
+              id="builder-template-category"
+              value={templateCategory}
+              onChange={(event) => {
+                setTemplateCategory(event.target.value as TemplateCategory);
+                markDirty();
+              }}
+              options={[
+                { value: "Business", label: "Бизнес" },
+                { value: "Events", label: "События" },
+                { value: "Outreach", label: "Первичный контакт" },
+                { value: "Newsletter", label: "Дайджест" },
+                { value: "Follow-up", label: "Продолжение" },
+                { value: "Transactional", label: "Сервисное" },
+              ]}
+            />
+          </FormField>
+          <FormField label="Описание" htmlFor="builder-template-description" hint="Помогает найти нужный шаблон в библиотеке">
+            <Input
+              id="builder-template-description"
+              value={templateDescription}
+              maxLength={1000}
+              onChange={(event) => {
+                setTemplateDescription(event.target.value);
+                markDirty();
+              }}
+              placeholder="Для какой задачи подходит этот макет"
+            />
+          </FormField>
+        </div>
+      ) : null}
 
       <div className="flex h-11 items-center justify-between gap-3 border-b border-border bg-surface px-3 lg:hidden">
         <div className="flex items-center rounded-[9px] bg-surface-subtle p-1">
@@ -502,6 +750,7 @@ function EmailBuilderWorkspace({
               key={panel}
               type="button"
               aria-pressed={mobilePanel === panel}
+              aria-label={panel === "blocks" ? "Блоки" : panel === "canvas" ? "Холст" : "Свойства"}
               onClick={() => setMobilePanel(panel)}
               className="flex h-7 items-center gap-1.5 rounded-[7px] px-2 text-[10px] font-medium capitalize text-text-muted outline-none transition aria-pressed:bg-surface aria-pressed:text-primary aria-pressed:shadow-[var(--shadow-xs)] focus-visible:ring-2 focus-visible:ring-primary/30 sm:px-2.5"
             >

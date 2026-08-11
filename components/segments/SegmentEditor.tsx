@@ -154,7 +154,7 @@ export function SegmentEditor({
     const invalidScore = rules.some(
       (rule) =>
         rule.field === "engagementScore" &&
-        (!Number.isFinite(Number(rule.value)) ||
+        (!Number.isInteger(Number(rule.value)) ||
           Number(rule.value) < 0 ||
           Number(rule.value) > 100),
     );
@@ -322,14 +322,16 @@ export function SegmentEditor({
                 <div>
                   <legend className="text-xs font-semibold">Правила</legend>
                   <p className="mt-1 text-[10px] leading-4 text-[var(--text-tertiary)]">
-                    Контакт попадёт в сегмент, если соответствует
-                    цепочке условий.
+                    Условия считаются сверху вниз; «И» и «ИЛИ» связывают
+                    новое условие с уже полученным результатом.
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setRules((current) => [...current, makeRule()])}
-                  className="btn btn-secondary shrink-0 gap-1.5"
+                  disabled={rules.length >= 20}
+                  className="btn btn-secondary shrink-0 gap-1.5 disabled:cursor-not-allowed disabled:opacity-50"
+                  title={rules.length >= 20 ? "Не более 20 условий" : undefined}
                 >
                   <Plus size={13} />
                   Условие
@@ -454,6 +456,8 @@ export function SegmentEditor({
                               className="input w-full bg-white"
                               min={option.input === "number" ? 0 : undefined}
                               max={option.input === "number" ? 100 : undefined}
+                              step={option.input === "number" ? 1 : undefined}
+                              maxLength={option.input === "text" ? 200 : undefined}
                               placeholder={
                                 option.input === "text" ? option.label : undefined
                               }

@@ -1,7 +1,6 @@
 import type { IntegrationProviderId } from "@/config/integrations";
 import type { IntegrationRecord } from "@/types/api";
 import {
-  checkSendPulse,
   checkTelegramBot,
   checkUniSender,
   checkVkCommunity,
@@ -60,11 +59,10 @@ export async function checkProviderConnection(
       signal: timeoutSignal(),
     });
   }
-  return checkSendPulse({
-    clientId: runtimeSecret("SENDPULSE_CLIENT_ID"),
-    clientSecret: runtimeSecret("SENDPULSE_CLIENT_SECRET"),
-    signal: timeoutSignal(),
-  });
+  return {
+    ok: false,
+    message: "Для выбранного провайдера нет реализованного маршрута.",
+  };
 }
 
 export function automaticProviderSecrets(providerId: IntegrationProviderId) {

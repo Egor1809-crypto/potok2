@@ -27,12 +27,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 const numberFormatter = new Intl.NumberFormat("ru-RU");
-const dateFormatter = new Intl.DateTimeFormat("ru-RU", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-});
-
 const fieldLabels: Record<SegmentRuleField, string> = {
   jobTitle: "должность",
   city: "город",
@@ -61,9 +55,18 @@ const valueLabels: Record<string, string> = {
   invalid: "некорректен",
 };
 
-function formatUpdatedAt(value: string): string {
+function formatUpdatedAt(value: string, formatter: Intl.DateTimeFormat): string {
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "—" : dateFormatter.format(date);
+  return Number.isNaN(date.getTime()) ? "—" : formatter.format(date);
+}
+
+function russianPlural(value: number, one: string, few: string, many: string) {
+  const absolute = Math.abs(value) % 100;
+  const last = absolute % 10;
+  if (absolute > 10 && absolute < 20) return many;
+  if (last === 1) return one;
+  if (last >= 2 && last <= 4) return few;
+  return many;
 }
 
 function formatRuleValue(rule: SegmentRule): string {
@@ -94,13 +97,15 @@ export function SegmentsView() {
   const [search, setSearch] = useState("");
   const [editor, setEditor] = useState<SegmentRecord | "new" | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [timezone, setTimezone] = useState("Europe/Moscow");
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     setLoadError(null);
     try {
-      const records = await getSegments(signal);
-      setSegments(records);
+      const snapshot = await getSegments(signal);
+      setSegments(snapshot.segments);
+      setTimezone(snapshot.timezone);
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
       setLoadError(
@@ -115,24 +120,12 @@ export function SegmentsView() {
 
   useEffect(() => {
     const controller = new AbortController();
-    getSegments(controller.signal)
-      .then((records) => {
-        setSegments(records);
-        setLoadError(null);
-      })
-      .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-        setLoadError(
-          error instanceof Error
-            ? error.message
-            : "Не удалось загрузить сегменты.",
-        );
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-    return () => controller.abort();
-  }, []);
+    const frame = window.requestAnimationFrame(() => void load(controller.signal));
+    return () => {
+      window.cancelAnimationFrame(frame);
+      controller.abort();
+    };
+  }, [load]);
 
   const visibleSegments = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("ru-RU");
@@ -148,6 +141,24 @@ export function SegmentsView() {
         .includes(query),
     );
   }, [search, segments]);
+
+  const dateFormatter = useMemo(() => {
+    try {
+      return new Intl.DateTimeFormat("ru-RU", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        timeZone: timezone,
+      });
+    } catch {
+      return new Intl.DateTimeFormat("ru-RU", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        timeZone: "Europe/Moscow",
+      });
+    }
+  }, [timezone]);
 
   const saveSegment = async (input: SegmentCreateInput) => {
     if (editor === null) return;
@@ -193,18 +204,31 @@ export function SegmentsView() {
             полям, затем используйте аудиторию в кампании.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            setNotice(null);
-            setEditor("new");
-          }}
-          disabled={loading}
-          className="btn btn-primary w-fit gap-2 disabled:cursor-wait disabled:opacity-60"
-        >
-          <Plus size={14} />
-          Новый сегмент
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {segments.length > 0 && (
+            <button
+              type="button"
+              onClick={() => void load()}
+              disabled={loading}
+              className="btn btn-secondary w-fit gap-2 disabled:cursor-wait disabled:opacity-60"
+            >
+              <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+              Пересчитать охват
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              setNotice(null);
+              setEditor("new");
+            }}
+            disabled={loading}
+            className="btn btn-primary w-fit gap-2 disabled:cursor-wait disabled:opacity-60"
+          >
+            <Plus size={14} />
+            Новый сегмент
+          </button>
+        </div>
       </header>
 
       <div aria-live="polite" aria-atomic="true">
@@ -325,13 +349,24 @@ export function SegmentsView() {
                       {numberFormatter.format(segment.contactCount)}
                     </p>
                     <p className="text-[9px] text-[var(--text-tertiary)]">
-                      контактов сейчас
+                      {russianPlural(
+                        segment.contactCount,
+                        "контакт сейчас",
+                        "контакта сейчас",
+                        "контактов сейчас",
+                      )}
                     </p>
                   </div>
                   <p className="text-right text-[9px] leading-4 text-[var(--text-tertiary)]">
-                    {segment.rules.length} усл.
+                    {segment.rules.length}{" "}
+                    {russianPlural(
+                      segment.rules.length,
+                      "условие",
+                      "условия",
+                      "условий",
+                    )}
                     <br />
-                    обн. {formatUpdatedAt(segment.updatedAt)}
+                    правила: {formatUpdatedAt(segment.updatedAt, dateFormatter)}
                   </p>
                 </div>
 

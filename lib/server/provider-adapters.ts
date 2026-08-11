@@ -67,7 +67,6 @@ const TELEGRAM_API = "https://api.telegram.org";
 const VK_API = "https://api.vk.com/method";
 const VK_API_VERSION = "5.199";
 const UNISENDER_API = "https://api.unisender.com/ru/api";
-const SENDPULSE_OAUTH = "https://api.sendpulse.com/oauth/access_token";
 
 function providerMessage(value: unknown, fallback: string): string {
   if (!value || typeof value !== "object") return fallback;
@@ -379,7 +378,6 @@ export async function createUniSenderCampaign(input: {
   subject: string;
   textBody: string;
   htmlBody?: string;
-  campaignTag: string;
   recipients: UniSenderRecipient[];
   fetchFn?: FetchLike;
   signal?: AbortSignal;
@@ -477,13 +475,11 @@ export async function createUniSenderCampaign(input: {
         ["field_names[0]", "email"],
         ["field_names[1]", "Name"],
         ["field_names[2]", "email_list_ids"],
-        ["field_names[3]", "tags"],
-        ["overwrite_tags", 0],
         ["overwrite_lists", 0],
       ];
       mergeTokens.forEach((token, index) => {
         importParameters.push([
-          `field_names[${index + 4}]`,
+          `field_names[${index + 3}]`,
           providerFieldByToken[token],
         ]);
       });
@@ -492,11 +488,10 @@ export async function createUniSenderCampaign(input: {
           [`data[${index}][0]`, recipient.email],
           [`data[${index}][1]`, recipient.name],
           [`data[${index}][2]`, input.listId],
-          [`data[${index}][3]`, input.campaignTag],
         );
         mergeTokens.forEach((token, fieldIndex) => {
           importParameters.push([
-            `data[${index}][${fieldIndex + 4}]`,
+            `data[${index}][${fieldIndex + 3}]`,
             recipient.mergeFields?.[token] ?? "",
           ]);
         });
@@ -560,7 +555,6 @@ export async function createUniSenderCampaign(input: {
         ["body", htmlBody],
         ["text_body", translateTokens(input.textBody)],
         ["list_id", input.listId],
-        ["tag", input.campaignTag],
         ["lang", "ru"],
       ],
       fetchFn,
@@ -591,6 +585,10 @@ export async function createUniSenderCampaign(input: {
         ["message_id", messageId],
         ["track_read", 1],
         ["track_links", 1],
+        // The configured list can contain contacts from other MAILFLOW
+        // campaigns. The provider-supported contacts filter is therefore the
+        // final, explicit audience boundary for this immutable dispatch.
+        ["contacts", validRecipients.map((recipient) => recipient.email).join(",")],
       ],
       fetchFn,
       signal: input.signal,
@@ -629,36 +627,5 @@ export async function createUniSenderCampaign(input: {
       acceptedOutboxIds: [],
       rejectedOutboxIds: [],
     };
-  }
-}
-
-export async function checkSendPulse(input: {
-  clientId: string;
-  clientSecret: string;
-  fetchFn?: FetchLike;
-  signal?: AbortSignal;
-}): Promise<ProviderCheckResult> {
-  const fetchFn = input.fetchFn ?? fetch;
-  try {
-    const response = await fetchFn(SENDPULSE_OAUTH, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        grant_type: "client_credentials",
-        client_id: input.clientId,
-        client_secret: input.clientSecret,
-      }),
-      signal: input.signal,
-    });
-    const body = await responseJson(response) as { access_token?: string; error?: string; message?: string } | null;
-    if (!response.ok || !body?.access_token) {
-      return { ok: false, message: providerMessage(body, `SendPulse вернул HTTP ${response.status}.`) };
-    }
-    return {
-      ok: true,
-      message: "SendPulse подтвердил серверные ключи. Отправка из MAILFLOW пока в плане развития.",
-    };
-  } catch (error) {
-    return { ok: false, message: ambiguousFailure(error, "SendPulse").message };
   }
 }

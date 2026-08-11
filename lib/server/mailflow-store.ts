@@ -8,6 +8,7 @@ import {
   deliveryJobs,
   deliveryOutbox,
   deliveryPlans,
+  emailTemplates,
   integrations,
   participants,
   segments,
@@ -86,11 +87,16 @@ import {
   parseEmailBuilderDocument,
   plainTextEmailHtml,
 } from "./email-document";
+import { uniqueAcceptedContactIds } from "./delivery-metrics";
 import {
   ensureDatabase,
   PARTICIPANT_ID,
   WORKSPACE_ID,
 } from "./database-init";
+import {
+  assertEmailTemplateReference,
+  toEmailTemplateRecord,
+} from "./template-store";
 
 type ContactRow = typeof contacts.$inferSelect;
 type SegmentRow = typeof segments.$inferSelect;
@@ -100,6 +106,8 @@ type CampaignEventRow = typeof campaignEvents.$inferSelect;
 type CampaignVersionRow = typeof campaignVersions.$inferSelect;
 type DeliveryJobRow = typeof deliveryJobs.$inferSelect;
 type DeliveryOutboxRow = typeof deliveryOutbox.$inferSelect;
+
+const WORKSPACE_HISTORY_LIMIT = 100;
 
 const CONTACT_STATUSES: ContactStatus[] = [
   "active",
@@ -410,23 +418,63 @@ function toSegment(
 
 async function loadCoreRows() {
   const db = getDb();
-  const [workspaceRows, participantRows, contactRows, segmentRows, integrationRows, campaignRows, planRows, jobRows, eventRows] =
-    await Promise.all([
-      db.select().from(workspaces).where(eq(workspaces.id, WORKSPACE_ID)).limit(1),
-      db.select().from(participants).where(eq(participants.id, PARTICIPANT_ID)).limit(1),
-      db.select().from(contacts).where(eq(contacts.workspaceId, WORKSPACE_ID)).orderBy(desc(contacts.updatedAt)),
-      db.select().from(segments).where(eq(segments.workspaceId, WORKSPACE_ID)).orderBy(desc(segments.updatedAt)),
-      db.select().from(integrations).where(eq(integrations.workspaceId, WORKSPACE_ID)).orderBy(integrations.providerId),
-      db.select().from(campaigns).where(eq(campaigns.workspaceId, WORKSPACE_ID)).orderBy(desc(campaigns.updatedAt)),
-      db.select().from(deliveryPlans),
-      db
-        .select()
-        .from(deliveryJobs)
-        .where(eq(deliveryJobs.workspaceId, WORKSPACE_ID))
-        .orderBy(desc(deliveryJobs.createdAt))
-        .limit(100),
-      db.select().from(campaignEvents).where(eq(campaignEvents.workspaceId, WORKSPACE_ID)).orderBy(desc(campaignEvents.occurredAt)).limit(100),
-    ]);
+  const [
+    workspaceRows,
+    participantRows,
+    contactRows,
+    segmentRows,
+    integrationRows,
+    templateRows,
+    campaignRows,
+    planRows,
+    jobRows,
+    eventRows,
+  ] = await Promise.all([
+    db.select().from(workspaces).where(eq(workspaces.id, WORKSPACE_ID)).limit(1),
+    db
+      .select()
+      .from(participants)
+      .where(eq(participants.id, PARTICIPANT_ID))
+      .limit(1),
+    db
+      .select()
+      .from(contacts)
+      .where(eq(contacts.workspaceId, WORKSPACE_ID))
+      .orderBy(desc(contacts.updatedAt)),
+    db
+      .select()
+      .from(segments)
+      .where(eq(segments.workspaceId, WORKSPACE_ID))
+      .orderBy(desc(segments.updatedAt)),
+    db
+      .select()
+      .from(integrations)
+      .where(eq(integrations.workspaceId, WORKSPACE_ID))
+      .orderBy(integrations.providerId),
+    db
+      .select()
+      .from(emailTemplates)
+      .where(eq(emailTemplates.workspaceId, WORKSPACE_ID))
+      .orderBy(desc(emailTemplates.updatedAt)),
+    db
+      .select()
+      .from(campaigns)
+      .where(eq(campaigns.workspaceId, WORKSPACE_ID))
+      .orderBy(desc(campaigns.updatedAt)),
+    db.select().from(deliveryPlans),
+    db
+      .select()
+      .from(deliveryJobs)
+      .where(eq(deliveryJobs.workspaceId, WORKSPACE_ID))
+      .orderBy(desc(deliveryJobs.createdAt))
+      .limit(WORKSPACE_HISTORY_LIMIT),
+    db
+      .select()
+      .from(campaignEvents)
+      .where(eq(campaignEvents.workspaceId, WORKSPACE_ID))
+      .orderBy(desc(campaignEvents.occurredAt))
+      .limit(WORKSPACE_HISTORY_LIMIT),
+  ]);
   const workspace = workspaceRows[0];
   const participant = participantRows[0];
   if (!workspace || !participant) {
@@ -438,6 +486,7 @@ async function loadCoreRows() {
     contactRows,
     segmentRows,
     integrationRows,
+    templateRows,
     campaignRows,
     planRows,
     jobRows,
@@ -452,7 +501,11 @@ export async function getWorkspaceSnapshot(
   const rows = await loadCoreRows();
   const contactRecords = rows.contactRows.map(toContact);
   const campaignRecords = rows.campaignRows.map(toCampaign);
-  const integrationRecords = rows.integrationRows.map(toIntegrationRecord);
+  // Rows from providers removed from the product stay inert in older databases
+  // and must never make the current workspace snapshot fail.
+  const integrationRecords = rows.integrationRows
+    .filter((row) => PROVIDERS.includes(row.providerId))
+    .map(toIntegrationRecord);
   return {
     workspace: toWorkspace(rows.workspace),
     participant: toParticipant(rows.participant),
@@ -461,10 +514,16 @@ export async function getWorkspaceSnapshot(
       toSegment(segment, contactRecords, rows.campaignRows),
     ),
     integrations: integrationRecords,
+    templates: rows.templateRows.map(toEmailTemplateRecord),
     campaigns: campaignRecords,
     deliveryPlans: rows.planRows.map(toDeliveryPlan),
     deliveryJobs: rows.jobRows.map(toDeliveryJob),
     events: rows.eventRows.map(toCampaignEvent),
+    historyWindow: {
+      scope: "latest_workspace",
+      deliveryJobsLimit: WORKSPACE_HISTORY_LIMIT,
+      campaignEventsLimit: WORKSPACE_HISTORY_LIMIT,
+    },
     stats: {
       totalContacts: contactRecords.length,
       activeContacts: contactRecords.filter((contact) => contact.status === "active").length,
@@ -512,45 +571,71 @@ function parseContact(
 
   const parsedTelegramChatId = nullableText(
     object.telegramChatId,
-    "Telegram chat ID",
+    "Идентификатор чата Telegram",
     80,
   );
   const telegramChatId =
     parsedTelegramChatId === undefined
       ? (existing?.telegramChatId ?? null)
       : parsedTelegramChatId;
-  const telegramConsent =
-    optionalBoolean(object.telegramConsent, "Согласие Telegram") ??
-    existing?.telegramConsent ??
-    false;
-  const parsedVkUserId = nullableText(object.vkUserId, "VK user ID", 80);
+  const telegramConsentInput = optionalBoolean(
+    object.telegramConsent,
+    "Согласие Telegram",
+  );
+  const telegramConsent = telegramChatId
+    ? telegramConsentInput ?? existing?.telegramConsent ?? false
+    : false;
+  const parsedVkUserId = nullableText(
+    object.vkUserId,
+    "Идентификатор пользователя ВКонтакте",
+    80,
+  );
   const vkUserId =
     parsedVkUserId === undefined ? (existing?.vkUserId ?? null) : parsedVkUserId;
-  const vkConsent =
-    optionalBoolean(object.vkConsent, "Согласие ВКонтакте") ??
-    existing?.vkConsent ??
-    false;
-  if (telegramConsent && !telegramChatId) {
+  const vkConsentInput = optionalBoolean(
+    object.vkConsent,
+    "Согласие ВКонтакте",
+  );
+  const vkConsent = vkUserId
+    ? vkConsentInput ?? existing?.vkConsent ?? false
+    : false;
+  if (telegramConsentInput === true && !telegramChatId) {
     throw new ApiRequestError(
-      "Для согласия Telegram нужен сохранённый chat ID контакта.",
+      "Для согласия Telegram нужен сохранённый идентификатор чата контакта.",
     );
   }
   if (telegramChatId && !/^-?\d+$/.test(telegramChatId)) {
-    throw new ApiRequestError("Telegram chat ID должен состоять из цифр.");
+    throw new ApiRequestError(
+      "Идентификатор чата Telegram должен состоять из цифр.",
+    );
   }
-  if (vkConsent && !vkUserId) {
+  if (vkConsentInput === true && !vkUserId) {
     throw new ApiRequestError(
       "Для согласия ВКонтакте нужен идентификатор пользователя.",
     );
   }
   if (vkUserId && !/^\d+$/.test(vkUserId)) {
-    throw new ApiRequestError("VK user ID должен состоять из цифр.");
+    throw new ApiRequestError(
+      "Идентификатор пользователя ВКонтакте должен состоять из цифр.",
+    );
   }
   if (!email && !telegramChatId && !vkUserId) {
     throw new ApiRequestError(
-      "Укажите хотя бы один канал контакта: email, Telegram chat ID или VK user ID.",
+      "Укажите хотя бы один канал контакта: email, идентификатор чата Telegram или идентификатор пользователя ВКонтакте.",
     );
   }
+  const emailConsentInput = optionalBoolean(
+    object.emailConsent,
+    "Согласие на email",
+  );
+  if (emailConsentInput && !email) {
+    throw new ApiRequestError(
+      "Для email-согласия нужен сохранённый адрес электронной почты.",
+    );
+  }
+  const emailConsent = email
+    ? emailConsentInput ?? existing?.emailConsent ?? false
+    : false;
 
   return {
     firstName,
@@ -570,9 +655,9 @@ function parseContact(
       existing?.jobTitle ??
       "",
     category:
-      optionalText(object.category, "Категория", 100) ??
-      existing?.category ??
-      "Client",
+      optionalText(object.category, "Категория", 100) ||
+      existing?.category ||
+      "Клиент",
     city: optionalText(object.city, "Город", 120) ?? existing?.city ?? "",
     country:
       optionalText(object.country, "Страна", 120) ??
@@ -584,10 +669,7 @@ function parseContact(
       optionalInteger(object.engagementScore, "Вовлечённость", 0, 100) ??
       existing?.engagementScore ??
       0,
-    emailConsent:
-      optionalBoolean(object.emailConsent, "Согласие на email") ??
-      existing?.emailConsent ??
-      Boolean(email),
+    emailConsent,
     telegramChatId,
     telegramConsent,
     vkUserId,
@@ -612,14 +694,14 @@ function contactValues(
     companyId: input.companyId ?? null,
     companyName: input.companyName ?? "",
     jobTitle: input.jobTitle ?? "",
-    category: input.category ?? "Client",
+    category: input.category || "Клиент",
     city: input.city ?? "",
     country: input.country ?? "Россия",
     tags: input.tags ?? [],
     status: input.status ?? "active",
     engagementScore: input.engagementScore ?? 0,
     avatarColor: existing?.avatarColor ?? "#6558E8",
-    emailConsent: input.emailConsent ?? Boolean(input.email),
+    emailConsent: Boolean(input.email && input.emailConsent),
     telegramChatId: input.telegramChatId ?? null,
     telegramConsent: input.telegramConsent ?? false,
     vkUserId: input.vkUserId ?? null,
@@ -687,12 +769,23 @@ async function findContactsByIdentifiers(
 
 export async function listContacts(request: Request): Promise<ContactsListResponse> {
   await ensureDatabase(request);
-  const rows = await getDb()
-    .select()
-    .from(contacts)
-    .where(eq(contacts.workspaceId, WORKSPACE_ID))
-    .orderBy(desc(contacts.updatedAt));
-  return { contacts: rows.map(toContact) };
+  const db = getDb();
+  const [rows, workspaceRows] = await Promise.all([
+    db
+      .select()
+      .from(contacts)
+      .where(eq(contacts.workspaceId, WORKSPACE_ID))
+      .orderBy(desc(contacts.updatedAt)),
+    db
+      .select({ timezone: workspaces.timezone })
+      .from(workspaces)
+      .where(eq(workspaces.id, WORKSPACE_ID))
+      .limit(1),
+  ]);
+  return {
+    contacts: rows.map(toContact),
+    timezone: workspaceRows[0]?.timezone ?? "Europe/Moscow",
+  };
 }
 
 export async function createContact(
@@ -958,6 +1051,17 @@ const RULE_OPERATORS: SegmentRule["operator"][] = [
   "after",
 ];
 
+function allowedRuleOperators(
+  field: SegmentRule["field"],
+): SegmentRule["operator"][] {
+  if (field === "status") return ["equals", "not_equals"];
+  if (field === "lastContactedAt") return ["before", "after"];
+  if (field === "engagementScore") {
+    return ["greater_than", "less_than", "equals"];
+  }
+  return ["equals", "not_equals", "contains"];
+}
+
 function parseRules(value: unknown): SegmentRule[] {
   if (!Array.isArray(value)) {
     throw new ApiRequestError("Добавьте хотя бы одно правило сегмента.");
@@ -997,19 +1101,71 @@ function parseRules(value: unknown): SegmentRule[] {
     ) {
       throw new ApiRequestError(`Заполните значение правила ${index + 1}.`);
     }
-    const normalizedValue = Array.isArray(ruleValue)
+    let normalizedValue: SegmentRule["value"] = Array.isArray(ruleValue)
       ? optionalStringArray(ruleValue, `Значение правила ${index + 1}`, 30) ?? []
       : typeof ruleValue === "string"
         ? cleanText(ruleValue, `Значение правила ${index + 1}`, 200)
         : ruleValue;
+    const normalizedField = field as SegmentRule["field"];
+    const normalizedOperator = operator as SegmentRule["operator"];
+    if (!allowedRuleOperators(normalizedField).includes(normalizedOperator)) {
+      throw new ApiRequestError(
+        `В правиле ${index + 1} оператор не подходит выбранному полю.`,
+      );
+    }
+    if (Array.isArray(normalizedValue) && normalizedValue.length === 0) {
+      throw new ApiRequestError(`Заполните значение правила ${index + 1}.`);
+    }
+    if (normalizedField === "status") {
+      const values = Array.isArray(normalizedValue)
+        ? normalizedValue
+        : [normalizedValue];
+      if (
+        values.some(
+          (value) =>
+            typeof value !== "string" ||
+            !CONTACT_STATUSES.includes(value as ContactStatus),
+        )
+      ) {
+        throw new ApiRequestError(
+          `В правиле ${index + 1} указан неизвестный статус контакта.`,
+        );
+      }
+    } else if (normalizedField === "engagementScore") {
+      const score = Number(normalizedValue);
+      if (
+        Array.isArray(normalizedValue) ||
+        !Number.isInteger(score) ||
+        score < 0 ||
+        score > 100
+      ) {
+        throw new ApiRequestError(
+          `В правиле ${index + 1} вовлечённость должна быть целым числом от 0 до 100.`,
+        );
+      }
+      normalizedValue = score;
+    } else if (normalizedField === "lastContactedAt") {
+      if (
+        typeof normalizedValue !== "string" ||
+        Number.isNaN(Date.parse(normalizedValue))
+      ) {
+        throw new ApiRequestError(
+          `В правиле ${index + 1} указана некорректная дата контакта.`,
+        );
+      }
+    } else if (typeof normalizedValue === "number") {
+      throw new ApiRequestError(
+        `В правиле ${index + 1} ожидается текстовое значение.`,
+      );
+    }
     return {
       id:
         optionalText(object.id, `Идентификатор правила ${index + 1}`, 120) ??
         newId("rule"),
-      field: field as SegmentRule["field"],
-      operator: operator as SegmentRule["operator"],
+      field: normalizedField,
+      operator: normalizedOperator,
       value: normalizedValue,
-      join,
+      join: index === 0 ? "and" : join,
     };
   });
 }
@@ -1020,7 +1176,18 @@ function parseSegment(
 ): SegmentCreateInput {
   const object = asObject(payload);
   const name = optionalText(object.name, "Название сегмента", 160) ?? existing?.name ?? "";
-  if (!name) throw new ApiRequestError("Укажите название сегмента.");
+  if (name.length < 2) {
+    throw new ApiRequestError(
+      "Название сегмента должно содержать не менее двух символов.",
+    );
+  }
+  const color =
+    optionalText(object.color, "Цвет сегмента", 20) ??
+    existing?.color ??
+    "#6558E8";
+  if (!/^#[0-9a-f]{6}$/i.test(color)) {
+    throw new ApiRequestError("Цвет сегмента должен быть указан в формате #625CF6.");
+  }
   return {
     name,
     description:
@@ -1028,10 +1195,7 @@ function parseSegment(
       existing?.description ??
       "",
     rules: object.rules === undefined && existing ? existing.rules : parseRules(object.rules),
-    color:
-      optionalText(object.color, "Цвет сегмента", 20) ??
-      existing?.color ??
-      "#6558E8",
+    color,
     isDynamic:
       optionalBoolean(object.isDynamic, "Динамический сегмент") ??
       existing?.isDynamic ??
@@ -1054,7 +1218,18 @@ async function allSegmentRecords() {
 
 export async function listSegments(request: Request): Promise<SegmentsListResponse> {
   await ensureDatabase(request);
-  return { segments: await allSegmentRecords() };
+  const [records, workspaceRows] = await Promise.all([
+    allSegmentRecords(),
+    getDb()
+      .select({ timezone: workspaces.timezone })
+      .from(workspaces)
+      .where(eq(workspaces.id, WORKSPACE_ID))
+      .limit(1),
+  ]);
+  return {
+    segments: records,
+    timezone: workspaceRows[0]?.timezone ?? "Europe/Moscow",
+  };
 }
 
 export async function createSegment(
@@ -1065,11 +1240,15 @@ export async function createSegment(
   const input = parseSegment(payload);
   const db = getDb();
   const duplicate = await db
-    .select({ id: segments.id })
+    .select({ id: segments.id, name: segments.name })
     .from(segments)
-    .where(and(eq(segments.workspaceId, WORKSPACE_ID), eq(segments.name, input.name)))
-    .limit(1);
-  if (duplicate[0]) {
+    .where(eq(segments.workspaceId, WORKSPACE_ID));
+  const normalizedName = input.name.toLocaleLowerCase("ru-RU");
+  if (
+    duplicate.some(
+      (segment) => segment.name.toLocaleLowerCase("ru-RU") === normalizedName,
+    )
+  ) {
     throw new ApiRequestError("Сегмент с таким названием уже существует.", 409);
   }
   const now = new Date().toISOString();
@@ -1102,10 +1281,17 @@ export async function updateSegment(
   const input = parseSegment(object, existing);
   const db = getDb();
   const duplicates = await db
-    .select({ id: segments.id })
+    .select({ id: segments.id, name: segments.name })
     .from(segments)
-    .where(and(eq(segments.workspaceId, WORKSPACE_ID), eq(segments.name, input.name)));
-  if (duplicates.some((segment) => segment.id !== id)) {
+    .where(eq(segments.workspaceId, WORKSPACE_ID));
+  const normalizedName = input.name.toLocaleLowerCase("ru-RU");
+  if (
+    duplicates.some(
+      (segment) =>
+        segment.id !== id &&
+        segment.name.toLocaleLowerCase("ru-RU") === normalizedName,
+    )
+  ) {
     throw new ApiRequestError("Другой сегмент уже использует это название.", 409);
   }
   await db
@@ -1254,7 +1440,6 @@ const PUBLIC_CONFIG_FIELDS: Record<IntegrationProviderId, string[]> = {
   "telegram-bot-api": ["botUsername"],
   "vk-api": ["communityId"],
   unisender: ["senderEmail", "listId"],
-  sendpulse: ["senderEmail", "botUsername"],
 };
 
 function parsePublicConfig(
@@ -1305,7 +1490,9 @@ async function allIntegrationRecords(): Promise<IntegrationRecord[]> {
     .from(integrations)
     .where(eq(integrations.workspaceId, WORKSPACE_ID))
     .orderBy(integrations.providerId);
-  return rows.map(toIntegrationRecord);
+  return rows
+    .filter((row) => PROVIDERS.includes(row.providerId))
+    .map(toIntegrationRecord);
 }
 
 export async function listIntegrations(
@@ -1506,13 +1693,22 @@ function parseCampaign(
     optionalText(object.emailBodyText, "Текст email-письма", 20_000) ??
     existing?.emailBodyText ??
     "";
-  const emailBuilderDocument =
+  const subject =
+    optionalText(object.subject, "Тема письма", 300) ?? existing?.subject ?? "";
+  const previewText =
+    optionalText(object.previewText, "Прехедер", 500) ??
+    existing?.previewText ??
+    "";
+  const parsedBuilderDocument =
     object.emailBuilderDocument === undefined
       ? (existing?.emailBuilderDocument ?? null)
       : parseEmailBuilderDocument(object.emailBuilderDocument);
+  const emailBuilderDocument = parsedBuilderDocument
+    ? { ...parsedBuilderDocument, subject, previewText }
+    : null;
   const emailBodyHtml = emailBuilderDocument
     ? compileEmailDocument(emailBuilderDocument)
-    : plainTextEmailHtml(emailBodyText);
+    : plainTextEmailHtml(emailBodyText, previewText);
   return {
     name,
     audienceType,
@@ -1531,12 +1727,8 @@ function parseCampaign(
       existing,
       defaults.workspace,
     ),
-    subject:
-      optionalText(object.subject, "Тема письма", 300) ?? existing?.subject ?? "",
-    previewText:
-      optionalText(object.previewText, "Прехедер", 500) ??
-      existing?.previewText ??
-      "",
+    subject,
+    previewText,
     emailBodyText,
     emailBodyHtml,
     emailBuilderDocument,
@@ -1696,14 +1888,19 @@ export async function listCampaigns(
       .from(deliveryJobs)
       .where(eq(deliveryJobs.workspaceId, WORKSPACE_ID))
       .orderBy(desc(deliveryJobs.createdAt))
-      .limit(100),
-    db.select().from(campaignEvents).where(eq(campaignEvents.workspaceId, WORKSPACE_ID)).orderBy(desc(campaignEvents.occurredAt)).limit(100),
+      .limit(WORKSPACE_HISTORY_LIMIT),
+    db.select().from(campaignEvents).where(eq(campaignEvents.workspaceId, WORKSPACE_ID)).orderBy(desc(campaignEvents.occurredAt)).limit(WORKSPACE_HISTORY_LIMIT),
   ]);
   return {
     campaigns: campaignRows.map(toCampaign),
     deliveryPlans: planRows.map(toDeliveryPlan),
     deliveryJobs: jobRows.map(toDeliveryJob),
     events: eventRows.map(toCampaignEvent),
+    historyWindow: {
+      scope: "latest_workspace",
+      deliveryJobsLimit: WORKSPACE_HISTORY_LIMIT,
+      campaignEventsLimit: WORKSPACE_HISTORY_LIMIT,
+    },
   };
 }
 
@@ -1715,6 +1912,9 @@ export async function createCampaign(
   const workspace = await workspaceRecord();
   const input = parseCampaign(payload, { workspace });
   const audienceLabel = await validateAudience(input);
+  if (input.templateId) {
+    await assertEmailTemplateReference(request, input.templateId);
+  }
   const now = new Date().toISOString();
   const id = newId("campaign");
   const db = getDb();
@@ -1826,7 +2026,7 @@ async function ensureCampaignVersion(
   campaign: CampaignRecord,
   plans: DeliveryPlanRecord[],
   audience: ContactRecord[],
-  requireConsent: boolean,
+  workspace: WorkspaceRecord,
 ): Promise<CampaignVersionRecord> {
   const snapshot: CampaignVersionSnapshot = {
     campaignId: campaign.id,
@@ -1850,7 +2050,7 @@ async function ensureCampaignVersion(
     recipientFingerprints: recipientFingerprints(
       plans,
       audience,
-      requireConsent,
+      workspace.requireConsent,
     ),
   };
   const contentHash = await versionHash(snapshot);
@@ -2061,7 +2261,7 @@ async function evaluateLaunch(
         campaign,
         plans,
         audience,
-        workspace.requireConsent,
+        workspace,
       );
   await db
     .update(campaigns)
@@ -2161,7 +2361,7 @@ async function updateOutboxResult(
 
 async function processDirectOutbox(
   rows: DeliveryOutboxRecord[],
-  campaign: CampaignRecord,
+  messengerMessage: string,
 ) {
   const contactsById = new Map(
     (await getDb()
@@ -2202,7 +2402,7 @@ async function processDirectOutbox(
           const result = await sendTelegramMessage({
             token: credentials.token ?? "",
             chatId: row.recipientEndpoint,
-            text: renderContactTemplate(campaign.messengerMessage, contact),
+            text: renderContactTemplate(messengerMessage, contact),
             signal: AbortSignal.timeout(15_000),
           });
           await updateOutboxResult(row, result);
@@ -2213,7 +2413,7 @@ async function processDirectOutbox(
           const result = await sendVkMessage({
             accessToken: credentials.accessToken ?? "",
             peerId: row.recipientEndpoint,
-            message: renderContactTemplate(campaign.messengerMessage, contact),
+            message: renderContactTemplate(messengerMessage, contact),
             idempotencyKey: row.idempotencyKey,
             signal: AbortSignal.timeout(15_000),
           });
@@ -2228,7 +2428,6 @@ async function processDirectOutbox(
 
 async function processUniSenderOutbox(
   rows: DeliveryOutboxRecord[],
-  campaign: CampaignRecord,
   integration: IntegrationRecord,
   version: CampaignVersionRecord,
 ) {
@@ -2256,12 +2455,11 @@ async function processUniSenderOutbox(
   const result = await createUniSenderCampaign({
     apiKey: credentials.apiKey ?? "",
     listId: integration.publicConfig.listId ?? "",
-    senderName: campaign.senderName,
-    senderEmail: campaign.senderEmail,
-    subject: campaign.subject,
-    textBody: campaign.emailBodyText,
-    htmlBody: campaign.emailBodyHtml,
-    campaignTag: `mailflow_${version.contentHash.replace(/[^a-zA-Z0-9_]/g, "_")}`.slice(0, 80),
+    senderName: version.snapshot.senderName,
+    senderEmail: version.snapshot.senderEmail,
+    subject: version.snapshot.subject,
+    textBody: version.snapshot.emailBodyText,
+    htmlBody: version.snapshot.emailBodyHtml,
     recipients: rows.map((row) => ({
       email: row.recipientEndpoint,
       name: contactsById.get(row.contactId)?.fullName ?? "",
@@ -2564,7 +2762,7 @@ async function dispatchCampaign(
       rows.filter((row) =>
         row.providerId === "telegram-bot-api" || row.providerId === "vk-api",
       ),
-      current.campaign,
+      version.snapshot.messengerMessage,
     );
     const unisenderRows = rows.filter((row) => row.providerId === "unisender");
     if (unisenderRows.length) {
@@ -2576,7 +2774,6 @@ async function dispatchCampaign(
         ...providerExternalIds,
         unisender: await processUniSenderOutbox(
           unisenderRows,
-          current.campaign,
           integration,
           version,
         ),
@@ -2609,6 +2806,7 @@ async function dispatchCampaign(
     await db.select().from(deliveryOutbox).where(eq(deliveryOutbox.jobId, jobId))
   ).map(toDeliveryOutbox);
   const acceptedRows = finalRows.filter((row) => row.status === "accepted");
+  const acceptedContactIds = uniqueAcceptedContactIds(finalRows);
   const rejectedCount = finalRows.filter((row) => row.status === "rejected").length;
   const ambiguousCount = finalRows.filter((row) => row.status === "ambiguous").length;
   const manualCount = finalRows.filter((row) => row.status === "manual_export").length;
@@ -2659,7 +2857,7 @@ async function dispatchCampaign(
       sentAt: acceptedCount ? completedAt : null,
       metrics: {
         ...current.campaign.metrics,
-        sent: acceptedCount,
+        sent: acceptedContactIds.length,
       },
       updatedAt: completedAt,
     })
@@ -2668,7 +2866,7 @@ async function dispatchCampaign(
     await db
       .update(contacts)
       .set({ lastContactedAt: completedAt, updatedAt: completedAt })
-      .where(inArray(contacts.id, [...new Set(acceptedRows.map((row) => row.contactId))]));
+      .where(inArray(contacts.id, acceptedContactIds));
   }
   const event = await appendEvent(
     campaignId,
@@ -2677,6 +2875,7 @@ async function dispatchCampaign(
     {
       jobId,
       acceptedCount,
+      uniqueAcceptedCount: acceptedContactIds.length,
       rejectedCount,
       ambiguousCount,
       manualCount,
@@ -2839,6 +3038,9 @@ export async function updateCampaign(
     plans: current.plans,
   });
   const audienceLabel = await validateAudience(input);
+  if (input.templateId) {
+    await assertEmailTemplateReference(request, input.templateId);
+  }
   const now = new Date().toISOString();
   await getDb()
     .update(campaigns)

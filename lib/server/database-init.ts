@@ -1,6 +1,7 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { getD1, getDb } from "@/db";
 import {
+  emailTemplates,
   integrations,
   participants,
   systemState,
@@ -8,6 +9,7 @@ import {
 } from "@/db/schema";
 import { integrationProviders } from "@/config/integrations";
 import { ApiRequestError } from "./api-utils";
+import { starterEmailTemplateValues } from "./starter-template-library";
 
 export const WORKSPACE_ID = "workspace-main";
 export const PARTICIPANT_ID = "participant-main";
@@ -86,6 +88,21 @@ const schemaStatements = [
     last_checked_at TEXT,
     check_status TEXT NOT NULL DEFAULT 'disconnected',
     check_message TEXT NOT NULL DEFAULT 'Подключение ещё не проверено.',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS email_templates (
+    id TEXT PRIMARY KEY NOT NULL,
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    name_key TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    category TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    preview_text TEXT NOT NULL DEFAULT '',
+    builder_document TEXT NOT NULL,
+    email_body_html TEXT NOT NULL,
+    email_body_text TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
@@ -196,6 +213,8 @@ const schemaStatements = [
   `CREATE INDEX IF NOT EXISTS idx_contacts_workspace_company ON contacts(workspace_id, company_id)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_segments_workspace_name ON segments(workspace_id, name)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_integrations_workspace_provider ON integrations(workspace_id, provider_id)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_email_templates_workspace_name_key ON email_templates(workspace_id, name_key)`,
+  `CREATE INDEX IF NOT EXISTS idx_email_templates_workspace_updated ON email_templates(workspace_id, updated_at)`,
   `CREATE INDEX IF NOT EXISTS idx_campaigns_workspace_status_updated ON campaigns(workspace_id, status, updated_at)`,
   `CREATE INDEX IF NOT EXISTS idx_campaigns_segment ON campaigns(segment_id)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_campaign_versions_number ON campaign_versions(campaign_id, version)`,
@@ -421,6 +440,28 @@ async function seedDatabase(request: Request) {
       })),
     )
     .onConflictDoNothing();
+
+  const [templateLibraryState] = await db
+    .select()
+    .from(systemState)
+    .where(eq(systemState.key, "email-template-library-v1"))
+    .limit(1);
+  if (!templateLibraryState) {
+    for (const template of starterEmailTemplateValues()) {
+      await db
+        .insert(emailTemplates)
+        .values({
+          ...template,
+          workspaceId: WORKSPACE_ID,
+        })
+        .onConflictDoNothing();
+    }
+    await db.insert(systemState).values({
+      key: "email-template-library-v1",
+      value: "seeded",
+      updatedAt: now,
+    });
+  }
 
   if (!initializationState) {
     await db.insert(systemState).values({

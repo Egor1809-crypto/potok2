@@ -6,7 +6,8 @@ export const MAX_CSV_ROWS = 10_000;
 
 export const targetFieldOptions = [
   { value: "ignore", label: "Не импортировать" },
-  { value: "email", label: "Email *" },
+  { value: "email", label: "Email" },
+  { value: "emailConsent", label: "Согласие Email" },
   { value: "fullName", label: "ФИО" },
   { value: "firstName", label: "Имя" },
   { value: "lastName", label: "Фамилия" },
@@ -18,6 +19,7 @@ export const targetFieldOptions = [
   { value: "country", label: "Страна" },
   { value: "tags", label: "Теги" },
   { value: "status", label: "Статус" },
+  { value: "engagementScore", label: "Вовлечённость, 0–100" },
   { value: "telegramChatId", label: "Идентификатор чата Telegram" },
   { value: "telegramConsent", label: "Согласие Telegram" },
   { value: "vkUserId", label: "Идентификатор пользователя ВКонтакте" },
@@ -49,6 +51,7 @@ export type RowIssue =
   | "duplicate-existing"
   | "missing-name"
   | "invalid-status"
+  | "invalid-score"
   | "value-too-long"
   | "invalid-channel";
 
@@ -70,6 +73,7 @@ export type ValidationSummary = {
   duplicateExisting: number;
   missingName: number;
   invalidStatus: number;
+  invalidScore: number;
   valueTooLong: number;
   invalidChannel: number;
 };
@@ -85,6 +89,13 @@ const aliases: Record<Exclude<TargetField, "ignore">, string[]> = {
     "элпочта",
     "электроннаяпочта",
     "рабочаяэлпочта",
+  ],
+  emailConsent: [
+    "emailconsent",
+    "mailconsent",
+    "согласиеemail",
+    "согласиепочта",
+    "согласиеэлектроннаяпочта",
   ],
   fullName: ["fullname", "name", "фио", "полноеимя", "имяконтакта"],
   firstName: ["firstname", "givenname", "имя"],
@@ -103,12 +114,21 @@ const aliases: Record<Exclude<TargetField, "ignore">, string[]> = {
   country: ["country", "страна"],
   tags: ["tags", "tag", "labels", "теги", "тег", "метки"],
   status: ["status", "статус"],
+  engagementScore: [
+    "engagementscore",
+    "score",
+    "вовлеченность",
+    "вовлечённость",
+    "оценкавовлеченности",
+  ],
   telegramChatId: [
     "telegramchatid",
     "telegramid",
     "tgchatid",
     "tgid",
     "телеграмid",
+    "идентификаторчатателеграм",
+    "идентификаторчатаtelegram",
   ],
   telegramConsent: [
     "telegramconsent",
@@ -116,8 +136,19 @@ const aliases: Record<Exclude<TargetField, "ignore">, string[]> = {
     "согласиеtelegram",
     "согласиетелеграм",
   ],
-  vkUserId: ["vkuserid", "vkid", "вкid", "идентификаторvk"],
-  vkConsent: ["vkconsent", "согласиеvk", "согласиевк"],
+  vkUserId: [
+    "vkuserid",
+    "vkid",
+    "вкid",
+    "идентификаторvk",
+    "идентификаторпользователявконтакте",
+  ],
+  vkConsent: [
+    "vkconsent",
+    "согласиеvk",
+    "согласиевк",
+    "согласиевконтакте",
+  ],
 };
 
 function normalizeHeader(value: string): string {
@@ -328,7 +359,8 @@ function valueFor(
   target: TargetField,
 ): string {
   const index = mapping.indexOf(target);
-  return index < 0 ? "" : (row.values[index] ?? "").trim();
+  const value = index < 0 ? "" : (row.values[index] ?? "").trim();
+  return /^'[=+\-@\t\r]/.test(value) ? value.slice(1) : value;
 }
 
 function normalizedStatus(value: string): ContactStatus | null {
@@ -342,8 +374,12 @@ function normalizedStatus(value: string): ContactStatus | null {
     "отписался": "unsubscribed",
     bounced: "bounced",
     "недоставлено": "bounced",
+    "недоставляемый": "bounced",
+    "возврат": "bounced",
     invalid: "invalid",
     "некорректен": "invalid",
+    "некорректный": "invalid",
+    "некорректный адрес": "invalid",
   };
   return statuses[normalized] ?? null;
 }
@@ -370,6 +406,7 @@ function mappedContact(
   input: ContactCreateInput;
   displayName: string;
   invalidStatus: boolean;
+  invalidScore: boolean;
   invalidChannel: boolean;
 } {
   const fullName = valueFor(row, mapping, "fullName");
@@ -378,7 +415,14 @@ function mappedContact(
   const lastName =
     valueFor(row, mapping, "lastName") || nameParts.slice(1).join(" ");
   const email = valueFor(row, mapping, "email").toLocaleLowerCase("ru-RU");
-  const input: ContactCreateInput = { firstName, lastName, emailConsent: false };
+  const emailConsent = normalizedBoolean(
+    valueFor(row, mapping, "emailConsent"),
+  );
+  const input: ContactCreateInput = {
+    firstName,
+    lastName,
+    emailConsent: emailConsent.value,
+  };
   if (email) input.email = email;
 
   const optionalTextFields = [
@@ -404,6 +448,18 @@ function mappedContact(
   const parsedStatus = status ? normalizedStatus(status) : null;
   if (parsedStatus) input.status = parsedStatus;
 
+  const engagementScoreRaw = valueFor(row, mapping, "engagementScore");
+  const engagementScore = Number(engagementScoreRaw);
+  const invalidScore = Boolean(
+    engagementScoreRaw &&
+      (!Number.isInteger(engagementScore) ||
+        engagementScore < 0 ||
+        engagementScore > 100),
+  );
+  if (engagementScoreRaw && !invalidScore) {
+    input.engagementScore = engagementScore;
+  }
+
   const telegramChatId = valueFor(row, mapping, "telegramChatId");
   const telegramConsent = normalizedBoolean(
     valueFor(row, mapping, "telegramConsent"),
@@ -416,10 +472,12 @@ function mappedContact(
   input.vkConsent = vkConsent.value;
 
   const invalidChannel =
+    emailConsent.invalid ||
     telegramConsent.invalid ||
     vkConsent.invalid ||
     Boolean(telegramChatId && !/^-?\d+$/.test(telegramChatId)) ||
     Boolean(vkUserId && !/^\d+$/.test(vkUserId)) ||
+    (emailConsent.value && !email) ||
     (telegramConsent.value && !telegramChatId) ||
     (vkConsent.value && !vkUserId);
 
@@ -427,6 +485,7 @@ function mappedContact(
     input,
     displayName: [firstName, lastName].filter(Boolean).join(" "),
     invalidStatus: Boolean(status && !parsedStatus),
+    invalidScore,
     invalidChannel,
   };
 }
@@ -480,6 +539,7 @@ export function validateRows(
     else if (!mapped.input.firstName.trim() || !mapped.input.lastName.trim()) {
       issue = "missing-name";
     } else if (mapped.invalidStatus) issue = "invalid-status";
+    else if (mapped.invalidScore) issue = "invalid-score";
     else if (mapped.invalidChannel) issue = "invalid-channel";
     else if (hasOversizedValue(mapped.input)) issue = "value-too-long";
     else if (seen) issue = "duplicate-file";
@@ -512,6 +572,7 @@ export function validateRows(
     duplicateExisting: 0,
     missingName: 0,
     invalidStatus: 0,
+    invalidScore: 0,
     valueTooLong: 0,
     invalidChannel: 0,
   };
@@ -524,6 +585,7 @@ export function validateRows(
     if (row.issue === "duplicate-existing") summary.duplicateExisting += 1;
     if (row.issue === "missing-name") summary.missingName += 1;
     if (row.issue === "invalid-status") summary.invalidStatus += 1;
+    if (row.issue === "invalid-score") summary.invalidScore += 1;
     if (row.issue === "value-too-long") summary.valueTooLong += 1;
     if (row.issue === "invalid-channel") summary.invalidChannel += 1;
   });

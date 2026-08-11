@@ -3,6 +3,7 @@ import type {
   EmailBlockType,
   EmailTemplate,
 } from "@/types";
+import type { EmailBuilderDocumentInput, EmailTemplateRecord } from "@/types/api";
 import { BRAND_NAME } from "@/config/brand";
 
 export type PreviewMode = "desktop" | "mobile";
@@ -189,6 +190,57 @@ export function documentFromTemplate(template: EmailTemplate): BuilderDocument {
     workspaceBackground: template.backgroundColor,
     contentWidth: 640,
     blocks: template.blocks.map(extendBlock),
+  };
+}
+
+export function documentFromApiTemplate(
+  template: EmailTemplateRecord,
+): BuilderDocument {
+  return {
+    ...template.builderDocument,
+    blocks: template.builderDocument.blocks.map((block) => ({ ...block })),
+  };
+}
+
+export function createBlankDocument(): BuilderDocument {
+  const blocks = [
+    createBlock("logo"),
+    createBlock("heading"),
+    createBlock("text"),
+    createBlock("button"),
+    createBlock("footer"),
+  ];
+  return {
+    templateId: "",
+    subject: "Тема письма",
+    previewText: "",
+    accentColor: "#6558e8",
+    bodyBackground: "#ffffff",
+    workspaceBackground: "#f3f4f8",
+    contentWidth: 640,
+    blocks,
+  } satisfies EmailBuilderDocumentInput;
+}
+
+export function createPlainTextDocument({
+  templateId = "",
+  subject,
+  previewText,
+  text,
+}: {
+  templateId?: string;
+  subject: string;
+  previewText: string;
+  text: string;
+}): BuilderDocument {
+  const base = createBlankDocument();
+  const textBlock = base.blocks.find((block) => block.type === "text") ?? createBlock("text");
+  return {
+    ...base,
+    templateId,
+    subject,
+    previewText,
+    blocks: [{ ...textBlock, content: text }],
   };
 }
 

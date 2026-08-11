@@ -26,6 +26,7 @@ export function CampaignDetailRoute() {
   const [dispatching, setDispatching] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
   const [dispatchNotice, setDispatchNotice] = React.useState<string | null>(null);
+  const [timeZone, setTimeZone] = React.useState("Europe/Moscow");
 
   const loadCampaign = React.useCallback(async () => {
     if (!campaignId) {
@@ -39,6 +40,7 @@ export function CampaignDetailRoute() {
       const body = await response.json() as WorkspaceSnapshot;
       const item = body.campaigns.find((candidate) => candidate.id === campaignId) ?? null;
       setCampaign(item);
+      setTimeZone(body.workspace.timezone || "Europe/Moscow");
       setDeliveryPlans(body.deliveryPlans.filter((plan) => plan.campaignId === campaignId));
       setEvents(body.events.filter((event) => event.campaignId === campaignId));
       setDeliveryJob(
@@ -136,6 +138,7 @@ export function CampaignDetailRoute() {
       dispatching={dispatching}
       deleting={deleting}
       dispatchNotice={dispatchNotice}
+      timeZone={timeZone}
       onDelete={() => void deleteCampaign()}
     />
   );

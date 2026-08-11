@@ -39,7 +39,6 @@ import {
 } from "@/config/integrations";
 import type {
   ApiError,
-  ContactsListResponse,
   IntegrationConnectionStatus,
   IntegrationMutationResponse,
   IntegrationRecord,
@@ -102,21 +101,6 @@ const setupFields: Record<IntegrationProviderId, SetupField[]> = {
       label: "Номер списка получателей",
       placeholder: "123456",
       hint: "Сервер проверит, что список получателей существует.",
-    },
-  ],
-  sendpulse: [
-    {
-      key: "senderEmail",
-      label: "Адрес отправителя",
-      placeholder: "mailing@company.ru",
-      type: "email",
-      hint: "Для рассылки по электронной почте. Секретные ключи задаются на сервере.",
-    },
-    {
-      key: "botUsername",
-      label: "Telegram-бот",
-      placeholder: "company_bot",
-      hint: "Для Telegram-канала, без символа @.",
     },
   ],
 };
@@ -405,42 +389,6 @@ export function IntegrationsView() {
     }
   };
 
-  const exportVkWorkspaceRecipients = async () => {
-    setBusyAction("export:vk-workspace");
-    setNotice(null);
-    try {
-      const response = await fetch("/api/contacts", { headers: { Accept: "application/json" } });
-      const body = await response.json() as ContactsListResponse | ApiError;
-      if (!response.ok || !("contacts" in body)) {
-        throw new Error("error" in body ? body.error : "Не удалось получить контакты.");
-      }
-      const eligible = body.contacts.filter(
-        (contact) => contact.status === "active" && Boolean(contact.email) && contact.emailConsent,
-      );
-      const csv = ["email", ...eligible.map((contact) => `"${contact.email.replaceAll('"', '""')}"`)].join("\r\n");
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = "mailflow-vk-workspace-recipients.csv";
-      anchor.click();
-      URL.revokeObjectURL(url);
-      setNotice({
-        tone: "success",
-        title: "Список подготовлен",
-        text: `В CSV добавлено ${eligible.length} активных контактов с email и согласием. Остальные контакты исключены.`,
-      });
-    } catch (error) {
-      setNotice({
-        tone: "danger",
-        title: "Экспорт не создан",
-        text: error instanceof Error ? error.message : "Повторите попытку.",
-      });
-    } finally {
-      setBusyAction(null);
-    }
-  };
-
   const selectedSetupProvider = setupProviderId
     ? integrationProviderById[setupProviderId]
     : null;
@@ -509,7 +457,7 @@ export function IntegrationsView() {
             const record = recordByProvider[providerId];
             const status = apiMode === "online" ? record?.status ?? "disconnected" : "disconnected";
             const meta = statusMeta[status];
-            const campaignHref = `/campaigns/new?step=sender&channel=${channel.id}&provider_${channel.id}=${provider.id}`;
+            const campaignHref = `/campaigns/new?channel=${channel.id}&provider_${channel.id}=${provider.id}`;
 
             return (
               <article key={channel.id} className="grid gap-4 px-5 py-5 sm:px-6 lg:grid-cols-[48px_minmax(190px,.8fr)_minmax(220px,1fr)_170px_170px] lg:items-center">
@@ -606,21 +554,19 @@ export function IntegrationsView() {
             <div>
               <h2 className="text-[14px] font-semibold text-text-strong">Нативные «Рассылки» VK WorkSpace</h2>
               <p className="mt-1 text-[12px] leading-5 text-text-muted">
-                MAILFLOW формирует только CSV получателей. HTML, отправитель, запуск и статистика
-                настраиваются в VK WorkSpace вручную; автоматическая отправка из MAILFLOW недоступна.
+                Создайте кампанию, выберите аудиторию и пройдите проверку. Только после этого
+                MAILFLOW сформирует CSV именно для зафиксированных получателей. Письмо и запуск завершаются в VK WorkSpace вручную.
               </p>
             </div>
           </div>
         </div>
-        <Button
-          variant="secondary"
-          onClick={() => void exportVkWorkspaceRecipients()}
-          loading={busyAction === "export:vk-workspace"}
-          loadingText="Готовим CSV…"
-          leadingIcon={<Download aria-hidden="true" className="size-4" />}
+        <Link
+          href="/campaigns/new?channel=email&provider_email=vk-workspace"
+          className={buttonVariants({ variant: "secondary" })}
         >
-          Скачать CSV
-        </Button>
+          Создать кампанию
+          <ArrowRight aria-hidden="true" className="size-4" />
+        </Link>
       </section>
 
       <SetupModal

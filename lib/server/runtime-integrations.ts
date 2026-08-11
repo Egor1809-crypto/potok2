@@ -15,7 +15,6 @@ const requiredSecretKeys: Record<IntegrationProviderId, string[]> = {
   "telegram-bot-api": ["TELEGRAM_BOT_TOKEN"],
   "vk-api": ["VK_COMMUNITY_ACCESS_TOKEN"],
   unisender: ["UNISENDER_API_KEY"],
-  sendpulse: ["SENDPULSE_CLIENT_ID", "SENDPULSE_CLIENT_SECRET"],
 };
 
 const requiredPublicFields: Record<
@@ -26,10 +25,6 @@ const requiredPublicFields: Record<
   "telegram-bot-api": { telegram: ["botUsername"] },
   "vk-api": { vk: ["communityId"] },
   unisender: { email: ["senderEmail", "listId"] },
-  sendpulse: {
-    email: ["senderEmail"],
-    telegram: ["botUsername"],
-  },
 };
 
 export type StoredIntegration = {
@@ -76,7 +71,7 @@ export function isIntegrationReadyForChannel(
   );
   return Boolean(
     integration.enabled &&
-      definition?.deliveryMode !== "roadmap" &&
+      definition &&
       integration.credentialsConfigured &&
       integration.status === "connected" &&
       fields?.every((key) => Boolean(integration.publicConfig[key]?.trim())),

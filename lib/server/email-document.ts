@@ -159,6 +159,29 @@ export function compileEmailDocument(document: EmailBuilderDocumentInput) {
   return html;
 }
 
-export function plainTextEmailHtml(text: string) {
-  return `<!doctype html><html><body><div style="font-family:Arial,sans-serif;font-size:16px;line-height:1.6;color:#1f2937;">${lineBreaks(text)}</div></body></html>`;
+export function emailDocumentPlainText(
+  document: EmailBuilderDocumentInput,
+): string {
+  const sections = document.blocks.flatMap((block) => {
+    if (block.type === "divider" || block.type === "spacer") return [];
+    if (block.type === "button") return [block.label || block.content];
+    if (block.type === "columns") {
+      return block.content.split("|").map((value) => value.trim());
+    }
+    return [block.content];
+  });
+  const text = sections.map((value) => value.trim()).filter(Boolean).join("\n\n");
+  if (!text) {
+    throw new ApiRequestError(
+      "Email-макет должен содержать хотя бы один заполненный текстовый блок.",
+    );
+  }
+  if (text.length > 200_000) {
+    throw new ApiRequestError("Текст email-макета превышает 200 000 символов.");
+  }
+  return text;
+}
+
+export function plainTextEmailHtml(text: string, previewText = "") {
+  return `<!doctype html><html><body><div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(previewText)}</div><div style="font-family:Arial,sans-serif;font-size:16px;line-height:1.6;color:#1f2937;">${lineBreaks(text)}</div></body></html>`;
 }

@@ -38,7 +38,7 @@ function mutationSegment(payload: SegmentMutationResponse): SegmentRecord {
   return payload.segment;
 }
 
-export async function getSegments(signal?: AbortSignal): Promise<SegmentRecord[]> {
+export async function getSegments(signal?: AbortSignal): Promise<SegmentsListResponse> {
   const response = await fetch("/api/segments", {
     method: "GET",
     headers: { Accept: "application/json" },
@@ -48,7 +48,10 @@ export async function getSegments(signal?: AbortSignal): Promise<SegmentRecord[]
   if (!Array.isArray(payload.segments)) {
     throw new Error("Сервер вернул неверный список сегментов.");
   }
-  return payload.segments;
+  if (typeof payload.timezone !== "string") {
+    throw new Error("Сервер вернул неверный часовой пояс рабочего пространства.");
+  }
+  return payload;
 }
 
 export async function createSegment(

@@ -9,7 +9,7 @@ import { IconButton } from "@/components/ui/button";
 import { cn } from "@/components/ui/utils";
 import { BRAND_NAME } from "@/config/brand";
 
-import { primaryProductRoutes, quickCreateRoutes } from "./navigation";
+import { productRoutes, quickCreateRoutes, secondaryProductRoutes } from "./navigation";
 import { containTabFocus } from "./focus-management";
 
 type CommandMenuProps = {
@@ -17,7 +17,21 @@ type CommandMenuProps = {
   onOpenChange: (open: boolean) => void;
 };
 
-const commandRoutes = [...quickCreateRoutes, ...primaryProductRoutes];
+const commandRoutes = [...quickCreateRoutes, ...productRoutes, ...secondaryProductRoutes];
+
+function searchScore(route: (typeof commandRoutes)[number], query: string) {
+  const label = route.label.toLocaleLowerCase("ru-RU");
+  const description = route.description.toLocaleLowerCase("ru-RU");
+  const keywords = (route.keywords ?? []).map((value) => value.toLocaleLowerCase("ru-RU"));
+  if (label === query) return 0;
+  if (label.startsWith(query)) return 1;
+  if (label.split(/\s+/).some((word) => word.startsWith(query))) return 2;
+  if (keywords.some((keyword) => keyword === query)) return 3;
+  if (keywords.some((keyword) => keyword.startsWith(query))) return 4;
+  if (label.includes(query)) return 5;
+  if (description.includes(query)) return 6;
+  return 7;
+}
 
 function formatResultsCount(count: number) {
   const remainder100 = count % 100;
@@ -76,6 +90,8 @@ export function CommandMenu({ open, onOpenChange }: CommandMenuProps) {
         .join(" ")
         .toLowerCase()
         .includes(normalized),
+    ).sort((first, second) =>
+      searchScore(first, normalized) - searchScore(second, normalized),
     );
   }, [query]);
 

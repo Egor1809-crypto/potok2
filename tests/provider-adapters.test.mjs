@@ -104,7 +104,6 @@ test("UniSender maps MAILFLOW merge fields into imported provider fields", async
     senderEmail: "sender@example.test",
     subject: "Для {{first_name}} из {{company}}",
     textBody: "Здравствуйте, {{first_name}} {{last_name}}",
-    campaignTag: "mailflow_merge",
     recipients: [{
       email: "ivan@example.test",
       name: "Иван Петров",
@@ -122,12 +121,12 @@ test("UniSender maps MAILFLOW merge fields into imported provider fields", async
       if (method === "getFields") return jsonResponse({ result: [] });
       if (method === "createField") return jsonResponse({ result: { id: methods.length } });
       if (method === "importContacts") {
-        assert.equal(body.get("field_names[4]"), "mailflow_first_name");
-        assert.equal(body.get("field_names[5]"), "mailflow_company");
-        assert.equal(body.get("field_names[6]"), "mailflow_last_name");
-        assert.equal(body.get("data[0][4]"), "Иван");
-        assert.equal(body.get("data[0][5]"), "Право и партнёры");
-        assert.equal(body.get("data[0][6]"), "Петров");
+        assert.equal(body.get("field_names[3]"), "mailflow_first_name");
+        assert.equal(body.get("field_names[4]"), "mailflow_company");
+        assert.equal(body.get("field_names[5]"), "mailflow_last_name");
+        assert.equal(body.get("data[0][3]"), "Иван");
+        assert.equal(body.get("data[0][4]"), "Право и партнёры");
+        assert.equal(body.get("data[0][5]"), "Петров");
         return jsonResponse({ result: { invalid: 0, log: [] } });
       }
       if (method === "createEmailMessage") {
@@ -142,6 +141,7 @@ test("UniSender maps MAILFLOW merge fields into imported provider fields", async
         return jsonResponse({ result: { message_id: 1234 } });
       }
       assert.equal(method, "createCampaign");
+      assert.equal(body.get("contacts"), "ivan@example.test");
       return jsonResponse({ result: { campaign_id: 5678 } });
     },
   });
@@ -173,7 +173,6 @@ test("UniSender imports in batches of at most 500 then creates one campaign", as
     senderEmail: "sender@example.test",
     subject: "Тема",
     textBody: "Текст",
-    campaignTag: "mailflow_test",
     recipients,
     fetchFn: async (url, init) => {
       const method = String(url).split("/").at(-1);
@@ -186,11 +185,11 @@ test("UniSender imports in batches of at most 500 then creates one campaign", as
         return jsonResponse({ result: { invalid: 0, log: [] } });
       }
       if (method === "createEmailMessage") {
-        assert.equal(body.get("tag"), "mailflow_test");
         return jsonResponse({ result: { message_id: 1234 } });
       }
       assert.equal(method, "createCampaign");
       assert.equal(body.get("message_id"), "1234");
+      assert.equal(body.get("contacts"), recipients.map((recipient) => recipient.email).join(","));
       return jsonResponse({ result: { campaign_id: 5678 } });
     },
   });
@@ -206,6 +205,40 @@ test("UniSender imports in batches of at most 500 then creates one campaign", as
   assert.equal(result.campaignId, "5678");
 });
 
+test("UniSender campaign contacts exclude addresses rejected during import", async () => {
+  const recipients = [
+    { email: "valid@example.test", name: "Валидный", outboxId: "outbox-valid" },
+    { email: "invalid@example.test", name: "Ошибка", outboxId: "outbox-invalid" },
+  ];
+  const result = await createUniSenderCampaign({
+    apiKey: "api-key",
+    listId: "88",
+    senderName: "MAILFLOW",
+    senderEmail: "sender@example.test",
+    subject: "Тема",
+    textBody: "Текст",
+    recipients,
+    fetchFn: async (url, init) => {
+      const method = String(url).split("/").at(-1);
+      if (method === "importContacts") {
+        return jsonResponse({ result: { invalid: 1, log: [{ index: 1, code: "e_email_invalid" }] } });
+      }
+      if (method === "createEmailMessage") {
+        return jsonResponse({ result: { message_id: 1234 } });
+      }
+      assert.equal(method, "createCampaign");
+      const body = new URLSearchParams(String(init.body));
+      assert.equal(body.get("contacts"), "valid@example.test");
+      assert.doesNotMatch(body.get("contacts"), /invalid@example\.test/);
+      return jsonResponse({ result: { campaign_id: 5678 } });
+    },
+  });
+
+  assert.equal(result.status, "accepted");
+  assert.deepEqual(result.acceptedOutboxIds, ["outbox-valid"]);
+  assert.deepEqual(result.rejectedOutboxIds, ["outbox-invalid"]);
+});
+
 test("UniSender does not mark recipients accepted when createCampaign is ambiguous", async () => {
   let calls = 0;
   const result = await createUniSenderCampaign({
@@ -215,7 +248,6 @@ test("UniSender does not mark recipients accepted when createCampaign is ambiguo
     senderEmail: "sender@example.test",
     subject: "Тема",
     textBody: "Текст",
-    campaignTag: "mailflow_test",
     recipients: [{ email: "one@example.test", name: "Один", outboxId: "outbox-1" }],
     fetchFn: async () => {
       calls += 1;

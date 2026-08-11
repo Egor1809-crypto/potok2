@@ -54,7 +54,6 @@ export const templates: EmailTemplate[] = [
       },
     ],
     isFavorite: true,
-    usageCount: 34,
     updatedAt: "2026-08-09T10:20:00Z",
   },
   {
@@ -108,7 +107,6 @@ export const templates: EmailTemplate[] = [
       },
     ],
     isFavorite: true,
-    usageCount: 28,
     updatedAt: "2026-08-04T07:20:00Z",
   },
   {
@@ -155,7 +153,6 @@ export const templates: EmailTemplate[] = [
       },
     ],
     isFavorite: false,
-    usageCount: 19,
     updatedAt: "2026-08-06T11:45:00Z",
   },
   {
@@ -204,7 +201,6 @@ export const templates: EmailTemplate[] = [
       },
     ],
     isFavorite: true,
-    usageCount: 41,
     updatedAt: "2026-08-07T15:10:00Z",
   },
   {
@@ -258,7 +254,6 @@ export const templates: EmailTemplate[] = [
       },
     ],
     isFavorite: false,
-    usageCount: 22,
     updatedAt: "2026-07-29T06:50:00Z",
   },
   {
@@ -307,7 +302,6 @@ export const templates: EmailTemplate[] = [
       },
     ],
     isFavorite: false,
-    usageCount: 17,
     updatedAt: "2026-07-24T09:35:00Z",
   },
   {
@@ -356,7 +350,6 @@ export const templates: EmailTemplate[] = [
       },
     ],
     isFavorite: true,
-    usageCount: 13,
     updatedAt: "2026-08-08T08:25:00Z",
   },
   {
@@ -412,7 +405,6 @@ export const templates: EmailTemplate[] = [
       },
     ],
     isFavorite: false,
-    usageCount: 11,
     updatedAt: "2026-08-09T10:50:00Z",
   },
 ];

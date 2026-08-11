@@ -6,8 +6,7 @@ export type IntegrationProviderId =
   | "vk-workspace"
   | "telegram-bot-api"
   | "vk-api"
-  | "unisender"
-  | "sendpulse";
+  | "unisender";
 
 export type DeliveryChannelDefinition = {
   id: DeliveryChannelId;
@@ -42,7 +41,7 @@ export const deliveryChannels: DeliveryChannelDefinition[] = [
     description:
       "Письма с корпоративного домена через почтовый или маркетинговый сервис.",
     contactField: "Рабочий email",
-    providerIds: ["vk-workspace", "unisender", "sendpulse"],
+    providerIds: ["vk-workspace", "unisender"],
   },
   {
     id: "telegram",
@@ -51,7 +50,7 @@ export const deliveryChannels: DeliveryChannelDefinition[] = [
     description:
       "Сообщения подписчикам бота, которые сами начали диалог и дали согласие.",
     contactField: "Идентификатор чата Telegram",
-    providerIds: ["telegram-bot-api", "sendpulse"],
+    providerIds: ["telegram-bot-api"],
   },
   {
     id: "vk",
@@ -171,34 +170,6 @@ export const integrationProviders: IntegrationProviderDefinition[] = [
     ],
     route: "MAILFLOW → серверный адаптер → UniSender",
     deliveryMode: "automatic",
-  },
-  {
-    id: "sendpulse",
-    name: "SendPulse",
-    category: "Мультиканальный сервис",
-    summary:
-      "Серверные ключи можно проверить, но автоматическая отправка из MAILFLOW пока не реализована.",
-    channelIds: ["email", "telegram"],
-    accent: "#16a66a",
-    initials: "SP",
-    recommendedFor: "Будущего расширения маршрутов после реализации адаптера",
-    credentials: [
-      "Идентификатор и секрет API рабочей учётной записи",
-      "Проверенный email-отправитель или подключённый Telegram-бот",
-      "Списки получателей с согласием по каждому каналу",
-    ],
-    setupSteps: [
-      "Подключить нужный канал в кабинете SendPulse.",
-      "Передать ключи в защищённую серверную конфигурацию.",
-      "Отдельно проверить тестовый маршрут, статусы и отписки каждого канала.",
-    ],
-    limitations: [
-      "Маршрут находится в плане развития: готовая кампания не может быть отправлена через SendPulse из MAILFLOW.",
-      "Возможности, тарифы и лимиты отличаются для email и Telegram.",
-      "Получатели должны дать согласие в соответствующем канале.",
-    ],
-    route: "MAILFLOW → проверка ключей; отправка ещё не реализована",
-    deliveryMode: "roadmap",
   },
 ];
 

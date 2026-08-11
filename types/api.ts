@@ -2,6 +2,7 @@ import type {
   DeliveryChannelId,
   IntegrationProviderId,
 } from "@/config/integrations";
+import type { TemplateCategory } from "./template";
 
 export type ApiError = {
   error: string;
@@ -175,6 +176,21 @@ export type EmailBuilderDocumentInput = {
   blocks: EmailBuilderBlockInput[];
 };
 
+export type EmailTemplateRecord = {
+  id: string;
+  workspaceId: string;
+  name: string;
+  description: string;
+  category: TemplateCategory;
+  subject: string;
+  previewText: string;
+  builderDocument: EmailBuilderDocumentInput;
+  emailBodyHtml: string;
+  emailBodyText: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type CampaignRecord = {
   id: string;
   workspaceId: string;
@@ -264,6 +280,8 @@ export type CampaignVersionSnapshot = {
   emailBodyHtml: string;
   emailBuilderDocument: EmailBuilderDocumentInput | null;
   messengerMessage: string;
+  workspaceSignature?: string;
+  replyToEmail?: string;
   channels: CampaignChannelInput[];
   scheduledAt: string | null;
   recipientFingerprints: string[];
@@ -339,16 +357,24 @@ export type WorkspaceStats = {
   connectedIntegrations: number;
 };
 
+export type WorkspaceHistoryWindow = {
+  scope: "latest_workspace";
+  deliveryJobsLimit: number;
+  campaignEventsLimit: number;
+};
+
 export type WorkspaceSnapshot = {
   workspace: WorkspaceRecord;
   participant: ParticipantRecord;
   contacts: ContactRecord[];
   segments: SegmentRecord[];
   integrations: IntegrationRecord[];
+  templates: EmailTemplateRecord[];
   campaigns: CampaignRecord[];
   deliveryPlans: DeliveryPlanRecord[];
   deliveryJobs: DeliveryJobRecord[];
   events: CampaignEventRecord[];
+  historyWindow: WorkspaceHistoryWindow;
   stats: WorkspaceStats;
 };
 
@@ -394,7 +420,10 @@ export type ContactCreateInput = {
 
 export type ContactPatchInput = Partial<ContactCreateInput> & { id: string };
 
-export type ContactsListResponse = { contacts: ContactRecord[] };
+export type ContactsListResponse = {
+  contacts: ContactRecord[];
+  timezone: string;
+};
 export type ContactMutationResponse = { contact: ContactRecord };
 export type ContactsBatchCreateInput = {
   contacts: ContactCreateInput[];
@@ -418,8 +447,44 @@ export type SegmentCreateInput = {
 
 export type SegmentPatchInput = Partial<SegmentCreateInput> & { id: string };
 
-export type SegmentsListResponse = { segments: SegmentRecord[] };
+export type SegmentsListResponse = {
+  segments: SegmentRecord[];
+  timezone: string;
+};
 export type SegmentMutationResponse = { segment: SegmentRecord };
+
+export type EmailTemplateCreateInput = {
+  name: string;
+  description?: string;
+  category: TemplateCategory;
+  subject: string;
+  previewText?: string;
+  builderDocument: EmailBuilderDocumentInput;
+};
+
+export type EmailTemplatePatchInput = Partial<EmailTemplateCreateInput> & {
+  id: string;
+  expectedUpdatedAt: string;
+};
+
+export type EmailTemplateCloneInput = {
+  action: "clone";
+  id: string;
+  name?: string;
+};
+
+export type EmailTemplatesListResponse = {
+  templates: EmailTemplateRecord[];
+};
+
+export type EmailTemplateMutationResponse = {
+  template: EmailTemplateRecord;
+};
+
+export type EmailTemplateDeleteResponse = DeleteResponse & {
+  detachedCampaignCount: number;
+  detachedCampaignNames: string[];
+};
 
 export type CampaignChannelInput = {
   channel: DeliveryChannelId;
@@ -460,6 +525,7 @@ export type CampaignsListResponse = {
   deliveryPlans: DeliveryPlanRecord[];
   events: CampaignEventRecord[];
   deliveryJobs: DeliveryJobRecord[];
+  historyWindow: WorkspaceHistoryWindow;
 };
 
 export type CampaignMutationResponse = {

@@ -26,10 +26,16 @@ type BuilderTopbarProps = {
   canRedo: boolean;
   dirty: boolean;
   campaignHandoff: boolean;
+  nameLabel?: string;
+  saveLabel?: string;
+  saving?: boolean;
+  continueLabel?: string;
+  statusText?: string;
+  dirtyText?: string;
   onUndo: () => void;
   onRedo: () => void;
   onSave: () => void;
-  onContinue: () => void;
+  onContinue: (event: React.MouseEvent<HTMLAnchorElement>) => void;
   continueHref: string;
 };
 
@@ -42,6 +48,12 @@ export function BuilderTopbar({
   canRedo,
   dirty,
   campaignHandoff,
+  nameLabel = "Название кампании",
+  saveLabel = "Сохранить черновик",
+  saving = false,
+  continueLabel = "Применить",
+  statusText,
+  dirtyText,
   onUndo,
   onRedo,
   onSave,
@@ -53,7 +65,7 @@ export function BuilderTopbar({
       <div className="flex min-w-0 items-center gap-2 sm:gap-3">
         <div className="min-w-0">
           <label htmlFor="builder-campaign-name" className="sr-only">
-            Название кампании
+            {nameLabel}
           </label>
           <input
             id="builder-campaign-name"
@@ -65,14 +77,14 @@ export function BuilderTopbar({
             {dirty ? (
               <>
                 <HardDrive aria-hidden="true" className="size-2.5" />
-                Изменения ещё не записаны в браузер
+                {dirtyText ?? "Изменения ещё не сохранены"}
               </>
             ) : (
               <>
                 <Check aria-hidden="true" className="size-2.5 text-success" />
-                {campaignHandoff
-                  ? "Подготовлено в браузере для мастера кампании"
-                  : "Локальный черновик хранится в этом браузере"}
+                {statusText ?? (campaignHandoff
+                  ? "Подготовлено для мастера кампании"
+                  : "Шаблон сохранён на сервере")}
               </>
             )}
           </span>
@@ -118,23 +130,26 @@ export function BuilderTopbar({
         <Button
           variant="secondary"
           size="sm"
-          aria-label="Сохранить локальный черновик в браузере"
+          aria-label={saveLabel}
           onClick={onSave}
+          loading={saving}
+          loadingText="Сохраняем…"
           className="px-2 sm:px-3"
         >
           <Save aria-hidden="true" className="size-3.5" />
-          <span className="hidden lg:inline">В браузер</span>
+          <span className="hidden lg:inline">{saveLabel}</span>
         </Button>
         <Link
           href={continueHref}
           onClick={onContinue}
+          aria-label={continueLabel}
           className={buttonVariants({
             variant: "primary",
             size: "sm",
             className: "px-2.5 sm:px-3",
           })}
         >
-          <span className="hidden sm:inline">Продолжить</span>
+          <span className="hidden sm:inline">{continueLabel}</span>
           <ArrowRight aria-hidden="true" className="size-3.5" />
         </Link>
       </div>

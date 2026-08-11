@@ -15,6 +15,13 @@
       "when": 1786454298351,
       "tag": "0001_gray_the_santerians",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1786460197216,
+      "tag": "0002_amazing_anthem",
+      "breakpoints": true
     }
   ]
 }

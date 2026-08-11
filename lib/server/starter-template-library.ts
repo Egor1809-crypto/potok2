@@ -1,0 +1,160 @@
+import { templates } from "@/data/templates";
+import type {
+  EmailBuilderBlockInput,
+  EmailBuilderDocumentInput,
+} from "@/types/api";
+
+import {
+  compileEmailDocument,
+  emailDocumentPlainText,
+  parseEmailBuilderDocument,
+} from "./email-document";
+
+type BlockStyle = Pick<
+  EmailBuilderBlockInput,
+  | "paddingTop"
+  | "paddingBottom"
+  | "backgroundColor"
+  | "textColor"
+  | "fontSize"
+  | "borderRadius"
+>;
+
+const BLOCK_STYLES: Record<EmailBuilderBlockInput["type"], BlockStyle> = {
+  logo: {
+    paddingTop: 28,
+    paddingBottom: 14,
+    backgroundColor: "transparent",
+    textColor: "#1f2937",
+    fontSize: 12,
+    borderRadius: 0,
+  },
+  heading: {
+    paddingTop: 18,
+    paddingBottom: 12,
+    backgroundColor: "transparent",
+    textColor: "#111827",
+    fontSize: 38,
+    borderRadius: 0,
+  },
+  text: {
+    paddingTop: 10,
+    paddingBottom: 10,
+    backgroundColor: "transparent",
+    textColor: "#4b5563",
+    fontSize: 15,
+    borderRadius: 0,
+  },
+  image: {
+    paddingTop: 18,
+    paddingBottom: 18,
+    backgroundColor: "transparent",
+    textColor: "#6b7280",
+    fontSize: 13,
+    borderRadius: 14,
+  },
+  button: {
+    paddingTop: 16,
+    paddingBottom: 20,
+    backgroundColor: "transparent",
+    textColor: "#ffffff",
+    fontSize: 14,
+    borderRadius: 9,
+  },
+  columns: {
+    paddingTop: 18,
+    paddingBottom: 18,
+    backgroundColor: "transparent",
+    textColor: "#374151",
+    fontSize: 14,
+    borderRadius: 10,
+  },
+  divider: {
+    paddingTop: 18,
+    paddingBottom: 18,
+    backgroundColor: "transparent",
+    textColor: "#e5e7eb",
+    fontSize: 8,
+    borderRadius: 0,
+  },
+  spacer: {
+    paddingTop: 12,
+    paddingBottom: 12,
+    backgroundColor: "transparent",
+    textColor: "#ffffff",
+    fontSize: 8,
+    borderRadius: 0,
+  },
+  social: {
+    paddingTop: 18,
+    paddingBottom: 18,
+    backgroundColor: "transparent",
+    textColor: "#64748b",
+    fontSize: 12,
+    borderRadius: 8,
+  },
+  footer: {
+    paddingTop: 22,
+    paddingBottom: 28,
+    backgroundColor: "transparent",
+    textColor: "#8b91a1",
+    fontSize: 11,
+    borderRadius: 0,
+  },
+};
+
+export type StarterEmailTemplateValue = {
+  id: string;
+  name: string;
+  nameKey: string;
+  description: string;
+  category: (typeof templates)[number]["category"];
+  subject: string;
+  previewText: string;
+  builderDocument: EmailBuilderDocumentInput;
+  emailBodyHtml: string;
+  emailBodyText: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export function starterEmailTemplateValues(): StarterEmailTemplateValue[] {
+  return templates.map((template) => {
+    const rawDocument: EmailBuilderDocumentInput = {
+      templateId: template.id,
+      subject: template.subject,
+      previewText: template.previewText,
+      accentColor: template.accentColor,
+      bodyBackground: "#ffffff",
+      workspaceBackground: template.backgroundColor,
+      contentWidth: 640,
+      blocks: template.blocks.map((block) => ({
+        id: block.id,
+        type: block.type,
+        content: block.content,
+        ...(block.label === undefined ? {} : { label: block.label }),
+        ...(block.href === undefined ? {} : { href: block.href }),
+        alignment: block.alignment ?? "left",
+        ...BLOCK_STYLES[block.type],
+      })),
+    };
+    const builderDocument = parseEmailBuilderDocument(rawDocument);
+    if (!builderDocument) {
+      throw new Error(`Starter email template ${template.id} is invalid`);
+    }
+    return {
+      id: template.id,
+      name: template.name,
+      nameKey: template.name.normalize("NFKC").toLocaleLowerCase("ru-RU"),
+      description: template.description,
+      category: template.category,
+      subject: template.subject,
+      previewText: template.previewText,
+      builderDocument,
+      emailBodyHtml: compileEmailDocument(builderDocument),
+      emailBodyText: emailDocumentPlainText(builderDocument),
+      createdAt: template.updatedAt,
+      updatedAt: template.updatedAt,
+    };
+  });
+}

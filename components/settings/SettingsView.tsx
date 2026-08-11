@@ -259,9 +259,8 @@ function AccountSection({ form, participant, update }: { form: WorkspaceForm; pa
         </p>
       </div>
 
-      <FormBlock title="Рабочее пространство" description="Название видно в навигации и отчётах.">
+      <FormBlock title="Рабочее пространство" description="Название видно в навигации и в выгрузке данных.">
         <Field label="Название пространства" value={form.name} onChange={(value) => update("name", value)} />
-        <Field label="Компания или проект" value={form.companyName} onChange={(value) => update("companyName", value)} placeholder="Например, Юридическая практика" />
         <label className="block">
           <span className="mb-1.5 block text-[12px] font-semibold">Часовой пояс</span>
           <select className="input" value={form.timezone} onChange={(event) => update("timezone", event.target.value)}>
@@ -307,7 +306,7 @@ function DataSection({ participantEmail, onExport }: { participantEmail: string;
       <SettingRow Icon={KeyRound} title="Вход в аккаунт" copy={`Доступ подтверждает защищённая учётная запись ${participantEmail}. Пароли внутри MAILFLOW не хранятся.`}>
         <span className="badge badge-success">Защищён</span>
       </SettingRow>
-      <SettingRow Icon={Download} title="Экспорт данных" copy="Скачать снимок контактов, сегментов, кампаний и настроек в формате JSON.">
+      <SettingRow Icon={Download} title="Экспорт данных" copy="Скачать снимок контактов, сегментов, email-шаблонов, кампаний и настроек в формате JSON.">
         <button type="button" onClick={onExport} className="btn btn-secondary gap-2"><Download aria-hidden="true" className="size-4" />Скачать</button>
       </SettingRow>
       <div className="rounded-xl border border-[var(--border)] p-4">

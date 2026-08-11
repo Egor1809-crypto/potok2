@@ -21,13 +21,20 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CampaignRecord, CampaignStatus, WorkspaceSnapshot } from "@/types/api";
 
 const number = new Intl.NumberFormat("ru-RU");
-const date = new Intl.DateTimeFormat("ru-RU", {
-  day: "numeric",
-  month: "short",
-  hour: "2-digit",
-  minute: "2-digit",
-  timeZone: "Europe/Moscow",
-});
+function formatDate(value: string, timeZone: string) {
+  const options: Intl.DateTimeFormatOptions = {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone,
+  };
+  try {
+    return new Intl.DateTimeFormat("ru-RU", options).format(new Date(value));
+  } catch {
+    return new Intl.DateTimeFormat("ru-RU", { ...options, timeZone: "UTC" }).format(new Date(value));
+  }
+}
 
 const statusLabel: Record<CampaignStatus, string> = {
   draft: "Черновик",
@@ -158,7 +165,7 @@ export function DashboardView() {
           </div>
           {recentCampaigns.length ? (
             <div className="divide-y divide-[var(--border)]">
-              {recentCampaigns.map((campaign) => <CampaignRow key={campaign.id} campaign={campaign} />)}
+              {recentCampaigns.map((campaign) => <CampaignRow key={campaign.id} campaign={campaign} timeZone={snapshot.workspace.timezone} />)}
             </div>
           ) : (
             <EmptyCampaigns />
@@ -190,11 +197,11 @@ function getNextAction(snapshot: WorkspaceSnapshot) {
   return { title: "Создайте следующую кампанию", description: "Контакты и канал готовы. Выберите аудиторию, сообщение и проверьте маршрут доставки.", action: "Создать кампанию", href: "/campaigns/new", Icon: Send, tone: "border-[#d9eadf] bg-[#f2faf5]" };
 }
 
-function CampaignRow({ campaign }: { campaign: CampaignRecord }) {
+function CampaignRow({ campaign, timeZone }: { campaign: CampaignRecord; timeZone: string }) {
   return (
     <Link href={`/campaigns/${campaign.id}`} className="flex items-center gap-3 px-5 py-4 transition hover:bg-[var(--surface-subtle)] sm:px-6">
       <span className={`grid size-9 shrink-0 place-items-center rounded-xl ${campaign.status === "blocked" ? "bg-[var(--warning-subtle)] text-[var(--warning)]" : "bg-[var(--primary-subtle)] text-[var(--primary)]"}`}><Megaphone aria-hidden="true" className="size-4" /></span>
-      <span className="min-w-0 flex-1"><span className="block truncate text-[12px] font-semibold">{campaign.name}</span><span className="mt-1 block truncate text-[10px] text-[var(--text-subtle)]">{campaign.audienceLabel} · {date.format(new Date(campaign.updatedAt))}</span></span>
+      <span className="min-w-0 flex-1"><span className="block truncate text-[12px] font-semibold">{campaign.name}</span><span className="mt-1 block truncate text-[10px] text-[var(--text-subtle)]">{campaign.audienceLabel} · {formatDate(campaign.updatedAt, timeZone)}</span></span>
       <span className={`badge ${statusTone[campaign.status]}`}>{statusLabel[campaign.status]}</span>
       <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-[var(--text-subtle)]" />
     </Link>

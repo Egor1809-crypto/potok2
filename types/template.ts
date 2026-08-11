@@ -39,6 +39,5 @@ export interface EmailTemplate {
   thumbnailVariant: "editorial" | "minimal" | "bold" | "classic";
   blocks: EmailBlock[];
   isFavorite: boolean;
-  usageCount: number;
   updatedAt: string;
 }

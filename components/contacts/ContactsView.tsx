@@ -30,7 +30,7 @@ import type {
 import { ContactDrawer } from "./ContactDrawer";
 
 type StatusFilter = "all" | ContactRecord["status"];
-type ContactDraft = ContactCreateInput & { email: string; tagsText: string };
+export type ContactDraft = ContactCreateInput & { email: string; tagsText: string };
 
 const statusLabel: Record<ContactRecord["status"], string> = {
   active: "Активен",
@@ -46,13 +46,6 @@ const statusTone: Record<ContactRecord["status"], string> = {
   invalid: "badge-danger",
 };
 
-const date = new Intl.DateTimeFormat("ru-RU", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  timeZone: "UTC",
-});
-
 const emptyDraft: ContactDraft = {
   firstName: "",
   lastName: "",
@@ -60,12 +53,13 @@ const emptyDraft: ContactDraft = {
   phone: "",
   companyName: "",
   jobTitle: "",
-  category: "",
+  category: "Клиент",
   city: "",
   country: "Россия",
   tags: [],
   tagsText: "",
   status: "active",
+  engagementScore: 0,
   emailConsent: false,
   telegramChatId: null,
   telegramConsent: false,
@@ -120,6 +114,7 @@ export function ContactsView() {
   const [editing, setEditing] = useState<ContactRecord | "new" | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [timezone, setTimezone] = useState("Europe/Moscow");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -129,6 +124,7 @@ export function ContactsView() {
       const payload: ContactsListResponse | ApiError = await response.json();
       if (!response.ok || !("contacts" in payload)) throw new Error(messageFrom(payload, "Не удалось загрузить контакты"));
       setContacts(payload.contacts);
+      setTimezone(payload.timezone);
       setSelected(new Set());
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Не удалось загрузить контакты");
@@ -155,6 +151,23 @@ export function ContactsView() {
   }, [contacts, search, status]);
 
   const selectedIds = useMemo(() => [...selected], [selected]);
+  const dateFormatter = useMemo(() => {
+    try {
+      return new Intl.DateTimeFormat("ru-RU", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        timeZone: timezone,
+      });
+    } catch {
+      return new Intl.DateTimeFormat("ru-RU", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        timeZone: "Europe/Moscow",
+      });
+    }
+  }, [timezone]);
   const allVisibleSelected = visible.length > 0 && visible.every((contact) => selected.has(contact.id));
   const activeCount = contacts.filter((contact) => contact.status === "active").length;
   const coverage = [
@@ -205,17 +218,32 @@ export function ContactsView() {
     if (!selectedIds.length || !window.confirm(`Удалить выбранные контакты: ${selectedIds.length}? Это действие нельзя отменить.`)) return;
     setBusy(true);
     setError("");
+    const deletedIds = new Set<string>();
     try {
       for (const id of selectedIds) {
         const response = await fetch(`/api/contacts?id=${encodeURIComponent(id)}`, { method: "DELETE" });
         const payload: unknown = await response.json().catch(() => null);
         if (!response.ok) throw new Error(messageFrom(payload, "Не удалось удалить контакты"));
+        deletedIds.add(id);
       }
-      setContacts((current) => current.filter((contact) => !selected.has(contact.id)));
+      setContacts((current) => current.filter((contact) => !deletedIds.has(contact.id)));
       setSelected(new Set());
       notify("Контакты удалены");
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Не удалось удалить контакты");
+      if (deletedIds.size) {
+        setContacts((current) => current.filter((contact) => !deletedIds.has(contact.id)));
+        setSelected((current) => {
+          const next = new Set(current);
+          deletedIds.forEach((id) => next.delete(id));
+          return next;
+        });
+      }
+      const message = reason instanceof Error ? reason.message : "Не удалось удалить контакты";
+      setError(
+        deletedIds.size
+          ? `Удалено контактов: ${deletedIds.size}. Остальные не удалены: ${message}`
+          : message,
+      );
     } finally {
       setBusy(false);
     }
@@ -223,10 +251,49 @@ export function ContactsView() {
 
   const exportCsv = () => {
     const source = selectedIds.length ? contacts.filter((contact) => selected.has(contact.id)) : visible;
-    const escape = (value: string) => `"${value.replaceAll('"', '""')}"`;
+    const escape = (value: string) => {
+      const guarded = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+      return `"${guarded.replaceAll('"', '""')}"`;
+    };
     const rows = [
-      ["Имя", "Фамилия", "Email", "Телефон", "Компания", "Должность", "Город", "Статус", "Теги"],
-      ...source.map((contact) => [contact.firstName, contact.lastName, contact.email, contact.phone, contact.companyName, contact.jobTitle, contact.city, statusLabel[contact.status], contact.tags.join(", ")]),
+      [
+        "Имя",
+        "Фамилия",
+        "Email",
+        "Согласие Email",
+        "Телефон",
+        "Компания",
+        "Должность",
+        "Категория",
+        "Город",
+        "Страна",
+        "Статус",
+        "Вовлечённость",
+        "Идентификатор чата Telegram",
+        "Согласие Telegram",
+        "Идентификатор пользователя ВКонтакте",
+        "Согласие ВКонтакте",
+        "Теги",
+      ],
+      ...source.map((contact) => [
+        contact.firstName,
+        contact.lastName,
+        contact.email,
+        contact.emailConsent ? "да" : "нет",
+        contact.phone,
+        contact.companyName,
+        contact.jobTitle,
+        contact.category,
+        contact.city,
+        contact.country,
+        statusLabel[contact.status],
+        String(contact.engagementScore),
+        contact.telegramChatId ?? "",
+        contact.telegramConsent ? "да" : "нет",
+        contact.vkUserId ?? "",
+        contact.vkConsent ? "да" : "нет",
+        contact.tags.join(", "),
+      ]),
     ];
     const blob = new Blob(["\uFEFF", rows.map((row) => row.map(escape).join(";")).join("\n")], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -274,7 +341,7 @@ export function ContactsView() {
         <div className="flex flex-col gap-3 border-b border-[var(--border)] p-3 sm:flex-row sm:items-center">
           <label className="relative min-w-0 flex-1"><span className="sr-only">Поиск контактов</span><Search aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--text-subtle)]" /><input className="input pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Имя, email, компания или тег" /></label>
           <label className="sm:w-52"><span className="sr-only">Фильтр по статусу</span><select className="input" value={status} onChange={(event) => setStatus(event.target.value as StatusFilter)}><option value="all">Все статусы</option><option value="active">Активные</option><option value="unsubscribed">Отписанные</option><option value="bounced">Недоставляемые</option><option value="invalid">Некорректные</option></select></label>
-          <button type="button" onClick={exportCsv} disabled={!visible.length} className="btn btn-secondary gap-2"><Download aria-hidden="true" className="size-4" />Экспорт</button>
+          <button type="button" onClick={exportCsv} disabled={!selectedIds.length && !visible.length} className="btn btn-secondary gap-2"><Download aria-hidden="true" className="size-4" />Экспорт</button>
         </div>
 
         {loading ? (
@@ -287,7 +354,7 @@ export function ContactsView() {
                 const checked = selected.has(contact.id);
                 const readyChannels = [contact.email && contact.emailConsent && contact.status === "active", contact.status === "active" && contact.telegramChatId && contact.telegramConsent, contact.status === "active" && contact.vkUserId && contact.vkConsent].filter(Boolean).length;
                 const primaryEndpoint = contact.email || (contact.telegramChatId ? `Telegram: ${contact.telegramChatId}` : contact.vkUserId ? `ВК: ${contact.vkUserId}` : "Канал не указан");
-                return <tr key={contact.id} data-selected={checked}><td><button type="button" onClick={() => setSelected((current) => { const next = new Set(current); if (next.has(contact.id)) next.delete(contact.id); else next.add(contact.id); return next; })} aria-label={`Выбрать ${contact.fullName}`} className={`grid size-4 place-items-center rounded border ${checked ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-[var(--border-strong)] bg-white"}`}>{checked && <Check aria-hidden="true" className="size-3" />}</button></td><td><button type="button" onClick={() => setDrawerContact(contact)} className="flex items-center gap-3 text-left"><span className="grid size-9 shrink-0 place-items-center rounded-full text-[10px] font-semibold text-white" style={{ backgroundColor: contact.avatarColor }}>{contact.firstName[0]}{contact.lastName[0]}</span><span><span className="block text-[12px] font-semibold hover:text-[var(--primary)]">{contact.fullName}</span><span className="mt-0.5 block text-[10px] text-[var(--text-subtle)]">{primaryEndpoint}</span></span></button></td><td><p className="text-[11px] font-medium">{contact.companyName || "—"}</p><p className="mt-0.5 text-[10px] text-[var(--text-subtle)]">{contact.jobTitle || "Должность не указана"}</p></td><td><span className={`badge ${readyChannels ? "badge-info" : "badge-warning"}`}>{readyChannels ? `${readyChannels} из 3` : "Нет доступных"}</span></td><td><span className={`badge ${statusTone[contact.status]}`}>{statusLabel[contact.status]}</span></td><td className="text-[11px] text-[var(--text-muted)]">{date.format(new Date(contact.updatedAt))}</td><td><button type="button" onClick={() => setEditing(contact)} className="grid size-8 place-items-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface-subtle)]" aria-label={`Изменить ${contact.fullName}`}><Pencil aria-hidden="true" className="size-4" /></button></td></tr>;
+                return <tr key={contact.id} data-selected={checked}><td><button type="button" onClick={() => setSelected((current) => { const next = new Set(current); if (next.has(contact.id)) next.delete(contact.id); else next.add(contact.id); return next; })} aria-label={`Выбрать ${contact.fullName}`} className={`grid size-4 place-items-center rounded border ${checked ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-[var(--border-strong)] bg-white"}`}>{checked && <Check aria-hidden="true" className="size-3" />}</button></td><td><button type="button" onClick={() => setDrawerContact(contact)} className="flex items-center gap-3 text-left"><span className="grid size-9 shrink-0 place-items-center rounded-full text-[10px] font-semibold text-white" style={{ backgroundColor: contact.avatarColor }}>{contact.firstName[0]}{contact.lastName[0]}</span><span><span className="block text-[12px] font-semibold hover:text-[var(--primary)]">{contact.fullName}</span><span className="mt-0.5 block text-[10px] text-[var(--text-subtle)]">{primaryEndpoint}</span></span></button></td><td><p className="text-[11px] font-medium">{contact.companyName || "—"}</p><p className="mt-0.5 text-[10px] text-[var(--text-subtle)]">{contact.jobTitle || "Должность не указана"}</p></td><td><span className={`badge ${readyChannels ? "badge-info" : "badge-warning"}`}>{readyChannels ? `${readyChannels} из 3` : "Нет доступных"}</span></td><td><span className={`badge ${statusTone[contact.status]}`}>{statusLabel[contact.status]}</span></td><td className="text-[11px] text-[var(--text-muted)]">{dateFormatter.format(new Date(contact.updatedAt))}</td><td><button type="button" onClick={() => setEditing(contact)} className="grid size-8 place-items-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface-subtle)]" aria-label={`Изменить ${contact.fullName}`}><Pencil aria-hidden="true" className="size-4" /></button></td></tr>;
               })}</tbody>
             </table>
           </div>
@@ -298,14 +365,14 @@ export function ContactsView() {
         <div className="flex flex-col gap-2 border-t border-[var(--border)] px-4 py-3 text-[11px] text-[var(--text-muted)] sm:flex-row sm:items-center sm:justify-between"><span>Найдено: {visible.length}</span>{selectedIds.length > 0 && <div className="flex flex-wrap items-center gap-2"><span className="font-semibold text-[var(--text-strong)]">Выбрано: {selectedIds.length}</span><button type="button" onClick={() => void removeSelected()} disabled={busy} className="btn btn-danger btn-sm gap-2"><Trash2 aria-hidden="true" className="size-3.5" />Удалить</button><button type="button" onClick={() => setSelected(new Set())} className="btn btn-ghost btn-sm gap-2"><X aria-hidden="true" className="size-3.5" />Снять выбор</button></div>}</div>
       </section>
 
-      {drawerContact && <ContactDrawer contact={drawerContact} onClose={() => setDrawerContact(null)} onEdit={(contact) => { setDrawerContact(null); setEditing(contact); }} />}
+      {drawerContact && <ContactDrawer contact={drawerContact} timezone={timezone} onClose={() => setDrawerContact(null)} onEdit={(contact) => { setDrawerContact(null); setEditing(contact); }} />}
       {editing && <ContactFormDialog contact={editing === "new" ? null : editing} busy={busy} onClose={() => setEditing(null)} onSave={saveContact} />}
       {notice && <div role="status" aria-live="polite" className="fixed bottom-6 right-6 z-[100] flex items-center gap-2 rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-[12px] font-semibold shadow-[var(--shadow-floating)]"><span className="grid size-5 place-items-center rounded-full bg-[var(--success-subtle)] text-[var(--success)]"><Check aria-hidden="true" className="size-3" /></span>{notice}</div>}
     </div>
   );
 }
 
-function ContactFormDialog({ contact, busy, onClose, onSave }: { contact: ContactRecord | null; busy: boolean; onClose: () => void; onSave: (draft: ContactDraft) => Promise<void> }) {
+export function ContactFormDialog({ contact, busy, onClose, onSave }: { contact: ContactRecord | null; busy: boolean; onClose: () => void; onSave: (draft: ContactDraft) => Promise<void> }) {
   const [draft, setDraft] = useState<ContactDraft>(() => contact ? toDraft(contact) : emptyDraft);
   const [error, setError] = useState("");
   const panelRef = useRef<HTMLElement>(null);
@@ -341,7 +408,9 @@ function ContactFormDialog({ contact, busy, onClose, onSave }: { contact: Contac
               <div className="grid gap-4 sm:grid-cols-2"><Field label="Имя" required value={draft.firstName} onChange={(value) => update("firstName", value)} /><Field label="Фамилия" required value={draft.lastName} onChange={(value) => update("lastName", value)} /></div>
               <div className="grid gap-4 sm:grid-cols-2"><Field label="Email" type="email" value={draft.email} onChange={(value) => update("email", value)} placeholder="Можно оставить пустым для Telegram или ВКонтакте" /><Field label="Телефон" value={draft.phone ?? ""} onChange={(value) => update("phone", value)} /></div>
               <div className="grid gap-4 sm:grid-cols-2"><Field label="Компания" value={draft.companyName ?? ""} onChange={(value) => update("companyName", value)} /><Field label="Должность" value={draft.jobTitle ?? ""} onChange={(value) => update("jobTitle", value)} /></div>
-              <div className="grid gap-4 sm:grid-cols-2"><Field label="Город" value={draft.city ?? ""} onChange={(value) => update("city", value)} /><label><span className="mb-1.5 block text-[12px] font-semibold">Статус</span><select className="input" value={draft.status} onChange={(event) => update("status", event.target.value as ContactRecord["status"])}><option value="active">Активен</option><option value="unsubscribed">Отписан</option><option value="bounced">Недоставляемый</option><option value="invalid">Некорректный адрес</option></select></label></div>
+              <div className="grid gap-4 sm:grid-cols-2"><Field label="Категория" value={draft.category ?? ""} onChange={(value) => update("category", value)} placeholder="Например, клиент или партнёр" /><label><span className="mb-1.5 block text-[12px] font-semibold">Вовлечённость</span><input type="number" min={0} max={100} required className="input" value={draft.engagementScore ?? 0} onChange={(event) => update("engagementScore", Number(event.target.value))} /><span className="mt-1 block text-[10px] text-[var(--text-subtle)]">Оценка от 0 до 100 для сегментации.</span></label></div>
+              <div className="grid gap-4 sm:grid-cols-2"><Field label="Город" value={draft.city ?? ""} onChange={(value) => update("city", value)} /><Field label="Страна" value={draft.country ?? ""} onChange={(value) => update("country", value)} /></div>
+              <label><span className="mb-1.5 block text-[12px] font-semibold">Статус</span><select className="input" value={draft.status} onChange={(event) => update("status", event.target.value as ContactRecord["status"])}><option value="active">Активен</option><option value="unsubscribed">Отписан</option><option value="bounced">Недоставляемый</option><option value="invalid">Некорректный адрес</option></select></label>
               <Field label="Теги через запятую" value={draft.tagsText} onChange={(value) => update("tagsText", value)} placeholder="Клиент, Москва, VIP" />
             </FormGroup>
 

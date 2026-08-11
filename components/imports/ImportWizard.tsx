@@ -23,6 +23,7 @@ import {
   ArrowRight,
   Check,
   CheckCircle2,
+  Download,
   FileText,
   Loader2,
   RotateCcw,
@@ -66,6 +67,7 @@ const issueLabels: Record<RowIssue, string> = {
   "duplicate-existing": "Уже есть в базе",
   "missing-name": "Нет имени или фамилии",
   "invalid-status": "Неизвестный статус",
+  "invalid-score": "Вовлечённость вне диапазона 0–100",
   "value-too-long": "Слишком длинное значение",
   "invalid-channel": "Проверьте идентификатор и согласие канала",
 };
@@ -90,6 +92,53 @@ function splitIntoBatches<T>(values: T[], size: number): T[][] {
     result.push(values.slice(index, index + size));
   }
   return result;
+}
+
+function downloadSampleCsv() {
+  const rows = [
+    [
+      "Имя",
+      "Фамилия",
+      "Email",
+      "Согласие Email",
+      "Компания",
+      "Категория",
+      "Город",
+      "Статус",
+      "Вовлечённость",
+      "Идентификатор чата Telegram",
+      "Согласие Telegram",
+      "Идентификатор пользователя ВКонтакте",
+      "Согласие ВКонтакте",
+      "Теги",
+    ],
+    [
+      "Анна",
+      "Петрова",
+      "anna@example.ru",
+      "да",
+      "Альфа",
+      "Клиент",
+      "Москва",
+      "Активен",
+      "70",
+      "",
+      "нет",
+      "",
+      "нет",
+      "клиент, приоритет",
+    ],
+  ];
+  const escape = (value: string) => `"${value.replaceAll('"', '""')}"`;
+  const content = rows.map((row) => row.map(escape).join(";")).join("\n");
+  const url = URL.createObjectURL(
+    new Blob(["\uFEFF", content], { type: "text/csv;charset=utf-8" }),
+  );
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = "mailflow-import-example.csv";
+  anchor.click();
+  URL.revokeObjectURL(url);
 }
 
 export function ImportWizard() {
@@ -182,12 +231,16 @@ export function ImportWizard() {
 
   const startImport = async () => {
     if (!validation || importingRef.current) return;
+    const hasMappedEmailConsent = mapping.includes("emailConsent");
     const contacts = validation.rows
       .map((row) => row.input)
       .filter((input): input is ContactCreateInput => input !== null)
       .map((input) => ({
         ...input,
-        emailConsent: Boolean(input.email) && emailConsentConfirmed,
+        emailConsent:
+          Boolean(input.email) &&
+          emailConsentConfirmed &&
+          (!hasMappedEmailConsent || Boolean(input.emailConsent)),
       }));
     if (contacts.length === 0) return;
 
@@ -262,6 +315,7 @@ export function ImportWizard() {
     readyCount > 0
       ? Math.min(100, Math.round((importRun.processed / readyCount) * 100))
       : 0;
+  const hasMappedEmailConsent = mapping.includes("emailConsent");
 
   return (
     <div className="mx-auto max-w-[1040px] space-y-5">
@@ -387,6 +441,15 @@ export function ImportWizard() {
               </div>
             ))}
           </div>
+
+          <button
+            type="button"
+            onClick={downloadSampleCsv}
+            className="btn btn-secondary mx-auto mt-5 gap-2"
+          >
+            <Download size={13} />
+            Скачать пример CSV
+          </button>
         </section>
       )}
 
@@ -509,6 +572,7 @@ export function ImportWizard() {
                     validation.summary.missingName +
                       validation.summary.columnCount +
                       validation.summary.invalidStatus +
+                      validation.summary.invalidScore +
                       validation.summary.valueTooLong +
                       validation.summary.invalidChannel,
                     "Другие ошибки",
@@ -600,15 +664,17 @@ export function ImportWizard() {
                       htmlFor="import-email-consent"
                       className="block cursor-pointer text-[10px] font-semibold"
                     >
-                      У всех импортируемых контактов с email есть
-                      согласие на email-рассылку
+                      {hasMappedEmailConsent
+                        ? "Подтверждаю достоверность email-согласий из CSV"
+                        : "У всех импортируемых контактов с email есть согласие на email-рассылку"}
                     </label>
                     <span
                       id="import-email-consent-help"
                       className="mt-1 block text-[9px] leading-4 text-[var(--text-tertiary)]"
                     >
-                      Отмечайте только если согласие уже получено. Без
-                      отметки контакты сохранятся без email-согласия.
+                      {hasMappedEmailConsent
+                        ? "Согласие будет записано только у строк со значением «да» или «1». Без подтверждения все контакты сохранятся без email-согласия."
+                        : "Отмечайте только если согласие уже получено. Без отметки контакты сохранятся без email-согласия."}
                     </span>
                   </span>
                 </div>
@@ -721,7 +787,9 @@ export function ImportWizard() {
             {readyEmailCount > 0 && (
             <p className="mt-3 text-left text-[9px] leading-4 text-[var(--text-tertiary)]">
               {emailConsentConfirmed
-                ? "Email-согласие записано для созданных контактов с email."
+                ? hasMappedEmailConsent
+                  ? "Email-согласие записано только для подтверждённых строк CSV."
+                  : "Email-согласие записано для созданных контактов с email."
                 : "Контакты с email созданы без email-согласия."}
             </p>
             )}
@@ -781,7 +849,7 @@ export function ImportWizard() {
         <FileText size={14} className="mt-0.5 shrink-0" />
         <p>
           Email-согласие записывается только после явного подтверждения
-          перед импортом. Для Telegram и VK сопоставьте ID и столбец
+          перед импортом. Для Telegram и ВКонтакте сопоставьте идентификатор и столбец
           согласия со значениями «да/нет» или «1/0».
         </p>
       </aside>

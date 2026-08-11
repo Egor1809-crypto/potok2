@@ -2,8 +2,12 @@ import {
   BarChart3,
   Cable,
   ContactRound,
+  FileUp,
   LayoutDashboard,
+  LayoutTemplate,
   Megaphone,
+  PenLine,
+  Settings,
   Shapes,
   UsersRound,
 } from "lucide-react";
@@ -25,9 +29,9 @@ export type ProductNavGroup = {
 };
 
 /**
- * Шесть разделов повторяют реальный рабочий маршрут: база → аудитория →
- * кампания → каналы → результат. Импорт, шаблоны и редактор открываются
- * из контекста задачи и не перегружают навигацию.
+ * Разделы повторяют реальный рабочий маршрут: база → аудитория → сообщение →
+ * кампания → каналы → результат. Инструменты подготовки письма должны быть
+ * видны постоянно, а не прятаться внутри мастера кампании.
  */
 export const productNavigation: ProductNavGroup[] = [
   {
@@ -63,6 +67,23 @@ export const productNavigation: ProductNavGroup[] = [
         keywords: ["рассылка", "email", "telegram", "вконтакте", "шаблоны"],
       },
       {
+        label: "Шаблоны писем",
+        description: "Создание и редактирование писем",
+        href: "/templates",
+        icon: LayoutTemplate,
+        keywords: ["письмо", "дизайн", "типограф", "редактор", "email"],
+        children: [
+          {
+            label: "Конструктор писем",
+            description: "Собрать письмо из блоков",
+            href: "/email-builder",
+            icon: PenLine,
+            exact: true,
+            keywords: ["редактор", "контент", "блоки", "email"],
+          },
+        ],
+      },
+      {
         label: "Каналы",
         description: "Провайдеры email, Telegram и ВК",
         href: "/integrations",
@@ -71,10 +92,10 @@ export const productNavigation: ProductNavGroup[] = [
       },
       {
         label: "Результаты",
-        description: "Доставка и отклик по кампаниям",
+        description: "Задания провайдерам и ошибки",
         href: "/analytics",
         icon: BarChart3,
-        keywords: ["аналитика", "отчёты", "метрики", "эффективность"],
+        keywords: ["аналитика", "отчёты", "задания", "ошибки", "экспорт"],
       },
     ],
   },
@@ -95,6 +116,25 @@ export const quickCreateRoutes: ProductNavItem[] = [
     icon: Shapes,
     exact: true,
     keywords: ["новая", "создать", "отправить"],
+  },
+];
+
+export const secondaryProductRoutes: ProductNavItem[] = [
+  {
+    label: "Импорт контактов",
+    description: "Загрузить и проверить файл CSV",
+    href: "/import",
+    icon: FileUp,
+    exact: true,
+    keywords: ["csv", "загрузка", "добавить контакты"],
+  },
+  {
+    label: "Настройки",
+    description: "Аккаунт, отправитель и данные",
+    href: "/settings",
+    icon: Settings,
+    exact: true,
+    keywords: ["аккаунт", "профиль", "часовой пояс", "экспорт"],
   },
 ];
 

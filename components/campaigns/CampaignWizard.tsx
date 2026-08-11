@@ -22,7 +22,6 @@ import {
   UsersRound,
 } from "lucide-react";
 
-import { templates } from "@/data/templates";
 import {
   Alert,
   Badge,
@@ -44,6 +43,20 @@ import {
   type CampaignChannel,
 } from "./campaignChannels";
 import {
+  campaignEmailPatchFromTemplate,
+  patchEmailDocumentMetadata,
+  resolveCampaignTemplateId,
+  shouldApplyTemplateQuery,
+  unlinkEmailTemplateDocument,
+} from "@/lib/campaign-email-draft";
+import {
+  campaignHandoffStorageKey,
+  createCampaignHandoffToken,
+  normalizeCampaignHandoffToken,
+  readCampaignHandoffSnapshot,
+  writeCampaignHandoffSnapshot,
+} from "@/lib/campaign-handoff";
+import {
   PREFERRED_PROVIDERS_STORAGE_KEY,
   integrationProviderById,
   type IntegrationProviderId,
@@ -57,6 +70,8 @@ import type {
   ContactRecord,
   DeliveryPlanRecord,
   EmailBuilderDocumentInput,
+  EmailTemplateRecord,
+  EmailTemplatesListResponse,
   IntegrationConnectionStatus,
   SegmentRecord,
   WorkspaceSnapshot,
@@ -96,6 +111,8 @@ type WizardDraft = {
   previewText: string;
   emailBodyText: string;
   emailBuilderDocument: EmailBuilderDocumentInput | null;
+  templateId: string | null;
+  consumedTemplateQueryId: string | null;
   messengerMessage: string;
   channels: CampaignChannel[];
   providers: Record<CampaignChannel, IntegrationProviderId>;
@@ -108,11 +125,6 @@ export type CampaignWizardSearchParams = Record<string, string | string[] | unde
 export interface CampaignWizardProps {
   searchParams?: CampaignWizardSearchParams | URLSearchParams;
 }
-
-const WIZARD_DRAFT_KEY = "mailflow:campaign-wizard-draft-v2";
-const EMAIL_BUILDER_DRAFT_KEY = "mailflow:email-draft";
-const CAMPAIGN_WIZARD_HANDOFF_STORAGE_PREFIX = "mailflow:campaign-wizard-handoff:";
-const CAMPAIGN_WIZARD_HANDOFF_TOKEN = "current-campaign";
 
 const steps = [
   { label: "Аудитория", description: "Кому отправляем" },
@@ -135,28 +147,23 @@ const connectionLabels: Record<ConnectionStatus, string> = {
 
 function subscribeToBrowser(onStoreChange: () => void) {
   window.addEventListener("popstate", onStoreChange);
-  window.addEventListener("storage", onStoreChange);
   return () => {
     window.removeEventListener("popstate", onStoreChange);
-    window.removeEventListener("storage", onStoreChange);
   };
 }
 
 function getBrowserSnapshot() {
   let draft = "";
-  let builderDraft = "";
   try {
     const query = new URLSearchParams(window.location.search);
-    const handoffToken = query.get("handoff")?.replace(/[^a-zA-Z0-9_-]/g, "");
-    const handoffDraft = handoffToken
-      ? window.localStorage.getItem(`${CAMPAIGN_WIZARD_HANDOFF_STORAGE_PREFIX}${handoffToken}`) ?? ""
+    const handoffToken = normalizeCampaignHandoffToken(query.get("handoff"));
+    draft = handoffToken
+      ? readCampaignHandoffSnapshot(window.sessionStorage, handoffToken) ?? ""
       : "";
-    draft = handoffDraft || window.localStorage.getItem(WIZARD_DRAFT_KEY) || "";
-    builderDraft = window.localStorage.getItem(EMAIL_BUILDER_DRAFT_KEY) ?? "";
   } catch {
     // The wizard remains usable without local recovery.
   }
-  return JSON.stringify({ search: window.location.search, draft, builderDraft });
+  return JSON.stringify({ search: window.location.search, draft, builderDraft: draft });
 }
 
 function getServerSnapshot() {
@@ -189,10 +196,22 @@ function parseBuilderDraft(value: string) {
   try {
     const parsed = JSON.parse(value) as {
       campaignName?: string;
+      name?: string;
       document?: EmailBuilderDocumentInput;
+      builderDocument?: EmailBuilderDocumentInput;
+      emailBuilderDocument?: EmailBuilderDocumentInput;
       emailBodyText?: string;
+      templateId?: string | null;
     };
-    return parsed && typeof parsed === "object" ? parsed : null;
+    if (!parsed || typeof parsed !== "object") return null;
+    return {
+      campaignName: parsed.campaignName ?? parsed.name,
+      document: parsed.document ?? parsed.builderDocument ?? parsed.emailBuilderDocument,
+      emailBodyText: parsed.emailBodyText,
+      templateId: Object.prototype.hasOwnProperty.call(parsed, "templateId")
+        ? parsed.templateId ?? null
+        : undefined,
+    };
   } catch {
     return null;
   }
@@ -207,15 +226,6 @@ function parseStep(value: string | null) {
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat("ru-RU").format(value);
-}
-
-function templateToPlainText(template: (typeof templates)[number] | undefined) {
-  if (!template) return "";
-  return template.blocks
-    .filter((block) => !["logo", "image", "divider", "spacer", "social"].includes(block.type))
-    .map((block) => block.content.trim())
-    .filter(Boolean)
-    .join("\n\n");
 }
 
 function isProviderId(value: unknown): value is IntegrationProviderId {
@@ -280,15 +290,34 @@ export function CampaignWizard({ searchParams }: CampaignWizardProps) {
   };
   const providedSearch = serializeParams(searchParams);
   const resolvedSearch = providedSearch ?? snapshot.search.replace(/^\?/, "");
+  const resolvedParams = new URLSearchParams(resolvedSearch);
+  if (!normalizeCampaignHandoffToken(resolvedParams.get("handoff"))) {
+    return <CampaignWizardTokenBootstrap />;
+  }
 
   return (
     <CampaignWizardState
       key={`${resolvedSearch}:${snapshot.builderDraft}`}
-      params={new URLSearchParams(resolvedSearch)}
+      params={resolvedParams}
       recoveredDraft={safeParseDraft(snapshot.draft)}
       builderDraft={parseBuilderDraft(snapshot.builderDraft)}
     />
   );
+}
+
+function CampaignWizardTokenBootstrap() {
+  React.useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      const target = new URL(window.location.href);
+      if (!normalizeCampaignHandoffToken(target.searchParams.get("handoff"))) {
+        target.searchParams.set("handoff", createCampaignHandoffToken());
+        window.history.replaceState({}, "", `${target.pathname}${target.search}${target.hash}`);
+      }
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+  return <div className="card grid min-h-64 place-items-center p-8 text-center text-[12px] text-text-muted">Готовим изолированный черновик кампании…</div>;
 }
 
 function CampaignWizardState({
@@ -301,17 +330,21 @@ function CampaignWizardState({
   builderDraft: ReturnType<typeof parseBuilderDraft>;
 }) {
   const builderResult = params.get("builderDraft") === "1" ? builderDraft : null;
+  const handoffToken = normalizeCampaignHandoffToken(params.get("handoff"));
+  if (!handoffToken) throw new Error("Ключ черновика кампании не создан.");
+  const handoffStorageKey = campaignHandoffStorageKey(handoffToken);
   const sourceId = params.get("campaign") ?? params.get("draft") ?? params.get("duplicate");
   const duplicate = params.has("duplicate") || params.get("copy") === "1";
-  const queryTemplate = templates.find((template) => template.id === params.get("template"));
+  const queryTemplateId = params.get("template")?.trim() || null;
   const querySegmentId = params.get("segment") ?? params.get("audience");
   const queryContactIds = params.getAll("contact").filter(Boolean);
-  const hasExternalSeed = Boolean(resolvedSeed(params));
-  const seedDraft = hasExternalSeed ? null : recoveredDraft;
+  const seedDraft = recoveredDraft;
 
   const [apiMode, setApiMode] = React.useState<ApiMode>("loading");
   const [workspaceContacts, setWorkspaceContacts] = React.useState<AudienceContact[]>([]);
   const [workspaceSegments, setWorkspaceSegments] = React.useState<AudienceSegment[]>([]);
+  const [workspaceTemplates, setWorkspaceTemplates] = React.useState<EmailTemplateRecord[]>([]);
+  const [templateLoadState, setTemplateLoadState] = React.useState<"loading" | "ready" | "error">("loading");
   const [integrations, setIntegrations] = React.useState<IntegrationSnapshot[]>([]);
   const [currentStep, setCurrentStep] = React.useState(() => parseStep(params.get("step")));
   const [campaignId, setCampaignId] = React.useState<string | null>(
@@ -335,16 +368,28 @@ function CampaignWizardState({
     queryContactIds.length > 0 ? queryContactIds : seedDraft?.contactIds ?? [],
   );
   const [subject, setSubject] = React.useState(
-    builderResult?.document?.subject ?? queryTemplate?.subject ?? seedDraft?.subject ?? "",
+    builderResult?.document?.subject ?? seedDraft?.subject ?? "",
   );
   const [previewText, setPreviewText] = React.useState(
-    builderResult?.document?.previewText ?? queryTemplate?.previewText ?? seedDraft?.previewText ?? "",
+    builderResult?.document?.previewText ?? seedDraft?.previewText ?? "",
   );
   const [emailBodyText, setEmailBodyText] = React.useState(
-    builderResult?.emailBodyText ?? seedDraft?.emailBodyText ?? templateToPlainText(queryTemplate),
+    builderResult?.emailBodyText ?? seedDraft?.emailBodyText ?? "",
   );
   const [emailBuilderDocument, setEmailBuilderDocument] = React.useState<EmailBuilderDocumentInput | null>(
     builderResult?.document ?? seedDraft?.emailBuilderDocument ?? null,
+  );
+  const [templateId, setTemplateId] = React.useState<string | null>(() =>
+    resolveCampaignTemplateId({
+      builderRootTemplateId: builderResult?.templateId,
+      builderDocumentTemplateId: builderResult?.document?.templateId,
+      queryTemplateId,
+      draftTemplateId: seedDraft && Object.prototype.hasOwnProperty.call(seedDraft, "templateId")
+        ? seedDraft.templateId
+        : undefined,
+    }));
+  const [consumedTemplateQueryId, setConsumedTemplateQueryId] = React.useState<string | null>(
+    seedDraft?.consumedTemplateQueryId ?? null,
   );
   const [messengerMessage, setMessengerMessage] = React.useState(
     params.get("message") ?? seedDraft?.messengerMessage ?? "",
@@ -367,15 +412,27 @@ function CampaignWizardState({
   const [evaluation, setEvaluation] = React.useState<Evaluation | null>(null);
   const [finishedCampaign, setFinishedCampaign] = React.useState<{ id: string; status: string } | null>(null);
   const hydratedCampaignId = React.useRef<string | null>(null);
+  const hydratedQueryTemplateId = React.useRef<string | null>(null);
 
-  // Setter identities are stable; sourceId and duplicate are the only changing inputs.
+  // Setter identities are stable; only the source and copy mode alter hydration.
   // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const loadWorkspace = React.useCallback(async () => {
     setApiMode("loading");
     try {
-      const response = await fetch("/api/workspace", { headers: { Accept: "application/json" } });
+      const [response, templatesResponse] = await Promise.all([
+        fetch("/api/workspace", { headers: { Accept: "application/json" } }),
+        fetch("/api/templates", { headers: { Accept: "application/json" } }),
+      ]);
       if (!response.ok) throw new Error("Рабочее пространство недоступно");
       const body = await response.json() as WorkspaceSnapshot;
+      if (templatesResponse.ok) {
+        const templateBody = await templatesResponse.json() as EmailTemplatesListResponse;
+        setWorkspaceTemplates(Array.isArray(templateBody.templates) ? templateBody.templates : []);
+        setTemplateLoadState("ready");
+      } else {
+        setWorkspaceTemplates([]);
+        setTemplateLoadState("error");
+      }
       if (Array.isArray(body.contacts)) setWorkspaceContacts(body.contacts);
       if (Array.isArray(body.segments)) setWorkspaceSegments(body.segments);
       setIntegrations((body.integrations ?? []).flatMap((record) => {
@@ -405,6 +462,7 @@ function CampaignWizardState({
             setPreviewText,
             setEmailBodyText,
             setEmailBuilderDocument,
+            setTemplateId,
             setMessengerMessage,
             setChannels,
             setProviders,
@@ -425,7 +483,9 @@ function CampaignWizardState({
     } catch {
       setWorkspaceContacts([]);
       setWorkspaceSegments([]);
+      setWorkspaceTemplates([]);
       setIntegrations([]);
+      setTemplateLoadState("error");
       setApiMode("offline");
     }
   }, [duplicate, sourceId]);
@@ -434,6 +494,28 @@ function CampaignWizardState({
     const frame = window.requestAnimationFrame(() => void loadWorkspace());
     return () => window.cancelAnimationFrame(frame);
   }, [loadWorkspace]);
+
+  React.useEffect(() => {
+    if (!shouldApplyTemplateQuery(queryTemplateId, consumedTemplateQueryId) || sourceId || builderResult || templateLoadState !== "ready") return;
+    if (hydratedQueryTemplateId.current === queryTemplateId) return;
+    const frame = window.requestAnimationFrame(() => {
+      const template = workspaceTemplates.find((item) => item.id === queryTemplateId);
+      if (!template) {
+        setError("Выбранный email-шаблон не найден в рабочем пространстве.");
+        hydratedQueryTemplateId.current = queryTemplateId;
+        return;
+      }
+      const patch = campaignEmailPatchFromTemplate(template);
+      setTemplateId(patch.templateId);
+      setSubject(patch.subject);
+      setPreviewText(patch.previewText);
+      setEmailBodyText(patch.emailBodyText);
+      setEmailBuilderDocument(patch.emailBuilderDocument);
+      setConsumedTemplateQueryId(queryTemplateId);
+      hydratedQueryTemplateId.current = queryTemplateId;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [builderResult, consumedTemplateQueryId, queryTemplateId, sourceId, templateLoadState, workspaceTemplates]);
 
   const selectedSegment = workspaceSegments.find((segment) => segment.id === segmentId);
   const selectedContacts = workspaceContacts.filter((contact) => contactIds.includes(contact.id));
@@ -467,7 +549,15 @@ function CampaignWizardState({
 
   const clientBlockers = React.useMemo(() => {
     const blockers: string[] = [];
-    if (recipientCount <= 0) blockers.push("Выберите аудиторию хотя бы с одним получателем.");
+    if (audienceType === "none") {
+      blockers.push("Выберите сегмент или конкретные контакты.");
+    } else if (recipientCount <= 0) {
+      blockers.push(
+        audienceType === "segment"
+          ? "В выбранной аудитории пока нет контактов. Добавьте подходящие контакты или выберите другую аудиторию."
+          : "Выберите хотя бы один контакт.",
+      );
+    }
     if (!campaignName.trim()) blockers.push("Укажите название кампании.");
     if (channels.length === 0) blockers.push("Выберите хотя бы один канал доставки.");
     if (channels.includes("email") && !subject.trim()) blockers.push("Добавьте тему email-письма.");
@@ -486,7 +576,7 @@ function CampaignWizardState({
       }
     });
     return Array.from(new Set(blockers));
-  }, [campaignName, channels, emailBodyText, integrationByProvider, messengerMessage, providers, recipientCount, senderEmail, senderName, subject]);
+  }, [audienceType, campaignName, channels, emailBodyText, integrationByProvider, messengerMessage, providers, recipientCount, senderEmail, senderName, subject]);
 
   const draft: WizardDraft = {
     campaignId,
@@ -499,6 +589,8 @@ function CampaignWizardState({
     previewText,
     emailBodyText,
     emailBuilderDocument,
+    templateId,
+    consumedTemplateQueryId,
     messengerMessage,
     channels,
     providers,
@@ -509,31 +601,43 @@ function CampaignWizardState({
   const editorReturnParams = new URLSearchParams({
     step: "message",
     builderDraft: "1",
-    handoff: CAMPAIGN_WIZARD_HANDOFF_TOKEN,
+    handoff: handoffToken,
   });
   const editorQuery = new URLSearchParams({
     campaign: campaignName,
-    handoff: CAMPAIGN_WIZARD_HANDOFF_TOKEN,
+    handoff: handoffToken,
     returnTo: `/campaigns/new?${editorReturnParams.toString()}`,
   });
-  if (queryTemplate?.id) editorQuery.set("template", queryTemplate.id);
+  if (templateId) editorQuery.set("template", templateId);
   const editorHref = `/email-builder?${editorQuery.toString()}`;
+  const libraryReturnParams = new URLSearchParams({
+    step: "message",
+    handoff: handoffToken,
+  });
+  const templateLibraryQuery = new URLSearchParams({
+    campaign: campaignName,
+    returnTo: `/campaigns/new?${libraryReturnParams.toString()}`,
+    backTo: `/campaigns/new?${libraryReturnParams.toString()}`,
+  });
+  const templateLibraryHref = `/templates?${templateLibraryQuery.toString()}`;
 
   React.useEffect(() => {
     try {
-      window.localStorage.setItem(WIZARD_DRAFT_KEY, draftJson);
-      window.localStorage.setItem(
-        `${CAMPAIGN_WIZARD_HANDOFF_STORAGE_PREFIX}${CAMPAIGN_WIZARD_HANDOFF_TOKEN}`,
-        draftJson,
-      );
+      writeCampaignHandoffSnapshot(window.sessionStorage, handoffToken, draftJson);
     } catch {
       // API saving remains available if browser recovery is disabled.
     }
-  }, [draftJson]);
+  }, [draftJson, handoffStorageKey, handoffToken]);
 
   const validateStep = (step: number) => {
     let message: string | null = null;
-    if (step === 0 && recipientCount <= 0) message = "Выберите сегмент или хотя бы один контакт.";
+    if (step === 0 && audienceType === "none") {
+      message = "Выберите сегмент или конкретные контакты.";
+    } else if (step === 0 && recipientCount <= 0) {
+      message = audienceType === "segment"
+        ? "В выбранной аудитории пока нет контактов. Добавьте подходящие контакты или выберите другую аудиторию."
+        : "Выберите хотя бы один контакт.";
+    }
     if (step === 1 && !campaignName.trim()) message = "Укажите название кампании.";
     if (step === 1 && channels.includes("email") && (!subject.trim() || !emailBodyText.trim())) {
       message = "Заполните тему и текст email-письма.";
@@ -586,6 +690,7 @@ function CampaignWizardState({
     previewText: previewText.trim(),
     emailBodyText: emailBodyText.trim(),
     emailBuilderDocument,
+    templateId,
     messengerMessage: messengerMessage.trim(),
     channels: channels.map((channel) => ({
       channel,
@@ -633,12 +738,6 @@ function CampaignWizardState({
 
       setApiMode("online");
       setCampaignId(body.campaign.id);
-      try {
-        window.localStorage.removeItem(WIZARD_DRAFT_KEY);
-      } catch {
-        // The durable API already contains the campaign.
-      }
-
       if (action === "save") {
         setNotice("Черновик сохранён в рабочем пространстве.");
         return;
@@ -653,6 +752,11 @@ function CampaignWizardState({
       if (serverEvaluation.blockers.length > 0 || serverEvaluation.status === "blocked") {
         setError("План не готов: устраните причины, затем повторите проверку.");
       } else {
+        try {
+          window.sessionStorage.removeItem(handoffStorageKey);
+        } catch {
+          // The durable API already contains the ready campaign.
+        }
         setFinishedCampaign({
           id: body.campaign.id,
           status: body.campaign.status ?? serverEvaluation.status ?? "ready",
@@ -763,14 +867,62 @@ function CampaignWizardState({
               campaignName={campaignName}
               onCampaignNameChange={setCampaignName}
               subject={subject}
-              onSubjectChange={(value) => { setSubject(value); setEmailBuilderDocument(null); }}
+              onSubjectChange={(value) => {
+                setSubject(value);
+                setEmailBuilderDocument((current) => patchEmailDocumentMetadata(current, { subject: value }));
+              }}
               previewText={previewText}
-              onPreviewTextChange={(value) => { setPreviewText(value); setEmailBuilderDocument(null); }}
+              onPreviewTextChange={(value) => {
+                setPreviewText(value);
+                setEmailBuilderDocument((current) => patchEmailDocumentMetadata(current, { previewText: value }));
+              }}
               emailBodyText={emailBodyText}
-              onEmailBodyTextChange={(value) => { setEmailBodyText(value); setEmailBuilderDocument(null); }}
+              visualDocumentActive={Boolean(emailBuilderDocument)}
+              onEmailBodyTextChange={(value) => {
+                if (
+                  emailBuilderDocument &&
+                  !window.confirm("Перейти к обычному тексту? Визуальная структура письма будет отвязана от кампании, но сам текст сохранится.")
+                ) return;
+                setEmailBodyText(value);
+                setEmailBuilderDocument(null);
+                setTemplateId(null);
+                if (queryTemplateId) setConsumedTemplateQueryId(queryTemplateId);
+              }}
+              templates={workspaceTemplates}
+              templateId={templateId}
+              templateLoadState={templateLoadState}
+              onTemplateChange={(nextTemplateId) => {
+                if (!nextTemplateId) {
+                  setTemplateId(null);
+                  setEmailBuilderDocument(unlinkEmailTemplateDocument);
+                  if (queryTemplateId) setConsumedTemplateQueryId(queryTemplateId);
+                  setEvaluation(null);
+                  return;
+                }
+                if (
+                  nextTemplateId !== templateId &&
+                  (subject.trim() || previewText.trim() || emailBodyText.trim()) &&
+                  !window.confirm("Заменить текущее email-письмо выбранным шаблоном? Тема, прехедер, текст и визуальный макет будут заменены.")
+                ) return;
+                const template = workspaceTemplates.find((item) => item.id === nextTemplateId);
+                if (!template) {
+                  setError("Шаблон не загружен. Обновите библиотеку и повторите выбор.");
+                  return;
+                }
+                const patch = campaignEmailPatchFromTemplate(template);
+                setTemplateId(patch.templateId);
+                setSubject(patch.subject);
+                setPreviewText(patch.previewText);
+                setEmailBodyText(patch.emailBodyText);
+                setEmailBuilderDocument(patch.emailBuilderDocument);
+                if (queryTemplateId) setConsumedTemplateQueryId(queryTemplateId);
+                setEvaluation(null);
+                setError(null);
+              }}
               messengerMessage={messengerMessage}
               onMessengerMessageChange={setMessengerMessage}
               editorHref={editorHref}
+              templateLibraryHref={templateLibraryHref}
             />
           ) : null}
 
@@ -850,11 +1002,6 @@ function CampaignWizardState({
   );
 }
 
-function resolvedSeed(params: URLSearchParams) {
-  return ["campaign", "draft", "duplicate", "template", "audience", "segment", "contact", "channel", "name"]
-    .some((key) => params.has(key));
-}
-
 function countAudienceReachable(contacts: AudienceContact[], channel: CampaignChannel) {
   return contacts.filter((contact) => {
     if (contact.status !== "active") return false;
@@ -881,6 +1028,7 @@ function hydrateFromApiCampaign(
     setPreviewText: (value: string) => void;
     setEmailBodyText: (value: string) => void;
     setEmailBuilderDocument: (value: EmailBuilderDocumentInput | null) => void;
+    setTemplateId: (value: string | null) => void;
     setMessengerMessage: (value: string) => void;
     setChannels: (value: CampaignChannel[]) => void;
     setProviders: React.Dispatch<React.SetStateAction<Record<CampaignChannel, IntegrationProviderId>>>;
@@ -897,6 +1045,7 @@ function hydrateFromApiCampaign(
   setters.setPreviewText(item.previewText);
   setters.setEmailBodyText(item.emailBodyText);
   setters.setEmailBuilderDocument(item.emailBuilderDocument);
+  setters.setTemplateId(item.templateId);
   setters.setMessengerMessage(item.messengerMessage);
   setters.setSenderName(item.senderName);
   setters.setSenderEmail(item.senderEmail);
@@ -1043,9 +1192,15 @@ function MessageStep({
   onPreviewTextChange,
   emailBodyText,
   onEmailBodyTextChange,
+  visualDocumentActive,
+  templates,
+  templateId,
+  templateLoadState,
+  onTemplateChange,
   messengerMessage,
   onMessengerMessageChange,
   editorHref,
+  templateLibraryHref,
 }: {
   campaignName: string;
   onCampaignNameChange: (value: string) => void;
@@ -1055,10 +1210,17 @@ function MessageStep({
   onPreviewTextChange: (value: string) => void;
   emailBodyText: string;
   onEmailBodyTextChange: (value: string) => void;
+  visualDocumentActive: boolean;
+  templates: EmailTemplateRecord[];
+  templateId: string | null;
+  templateLoadState: "loading" | "ready" | "error";
+  onTemplateChange: (value: string) => void;
   messengerMessage: string;
   onMessengerMessageChange: (value: string) => void;
   editorHref: string;
+  templateLibraryHref: string;
 }) {
+  const selectedTemplate = templates.find((template) => template.id === templateId);
   return (
     <div>
       <StepIntro number={2} title="Подготовьте сообщение" description="Создайте email-версию и короткий вариант для мессенджеров. На следующем шаге выберите, какие версии отправлять." />
@@ -1067,6 +1229,38 @@ function MessageStep({
           <Input id="campaign-name" value={campaignName} onChange={(event) => onCampaignNameChange(event.target.value)} />
         </FormField>
       </div>
+      <section className="mt-5 rounded-xl border border-border bg-surface-subtle/45 p-4" aria-labelledby="campaign-template-title">
+        <div className="grid gap-3 md:grid-cols-[minmax(240px,1fr)_auto] md:items-end">
+          <FormField
+            label="Email-шаблон"
+            htmlFor="campaign-template"
+            hint={selectedTemplate
+              ? `В кампанию попадёт копия «${selectedTemplate.name}», а не живая ссылка.`
+              : "Можно начать с чистого листа или выбрать сохранённый макет."}
+          >
+            <Select
+              id="campaign-template"
+              value={templateId ?? ""}
+              disabled={templateLoadState !== "ready"}
+              onChange={(event) => onTemplateChange(event.target.value)}
+              options={[
+                { value: "", label: "Без шаблона · сохранить текущий текст" },
+                ...templates.map((template) => ({ value: template.id, label: template.name })),
+              ]}
+            />
+          </FormField>
+          <Link href={templateLibraryHref} className={buttonVariants({ variant: "secondary", size: "sm" })}>
+            Открыть библиотеку
+          </Link>
+        </div>
+        {templateLoadState === "loading" ? (
+          <p className="mt-3 text-[11px] text-text-muted">Загружаем шаблоны рабочего пространства…</p>
+        ) : templateLoadState === "error" ? (
+          <Alert tone="warning" title="Библиотека недоступна" className="mt-3">
+            Письмо можно заполнить вручную, но выбрать серверный шаблон до восстановления связи нельзя.
+          </Alert>
+        ) : null}
+      </section>
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <section className="rounded-xl border border-border p-5" aria-labelledby="email-message-title">
           <div className="flex items-center gap-3">
@@ -1086,6 +1280,11 @@ function MessageStep({
             <FormField label="Текст письма" htmlFor="campaign-email-message" hint={`${emailBodyText.length} символов`}>
               <Textarea id="campaign-email-message" rows={8} value={emailBodyText} onChange={(event) => onEmailBodyTextChange(event.target.value)} placeholder="Здравствуйте, {{first_name}}…" />
             </FormField>
+            {visualDocumentActive ? (
+              <p className="rounded-lg border border-info/20 bg-info-subtle px-3 py-2 text-[10px] leading-4 text-text-muted">
+                Сейчас подключён блочный макет. Тема и прехедер обновляются без потери дизайна; ручное изменение текстовой версии явно переведёт письмо в обычный текст.
+              </p>
+            ) : null}
             <Link href={editorHref} className={buttonVariants({ variant: "secondary", size: "sm" })}>
               <PencilLine aria-hidden="true" className="size-3.5" />
               Открыть визуальный редактор
@@ -1336,7 +1535,15 @@ function CampaignSummary({
       <dl className="mt-5 space-y-4">
         <SummaryRow icon={<Send aria-hidden="true" className="size-4" />} label="Кампания" value={campaignName || "Не названа"} />
         <SummaryRow icon={<UsersRound aria-hidden="true" className="size-4" />} label="Аудитория" value={`${audienceLabel} · ${formatNumber(recipientCount)}`} />
-        <SummaryRow icon={<ShieldCheck aria-hidden="true" className="size-4" />} label="Маршруты" value={channels.length ? channels.map((channel) => `${getCampaignChannelDefinition(channel).shortLabel}: ${integrationProviderById[providers[channel]].name}`).join("; ") : "Не выбраны"} />
+        <SummaryRow
+          icon={<ShieldCheck aria-hidden="true" className="size-4" />}
+          label="Маршруты"
+          value={currentStep < 2
+            ? "Настроите на шаге 3"
+            : channels.length
+              ? channels.map((channel) => `${getCampaignChannelDefinition(channel).shortLabel}: ${integrationProviderById[providers[channel]].name}`).join("; ")
+              : "Не выбраны"}
+        />
       </dl>
       <div className="mt-5 rounded-xl bg-surface-subtle p-4">
         <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-subtle">Сейчас</p>

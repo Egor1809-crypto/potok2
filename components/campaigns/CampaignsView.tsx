@@ -94,14 +94,23 @@ function formatNumber(value: number) {
   return new Intl.NumberFormat("ru-RU").format(value);
 }
 
-function formatDate(value: string | null) {
+function formatDate(value: string | null, timeZone: string) {
   if (!value) return "Не задано";
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(value));
+  try {
+    return new Intl.DateTimeFormat("ru-RU", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      timeZone,
+    }).format(new Date(value));
+  } catch {
+    return new Intl.DateTimeFormat("ru-RU", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      timeZone: "Europe/Moscow",
+    }).format(new Date(value));
+  }
 }
 
 function fromApi(campaign: CampaignRecord): CampaignListItem {
@@ -130,6 +139,7 @@ export function CampaignsView({
   const [campaigns, setCampaigns] = React.useState<CampaignListItem[]>([]);
   const [deliveryPlans, setDeliveryPlans] = React.useState<DeliveryPlanRecord[]>([]);
   const [apiMode, setApiMode] = React.useState<"loading" | "online" | "offline">("loading");
+  const [timeZone, setTimeZone] = React.useState("Europe/Moscow");
   const [activeTab, setActiveTab] = React.useState<CampaignsTab>(initialTab);
   const [search, setSearch] = React.useState("");
 
@@ -141,6 +151,7 @@ export function CampaignsView({
       const body = await response.json() as WorkspaceSnapshot;
       setCampaigns(body.campaigns.map(fromApi));
       setDeliveryPlans(body.deliveryPlans);
+      setTimeZone(body.workspace.timezone || "Europe/Moscow");
       setApiMode("online");
     } catch {
       setCampaigns([]);
@@ -175,7 +186,7 @@ export function CampaignsView({
     { all: 0, draft: 0, ready: 0, blocked: 0, scheduled: 0, sending: 0, completed: 0, cancelled: 0 },
   ), [campaigns]);
 
-  const delivered = campaigns.reduce((total, campaign) => total + campaign.metrics.delivered, 0);
+  const acceptedRecipients = campaigns.reduce((total, campaign) => total + campaign.metrics.sent, 0);
   const active = counts.ready + counts.scheduled + counts.sending;
 
   return (
@@ -209,7 +220,7 @@ export function CampaignsView({
       <section className="grid gap-3 sm:grid-cols-3" aria-label="Сводка по кампаниям">
         <SummaryCard icon={Send} label="Активный цикл" value={formatNumber(active)} text="Готовы, запланированы или отправляются" />
         <SummaryCard icon={AlertTriangle} label="Требуют внимания" value={formatNumber(counts.blocked + counts.draft)} text="Черновики и кампании, которым нужна настройка" tone="warning" />
-        <SummaryCard icon={BarChart3} label="Доставлено" value={formatNumber(delivered)} text="По всем завершённым и активным кампаниям" tone="success" />
+        <SummaryCard icon={BarChart3} label="Принято провайдерами" value={formatNumber(acceptedRecipients)} text="Уникальные получатели; это ещё не подтверждение доставки" tone="success" />
       </section>
 
       <section className="card overflow-hidden" aria-labelledby="campaign-list-title">
@@ -262,7 +273,7 @@ export function CampaignsView({
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant={meta.tone} dot>{meta.label}</Badge>
-                      <span className="text-[11px] text-text-subtle">Создана {formatDate(campaign.createdAt)}</span>
+                      <span className="text-[11px] text-text-subtle">Создана {formatDate(campaign.createdAt, timeZone)}</span>
                     </div>
                     <Link href={`/campaigns/${campaign.id}`} className="mt-2 block truncate text-[15px] font-semibold text-text-strong hover:text-primary">
                       {campaign.name}

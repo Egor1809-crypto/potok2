@@ -11,9 +11,7 @@ import {
   FileEdit,
   Mail,
   MessageCircle,
-  MousePointerClick,
   RefreshCw,
-  Reply,
   SearchX,
   Send,
   SendHorizontal,
@@ -50,6 +48,7 @@ export type CampaignDetailViewProps = {
   dispatching?: boolean;
   deleting?: boolean;
   dispatchNotice?: string | null;
+  timeZone?: string;
 };
 
 type DetailCampaign = {
@@ -115,7 +114,7 @@ const statusMeta: Record<CampaignStatus, {
     label: "Отправляется",
     badge: "accent",
     title: "Провайдеры обрабатывают получателей",
-    description: "Статусы доставки будут обновляться по мере обработки каналов.",
+    description: "Задания передаются выбранным провайдерам.",
   },
   completed: {
     label: "Обработка завершена",
@@ -144,19 +143,30 @@ function campaignSummary(campaign: DetailCampaign) {
 
 function formatPercent(value: number, total: number) {
   if (!total) return "—";
-  return `${((value / total) * 100).toLocaleString("ru-RU", { maximumFractionDigits: 1 })}%`;
+  return `${((Math.min(Math.max(value, 0), total) / total) * 100).toLocaleString("ru-RU", { maximumFractionDigits: 1 })}%`;
 }
 
-function formatDateTime(value: string | null) {
+function formatDateTime(value: string | null, timeZone: string) {
   if (!value) return "Не задано";
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "UTC",
-  }).format(new Date(value));
+  try {
+    return new Intl.DateTimeFormat("ru-RU", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone,
+    }).format(new Date(value));
+  } catch {
+    return new Intl.DateTimeFormat("ru-RU", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Europe/Moscow",
+    }).format(new Date(value));
+  }
 }
 
 function normalizeCampaign(campaign: CampaignRecord): DetailCampaign {
@@ -203,6 +213,7 @@ export function CampaignDetailView({
   dispatching = false,
   deleting = false,
   dispatchNotice = null,
+  timeZone = "Europe/Moscow",
 }: CampaignDetailViewProps) {
   if (!campaign) {
     if (apiMode === "loading") return <CampaignLoading />;
@@ -278,7 +289,7 @@ export function CampaignDetailView({
 
       <Alert tone={item.status === "blocked" ? "warning" : item.status === "cancelled" ? "warning" : "info"} title={meta.title}>
         {item.statusReason || meta.description}
-        {item.status === "scheduled" ? ` Время в плане: ${formatDateTime(item.scheduledAt)}.` : ""}
+        {item.status === "scheduled" ? ` Время в плане: ${formatDateTime(item.scheduledAt, timeZone)}.` : ""}
       </Alert>
 
       <Lifecycle status={item.status} currentIndex={currentLifecycleIndex} />
@@ -308,7 +319,7 @@ export function CampaignDetailView({
         </section>
       ) : null}
 
-      <Metrics campaign={item} />
+      <Metrics campaign={item} plans={deliveryPlans} deliveryJob={deliveryJob} />
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-5">
@@ -316,9 +327,9 @@ export function CampaignDetailView({
           <DeliveryRoutes campaign={item} plans={deliveryPlans} />
         </div>
         <aside className="space-y-5">
-          <CampaignFacts campaign={item} />
+          <CampaignFacts campaign={item} timeZone={timeZone} />
           <Audience campaign={item} />
-          <EventHistory events={events} />
+          <EventHistory events={events} timeZone={timeZone} />
         </aside>
       </div>
     </div>
@@ -447,31 +458,47 @@ function DispatchPanel({
   );
 }
 
-function Metrics({ campaign }: { campaign: DetailCampaign }) {
+function Metrics({
+  campaign,
+  plans,
+  deliveryJob,
+}: {
+  campaign: DetailCampaign;
+  plans: DeliveryPlanRecord[];
+  deliveryJob: DeliveryJobRecord | null;
+}) {
+  const actualJobs = deliveryJob
+    ? deliveryJob.acceptedCount + deliveryJob.rejectedCount + deliveryJob.ambiguousCount + deliveryJob.manualCount
+    : plans.reduce((total, plan) => total + plan.eligibleCount, 0);
+  const problemJobs = deliveryJob
+    ? deliveryJob.rejectedCount + deliveryJob.ambiguousCount
+    : 0;
   const metrics = [
-    { label: "Получатели", value: formatNumber(campaign.metrics.recipients), meta: "В аудитории", icon: UsersRound },
-    { label: "Принято провайдером", value: campaign.metrics.sent ? formatNumber(campaign.metrics.sent) : "—", meta: formatPercent(campaign.metrics.sent, campaign.metrics.recipients), icon: Send },
-    { label: "Доставлено", value: campaign.metrics.delivered ? formatNumber(campaign.metrics.delivered) : "—", meta: formatPercent(campaign.metrics.delivered, campaign.metrics.sent), icon: ShieldCheck },
-    { label: "Открыто", value: campaign.metrics.opened ? formatNumber(campaign.metrics.opened) : "—", meta: formatPercent(campaign.metrics.opened, campaign.metrics.delivered), icon: Mail },
-    { label: "Переходы", value: campaign.metrics.clicked ? formatNumber(campaign.metrics.clicked) : "—", meta: formatPercent(campaign.metrics.clicked, campaign.metrics.delivered), icon: MousePointerClick },
-    { label: "Ответы", value: campaign.metrics.replies ? formatNumber(campaign.metrics.replies) : "—", meta: formatPercent(campaign.metrics.replies, campaign.metrics.delivered), icon: Reply },
+    { label: "Получатели", value: formatNumber(campaign.metrics.recipients), meta: "Уникальные контакты аудитории", icon: UsersRound },
+    { label: deliveryJob ? "Заданий" : "Плановых заданий", value: actualJobs ? formatNumber(actualJobs) : "—", meta: "По всем выбранным каналам", icon: Mail },
+    { label: "Принято заданий", value: deliveryJob?.acceptedCount ? formatNumber(deliveryJob.acceptedCount) : "—", meta: "Ответ адаптера провайдера", icon: Send },
+    { label: "Уникально принято", value: campaign.metrics.sent ? formatNumber(campaign.metrics.sent) : "—", meta: formatPercent(campaign.metrics.sent, campaign.metrics.recipients), icon: ShieldCheck },
+    { label: "С проблемой", value: problemJobs ? formatNumber(problemJobs) : "—", meta: "Отклонено или статус неопределён", icon: AlertTriangle },
+    { label: "Строк CSV", value: deliveryJob?.manualCount ? formatNumber(deliveryJob.manualCount) : "—", meta: "Для ручного запуска в VK WorkSpace", icon: FileEdit },
   ];
   return (
-    <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6" aria-label="Показатели кампании">
-      {metrics.map((metric) => {
-        const Icon = metric.icon;
-        return (
-          <article key={metric.label} className="card p-4">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-[11px] font-medium text-text-muted">{metric.label}</span>
-              <Icon aria-hidden="true" className="size-4 text-text-subtle" />
-            </div>
-            <p className="mt-2 text-[21px] font-semibold tracking-[-0.04em] text-text-strong">{metric.value}</p>
-            <p className="mt-1 text-[10px] text-text-subtle">{metric.meta}</p>
-          </article>
-        );
-      })}
-    </section>
+    <div className="space-y-3">
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6" aria-label="Показатели кампании">
+        {metrics.map((metric) => {
+          const Icon = metric.icon;
+          return (
+            <article key={metric.label} className="card p-4">
+              <div className="flex items-center justify-between gap-3"><span className="text-[11px] font-medium text-text-muted">{metric.label}</span><Icon aria-hidden="true" className="size-4 text-text-subtle" /></div>
+              <p className="mt-2 text-[21px] font-semibold tracking-[-0.04em] text-text-strong">{metric.value}</p>
+              <p className="mt-1 text-[10px] text-text-subtle">{metric.meta}</p>
+            </article>
+          );
+        })}
+      </section>
+      <Alert tone="info" title="Показаны только проверяемые факты">
+        MAILFLOW пока не получает от провайдеров события доставки, открытий, переходов и ответов, поэтому эти метрики не имитируются нулями.
+      </Alert>
+    </div>
   );
 }
 
@@ -530,12 +557,12 @@ function DeliveryRoutes({ campaign, plans }: { campaign: DetailCampaign; plans: 
   );
 }
 
-function CampaignFacts({ campaign }: { campaign: DetailCampaign }) {
+function CampaignFacts({ campaign, timeZone }: { campaign: DetailCampaign; timeZone: string }) {
   const rows = [
     ["Статус", statusMeta[campaign.status].label],
-    ["Создана", formatDateTime(campaign.createdAt)],
-    ["Обновлена", formatDateTime(campaign.updatedAt)],
-    [campaign.sentAt ? "Отправлена" : "Запланирована", formatDateTime(campaign.sentAt ?? campaign.scheduledAt)],
+    ["Создана", formatDateTime(campaign.createdAt, timeZone)],
+    ["Обновлена", formatDateTime(campaign.updatedAt, timeZone)],
+    [campaign.sentAt ? "Отправлена" : "Запланирована", formatDateTime(campaign.sentAt ?? campaign.scheduledAt, timeZone)],
   ];
   return (
     <section className="card p-5" aria-labelledby="campaign-facts-title">
@@ -558,16 +585,19 @@ function Audience({ campaign }: { campaign: DetailCampaign }) {
   );
 }
 
-function EventHistory({ events }: { events: CampaignEventRecord[] }) {
+function EventHistory({ events, timeZone }: { events: CampaignEventRecord[]; timeZone: string }) {
   const recent = [...events].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt)).slice(0, 5);
   return (
     <section className="card p-5" aria-labelledby="campaign-history-title">
       <h2 id="campaign-history-title" className="text-[15px] font-semibold text-text-strong">История действий</h2>
       {recent.length ? (
         <ol className="mt-4 space-y-4">
-          {recent.map((event) => <li key={event.id} className="flex gap-3"><span className="mt-1 grid size-6 shrink-0 place-items-center rounded-full bg-surface-subtle text-text-muted"><Clock3 aria-hidden="true" className="size-3" /></span><div><p className="text-[12px] leading-5 text-text-strong">{event.message}</p><time className="mt-0.5 block text-[10px] text-text-subtle">{formatDateTime(event.occurredAt)}</time></div></li>)}
+          {recent.map((event) => <li key={event.id} className="flex gap-3"><span className="mt-1 grid size-6 shrink-0 place-items-center rounded-full bg-surface-subtle text-text-muted"><Clock3 aria-hidden="true" className="size-3" /></span><div><p className="text-[12px] leading-5 text-text-strong">{event.message}</p><time className="mt-0.5 block text-[10px] text-text-subtle">{formatDateTime(event.occurredAt, timeZone)}</time></div></li>)}
         </ol>
       ) : <p className="mt-3 text-[12px] leading-5 text-text-muted">События появятся после сохранения и проверки кампании.</p>}
+      <p className="mt-4 border-t border-border pt-3 text-[10px] leading-4 text-text-subtle">
+        Показано до 5 событий этой кампании из окна последних 100 событий рабочего пространства. Это не полный архив.
+      </p>
     </section>
   );
 }

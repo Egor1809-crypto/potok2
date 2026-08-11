@@ -59,13 +59,12 @@ const campaignProviderDescriptions: Partial<
   "telegram-bot-api": "Прямая отправка от бота по сохранённому идентификатору чата.",
   "vk-api": "Сообщения от имени сообщества пользователям с разрешением.",
   unisender: "Массовая рассылка по электронной почте: загрузка получателей, создание письма и запуск кампании.",
-  sendpulse: "Проверка ключей доступна, автоматическая отправка пока не поддерживается.",
 };
 
 function campaignProvidersFor(channel: CampaignChannel): CampaignChannelProvider[] {
   return getProvidersForChannel(channel).map((provider) => ({
     id: provider.id,
-    label: `${provider.name}${provider.deliveryMode === "manual_export" ? " · вручную" : provider.deliveryMode === "roadmap" ? " · в плане" : ""}`,
+    label: `${provider.name}${provider.deliveryMode === "manual_export" ? " · вручную" : ""}`,
     description: campaignProviderDescriptions[provider.id] ?? provider.summary,
   }));
 }
