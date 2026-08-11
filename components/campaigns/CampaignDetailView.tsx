@@ -94,9 +94,9 @@ const statusMeta: Record<CampaignStatus, {
     description: "Завершите четыре шага и проверьте готовность на сервере.",
   },
   blocked: {
-    label: "Есть блокеры",
+    label: "Требует настройки",
     badge: "warning",
-    title: "Проверка готовности выявила блокеры",
+    title: "Проверка готовности выявила проблемы",
     description: "Исправьте причины ниже и повторите проверку. Сообщения не отправлены.",
   },
   ready: {
@@ -109,7 +109,7 @@ const statusMeta: Record<CampaignStatus, {
     label: "Запланирована",
     badge: "info",
     title: "План сохранён по расписанию",
-    description: "Маршруты проверены; внешний адаптер отправки этим API не запускался.",
+    description: "Маршруты проверены; отправка не запускалась.",
   },
   sending: {
     label: "Отправляется",
@@ -264,7 +264,7 @@ export function CampaignDetailView({
             {editable ? (
               <Link href={`/campaigns/new?campaign=${encodeURIComponent(item.id)}&step=${item.status === "blocked" ? "review" : "audience"}`} className={buttonVariants({ variant: "primary" })}>
                 <FileEdit aria-hidden="true" className="size-4" />
-                {item.status === "blocked" ? "Исправить блокеры" : "Редактировать"}
+                {item.status === "blocked" ? "Устранить причины" : "Редактировать"}
               </Link>
             ) : (
               <Link href={`/analytics?campaign=${encodeURIComponent(item.id)}`} className={buttonVariants({ variant: "primary" })}>

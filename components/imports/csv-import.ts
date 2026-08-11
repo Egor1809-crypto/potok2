@@ -18,10 +18,10 @@ export const targetFieldOptions = [
   { value: "country", label: "Страна" },
   { value: "tags", label: "Теги" },
   { value: "status", label: "Статус" },
-  { value: "telegramChatId", label: "Telegram chat ID" },
+  { value: "telegramChatId", label: "Идентификатор чата Telegram" },
   { value: "telegramConsent", label: "Согласие Telegram" },
-  { value: "vkUserId", label: "VK user ID" },
-  { value: "vkConsent", label: "Согласие VK" },
+  { value: "vkUserId", label: "Идентификатор пользователя ВКонтакте" },
+  { value: "vkConsent", label: "Согласие ВКонтакте" },
 ] as const;
 
 export type TargetField = (typeof targetFieldOptions)[number]["value"];
@@ -307,7 +307,7 @@ export function mappingError(mapping: FieldMapping): string | null {
     !mapping.includes("telegramChatId") &&
     !mapping.includes("vkUserId")
   ) {
-    return "Сопоставьте хотя бы один канал: Email, Telegram chat ID или VK user ID.";
+    return "Сопоставьте хотя бы один канал: адрес электронной почты, идентификатор чата Telegram или идентификатор пользователя ВКонтакте.";
   }
   const hasFullName = mapping.includes("fullName");
   const hasSeparateName =

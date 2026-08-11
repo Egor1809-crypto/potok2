@@ -8,7 +8,6 @@ import {
   MessageCircle,
   Search,
   SendHorizontal,
-  Sparkles,
   UsersRound,
 } from "lucide-react";
 import { BRAND_NAME } from "@/config/brand";
@@ -23,7 +22,7 @@ const rows = [
 
 export function ProductPreview() {
   return (
-    <div className="relative mx-auto mt-16 max-w-[1180px] px-3 sm:px-6 lg:px-0">
+    <div aria-hidden="true" className="relative mx-auto mt-16 max-w-[1180px] px-3 sm:px-6 lg:px-0">
       <div className="absolute inset-x-[8%] -top-10 h-64 rounded-full bg-[#756dff]/10 blur-3xl" />
       <div className="relative overflow-hidden rounded-[22px] border border-[#dfe1e9] bg-[#f8f9fb] p-2 shadow-[0_35px_90px_rgba(31,32,52,.16),0_3px_12px_rgba(31,32,52,.07)] sm:p-3">
         <div className="overflow-hidden rounded-[16px] border border-[#e4e5eb] bg-white">
@@ -40,17 +39,17 @@ export function ProductPreview() {
                 <span className="grid size-6 place-items-center rounded-[7px] bg-[#625cf6] text-[10px] font-bold text-white">M</span>
                 <span className="text-[11px] font-semibold tracking-[.12em]">{BRAND_NAME}</span>
               </div>
-              <button className="mb-3 flex w-full items-center justify-between rounded-lg border border-[#e5e5eb] bg-white px-2.5 py-2 text-left text-[10px] font-medium text-[#353744] shadow-sm">
-                Юридическая команда <ChevronDown size={12} />
-              </button>
+              <div className="mb-3 flex w-full items-center justify-between rounded-lg border border-[#e5e5eb] bg-white px-2.5 py-2 text-left text-[10px] font-medium text-[#353744] shadow-sm">
+                Рабочее пространство <ChevronDown size={12} />
+              </div>
               <div className="space-y-0.5">
                 {[
                   [LayoutDashboard, "Обзор", false],
                   [ContactRound, "Контакты", true],
-                  [UsersRound, "Компании", false],
-                  [Sparkles, "Сегменты", false],
+                  [UsersRound, "Аудитории", false],
                   [Mail, "Кампании", false],
-                  [BarChart3, "Аналитика", false],
+                  [SendHorizontal, "Каналы", false],
+                  [BarChart3, "Результаты", false],
                 ].map(([Icon, label, active]) => {
                   const NavIcon = Icon as typeof LayoutDashboard;
                   return (
@@ -78,7 +77,7 @@ export function ProductPreview() {
               <div className="p-4 sm:p-6">
                 <div className="flex items-end justify-between">
                   <div><p className="text-[9px] font-medium uppercase tracking-[.14em] text-[#9b9da9]">Люди</p><h3 className="mt-1 text-xl font-semibold tracking-[-.025em] text-[#20212c] sm:text-2xl">Контакты</h3><p className="mt-1 text-[10px] text-[#8b8d99]">24 821 контакт в вашем пространстве</p></div>
-                  <button className="rounded-lg bg-[#625cf6] px-3 py-2 text-[9px] font-semibold text-white shadow-[0_5px_12px_rgba(98,92,246,.24)]">+ Добавить контакт</button>
+                  <span className="rounded-lg bg-[#625cf6] px-3 py-2 text-[9px] font-semibold text-white shadow-[0_5px_12px_rgba(98,92,246,.24)]">+ Добавить контакт</span>
                 </div>
                 <div className="mt-5 flex items-center justify-between border-b border-[#ececf1]">
                   <div className="flex gap-4 text-[9px]"><span className="border-b-2 border-[#625cf6] pb-2.5 font-semibold text-[#343641]">Все контакты</span><span className="pb-2.5 text-[#9294a0]">Партнёры</span><span className="hidden pb-2.5 text-[#9294a0] sm:inline">Юристы</span><span className="hidden pb-2.5 text-[#9294a0] sm:inline">Конференция 2026</span></div>
@@ -86,8 +85,8 @@ export function ProductPreview() {
                 </div>
                 <div className="mt-3 flex items-center gap-2">
                   <div className="flex h-8 flex-1 items-center gap-2 rounded-lg border border-[#e4e5eb] px-2.5 text-[9px] text-[#9b9da9]"><Search size={12} /> Поиск контактов</div>
-                  <button className="h-8 rounded-lg border border-[#d9dbe3] bg-[#f8f7ff] px-3 text-[9px] font-semibold text-[#5e57dc]">Фильтр <span className="ml-1 rounded bg-[#625cf6] px-1.5 py-0.5 text-white">3</span></button>
-                  <button className="hidden h-8 rounded-lg border border-[#e4e5eb] px-3 text-[9px] text-[#555765] sm:block">Столбцы</button>
+                  <span className="flex h-8 items-center rounded-lg border border-[#d9dbe3] bg-[#f8f7ff] px-3 text-[9px] font-semibold text-[#5e57dc]">Фильтр <span className="ml-1 rounded bg-[#625cf6] px-1.5 py-0.5 text-white">3</span></span>
+                  <span className="hidden h-8 items-center rounded-lg border border-[#e4e5eb] px-3 text-[9px] text-[#555765] sm:flex">Столбцы</span>
                 </div>
 
                 <div className="mt-3 overflow-hidden rounded-xl border border-[#e6e7ec]">
@@ -119,7 +118,7 @@ export function ProductPreview() {
             return <span key={label as string} className="flex items-center gap-1 rounded-md border border-[#e1e0fb] bg-[#f7f6ff] px-2 py-1 text-[7px] font-semibold text-[#5b55d8]"><ChannelIcon size={9} />{label as string}</span>;
           })}
         </div>
-        <div className="mt-4 flex items-center justify-between border-t border-[#ececf1] pt-3"><div><p className="text-[8px] text-[#9698a5]">Найдена аудитория</p><p className="text-[15px] font-semibold text-[#262733]">843 контакта</p></div><button className="rounded-lg bg-[#625cf6] px-3 py-2 text-[9px] font-semibold text-white">Создать кампанию</button></div>
+        <div className="mt-4 flex items-center justify-between border-t border-[#ececf1] pt-3"><div><p className="text-[8px] text-[#9698a5]">Найдена аудитория</p><p className="text-[15px] font-semibold text-[#262733]">843 контакта</p></div><span className="rounded-lg bg-[#625cf6] px-3 py-2 text-[9px] font-semibold text-white">Создать кампанию</span></div>
       </div>
 
       <div className="absolute -left-5 bottom-12 hidden items-center gap-3 rounded-xl border border-[#dedfe7] bg-white p-3 pr-5 shadow-[0_18px_45px_rgba(32,33,50,.15)] xl:flex">

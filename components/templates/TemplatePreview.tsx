@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Heart, Image as ImageIcon, Users } from "lucide-react";
+import { ArrowRight, Image as ImageIcon, Users } from "lucide-react";
 
 import type { EmailTemplate } from "@/types";
 import { BRAND_NAME } from "@/config/brand";
@@ -11,13 +11,9 @@ import { templateCategoryLabels } from "./templateLabels";
 
 export function TemplateCard({
   template,
-  favorite,
-  onFavoriteChange,
   builderHref,
 }: {
   template: EmailTemplate;
-  favorite: boolean;
-  onFavoriteChange: (favorite: boolean) => void;
   builderHref?: string;
 }) {
   const resolvedBuilderHref =
@@ -33,15 +29,6 @@ export function TemplateCard({
         >
           <TemplateThumbnail template={template} />
         </Link>
-        <button
-          type="button"
-          aria-label={favorite ? `Удалить «${template.name}» из избранного` : `Добавить «${template.name}» в избранное`}
-          aria-pressed={favorite}
-          onClick={() => onFavoriteChange(!favorite)}
-          className="absolute right-3 top-3 grid size-8 place-items-center rounded-full border border-white/75 bg-white/90 text-[#7a8090] shadow-[0_4px_14px_rgba(20,24,38,0.1)] backdrop-blur-md outline-none transition hover:scale-105 hover:text-[#e35368] focus-visible:ring-2 focus-visible:ring-primary/40 aria-pressed:text-[#e35368]"
-        >
-          <Heart aria-hidden="true" className={cn("size-3.5", favorite && "fill-current")} />
-        </button>
       </div>
 
       <div className="p-4">

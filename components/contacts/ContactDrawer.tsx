@@ -71,17 +71,17 @@ export function ContactDrawer({
         {
           id: "telegram",
           label: "Telegram",
-          address: contact.telegramChatId ?? "chat_id не указан",
+          address: contact.telegramChatId ?? "Идентификатор чата не указан",
           ready: Boolean(contact.status === "active" && contact.telegramChatId && contact.telegramConsent),
-          reason: contact.status !== "active" ? "Контакт недоступен" : !contact.telegramChatId ? "Нет chat_id" : !contact.telegramConsent ? "Нет согласия" : "Готов к отправке",
+          reason: contact.status !== "active" ? "Контакт недоступен" : !contact.telegramChatId ? "Нет идентификатора чата" : !contact.telegramConsent ? "Нет согласия" : "Готов к отправке",
           Icon: SendHorizontal,
         },
         {
           id: "vk",
           label: "ВКонтакте",
-          address: contact.vkUserId ?? "ID пользователя не указан",
+          address: contact.vkUserId ?? "Идентификатор пользователя не указан",
           ready: Boolean(contact.status === "active" && contact.vkUserId && contact.vkConsent),
-          reason: contact.status !== "active" ? "Контакт недоступен" : !contact.vkUserId ? "Нет ID пользователя" : !contact.vkConsent ? "Нет согласия" : "Готов к отправке",
+          reason: contact.status !== "active" ? "Контакт недоступен" : !contact.vkUserId ? "Нет идентификатора пользователя" : !contact.vkConsent ? "Нет согласия" : "Готов к отправке",
           Icon: MessageCircle,
         },
       ]

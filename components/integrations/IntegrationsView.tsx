@@ -84,7 +84,7 @@ const setupFields: Record<IntegrationProviderId, SetupField[]> = {
   "vk-api": [
     {
       key: "communityId",
-      label: "ID сообщества",
+      label: "Идентификатор сообщества",
       placeholder: "123456789",
       hint: "Ключ доступа сообщества задаётся на сервере.",
     },
@@ -95,13 +95,13 @@ const setupFields: Record<IntegrationProviderId, SetupField[]> = {
       label: "Проверенный адрес отправителя",
       placeholder: "mailing@company.ru",
       type: "email",
-      hint: "API-ключ задаётся только в серверном окружении.",
+      hint: "Секретный ключ подключения задаётся только на сервере.",
     },
     {
       key: "listId",
-      label: "ID списка получателей",
+      label: "Номер списка получателей",
       placeholder: "123456",
-      hint: "Сервер проверит существование списка через getLists.",
+      hint: "Сервер проверит, что список получателей существует.",
     },
   ],
   sendpulse: [
@@ -110,7 +110,7 @@ const setupFields: Record<IntegrationProviderId, SetupField[]> = {
       label: "Адрес отправителя",
       placeholder: "mailing@company.ru",
       type: "email",
-      hint: "Для email-канала. API-секреты задаются на сервере.",
+      hint: "Для рассылки по электронной почте. Секретные ключи задаются на сервере.",
     },
     {
       key: "botUsername",
@@ -607,7 +607,7 @@ export function IntegrationsView() {
               <h2 className="text-[14px] font-semibold text-text-strong">Нативные «Рассылки» VK WorkSpace</h2>
               <p className="mt-1 text-[12px] leading-5 text-text-muted">
                 MAILFLOW формирует только CSV получателей. HTML, отправитель, запуск и статистика
-                настраиваются в VK WorkSpace вручную; публичный Mailing API не имитируется.
+                настраиваются в VK WorkSpace вручную; автоматическая отправка из MAILFLOW недоступна.
               </p>
             </div>
           </div>

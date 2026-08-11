@@ -118,7 +118,7 @@ const steps = [
   { label: "Аудитория", description: "Кому отправляем" },
   { label: "Сообщение", description: "Что отправляем" },
   { label: "Каналы", description: "Как доставляем" },
-  { label: "Готовность", description: "Охват и блокеры" },
+  { label: "Готовность", description: "Охват и проверка" },
 ];
 
 const channelIcons: Record<CampaignChannel, typeof Mail> = {
@@ -261,7 +261,7 @@ function normalizeBlockers(value: unknown): string[] {
     if (typeof blocker === "string") return blocker;
     if (blocker && typeof blocker === "object") {
       const item = blocker as Record<string, unknown>;
-      return String(item.message ?? item.reason ?? item.code ?? "Неизвестный блокер");
+      return String(item.message ?? item.reason ?? item.code ?? "Неизвестная причина");
     }
     return String(blocker);
   });
@@ -651,7 +651,7 @@ function CampaignWizardState({
       };
       setEvaluation(serverEvaluation);
       if (serverEvaluation.blockers.length > 0 || serverEvaluation.status === "blocked") {
-        setError("План не готов: исправьте блокеры, затем повторите проверку.");
+        setError("План не готов: устраните причины, затем повторите проверку.");
       } else {
         setFinishedCampaign({
           id: body.campaign.id,
@@ -1144,7 +1144,7 @@ function ChannelsStep({
 }) {
   return (
     <div>
-      <StepIntro number={3} title="Настройте маршруты доставки" description="Для каждого канала выберите провайдера. Точный охват и блокеры рассчитает сервер на шаге готовности." />
+      <StepIntro number={3} title="Настройте маршруты доставки" description="Для каждого канала выберите провайдера. Точный охват и причины, мешающие запуску, рассчитает сервер на шаге готовности." />
       <div className="mt-6 space-y-3">
         {campaignChannelDefinitions.map((channel) => {
           const selected = channels.includes(channel.id);
@@ -1229,7 +1229,7 @@ function ChannelsStep({
         <div className="flex items-start gap-3">
           <div>
             <p className="text-[13px] font-semibold text-text-strong">Согласия проверяет сервер</p>
-            <p className="mt-1 text-[12px] leading-5 text-text-muted">В финальный охват попадут только active-контакты с email-согласием, Telegram chat_id или VK ID и согласием для соответствующего канала.</p>
+            <p className="mt-1 text-[12px] leading-5 text-text-muted">В итоговую аудиторию попадут только доступные контакты с согласием и адресом электронной почты, идентификатором чата Telegram или идентификатором пользователя ВКонтакте.</p>
           </div>
         </div>
       </div>
@@ -1285,7 +1285,7 @@ function ReviewStep({
         <div className="flex items-center gap-3">
           {blockers.length ? <CircleAlert aria-hidden="true" className="size-5 text-warning" /> : <CheckCircle2 aria-hidden="true" className="size-5 text-success" />}
           <div>
-            <h3 id="blockers-title" className="text-[14px] font-semibold text-text-strong">{blockers.length ? `Блокеров: ${blockers.length}` : "Предварительная проверка пройдена"}</h3>
+            <h3 id="blockers-title" className="text-[14px] font-semibold text-text-strong">{blockers.length ? `Причин, мешающих запуску: ${blockers.length}` : "Предварительная проверка пройдена"}</h3>
             <p className="mt-1 text-[12px] text-text-muted">{evaluation ? "Результат серверной проверки" : "Предварительная проверка формы"}</p>
           </div>
         </div>
@@ -1331,7 +1331,7 @@ function CampaignSummary({
     <aside className="card p-5 xl:sticky xl:top-5" aria-label="Сводка кампании">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-[15px] font-semibold text-text-strong">Сводка</h2>
-        <Badge variant={blockers.length === 0 ? "success" : "warning"} dot>{blockers.length === 0 ? "Готово" : `Блокеров: ${blockers.length}`}</Badge>
+        <Badge variant={blockers.length === 0 ? "success" : "warning"} dot>{blockers.length === 0 ? "Готово" : `Нужно исправить: ${blockers.length}`}</Badge>
       </div>
       <dl className="mt-5 space-y-4">
         <SummaryRow icon={<Send aria-hidden="true" className="size-4" />} label="Кампания" value={campaignName || "Не названа"} />
@@ -1341,7 +1341,7 @@ function CampaignSummary({
       <div className="mt-5 rounded-xl bg-surface-subtle p-4">
         <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-subtle">Сейчас</p>
         <p className="mt-1 text-[14px] font-semibold text-text-strong">Шаг {currentStep + 1} из 4 · {steps[currentStep].label}</p>
-        <p className="mt-2 text-[11px] leading-5 text-text-muted">Черновик формы восстанавливается в этом браузере. Бизнес-данные считаются сохранёнными только после ответа API.</p>
+        <p className="mt-2 text-[11px] leading-5 text-text-muted">Черновик формы восстанавливается в этом браузере. Данные кампании считаются сохранёнными только после подтверждения сервера.</p>
       </div>
     </aside>
   );

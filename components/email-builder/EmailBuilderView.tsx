@@ -44,6 +44,7 @@ type EmailBuilderWorkspaceProps = EmailBuilderViewProps & {
 
 const CAMPAIGN_WIZARD_HANDOFF_STORAGE_PREFIX =
   "mailflow:campaign-wizard-handoff:";
+const EMAIL_BUILDER_DRAFT_STORAGE_KEY = "mailflow:email-draft";
 const emailBlockTypes = new Set<EmailBlockType>([
   "logo",
   "heading",
@@ -160,10 +161,17 @@ function parseWizardBuilderSnapshot(snapshot: string) {
     const value: unknown = JSON.parse(snapshot);
     if (!isRecord(value)) return {};
     return {
-      campaignName: typeof value.name === "string" ? value.name : undefined,
+      campaignName:
+        typeof value.name === "string"
+          ? value.name
+          : typeof value.campaignName === "string"
+            ? value.campaignName
+            : undefined,
       document: isBuilderDocument(value.builderDocument)
         ? value.builderDocument
-        : undefined,
+        : isBuilderDocument(value.document)
+          ? value.document
+          : undefined,
     };
   } catch {
     return {};
@@ -195,22 +203,23 @@ export function EmailBuilderView(props: EmailBuilderViewProps) {
   const handoffStorageKey = handoffToken
     ? `${CAMPAIGN_WIZARD_HANDOFF_STORAGE_PREFIX}${handoffToken}`
     : undefined;
-  const getHandoffSnapshot = useCallback(() => {
-    if (!handoffStorageKey) return "";
+  const browserDraftStorageKey =
+    handoffStorageKey ?? EMAIL_BUILDER_DRAFT_STORAGE_KEY;
+  const getBrowserDraftSnapshot = useCallback(() => {
     try {
-      return window.localStorage.getItem(handoffStorageKey) ?? "";
+      return window.localStorage.getItem(browserDraftStorageKey) ?? "";
     } catch {
       return "";
     }
-  }, [handoffStorageKey]);
-  const handoffSnapshot = useSyncExternalStore(
+  }, [browserDraftStorageKey]);
+  const browserDraftSnapshot = useSyncExternalStore(
     subscribeToStorage,
-    getHandoffSnapshot,
+    getBrowserDraftSnapshot,
     getServerStorageSnapshot,
   );
   const restoredState = useMemo(
-    () => parseWizardBuilderSnapshot(handoffSnapshot),
-    [handoffSnapshot],
+    () => parseWizardBuilderSnapshot(browserDraftSnapshot),
+    [browserDraftSnapshot],
   );
   const restoredDocument =
     restoredState.document &&
@@ -226,7 +235,7 @@ export function EmailBuilderView(props: EmailBuilderViewProps) {
   const resolvedCampaignName =
     props.campaignName ??
     query.get("campaign") ??
-    restoredState.campaignName ??
+    (restoredDocument ? restoredState.campaignName : undefined) ??
     resolvedTemplate?.name ??
     "Кампания без названия";
   const resolvedContinueHref =
@@ -238,7 +247,7 @@ export function EmailBuilderView(props: EmailBuilderViewProps) {
   return (
     <ToastProvider>
       <EmailBuilderWorkspace
-        key={`${resolvedTemplateId ?? "default"}:${resolvedCampaignName}:${resolvedContinueHref}:${storageSnapshotFingerprint(handoffSnapshot)}`}
+        key={`${resolvedTemplateId ?? "default"}:${resolvedCampaignName}:${resolvedContinueHref}:${storageSnapshotFingerprint(browserDraftSnapshot)}`}
         templateId={resolvedTemplateId}
         campaignName={resolvedCampaignName}
         continueHref={resolvedContinueHref}
@@ -278,7 +287,7 @@ function EmailBuilderWorkspace({
   const [campaignName, setCampaignName] = useState(initialCampaignName);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("desktop");
   const [mobilePanel, setMobilePanel] = useState<BuilderPanel>("canvas");
-  const [dirty, setDirty] = useState(false);
+  const [dirty, setDirty] = useState(!restoredDocument);
 
   const document = history.present;
   const selectedBlock =
@@ -383,13 +392,14 @@ function EmailBuilderWorkspace({
 
   const persistDraft = useCallback(() => {
     const emailBodyText = documentToPlainText(document);
+    let savedToBrowser = true;
     try {
       window.localStorage.setItem(
-        "mailflow:email-draft",
+        EMAIL_BUILDER_DRAFT_STORAGE_KEY,
         JSON.stringify({ campaignName, document, emailBodyText }),
       );
     } catch {
-      // Saving remains successful for the current demo session.
+      savedToBrowser = false;
     }
     if (handoffStorageKey) {
       try {
@@ -408,18 +418,32 @@ function EmailBuilderWorkspace({
               builderDocument: document,
             }),
           );
+        } else {
+          savedToBrowser = false;
         }
       } catch {
-        // The global builder draft still preserves the current demo edit.
+        savedToBrowser = false;
       }
     }
-    setDirty(false);
+    if (savedToBrowser) setDirty(false);
+    return savedToBrowser;
   }, [campaignName, document, handoffStorageKey]);
 
   const save = useCallback(() => {
-    persistDraft();
-    toast.success("Черновик сохранён", "Изменения будут переданы в мастер кампании.");
-  }, [persistDraft, toast]);
+    if (!persistDraft()) {
+      toast.warning(
+        "Не удалось записать черновик",
+        "Изменения остаются в открытом редакторе, но браузер их не сохранил.",
+      );
+      return;
+    }
+    toast.success(
+      "Сохранено в браузере",
+      handoffStorageKey
+        ? "Мастер кампании получит черновик; серверная версия появится после сохранения кампании."
+        : "Это локальный черновик: серверная копия не создавалась.",
+    );
+  }, [handoffStorageKey, persistDraft, toast]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -457,6 +481,7 @@ function EmailBuilderWorkspace({
         canUndo={history.past.length > 0}
         canRedo={history.future.length > 0}
         dirty={dirty}
+        campaignHandoff={Boolean(handoffStorageKey)}
         onUndo={undo}
         onRedo={redo}
         onSave={save}

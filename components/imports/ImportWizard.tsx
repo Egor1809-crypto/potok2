@@ -67,7 +67,7 @@ const issueLabels: Record<RowIssue, string> = {
   "missing-name": "Нет имени или фамилии",
   "invalid-status": "Неизвестный статус",
   "value-too-long": "Слишком длинное значение",
-  "invalid-channel": "Проверьте ID и согласие канала",
+  "invalid-channel": "Проверьте идентификатор и согласие канала",
 };
 
 function formatBytes(value: number): string {
@@ -315,7 +315,7 @@ export function ImportWizard() {
             </h2>
             <p className="mt-2 text-[10px] leading-5 text-[var(--text-tertiary)]">
               Первая строка — заголовки. Нужны ФИО и хотя бы один канал:
-              email, Telegram chat ID или VK user ID.
+              адрес электронной почты, идентификатор чата Telegram или идентификатор пользователя ВКонтакте.
             </p>
           </div>
 
@@ -493,7 +493,7 @@ export function ImportWizard() {
                   Проверка перед импортом
                 </h2>
                 <p className="mt-1 text-[10px] leading-4 text-[var(--text-tertiary)]">
-                  Дубликаты сравниваются по email, Telegram chat ID и VK user ID.
+                  Дубликаты сравниваются по адресу электронной почты, идентификатору чата Telegram и идентификатору пользователя ВКонтакте.
                   Существующие контакты не изменятся и будут пропущены.
                 </p>
               </div>

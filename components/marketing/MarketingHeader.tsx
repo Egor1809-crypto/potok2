@@ -24,7 +24,7 @@ export function MarketingHeader() {
             ["Решения", "#solutions"],
             ["Интеграции", "/integrations"],
             ["Шаблоны", "#templates"],
-            ["Тарифы", "#pricing"],
+            ["Начать", "#start"],
           ].map(([label, href]) => (
             <a key={label} href={href} className="text-sm font-medium text-[#626474] transition-colors hover:text-[#171825]">
               {label}
@@ -34,7 +34,7 @@ export function MarketingHeader() {
 
         <div className="hidden items-center gap-2 xl:flex">
           <Link href="/login" className="btn btn-ghost">Войти</Link>
-          <Link href="/register" className="btn btn-primary gap-2">Попробовать бесплатно <ArrowRight size={15} /></Link>
+          <Link href="/register" className="btn btn-primary gap-2">Начать работу <ArrowRight size={15} /></Link>
         </div>
 
         <button
@@ -56,7 +56,7 @@ export function MarketingHeader() {
               ["Решения", "#solutions"],
               ["Интеграции", "/integrations"],
               ["Шаблоны", "#templates"],
-              ["Тарифы", "#pricing"],
+              ["Начать", "#start"],
             ].map(([label, href]) => (
               <a key={label} href={href} onClick={() => setOpen(false)} className="rounded-lg px-3 py-3 text-sm font-medium text-[#454754] hover:bg-[#f4f5f8]">
                 {label}
@@ -64,7 +64,7 @@ export function MarketingHeader() {
             ))}
             <div className="mt-3 grid grid-cols-2 gap-2">
               <Link href="/login" className="btn btn-secondary justify-center">Войти</Link>
-              <Link href="/register" className="btn btn-primary justify-center">Начать бесплатно</Link>
+              <Link href="/register" className="btn btn-primary justify-center">Начать работу</Link>
             </div>
           </nav>
         </div>

@@ -61,7 +61,7 @@ type CampaignListItem = {
 const tabs: { value: CampaignsTab; label: string }[] = [
   { value: "all", label: "Все" },
   { value: "draft", label: "Черновики" },
-  { value: "blocked", label: "Есть блокеры" },
+  { value: "blocked", label: "Требуют настройки" },
   { value: "ready", label: "Готовы" },
   { value: "scheduled", label: "Запланированы" },
   { value: "sending", label: "Отправляются" },
@@ -76,9 +76,9 @@ const statusMeta: Record<CampaignStatus, {
   icon: typeof Clock3;
 }> = {
   draft: { label: "Черновик", tone: "neutral", next: "Завершите аудиторию, сообщение и маршруты", icon: Clock3 },
-  blocked: { label: "Есть блокеры", tone: "warning", next: "Исправьте блокеры и повторите проверку", icon: AlertTriangle },
+  blocked: { label: "Требует настройки", tone: "warning", next: "Устраните причины и повторите проверку", icon: AlertTriangle },
   ready: { label: "Готова", tone: "success", next: "Проверки пройдены; внешняя отправка не выполнялась", icon: CheckCircle2 },
-  scheduled: { label: "План по времени", tone: "info", next: "Расписание сохранено; адаптер не запускался", icon: CalendarClock },
+  scheduled: { label: "План по времени", tone: "info", next: "Расписание сохранено; отправка не запускалась", icon: CalendarClock },
   sending: { label: "Отправляется", tone: "accent", next: "Провайдеры обрабатывают получателей", icon: Send },
   completed: { label: "Обработка завершена", tone: "success", next: "Смотрите фактически принятые провайдером сообщения", icon: CheckCircle2 },
   cancelled: { label: "Отменена", tone: "neutral", next: "Создайте копию, чтобы повторить", icon: Clock3 },
@@ -208,7 +208,7 @@ export function CampaignsView({
 
       <section className="grid gap-3 sm:grid-cols-3" aria-label="Сводка по кампаниям">
         <SummaryCard icon={Send} label="Активный цикл" value={formatNumber(active)} text="Готовы, запланированы или отправляются" />
-        <SummaryCard icon={AlertTriangle} label="Требуют внимания" value={formatNumber(counts.blocked + counts.draft)} text="Черновики и кампании с блокерами" tone="warning" />
+        <SummaryCard icon={AlertTriangle} label="Требуют внимания" value={formatNumber(counts.blocked + counts.draft)} text="Черновики и кампании, которым нужна настройка" tone="warning" />
         <SummaryCard icon={BarChart3} label="Доставлено" value={formatNumber(delivered)} text="По всем завершённым и активным кампаниям" tone="success" />
       </section>
 

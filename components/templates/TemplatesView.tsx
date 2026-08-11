@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { ArrowLeft, FileText, Heart, Plus, SearchX } from "lucide-react";
+import { ArrowLeft, FileText, Plus, SearchX } from "lucide-react";
 
 import { templates } from "@/data/templates";
 import type { TemplateCategory } from "@/types";
@@ -17,8 +17,6 @@ import {
   TabsTrigger,
   buttonVariants,
 } from "@/components/ui";
-import { cn } from "@/components/ui/utils";
-
 import { TemplateCard } from "./TemplatePreview";
 import { templateCategoryLabels } from "./templateLabels";
 
@@ -95,17 +93,12 @@ export function TemplatesView() {
   }, [browserSearch]);
   const [category, setCategory] = useState<CategoryFilter>("All");
   const [query, setQuery] = useState("");
-  const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [sort, setSort] = useState<SortMode>("popular");
-  const [favorites, setFavorites] = useState(
-    () => new Set(templates.filter((template) => template.isFavorite).map((template) => template.id)),
-  );
 
   const filteredTemplates = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     return templates
       .filter((template) => category === "All" || template.category === category)
-      .filter((template) => !favoritesOnly || favorites.has(template.id))
       .filter((template) =>
         !normalized
           ? true
@@ -127,21 +120,11 @@ export function TemplatesView() {
         }
         return second.usageCount - first.usageCount;
       });
-  }, [category, favorites, favoritesOnly, query, sort]);
-
-  const toggleFavorite = (templateId: string, favorite: boolean) => {
-    setFavorites((current) => {
-      const next = new Set(current);
-      if (favorite) next.add(templateId);
-      else next.delete(templateId);
-      return next;
-    });
-  };
+  }, [category, query, sort]);
 
   const clearFilters = () => {
     setQuery("");
     setCategory("All");
-    setFavoritesOnly(false);
   };
 
   return (
@@ -207,18 +190,6 @@ export function TemplatesView() {
               wrapperClassName="w-full sm:max-w-sm"
             />
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                aria-pressed={favoritesOnly}
-                onClick={() => setFavoritesOnly((current) => !current)}
-                className={cn(
-                  "btn btn-outline btn-sm gap-1.5",
-                  favoritesOnly && "border-primary/25 bg-primary-subtle text-primary",
-                )}
-              >
-                <Heart aria-hidden="true" className={cn("size-3.5", favoritesOnly && "fill-current")} />
-                Избранное
-              </button>
               <Select
                 value={sort}
                 onChange={(event) => setSort(event.target.value as SortMode)}
@@ -252,8 +223,6 @@ export function TemplatesView() {
                 <TemplateCard
                   key={template.id}
                   template={template}
-                  favorite={favorites.has(template.id)}
-                  onFavoriteChange={(favorite) => toggleFavorite(template.id, favorite)}
                   builderHref={builderHref({
                     templateId: template.id,
                     campaignName: routeContext.campaignName,

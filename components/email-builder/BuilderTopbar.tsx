@@ -4,7 +4,7 @@ import Link from "next/link";
 import {
   ArrowRight,
   Check,
-  Cloud,
+  HardDrive,
   Monitor,
   Redo2,
   Save,
@@ -25,6 +25,7 @@ type BuilderTopbarProps = {
   canUndo: boolean;
   canRedo: boolean;
   dirty: boolean;
+  campaignHandoff: boolean;
   onUndo: () => void;
   onRedo: () => void;
   onSave: () => void;
@@ -40,6 +41,7 @@ export function BuilderTopbar({
   canUndo,
   canRedo,
   dirty,
+  campaignHandoff,
   onUndo,
   onRedo,
   onSave,
@@ -62,13 +64,15 @@ export function BuilderTopbar({
           <span className="hidden items-center gap-1.5 px-1 text-[9px] text-text-subtle sm:flex">
             {dirty ? (
               <>
-                <Cloud aria-hidden="true" className="size-2.5" />
-                Есть несохранённые изменения
+                <HardDrive aria-hidden="true" className="size-2.5" />
+                Изменения ещё не записаны в браузер
               </>
             ) : (
               <>
                 <Check aria-hidden="true" className="size-2.5 text-success" />
-                Все изменения сохранены
+                {campaignHandoff
+                  ? "Подготовлено в браузере для мастера кампании"
+                  : "Локальный черновик хранится в этом браузере"}
               </>
             )}
           </span>
@@ -114,12 +118,12 @@ export function BuilderTopbar({
         <Button
           variant="secondary"
           size="sm"
-          aria-label="Сохранить письмо"
+          aria-label="Сохранить локальный черновик в браузере"
           onClick={onSave}
           className="px-2 sm:px-3"
         >
           <Save aria-hidden="true" className="size-3.5" />
-          <span className="hidden lg:inline">Сохранить</span>
+          <span className="hidden lg:inline">В браузер</span>
         </Button>
         <Link
           href={continueHref}

@@ -29,7 +29,7 @@ test("server-renders the finished MAILFLOW landing page", async () => {
   assert.match(html, /MAILFLOW/);
   assert.match(html, /Деловые рассылки/);
   assert.match(html, /Во всех нужных каналах/);
-  assert.match(html, /Попробовать бесплатно/);
+  assert.match(html, /Начать работу/);
   assert.match(html, /Все деловые связи/);
   assert.match(html, /<html[^>]+lang="ru"/);
   assert.doesNotMatch(html, /codex-preview|SkeletonPreview|Your site is taking shape|react-loading-skeleton/i);
@@ -45,7 +45,7 @@ test("all key product routes render without a dead end", async () => {
     "/segments",
     "/import",
     "/campaigns",
-    "/campaigns/new?audience=segment-moscow-lawyers&count=843",
+    "/campaigns/new",
     "/campaigns/campaign-legal-conference",
     "/integrations",
     "/email-builder?template=template-legal-conference",
