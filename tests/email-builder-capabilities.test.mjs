@@ -47,11 +47,24 @@ test("AI design remains a separate version until the user chooses it", async () 
   assert.match(assistant, /Мой макет и вариант ИИ/);
   assert.match(assistant, /Оставить мой/);
   assert.match(assistant, /Использовать вариант ИИ/);
-  assert.match(assistant, /Найти релевантные с открытой лицензией/);
-  assert.match(assistant, /Лучшее качество — создать новые/);
-  assert.match(assistant, /Создать новый логотип под письмо/);
+  assert.match(assistant, /Настройки появятся только после отправки/);
+  assert.match(assistant, /Без файлов ИИ использует только узоры/);
   assert.match(server, /api\.openverse\.org/);
   assert.match(server, /license_type/);
   assert.match(server, /aspect_ratio/);
   assert.match(server, /images\/generations/);
+});
+
+test("AI brief asks follow-up questions and accepts dragged user images", async () => {
+  const [assistant, server] = await Promise.all([
+    readFile(new URL("../components/email-builder/AiEmailAssistant.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/server/email-ai.ts", import.meta.url), "utf8"),
+  ]);
+  assert.match(assistant, /Продолжить — уточнить детали/);
+  assert.match(assistant, /Как называется компания/);
+  assert.match(assistant, /Какой срок или дата/);
+  assert.match(assistant, /Перетащите изображение сюда/);
+  assert.match(assistant, /imageSource: "none"/);
+  assert.match(server, /декоративные pattern/);
+  assert.match(server, /availableAssets/);
 });
