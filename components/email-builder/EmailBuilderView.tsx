@@ -788,7 +788,7 @@ function EmailBuilderWorkspace({
         <MobilePreviewToggle value={previewMode} onChange={setPreviewMode} />
       </div>
 
-      <div className="grid h-[calc(100dvh-200px)] min-h-[560px] max-h-[920px] lg:grid-cols-[210px_minmax(420px,1fr)_260px] xl:grid-cols-[232px_minmax(520px,1fr)_286px]">
+      <div className="grid h-[calc(100dvh-176px)] min-h-[620px] lg:grid-cols-[260px_minmax(440px,1fr)_310px] xl:grid-cols-[280px_minmax(560px,1fr)_330px]">
         <BlockLibrary
           onAdd={addBlock}
           className={cn(
@@ -805,6 +805,7 @@ function EmailBuilderWorkspace({
           onMove={moveBlock}
           onDuplicate={duplicateBlock}
           onDelete={deleteBlock}
+          onInlineEdit={(blockId, content) => updateBlock(blockId, { content })}
           onOpenBlocks={() => setMobilePanel("blocks")}
           className={cn(
             "min-h-0",

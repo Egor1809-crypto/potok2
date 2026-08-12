@@ -29,6 +29,7 @@ type EmailCanvasProps = {
   onMove: (blockId: string, direction: -1 | 1) => void;
   onDuplicate: (blockId: string) => void;
   onDelete: (blockId: string) => void;
+  onInlineEdit: (blockId: string, content: string) => void;
   onOpenBlocks: () => void;
   className?: string;
 };
@@ -41,6 +42,7 @@ export function EmailCanvas({
   onMove,
   onDuplicate,
   onDelete,
+  onInlineEdit,
   onOpenBlocks,
   className,
 }: EmailCanvasProps) {
@@ -107,6 +109,7 @@ export function EmailCanvas({
                 onMove={(direction) => onMove(block.id, direction)}
                 onDuplicate={() => onDuplicate(block.id)}
                 onDelete={() => onDelete(block.id)}
+                onInlineEdit={(content) => onInlineEdit(block.id, content)}
               />
             ))}
 
@@ -142,6 +145,7 @@ function CanvasBlock({
   onMove,
   onDuplicate,
   onDelete,
+  onInlineEdit,
 }: {
   block: BuilderBlock;
   accentColor: string;
@@ -153,6 +157,7 @@ function CanvasBlock({
   onMove: (direction: -1 | 1) => void;
   onDuplicate: () => void;
   onDelete: () => void;
+  onInlineEdit: (content: string) => void;
 }) {
   const horizontalPadding = compact ? 24 : 46;
   const backgroundColor =
@@ -239,7 +244,7 @@ function CanvasBlock({
       ) : null}
 
       <div style={{ width: `${block.widthPercent}%`, marginLeft: block.alignment === "right" ? "auto" : block.alignment === "center" ? "auto" : 0, marginRight: block.alignment === "center" ? "auto" : 0, border: `${block.borderWidth}px solid ${block.borderColor}`, borderRadius: block.borderRadius }}>
-        <BlockContent block={block} accentColor={accentColor} compact={compact} selected={selected} />
+        <BlockContent block={block} accentColor={accentColor} compact={compact} selected={selected} onInlineEdit={onInlineEdit} />
       </div>
     </div>
   );
@@ -250,11 +255,13 @@ function BlockContent({
   accentColor,
   compact,
   selected,
+  onInlineEdit,
 }: {
   block: BuilderBlock;
   accentColor: string;
   compact: boolean;
   selected: boolean;
+  onInlineEdit: (content: string) => void;
 }) {
   if (block.type === "logo") {
     if (block.href) {
@@ -279,6 +286,10 @@ function BlockContent({
   if (block.type === "heading") {
     return (
       <h2
+        contentEditable
+        suppressContentEditableWarning
+        onPointerDown={(event) => event.stopPropagation()}
+        onBlur={(event) => onInlineEdit(event.currentTarget.textContent ?? "")}
         className="m-0 font-semibold tracking-[-0.035em]"
         style={{
           fontSize: compact ? Math.min(block.fontSize, 31) : block.fontSize,
@@ -293,6 +304,10 @@ function BlockContent({
   if (block.type === "text") {
     return (
       <p
+        contentEditable
+        suppressContentEditableWarning
+        onPointerDown={(event) => event.stopPropagation()}
+        onBlur={(event) => onInlineEdit(event.currentTarget.textContent ?? "")}
         className="m-0 whitespace-pre-wrap"
         style={{ fontSize: block.fontSize, lineHeight: 1.65 }}
       >
