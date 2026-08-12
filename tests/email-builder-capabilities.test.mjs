@@ -81,3 +81,27 @@ test("manual controls and export are wired to live updates without popup PDF", a
   assert.match(exports, /contentDocument/);
   assert.doesNotMatch(exports, /window\.open/);
 });
+
+test("starter edits become personal templates and uploads work in every manual editor", async () => {
+  const [builder, library, picker, store] = await Promise.all([
+    readFile(new URL("../components/email-builder/EmailBuilderView.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/templates/TemplatesView.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/email-builder/ImageAssetPicker.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/server/template-store.ts", import.meta.url), "utf8"),
+  ]);
+  assert.match(builder, /Сохранить в мои шаблоны/);
+  assert.match(builder, /editingStarter \? null/);
+  assert.match(library, /Мои шаблоны/);
+  assert.match(library, /!template\.isStarter/);
+  assert.match(picker, /onDrop=/);
+  assert.match(picker, /onPaste=/);
+  assert.match(picker, /Перетащите/);
+  assert.match(store, /isStarterEmailTemplateId/);
+});
+
+test("visible typography properties drive the live canvas", async () => {
+  const canvas = await readFile(new URL("../components/email-builder/EmailCanvas.tsx", import.meta.url), "utf8");
+  assert.ok((canvas.match(/lineHeight: block\.lineHeight \/ 100/g) ?? []).length >= 8);
+  assert.ok((canvas.match(/letterSpacing: block\.letterSpacing/g) ?? []).length >= 8);
+  assert.ok((canvas.match(/fontWeight: block\.fontWeight/g) ?? []).length >= 4);
+});

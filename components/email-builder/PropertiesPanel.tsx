@@ -68,7 +68,7 @@ export function PropertiesPanel({
   const canEditContent = !["divider", "spacer"].includes(block.type);
   const supportsTypography = !["image", "divider", "spacer"].includes(block.type);
   const supportsAlignment = !["divider", "spacer"].includes(block.type);
-  const supportsRadius = ["button", "image", "columns", "hero", "quote", "stats", "product", "signature", "pattern"].includes(block.type);
+  const supportsRadius = !["divider", "spacer"].includes(block.type);
 
   const updateContent = (content: string) => {
     onUpdateBlock(
@@ -177,7 +177,7 @@ export function PropertiesPanel({
               />
             </FormField>
 
-            {block.type === "button" || block.type === "product" ? (
+            {block.type === "button" || block.type === "product" || block.type === "video" ? (
               <FormField label="Целевая ссылка" htmlFor="builder-button-link">
                 <div className="relative">
                   <Link2 aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-text-subtle" />
@@ -476,8 +476,8 @@ function ColorField({
 }
 
 function fontSizeOptions(type: BuilderBlock["type"]) {
-  if (type === "heading") {
-    return [28, 32, 38, 44, 52].map((size) => ({ value: String(size), label: `${size} пикс.` }));
+  if (type === "heading" || type === "hero") {
+    return [24, 28, 32, 34, 38, 44, 52, 60].map((size) => ({ value: String(size), label: `${size} пикс.` }));
   }
   if (type === "footer" || type === "logo" || type === "social") {
     return [10, 11, 12, 13, 14].map((size) => ({ value: String(size), label: `${size} пикс.` }));

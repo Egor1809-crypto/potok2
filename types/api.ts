@@ -201,6 +201,7 @@ export type EmailBuilderDocumentInput = {
 export type EmailTemplateRecord = {
   id: string;
   workspaceId: string;
+  isStarter: boolean;
   name: string;
   description: string;
   category: TemplateCategory;

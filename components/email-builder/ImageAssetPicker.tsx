@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ImagePlus, LoaderCircle, Upload } from "lucide-react";
 
-import { Button } from "@/components/ui";
 import type { ApiError, EmailAssetMutationResponse, EmailAssetRecord, EmailAssetsListResponse } from "@/types/api";
 
 export function ImageAssetPicker({ kind, value, onSelect }: {
@@ -15,6 +14,7 @@ export function ImageAssetPicker({ kind, value, onSelect }: {
   const [assets, setAssets] = useState<EmailAssetRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -33,6 +33,14 @@ export function ImageAssetPicker({ kind, value, onSelect }: {
   }, []);
 
   const upload = async (file: File) => {
+    if (!['image/png', 'image/jpeg', 'image/gif'].includes(file.type)) {
+      setError("Выберите изображение PNG, JPEG или GIF.");
+      return;
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      setError("Файл слишком большой. Выберите изображение до 4 МБ.");
+      return;
+    }
     setUploading(true);
     setError("");
     try {
@@ -54,14 +62,53 @@ export function ImageAssetPicker({ kind, value, onSelect }: {
   };
 
   const relevantAssets = assets.filter((asset) => asset.kind === kind);
+  const pickerLabel = kind === "logo" ? "логотип" : "фотографию";
   return (
     <div className="grid gap-2.5">
       <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/gif" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; if (file) void upload(file); }} />
-      <Button type="button" variant="outline" size="sm" disabled={uploading} onClick={() => inputRef.current?.click()}>
-        {uploading ? <LoaderCircle aria-hidden="true" className="size-3.5 animate-spin" /> : <Upload aria-hidden="true" className="size-3.5" />}
-        {uploading ? "Загружаем…" : kind === "logo" ? "Загрузить логотип" : "Загрузить фотографию"}
-      </Button>
-      <p className="m-0 text-[9px] leading-4 text-text-subtle">PNG, JPEG или GIF, до 4 МБ. Файл сохранится в рабочем пространстве.</p>
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label={`Загрузить ${pickerLabel} с компьютера`}
+        aria-busy={uploading}
+        onClick={() => !uploading && inputRef.current?.click()}
+        onKeyDown={(event) => {
+          if ((event.key === "Enter" || event.key === " ") && !uploading) {
+            event.preventDefault();
+            inputRef.current?.click();
+          }
+        }}
+        onDragEnter={(event) => { event.preventDefault(); setDragActive(true); }}
+        onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; setDragActive(true); }}
+        onDragLeave={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragActive(false);
+        }}
+        onDrop={(event) => {
+          event.preventDefault();
+          setDragActive(false);
+          const file = event.dataTransfer.files?.[0];
+          if (file && !uploading) void upload(file);
+        }}
+        onPaste={(event) => {
+          const file = Array.from(event.clipboardData.files).find((item) => item.type.startsWith("image/"));
+          if (file && !uploading) {
+            event.preventDefault();
+            void upload(file);
+          }
+        }}
+        className={`grid min-h-28 cursor-pointer place-items-center rounded-xl border-2 border-dashed px-4 py-4 text-center outline-none transition focus-visible:ring-2 focus-visible:ring-primary/30 ${dragActive ? "border-primary bg-primary-subtle/70" : "border-border-strong bg-surface-subtle hover:border-primary/50 hover:bg-primary-subtle/30"}`}
+      >
+        <span>
+          {uploading ? <LoaderCircle aria-hidden="true" className="mx-auto size-5 animate-spin text-primary" /> : <Upload aria-hidden="true" className="mx-auto size-5 text-primary" />}
+          <span className="mt-2 block text-[11px] font-semibold text-text-strong">
+            {uploading ? "Загружаем…" : `Перетащите ${pickerLabel} сюда`}
+          </span>
+          <span className="mt-1 block text-[9px] leading-4 text-text-subtle">
+            или нажмите, чтобы выбрать файл · можно вставить из буфера
+          </span>
+        </span>
+      </div>
+      <p className="m-0 text-[9px] leading-4 text-text-subtle">PNG, JPEG или GIF, до 4 МБ. После загрузки файл сразу появится в письме и сохранится в медиатеке.</p>
       {error ? <p role="alert" className="m-0 rounded-lg bg-danger-subtle px-2.5 py-2 text-[10px] leading-4 text-danger">{error}</p> : null}
       {loading ? <p className="m-0 text-[10px] text-text-subtle">Загружаем медиатеку…</p> : relevantAssets.length ? (
         <div>

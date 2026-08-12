@@ -39,6 +39,7 @@ const categories = [
 ] as const;
 
 type CategoryFilter = (typeof categories)[number];
+type ScopeFilter = "all" | "mine";
 type SortMode = "recent" | "name" | "blocks";
 type LoadState = "loading" | "ready" | "error";
 
@@ -122,6 +123,7 @@ export function TemplatesView() {
   const [templates, setTemplates] = useState<EmailTemplateRecord[]>([]);
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [category, setCategory] = useState<CategoryFilter>("All");
+  const [scope, setScope] = useState<ScopeFilter>(() => new URLSearchParams(browserSearch).get("scope") === "mine" ? "mine" : "all");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortMode>("recent");
   const [busy, setBusy] = useState<{ id: string; action: "clone" | "delete" } | null>(null);
@@ -154,6 +156,7 @@ export function TemplatesView() {
   const filteredTemplates = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase("ru-RU");
     return templates
+      .filter((template) => scope === "all" || !template.isStarter)
       .filter((template) => category === "All" || template.category === category)
       .filter((template) => !normalized || [
         template.name,
@@ -169,7 +172,12 @@ export function TemplatesView() {
         }
         return Date.parse(second.updatedAt) - Date.parse(first.updatedAt);
       });
-  }, [category, query, sort, templates]);
+  }, [category, query, scope, sort, templates]);
+
+  const scopedTemplates = useMemo(
+    () => templates.filter((template) => scope === "all" || !template.isStarter),
+    [scope, templates],
+  );
 
   const cloneTemplate = async (template: EmailTemplateRecord) => {
     setBusy({ id: template.id, action: "clone" });
@@ -267,13 +275,22 @@ export function TemplatesView() {
           />
         </div>
       ) : (
+        <div className="space-y-4">
+          <div className="inline-flex rounded-xl border border-border bg-surface p-1" role="group" aria-label="Раздел шаблонов">
+            <button type="button" aria-pressed={scope === "all"} onClick={() => setScope("all")} className="rounded-lg px-4 py-2 text-[12px] font-semibold text-text-muted outline-none transition hover:text-text-strong aria-pressed:bg-primary aria-pressed:text-white focus-visible:ring-2 focus-visible:ring-primary/30">
+              Библиотека <span className="ml-1 opacity-70">{templates.length}</span>
+            </button>
+            <button type="button" aria-pressed={scope === "mine"} onClick={() => setScope("mine")} className="rounded-lg px-4 py-2 text-[12px] font-semibold text-text-muted outline-none transition hover:text-text-strong aria-pressed:bg-primary aria-pressed:text-white focus-visible:ring-2 focus-visible:ring-primary/30">
+              Мои шаблоны <span className="ml-1 opacity-70">{templates.filter((template) => !template.isStarter).length}</span>
+            </button>
+          </div>
         <Tabs value={category} onValueChange={(value) => setCategory(value as CategoryFilter)} className="min-w-0">
           <TabsList className="-mb-px">
             {categories.map((item) => (
               <TabsTrigger key={item} value={item}>
                 {item === "All" ? "Все" : templateCategoryLabels[item]}
                 <span className="ml-1.5 text-[10px] font-normal text-text-subtle">
-                  {item === "All" ? templates.length : templates.filter((template) => template.category === (item as TemplateCategory)).length}
+                  {item === "All" ? scopedTemplates.length : scopedTemplates.filter((template) => template.category === (item as TemplateCategory)).length}
                 </span>
               </TabsTrigger>
             ))}
@@ -326,14 +343,15 @@ export function TemplatesView() {
               <div className="mt-4 rounded-[14px] border border-border bg-surface">
                 <EmptyState
                   icon={<SearchX aria-hidden="true" className="size-5" />}
-                  title={templates.length ? "Подходящих шаблонов нет" : "Библиотека пуста"}
-                  description={templates.length ? "Измените запрос или категорию." : "Создайте первый шаблон в визуальном редакторе."}
-                  action={templates.length ? { label: "Сбросить фильтры", onClick: () => { setQuery(""); setCategory("All"); } } : undefined}
+                  title={scope === "mine" && !scopedTemplates.length ? "У вас пока нет своих шаблонов" : templates.length ? "Подходящих шаблонов нет" : "Библиотека пуста"}
+                  description={scope === "mine" && !scopedTemplates.length ? "Создайте макет с нуля или откройте стартовый шаблон и сохраните свой вариант." : templates.length ? "Измените запрос или категорию." : "Создайте первый шаблон в визуальном редакторе."}
+                  action={templates.length ? { label: scope === "mine" && !scopedTemplates.length ? "Показать библиотеку" : "Сбросить фильтры", onClick: () => { setQuery(""); setCategory("All"); if (scope === "mine" && !scopedTemplates.length) setScope("all"); } } : undefined}
                 />
               </div>
             )}
           </TabsContent>
         </Tabs>
+        </div>
       )}
     </div>
   );

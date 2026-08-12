@@ -132,7 +132,7 @@ export function BuilderTopbar({
         </div>
 
         <Button
-          variant="secondary"
+          variant={campaignHandoff ? "secondary" : "primary"}
           size="sm"
           aria-label={saveLabel}
           onClick={onSave}
@@ -141,14 +141,14 @@ export function BuilderTopbar({
           className="px-2 sm:px-3"
         >
           <Save aria-hidden="true" className="size-3.5" />
-          <span className="hidden lg:inline">{saveLabel}</span>
+          <span className="hidden sm:inline">{saveLabel}</span>
         </Button>
         <Link
           href={continueHref}
           onClick={onContinue}
           aria-label={continueLabel}
           className={buttonVariants({
-            variant: "primary",
+            variant: campaignHandoff ? "primary" : "secondary",
             size: "sm",
             className: "px-2.5 sm:px-3",
           })}

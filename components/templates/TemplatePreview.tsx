@@ -53,9 +53,12 @@ export function TemplateCard({
               {template.description || "Без описания"}
             </p>
           </div>
-          <Badge variant="neutral" className="shrink-0">
-            {templateCategoryLabels[template.category]}
-          </Badge>
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            <Badge variant={template.isStarter ? "neutral" : "accent"}>
+              {template.isStarter ? "Из библиотеки" : "Мой шаблон"}
+            </Badge>
+            <span className="text-[9px] text-text-subtle">{templateCategoryLabels[template.category]}</span>
+          </div>
         </div>
 
         <div className="mt-4 flex items-center justify-between gap-3 border-t border-border/70 pt-3.5">
@@ -99,7 +102,7 @@ export function TemplateCard({
             <Copy aria-hidden="true" className="size-3" />
             Дублировать
           </Button>
-          <Button
+          {!template.isStarter ? <Button
             variant="ghost"
             size="sm"
             onClick={onDelete}
@@ -111,7 +114,7 @@ export function TemplateCard({
           >
             <Trash2 aria-hidden="true" className="size-3" />
             Удалить
-          </Button>
+          </Button> : null}
         </div>
       </div>
     </article>

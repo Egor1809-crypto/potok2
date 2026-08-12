@@ -27,6 +27,7 @@ import {
 } from "./email-document";
 import { ensureDatabase, WORKSPACE_ID } from "./database-init";
 import { unknownMergeTokens } from "./provider-adapters";
+import { isStarterEmailTemplateId } from "./starter-template-library";
 
 type EmailTemplateRow = typeof emailTemplates.$inferSelect;
 
@@ -207,6 +208,7 @@ export function toEmailTemplateRecord(
   return {
     id: row.id,
     workspaceId: row.workspaceId,
+    isStarter: isStarterEmailTemplateId(row.id),
     name: row.name,
     description: row.description,
     category: row.category,

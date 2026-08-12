@@ -324,7 +324,11 @@ export function EmailBuilderView(props: EmailBuilderViewProps) {
     props.campaignName ??
     query.get("campaign") ??
     (campaignMode ? restoredState.campaignName : undefined) ??
-    templateRecord?.name ??
+    (templateRecord
+      ? !campaignMode && templateRecord.isStarter
+        ? `${templateRecord.name} — мой вариант`
+        : templateRecord.name
+      : undefined) ??
     (campaignMode ? "Кампания без названия" : "Новый email-шаблон");
   const resolvedContinueHref =
     requestedContinueHref ??
@@ -332,7 +336,7 @@ export function EmailBuilderView(props: EmailBuilderViewProps) {
       ? `/campaigns/new?step=message&builderDraft=1${
           resolvedTemplateId ? `&template=${encodeURIComponent(resolvedTemplateId)}` : ""
         }`
-      : "/templates");
+      : "/templates?scope=mine");
 
   if (templateLoadState === "loading") {
     return <div className="card grid min-h-[560px] place-items-center p-8 text-center text-[13px] text-text-muted">Загружаем шаблон с сервера…</div>;
@@ -412,12 +416,13 @@ function EmailBuilderWorkspace({
   const [campaignName, setCampaignName] = useState(initialCampaignName);
   const [templateDescription, setTemplateDescription] = useState(templateRecord?.description ?? "");
   const [templateCategory, setTemplateCategory] = useState<TemplateCategory>(templateRecord?.category ?? "Business");
-  const [savedTemplateId, setSavedTemplateId] = useState(templateRecord?.id ?? templateId ?? null);
-  const [templateRevision, setTemplateRevision] = useState(templateRecord?.updatedAt ?? null);
+  const editingStarter = mode === "template" && Boolean(templateRecord?.isStarter);
+  const [savedTemplateId, setSavedTemplateId] = useState(editingStarter ? null : templateRecord?.id ?? templateId ?? null);
+  const [templateRevision, setTemplateRevision] = useState(editingStarter ? null : templateRecord?.updatedAt ?? null);
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("desktop");
   const [mobilePanel, setMobilePanel] = useState<BuilderPanel>("canvas");
-  const [dirty, setDirty] = useState(mode === "template" ? !templateRecord : true);
+  const [dirty, setDirty] = useState(mode === "template" ? !templateRecord || editingStarter : true);
   const [creationMode, setCreationMode] = useState<"manual" | "ai">("manual");
   const editRevisionRef = useRef(0);
   const savingTemplateRef = useRef(false);
@@ -614,7 +619,7 @@ function EmailBuilderWorkspace({
         `/email-builder?template=${encodeURIComponent(body.template.id)}`,
       );
       toast.success(
-        "Шаблон сохранён",
+        savedTemplateId ? "Изменения сохранены" : "Добавлено в «Мои шаблоны»",
         hasNewerLocalChanges
           ? "Версия на момент нажатия сохранена. Более новые правки остаются в редакторе и требуют повторного сохранения."
           : "HTML и текстовая версия повторно собраны на сервере.",
@@ -705,9 +710,9 @@ function EmailBuilderWorkspace({
         dirty={dirty}
         campaignHandoff={mode === "campaign"}
         nameLabel={mode === "template" ? "Название шаблона" : "Название кампании"}
-        saveLabel={mode === "template" ? "Сохранить шаблон" : "Сохранить черновик"}
         saving={savingTemplate}
-        continueLabel={mode === "template" ? "К библиотеке" : "Применить к кампании"}
+        saveLabel={mode === "template" ? (savedTemplateId ? "Сохранить изменения" : "Сохранить в мои шаблоны") : "Сохранить черновик"}
+        continueLabel={mode === "template" ? "Мои шаблоны" : "Применить к кампании"}
         statusText={mode === "template" ? "Шаблон сохранён на сервере" : undefined}
         dirtyText={mode === "template" ? "Изменения не сохранены на сервере" : "Изменения не переданы в мастер кампании"}
         onUndo={undo}
@@ -729,7 +734,13 @@ function EmailBuilderWorkspace({
         <>
 
       {mode === "template" ? (
-        <div className="grid gap-3 border-b border-border bg-surface-subtle/45 px-4 py-3 md:grid-cols-[190px_minmax(260px,1fr)] md:items-end">
+        <div className="border-b border-border bg-surface-subtle/45 px-4 py-3">
+          {editingStarter && !savedTemplateId ? (
+            <div className="mb-3 rounded-xl border border-primary/20 bg-primary-subtle/60 px-3 py-2.5 text-[11px] leading-5 text-text-muted">
+              Это готовый макет из библиотеки. Кнопка «Сохранить в мои шаблоны» создаст вашу отдельную копию — исходный шаблон останется без изменений.
+            </div>
+          ) : null}
+          <div className="grid gap-3 md:grid-cols-[190px_minmax(260px,1fr)] md:items-end">
           <FormField label="Категория" htmlFor="builder-template-category">
             <Select
               id="builder-template-category"
@@ -760,6 +771,7 @@ function EmailBuilderWorkspace({
               placeholder="Для какой задачи подходит этот макет"
             />
           </FormField>
+          </div>
         </div>
       ) : null}
 

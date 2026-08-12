@@ -10,6 +10,14 @@ import {
   parseEmailBuilderDocument,
 } from "./email-document";
 
+const STARTER_EMAIL_TEMPLATE_IDS = new Set(
+  templates.map((template) => template.id),
+);
+
+export function isStarterEmailTemplateId(id: string): boolean {
+  return STARTER_EMAIL_TEMPLATE_IDS.has(id);
+}
+
 type BlockStyle = Pick<
   EmailBuilderBlockInput,
   | "paddingTop"

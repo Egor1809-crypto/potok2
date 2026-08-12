@@ -267,13 +267,13 @@ function BlockContent({
     if (block.href) {
       return (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={block.href} alt={block.content} className="inline-block max-h-20 max-w-[220px] object-contain" />
+        <img src={block.href} alt={block.content} className="inline-block max-h-24 max-w-full object-contain" />
       );
     }
     return (
       <div
-        className="inline-flex items-center gap-2 font-semibold tracking-[0.12em]"
-        style={{ fontSize: block.fontSize }}
+        className="inline-flex items-center gap-2"
+        style={{ fontSize: block.fontSize, fontWeight: block.fontWeight, lineHeight: block.lineHeight / 100, letterSpacing: block.letterSpacing }}
       >
         <span className="grid size-6 place-items-center rounded-md text-[9px] font-bold text-white" style={{ backgroundColor: accentColor }}>
           M
@@ -290,10 +290,12 @@ function BlockContent({
         suppressContentEditableWarning
         onPointerDown={(event) => event.stopPropagation()}
         onBlur={(event) => onInlineEdit(event.currentTarget.textContent ?? "")}
-        className="m-0 font-semibold tracking-[-0.035em]"
+        className="m-0"
         style={{
           fontSize: compact ? Math.min(block.fontSize, 31) : block.fontSize,
-          lineHeight: 1.08,
+          fontWeight: block.fontWeight,
+          lineHeight: block.lineHeight / 100,
+          letterSpacing: block.letterSpacing,
         }}
       >
         {renderTokens(block.content)}
@@ -309,7 +311,7 @@ function BlockContent({
         onPointerDown={(event) => event.stopPropagation()}
         onBlur={(event) => onInlineEdit(event.currentTarget.textContent ?? "")}
         className="m-0 whitespace-pre-wrap"
-        style={{ fontSize: block.fontSize, lineHeight: 1.65 }}
+        style={{ fontSize: block.fontSize, fontWeight: block.fontWeight, lineHeight: block.lineHeight / 100, letterSpacing: block.letterSpacing }}
       >
         {renderTokens(block.content)}
       </p>
@@ -321,13 +323,16 @@ function BlockContent({
     const buttonColor = block.buttonStyle === "solid" ? block.textColor : accentColor;
     return (
       <span
-        className="inline-flex min-h-10 items-center justify-center px-5 font-semibold text-white shadow-[0_4px_12px_rgba(30,32,60,0.14)]"
+        className="inline-flex min-h-10 items-center justify-center px-5 text-white shadow-[0_4px_12px_rgba(30,32,60,0.14)]"
         style={{
           borderRadius: block.borderRadius,
           backgroundColor: buttonBackground,
           color: buttonColor,
           border: block.buttonStyle === "outline" ? `2px solid ${accentColor}` : undefined,
           fontSize: block.fontSize,
+          fontWeight: block.fontWeight,
+          lineHeight: block.lineHeight / 100,
+          letterSpacing: block.letterSpacing,
         }}
       >
         {renderTokens(block.label || block.content)}
@@ -393,17 +398,17 @@ function BlockContent({
   if (block.type === "columns") {
     const columns = block.content.split("|");
     return (
-      <div className="grid grid-cols-2 gap-3 text-left">
+      <div className="grid grid-cols-2 gap-3">
         {[columns[0] || "Первый столбец", columns[1] || "Второй столбец"].map((column, index) => (
           <div
             key={`${column}-${index}`}
             className="rounded-lg border border-black/5 bg-black/[0.025] p-3"
-            style={{ borderRadius: block.borderRadius, fontSize: block.fontSize }}
+            style={{ borderRadius: block.borderRadius, fontSize: block.fontSize, lineHeight: block.lineHeight / 100, letterSpacing: block.letterSpacing }}
           >
             <span className="mb-2 block size-5 rounded-md text-center text-[10px] font-bold leading-5 text-white" style={{ backgroundColor: accentColor }}>
               {index + 1}
             </span>
-            <span className="font-medium leading-5">{renderTokens(column)}</span>
+            <span>{renderTokens(column)}</span>
           </div>
         ))}
       </div>
@@ -427,7 +432,7 @@ function BlockContent({
   if (block.type === "social") {
     const items = block.content.split("|");
     return (
-      <div className="inline-flex flex-wrap items-center gap-2">
+      <div className="inline-flex flex-wrap items-center gap-2" style={{ lineHeight: block.lineHeight / 100, letterSpacing: block.letterSpacing }}>
         {items.map((item, index) => (
           <span key={`${item}-${index}`} className="inline-flex items-center gap-1.5 rounded-full border border-black/10 px-2.5 py-1.5 font-medium" style={{ fontSize: block.fontSize }}>
             {index === 0 ? <Linkedin aria-hidden="true" className="size-3" /> : <Globe2 aria-hidden="true" className="size-3" />}
@@ -442,8 +447,8 @@ function BlockContent({
     const [title, subtitle] = block.content.split("|");
     return (
       <div className="rounded-2xl p-6" style={{ backgroundColor: block.backgroundColor === "transparent" ? `${accentColor}12` : block.backgroundColor, borderRadius: block.borderRadius }}>
-        <h2 className="m-0 font-bold tracking-[-0.035em]" style={{ fontSize: compact ? Math.min(block.fontSize, 29) : block.fontSize, lineHeight: 1.1 }}>{renderTokens(title || "Главная идея письма")}</h2>
-        <p className="mb-0 mt-3 whitespace-pre-wrap opacity-75" style={{ fontSize: 16, lineHeight: 1.55 }}>{renderTokens(subtitle || "Коротко объясните ценность предложения")}</p>
+        <h2 className="m-0" style={{ fontSize: compact ? Math.min(block.fontSize, 29) : block.fontSize, fontWeight: block.fontWeight, lineHeight: block.lineHeight / 100, letterSpacing: block.letterSpacing }}>{renderTokens(title || "Главная идея письма")}</h2>
+        <p className="mb-0 mt-3 whitespace-pre-wrap opacity-75" style={{ fontSize: Math.max(13, Math.round(block.fontSize * 0.48)), lineHeight: block.lineHeight / 100 }}>{renderTokens(subtitle || "Коротко объясните ценность предложения")}</p>
       </div>
     );
   }
@@ -451,8 +456,8 @@ function BlockContent({
   if (block.type === "quote") {
     const [quote, author] = block.content.split("|");
     return (
-      <blockquote className="m-0 rounded-xl border-l-4 p-5 text-left" style={{ borderLeftColor: accentColor, backgroundColor: block.backgroundColor === "transparent" ? "#f8f8fb" : block.backgroundColor, borderRadius: block.borderRadius }}>
-        <p className="m-0 italic" style={{ fontSize: block.fontSize, lineHeight: 1.55 }}>“{renderTokens(quote || "Цитата клиента или важная мысль")}”</p>
+      <blockquote className="m-0 rounded-xl border-l-4 p-5" style={{ borderLeftColor: accentColor, backgroundColor: block.backgroundColor === "transparent" ? "#f8f8fb" : block.backgroundColor, borderRadius: block.borderRadius }}>
+        <p className="m-0 italic" style={{ fontSize: block.fontSize, lineHeight: block.lineHeight / 100, letterSpacing: block.letterSpacing }}>“{renderTokens(quote || "Цитата клиента или важная мысль")}”</p>
         <footer className="mt-2 text-[12px] font-semibold opacity-70">{renderTokens(author || "Имя, должность")}</footer>
       </blockquote>
     );
@@ -460,11 +465,11 @@ function BlockContent({
 
   if (block.type === "checklist") {
     return (
-      <ul className="m-0 grid list-none gap-2 p-0 text-left">
+      <ul className="m-0 grid list-none gap-2 p-0">
         {block.content.split("|").filter(Boolean).map((item, index) => (
-          <li key={`${item}-${index}`} className="flex items-start gap-2" style={{ fontSize: block.fontSize }}>
+          <li key={`${item}-${index}`} className="flex items-start gap-2" style={{ fontSize: block.fontSize, lineHeight: block.lineHeight / 100, letterSpacing: block.letterSpacing }}>
             <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full text-[11px] font-bold text-white" style={{ backgroundColor: accentColor }}>✓</span>
-            <span className="leading-5">{renderTokens(item.trim())}</span>
+            <span>{renderTokens(item.trim())}</span>
           </li>
         ))}
       </ul>
@@ -488,9 +493,9 @@ function BlockContent({
   if (block.type === "product") {
     const [name, description, price] = block.content.split("|");
     return (
-      <div className="rounded-xl border border-black/10 p-5 text-left" style={{ backgroundColor: block.backgroundColor === "transparent" ? "#fff" : block.backgroundColor, borderRadius: block.borderRadius }}>
+      <div className="rounded-xl border border-black/10 p-5" style={{ backgroundColor: block.backgroundColor === "transparent" ? "#fff" : block.backgroundColor, borderRadius: block.borderRadius, lineHeight: block.lineHeight / 100, letterSpacing: block.letterSpacing }}>
         <strong className="block text-[19px]">{renderTokens(name || "Название предложения")}</strong>
-        <p className="mb-0 mt-2 opacity-75" style={{ fontSize: block.fontSize, lineHeight: 1.55 }}>{renderTokens(description || "Короткое описание пользы")}</p>
+        <p className="mb-0 mt-2 opacity-75" style={{ fontSize: block.fontSize }}>{renderTokens(description || "Короткое описание пользы")}</p>
         <strong className="mt-3 block text-[17px]">{renderTokens(price || "Цена")}</strong>
         <span className="mt-4 inline-flex rounded-lg px-4 py-2 text-[12px] font-semibold text-white" style={{ backgroundColor: accentColor }}>{renderTokens(block.label || "Узнать подробнее")}</span>
       </div>
@@ -500,7 +505,7 @@ function BlockContent({
   if (block.type === "signature") {
     const [name, position, contact] = block.content.split("|");
     return (
-      <div className="inline-flex items-center gap-3 text-left">
+      <div className="inline-flex items-center gap-3" style={{ fontSize: block.fontSize, lineHeight: block.lineHeight / 100, letterSpacing: block.letterSpacing }}>
         <span className="grid size-10 shrink-0 place-items-center rounded-full text-sm font-bold text-white" style={{ backgroundColor: accentColor }}>{(name || "М").slice(0, 1)}</span>
         <span><strong className="block">{renderTokens(name || "Имя отправителя")}</strong><span className="block opacity-70">{renderTokens(position || "Должность")}</span><span className="block text-[11px] opacity-55">{renderTokens(contact || "Контакты")}</span></span>
       </div>
@@ -513,23 +518,23 @@ function BlockContent({
 
   if (block.type === "banner") {
     const [title, subtitle] = block.content.split("|");
-    return <div className="p-6 text-left" style={{ backgroundColor: block.backgroundColor, borderRadius: block.borderRadius }}><strong className="block text-[24px]">{renderTokens(title || "Важное объявление")}</strong><span className="mt-2 block opacity-75">{renderTokens(subtitle || "Короткое пояснение")}</span></div>;
+    return <div className="p-6" style={{ backgroundColor: block.backgroundColor, borderRadius: block.borderRadius, fontSize: block.fontSize, lineHeight: block.lineHeight / 100, letterSpacing: block.letterSpacing }}><strong className="block" style={{ fontSize: block.fontSize + 8 }}>{renderTokens(title || "Важное объявление")}</strong><span className="mt-2 block opacity-75">{renderTokens(subtitle || "Короткое пояснение")}</span></div>;
   }
   if (block.type === "timeline") {
     const items = block.content.split("|");
-    return <ol className="m-0 grid list-none gap-3 p-0 text-left">{Array.from({length:Math.ceil(items.length/2)},(_,index)=><li key={index} className="flex gap-3"><span className="grid size-7 shrink-0 place-items-center rounded-full text-xs font-bold text-white" style={{backgroundColor:accentColor}}>{index+1}</span><span><strong className="block">{renderTokens(items[index*2]||"")}</strong><span className="opacity-65">{renderTokens(items[index*2+1]||"")}</span></span></li>)}</ol>;
+    return <ol className="m-0 grid list-none gap-3 p-0" style={{ fontSize: block.fontSize, lineHeight: block.lineHeight / 100, letterSpacing: block.letterSpacing }}>{Array.from({length:Math.ceil(items.length/2)},(_,index)=><li key={index} className="flex gap-3"><span className="grid size-7 shrink-0 place-items-center rounded-full text-xs font-bold text-white" style={{backgroundColor:accentColor}}>{index+1}</span><span><strong className="block">{renderTokens(items[index*2]||"")}</strong><span className="opacity-65">{renderTokens(items[index*2+1]||"")}</span></span></li>)}</ol>;
   }
   if (block.type === "faq") {
     const items = block.content.split("|");
-    return <div className="grid text-left">{Array.from({length:Math.ceil(items.length/2)},(_,index)=><div key={index} className="border-b border-black/10 py-3"><strong className="block">{renderTokens(items[index*2]||"")}</strong><span className="mt-1 block opacity-65">{renderTokens(items[index*2+1]||"")}</span></div>)}</div>;
+    return <div className="grid" style={{ fontSize: block.fontSize, lineHeight: block.lineHeight / 100, letterSpacing: block.letterSpacing }}>{Array.from({length:Math.ceil(items.length/2)},(_,index)=><div key={index} className="border-b border-black/10 py-3"><strong className="block">{renderTokens(items[index*2]||"")}</strong><span className="mt-1 block opacity-65">{renderTokens(items[index*2+1]||"")}</span></div>)}</div>;
   }
   if (block.type === "coupon") {
     const [eyebrow, code, note] = block.content.split("|");
-    return <div className="border-2 border-dashed p-5 text-center" style={{borderColor:accentColor,borderRadius:block.borderRadius,backgroundColor:block.backgroundColor}}><span className="block text-[11px] uppercase tracking-wider">{eyebrow}</span><strong className="my-2 block text-[26px] tracking-wider" style={{color:accentColor}}>{code}</strong><span className="block text-[11px] opacity-65">{note}</span></div>;
+    return <div className="border-2 border-dashed p-5" style={{borderColor:accentColor,borderRadius:block.borderRadius,backgroundColor:block.backgroundColor,fontSize:block.fontSize,lineHeight:block.lineHeight/100,letterSpacing:block.letterSpacing}}><span className="block text-[11px] uppercase tracking-wider">{eyebrow}</span><strong className="my-2 block tracking-wider" style={{color:accentColor,fontSize:block.fontSize+8}}>{code}</strong><span className="block text-[11px] opacity-65">{note}</span></div>;
   }
   if (block.type === "video") {
     const [title, duration] = block.content.split("|");
-    return <div className="grid min-h-44 place-items-center p-6 text-center" style={{backgroundColor:block.backgroundColor,borderRadius:block.borderRadius}}><div><span className="mx-auto grid size-12 place-items-center rounded-full bg-white/15 text-xl">▶</span><strong className="mt-3 block">{renderTokens(title||"Видео")}</strong><span className="mt-1 block text-xs opacity-60">{duration}</span></div></div>;
+    return <div className="grid min-h-44 place-items-center p-6" style={{backgroundColor:block.backgroundColor,borderRadius:block.borderRadius,fontSize:block.fontSize,lineHeight:block.lineHeight/100,letterSpacing:block.letterSpacing}}><div><span className="mx-auto grid size-12 place-items-center rounded-full bg-white/15 text-xl">▶</span><strong className="mt-3 block">{renderTokens(title||"Видео")}</strong><span className="mt-1 block text-xs opacity-60">{duration}</span></div></div>;
   }
 
   return (
