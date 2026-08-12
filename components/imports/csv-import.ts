@@ -1,8 +1,7 @@
 import type { ContactCreateInput, ContactStatus } from "@/types/api";
 import type { ExistingContactEndpoints } from "@/components/imports/import-api";
 
-export const MAX_CSV_BYTES = 10 * 1024 * 1024;
-export const MAX_CSV_ROWS = 10_000;
+export const MAX_TABLE_BYTES = 50 * 1024 * 1024;
 
 export const targetFieldOptions = [
   { value: "ignore", label: "Не импортировать" },
@@ -40,6 +39,8 @@ export type ParsedCsv = {
   rows: CsvRow[];
   delimiter: "," | ";" | "\t";
   encoding: "UTF-8" | "Windows-1251";
+  format: "CSV" | "TSV" | "XLSX" | "XLS";
+  sheetName?: string;
 };
 
 export type RowIssue =
@@ -272,17 +273,43 @@ async function decodeFile(file: File): Promise<{
 }
 
 export async function parseCsvFile(file: File): Promise<ParsedCsv> {
-  if (!file.name.toLocaleLowerCase().endsWith(".csv")) {
-    throw new Error("Поддерживается только файл CSV.");
+  const extension = file.name.toLocaleLowerCase().split(".").pop() ?? "";
+  if (!new Set(["csv", "tsv", "xlsx", "xls"]).has(extension)) {
+    throw new Error("Поддерживаются таблицы CSV, TSV, XLSX и XLS.");
   }
   if (file.size === 0) throw new Error("Файл пустой.");
-  if (file.size > MAX_CSV_BYTES) {
-    throw new Error("Файл больше 10 МБ. Разделите его на несколько CSV.");
+  if (file.size > MAX_TABLE_BYTES) {
+    throw new Error("Файл больше 50 МБ. Разделите его на несколько таблиц.");
+  }
+
+  if (extension === "xlsx" || extension === "xls") {
+    const XLSX = await import("@e965/xlsx");
+    const workbook = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true, dense: true });
+    const sheetName = workbook.SheetNames[0];
+    if (!sheetName) throw new Error("В книге нет листов.");
+    const records = XLSX.utils.sheet_to_json<Array<string | number | boolean | Date>>(workbook.Sheets[sheetName], {
+      header: 1,
+      raw: false,
+      defval: "",
+      blankrows: false,
+      dateNF: "yyyy-mm-dd",
+    }).map((row) => row.map((value) => value instanceof Date ? value.toISOString().slice(0, 10) : String(value)));
+    return parsedRecords(records, extension === "xlsx" ? "XLSX" : "XLS", "UTF-8", sheetName);
   }
 
   const decoded = await decodeFile(file);
-  const delimiter = delimiterInFirstRecord(decoded.text);
+  const delimiter = extension === "tsv" ? "\t" : delimiterInFirstRecord(decoded.text);
   const records = parseRecords(decoded.text, delimiter);
+  return parsedRecords(records, extension === "tsv" ? "TSV" : "CSV", decoded.encoding, undefined, delimiter);
+}
+
+function parsedRecords(
+  records: string[][],
+  format: ParsedCsv["format"],
+  encoding: ParsedCsv["encoding"],
+  sheetName?: string,
+  delimiter: ParsedCsv["delimiter"] = "\t",
+): ParsedCsv {
   const dataRows = records
     .slice(1)
     .map((values, index) => ({ values, rowNumber: index + 2 }))
@@ -291,20 +318,15 @@ export async function parseCsvFile(file: File): Promise<ParsedCsv> {
     );
 
   if (!records[0]?.some((value) => value.trim().length > 0)) {
-    throw new Error("В CSV нет строки с заголовками.");
+    throw new Error("В таблице нет строки с заголовками.");
   }
   if (dataRows.length === 0) {
-    throw new Error("В CSV нет строк с контактами.");
+    throw new Error("В таблице нет строк с контактами.");
   }
 
   const headers = uniqueHeaders(records[0]);
   if (headers.length < 2) {
-    throw new Error("В CSV должно быть не менее двух столбцов.");
-  }
-  if (dataRows.length > MAX_CSV_ROWS) {
-    throw new Error(
-      `В файле ${dataRows.length} строк. За один раз можно импортировать до ${MAX_CSV_ROWS}.`,
-    );
+    throw new Error("В таблице должно быть не менее двух столбцов.");
   }
 
   return {
@@ -315,7 +337,9 @@ export async function parseCsvFile(file: File): Promise<ParsedCsv> {
       columnMismatch: values.length !== headers.length,
     })),
     delimiter,
-    encoding: decoded.encoding,
+    encoding,
+    format,
+    ...(sheetName ? { sheetName } : {}),
   };
 }
 

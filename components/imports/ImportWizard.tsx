@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  MAX_CSV_ROWS,
+  MAX_TABLE_BYTES,
   mappingError,
   parseCsvFile,
   suggestMapping,
@@ -33,7 +33,7 @@ import {
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 
-const steps = ["Файл CSV", "Поля и проверка", "Импорт"];
+const steps = ["Таблица", "Поля и проверка", "Импорт"];
 const batchSize = 250;
 
 type ImportRun = {
@@ -84,6 +84,13 @@ function delimiterLabel(delimiter: ParsedCsv["delimiter"]): string {
   if (delimiter === ";") return "точка с запятой";
   if (delimiter === "\t") return "табуляция";
   return "запятая";
+}
+
+function tableFormatLabel(parsed: ParsedCsv): string {
+  if (parsed.format === "XLSX" || parsed.format === "XLS") {
+    return `${parsed.format}${parsed.sheetName ? ` · лист «${parsed.sheetName}»` : ""}`;
+  }
+  return `${parsed.format} · ${parsed.encoding} · ${delimiterLabel(parsed.delimiter)}`;
 }
 
 function splitIntoBatches<T>(values: T[], size: number): T[][] {
@@ -197,7 +204,7 @@ export function ImportWizard() {
       setFileError(
         error instanceof Error
           ? error.message
-          : "Не удалось прочитать CSV.",
+          : "Не удалось прочитать таблицу.",
       );
       setParsed(null);
     } finally {
@@ -325,8 +332,8 @@ export function ImportWizard() {
           Импорт контактов
         </h1>
         <p className="mt-1.5 max-w-2xl text-sm text-[var(--text-secondary)]">
-          Загрузите CSV, сверьте столбцы и добавьте только корректные
-          новые записи.
+          Загрузите CSV, TSV, XLSX или XLS, сверьте столбцы и импортируйте
+          все корректные записи из таблицы.
         </p>
       </header>
 
@@ -365,7 +372,7 @@ export function ImportWizard() {
         <section className="card p-5 sm:p-8" aria-labelledby="upload-title">
           <div className="mx-auto max-w-[760px] text-center">
             <h2 id="upload-title" className="text-lg font-semibold">
-              Выберите файл CSV
+              Выберите таблицу с контактами
             </h2>
             <p className="mt-2 text-[10px] leading-5 text-[var(--text-tertiary)]">
               Первая строка — заголовки. Нужны ФИО и хотя бы один канал:
@@ -389,7 +396,7 @@ export function ImportWizard() {
             <input
               type="file"
               className="sr-only"
-              accept=".csv,text/csv"
+              accept=".csv,.tsv,.xlsx,.xls,text/csv,text/tab-separated-values,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
               disabled={reading}
               onChange={(event) => {
                 const selectedFile = event.currentTarget.files?.[0];
@@ -405,12 +412,12 @@ export function ImportWizard() {
               )}
             </span>
             <p className="mt-4 text-xs font-semibold">
-              {reading ? "Читаем файл и сверяем базу…" : "Перетащите CSV сюда"}
+              {reading ? "Читаем таблицу и сверяем базу…" : "Перетащите таблицу сюда"}
             </p>
             <p className="mt-1 text-[10px] text-[var(--text-tertiary)]">
               {reading
                 ? file?.name
-                : `или нажмите, чтобы выбрать · до 10 МБ и ${MAX_CSV_ROWS.toLocaleString("ru-RU")} строк`}
+                : `или нажмите, чтобы выбрать · CSV, TSV, XLSX или XLS · до ${Math.round(MAX_TABLE_BYTES / 1024 / 1024)} МБ`}
             </p>
           </label>
 
@@ -428,8 +435,8 @@ export function ImportWizard() {
 
           <div className="mx-auto mt-5 grid max-w-[760px] gap-3 sm:grid-cols-3">
             {[
-              ["Формат", "Только CSV"],
-              ["Кодировка", "UTF-8 или Windows-1251"],
+              ["Форматы", "CSV, TSV, XLSX и XLS"],
+              ["Строки", "Все корректные строки"],
               ["Дубликаты", "Будут показаны и пропущены"],
             ].map(([label, value]) => (
               <div
@@ -468,8 +475,7 @@ export function ImportWizard() {
               <div className="rounded-lg bg-[var(--surface-subtle)] px-3 py-2 text-[9px] leading-4 text-[var(--text-secondary)]">
                 <span className="font-semibold">{file.name}</span>
                 <br />
-                {formatBytes(file.size)} · {parsed.encoding} ·{" "}
-                {delimiterLabel(parsed.delimiter)}
+                {formatBytes(file.size)} · {tableFormatLabel(parsed)}
               </div>
             </div>
 
@@ -478,7 +484,7 @@ export function ImportWizard() {
                 <thead>
                   <tr className="bg-[var(--surface-subtle)] text-[9px] uppercase tracking-[.06em] text-[var(--text-tertiary)]">
                     <th scope="col" className="px-5 py-3 sm:px-6">
-                      Столбец CSV
+                      Столбец таблицы
                     </th>
                     <th scope="col" className="px-4 py-3">
                       Поле контакта
@@ -665,7 +671,7 @@ export function ImportWizard() {
                       className="block cursor-pointer text-[10px] font-semibold"
                     >
                       {hasMappedEmailConsent
-                        ? "Подтверждаю достоверность email-согласий из CSV"
+                        ? "Подтверждаю достоверность email-согласий из таблицы"
                         : "У всех импортируемых контактов с email есть согласие на email-рассылку"}
                     </label>
                     <span
@@ -685,7 +691,7 @@ export function ImportWizard() {
 
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
             <button type="button" onClick={reset} className="btn btn-secondary">
-              Выбрать другой CSV
+              Выбрать другую таблицу
             </button>
             <button
               type="button"
@@ -788,7 +794,7 @@ export function ImportWizard() {
             <p className="mt-3 text-left text-[9px] leading-4 text-[var(--text-tertiary)]">
               {emailConsentConfirmed
                 ? hasMappedEmailConsent
-                  ? "Email-согласие записано только для подтверждённых строк CSV."
+                  ? "Email-согласие записано только для подтверждённых строк таблицы."
                   : "Email-согласие записано для созданных контактов с email."
                 : "Контакты с email созданы без email-согласия."}
             </p>
@@ -830,7 +836,7 @@ export function ImportWizard() {
                   className="btn btn-secondary justify-center gap-1.5"
                 >
                   <RotateCcw size={12} />
-                  Другой CSV
+                  Другая таблица
                 </button>
                 <Link
                   href="/contacts"

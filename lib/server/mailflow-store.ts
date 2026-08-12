@@ -1667,7 +1667,7 @@ function parseCampaign(
   const segmentId =
     parsedSegmentId === undefined ? (existing?.segmentId ?? null) : parsedSegmentId;
   const contactIds =
-    optionalStringArray(object.contactIds, "Контакты", 500) ??
+    optionalStringArray(object.contactIds, "Контакты", 50_000) ??
     existing?.contactIds ??
     [];
   const existingChannels = defaults.plans?.map((plan) => ({

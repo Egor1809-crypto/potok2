@@ -18,6 +18,7 @@ import {
   SendHorizontal,
   Settings2,
   ShieldCheck,
+  Search,
   UserRound,
   UsersRound,
 } from "lucide-react";
@@ -82,7 +83,7 @@ type ConnectionStatus = IntegrationConnectionStatus;
 
 type AudienceContact = Pick<
   ContactRecord,
-  "id" | "fullName" | "email" | "companyName" | "status"
+  "id" | "fullName" | "email" | "companyName" | "jobTitle" | "city" | "tags" | "status"
 > & Partial<Pick<
   ContactRecord,
   "emailConsent" | "telegramChatId" | "telegramConsent" | "vkUserId" | "vkConsent"
@@ -859,6 +860,7 @@ function CampaignWizardState({
               contacts={workspaceContacts}
               contactIds={contactIds}
               onToggleContact={toggleContact}
+              onSetContacts={(ids) => { setContactIds(ids); setEvaluation(null); }}
             />
           ) : null}
 
@@ -1079,6 +1081,7 @@ function AudienceStep({
   contacts,
   contactIds,
   onToggleContact,
+  onSetContacts,
 }: {
   audienceType: "none" | "segment" | "contacts";
   onAudienceTypeChange: (value: "segment" | "contacts") => void;
@@ -1088,7 +1091,39 @@ function AudienceStep({
   contacts: AudienceContact[];
   contactIds: string[];
   onToggleContact: (id: string) => void;
+  onSetContacts: (ids: string[]) => void;
 }) {
+  const [search, setSearch] = React.useState("");
+  const [company, setCompany] = React.useState("");
+  const [city, setCity] = React.useState("");
+  const [jobTitle, setJobTitle] = React.useState("");
+  const [tag, setTag] = React.useState("");
+  const companies = React.useMemo(() => [...new Set(contacts.map((item) => item.companyName).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ru")), [contacts]);
+  const cities = React.useMemo(() => [...new Set(contacts.map((item) => item.city).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ru")), [contacts]);
+  const jobTitles = React.useMemo(() => [...new Set(contacts.map((item) => item.jobTitle).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ru")), [contacts]);
+  const tags = React.useMemo(() => [...new Set(contacts.flatMap((item) => item.tags ?? []).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ru")), [contacts]);
+  const filteredContacts = React.useMemo(() => {
+    const query = search.trim().toLocaleLowerCase("ru-RU");
+    return contacts.filter((contact) => {
+      if (company && contact.companyName !== company) return false;
+      if (city && contact.city !== city) return false;
+      if (jobTitle && contact.jobTitle !== jobTitle) return false;
+      if (tag && !(contact.tags ?? []).includes(tag)) return false;
+      if (!query) return true;
+      return [contact.fullName, contact.email, contact.companyName, contact.jobTitle, contact.city, ...(contact.tags ?? [])]
+        .some((value) => value.toLocaleLowerCase("ru-RU").includes(query));
+    });
+  }, [city, company, contacts, jobTitle, search, tag]);
+  const filteredIds = React.useMemo(
+    () => filteredContacts.map((contact) => contact.id),
+    [filteredContacts],
+  );
+  const selectedIds = React.useMemo(() => new Set(contactIds), [contactIds]);
+  const filteredIdSet = React.useMemo(() => new Set(filteredIds), [filteredIds]);
+  const selectedVisible = filteredIds.filter((id) => selectedIds.has(id)).length;
+  const allVisibleSelected = filteredIds.length > 0 && selectedVisible === filteredIds.length;
+  const filtersActive = Boolean(search || company || city || jobTitle || tag);
+
   return (
     <div>
       <StepIntro number={1} title="Выберите аудиторию" description="Используйте сохранённый сегмент или выберите конкретные контакты. Охват по каждому каналу посчитается отдельно." />
@@ -1152,12 +1187,53 @@ function AudienceStep({
       ) : audienceType === "contacts" ? (
         <fieldset className="mt-6">
           <legend className="text-[13px] font-semibold text-text-strong">Контакты рабочего пространства</legend>
+          <div className="mt-3 grid gap-2 rounded-xl border border-border bg-surface-subtle/45 p-3">
+            <div className="relative">
+              <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-subtle" />
+              <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск по имени, email, компании или должности" className="pl-9" />
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              <Select value={company} onChange={(event) => setCompany(event.target.value)} options={[{ value: "", label: "Все компании" }, ...companies.map((value) => ({ value, label: value }))]} />
+              <Select value={jobTitle} onChange={(event) => setJobTitle(event.target.value)} options={[{ value: "", label: "Все должности" }, ...jobTitles.map((value) => ({ value, label: value }))]} />
+              <Select value={city} onChange={(event) => setCity(event.target.value)} options={[{ value: "", label: "Все города" }, ...cities.map((value) => ({ value, label: value }))]} />
+              <Select value={tag} onChange={(event) => setTag(event.target.value)} options={[{ value: "", label: "Все теги" }, ...tags.map((value) => ({ value, label: value }))]} />
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[11px] text-text-muted">Найдено: {formatNumber(filteredContacts.length)} · выбрано: {formatNumber(contactIds.length)}</span>
+              <div className="flex gap-2">
+                {filtersActive ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSearch("");
+                      setCompany("");
+                      setJobTitle("");
+                      setCity("");
+                      setTag("");
+                    }}
+                  >
+                    Сбросить фильтры
+                  </Button>
+                ) : null}
+                {contactIds.length ? <Button variant="ghost" size="sm" onClick={() => onSetContacts([])}>Снять выбор</Button> : null}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={filteredIds.length === 0}
+                  onClick={() => onSetContacts(allVisibleSelected ? contactIds.filter((id) => !filteredIdSet.has(id)) : [...new Set([...contactIds, ...filteredIds])])}
+                >
+                  {allVisibleSelected ? "Убрать найденных" : "Добавить всех найденных"}
+                </Button>
+              </div>
+            </div>
+          </div>
           <div className="mt-3 max-h-80 divide-y divide-border overflow-y-auto rounded-xl border border-border">
-            {contacts.map((contact) => (
+            {filteredContacts.map((contact) => (
               <label key={contact.id} className="flex cursor-pointer items-center gap-3 px-4 py-3 hover:bg-surface-subtle">
                 <input
                   type="checkbox"
-                  checked={contactIds.includes(contact.id)}
+                  checked={selectedIds.has(contact.id)}
                   onChange={() => onToggleContact(contact.id)}
                   className="size-4 accent-[var(--primary)]"
                 />
@@ -1168,6 +1244,7 @@ function AudienceStep({
                 {contact.status && contact.status !== "active" ? <Badge variant="warning">Недоступен</Badge> : null}
               </label>
             ))}
+            {filteredContacts.length === 0 ? <p className="m-0 px-4 py-8 text-center text-[12px] text-text-muted">По выбранным фильтрам контактов нет.</p> : null}
           </div>
         </fieldset>
       ) : (
