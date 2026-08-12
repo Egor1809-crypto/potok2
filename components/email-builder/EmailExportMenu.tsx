@@ -27,14 +27,11 @@ function saveBlob(content: BlobPart, type: string, filename: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
 }
 
-function loadingPage() {
-  return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Подготовка PDF</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f7f2e9;color:#211924;font-family:Arial,sans-serif}.card{max-width:420px;padding:32px;border:1px solid #dfd1e8;border-radius:18px;background:#fff;text-align:center}.dot{width:30px;height:30px;margin:0 auto 18px;border:3px solid #eadcf5;border-top-color:#7c3aed;border-radius:50%;animation:s .8s linear infinite}@keyframes s{to{transform:rotate(360deg)}}</style></head><body><div class="card"><div class="dot"></div><strong>Подготавливаем PDF</strong><p>Окно печати откроется автоматически.</p></div></body></html>`;
-}
-
 export function EmailExportMenu({ document, name }: { document: BuilderDocument; name: string }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [dialog, setDialog] = useState<{ title: string; message: string; retryPdf?: boolean } | null>(null);
+  const [copies, setCopies] = useState(1);
   const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -57,53 +54,34 @@ export function EmailExportMenu({ document, name }: { document: BuilderDocument;
   };
 
   const run = async (format: ExportFormat) => {
-    // PDF-окно создаётся синхронно внутри пользовательского клика. Только так
-    // браузер показывает собственный запрос разрешения вместо тихой блокировки.
-    const printWindow = format === "pdf" ? window.open("about:blank", "_blank") : null;
-    if (format === "pdf" && !printWindow) {
-      setOpen(false);
-      setDialog({
-        title: "Браузер заблокировал окно PDF",
-        message: "Нажмите «Разрешить и повторить». Если браузер покажет системный запрос, разрешите всплывающие окна для MAILFLOW — окно печати откроется сразу.",
-        retryPdf: true,
-      });
-      return;
-    }
-    if (printWindow) {
-      printWindow.opener = null;
-      printWindow.document.open();
-      printWindow.document.write(loadingPage());
-      printWindow.document.close();
-    }
-
     setBusy(true);
     setOpen(false);
     setDialog(null);
     try {
       const filename = safeName(name);
       if (format === "json") {
-        saveBlob(JSON.stringify(document, null, 2), "application/json;charset=utf-8", `${filename}.mailflow.json`);
+        for (let index = 1; index <= copies; index += 1) saveBlob(JSON.stringify(document, null, 2), "application/json;charset=utf-8", `${filename}${copies > 1 ? `-${index}` : ""}.mailflow.json`);
       } else {
         const result = await compiled();
-        if (format === "html") saveBlob(result.html, "text/html;charset=utf-8", `${filename}.html`);
-        if (format === "txt") saveBlob(result.text, "text/plain;charset=utf-8", `${filename}.txt`);
+        if (format === "html") for (let index = 1; index <= copies; index += 1) saveBlob(result.html, "text/html;charset=utf-8", `${filename}${copies > 1 ? `-${index}` : ""}.html`);
+        if (format === "txt") for (let index = 1; index <= copies; index += 1) saveBlob(result.text, "text/plain;charset=utf-8", `${filename}${copies > 1 ? `-${index}` : ""}.txt`);
         if (format === "doc") {
           const wordBody = new DOMParser().parseFromString(result.html, "text/html").body.innerHTML;
           const wordHtml = `<!doctype html><html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" lang="ru"><head><meta charset="utf-8"><title>${filename}</title></head><body>${wordBody}</body></html>`;
-          saveBlob(wordHtml, "application/msword;charset=utf-8", `${filename}.doc`);
+          for (let index = 1; index <= copies; index += 1) saveBlob(wordHtml, "application/msword;charset=utf-8", `${filename}${copies > 1 ? `-${index}` : ""}.doc`);
         }
-        if (format === "pdf" && printWindow) {
-          printWindow.document.open();
-          printWindow.document.write(result.html);
-          printWindow.document.close();
-          window.setTimeout(() => {
-            try { printWindow.focus(); printWindow.print(); }
-            catch { setDialog({ title: "Не удалось открыть печать", message: "Окно письма уже открыто. В нём нажмите ⌘P или Ctrl+P и выберите «Сохранить как PDF»." }); }
-          }, 350);
+        if (format === "pdf") {
+          const frame = window.document.createElement("iframe");
+          frame.setAttribute("aria-hidden", "true");
+          frame.style.position = "fixed"; frame.style.width = "1px"; frame.style.height = "1px"; frame.style.right = "0"; frame.style.bottom = "0"; frame.style.opacity = "0";
+          window.document.body.appendChild(frame);
+          const frameDocument = frame.contentDocument;
+          if (!frameDocument) throw new Error("Не удалось подготовить PDF.");
+          frameDocument.open(); frameDocument.write(result.html); frameDocument.close();
+          window.setTimeout(() => { try { frame.contentWindow?.focus(); frame.contentWindow?.print(); } finally { window.setTimeout(() => frame.remove(), 2_000); } }, 500);
         }
       }
     } catch (caught) {
-      printWindow?.close();
       setDialog({
         title: "Экспорт не выполнен",
         message: caught instanceof Error ? caught.message : "Не удалось подготовить файл. Повторите попытку.",
@@ -114,7 +92,7 @@ export function EmailExportMenu({ document, name }: { document: BuilderDocument;
   const options = [
     ["html", FileCode2, "HTML", "Для отправки и публикации"],
     ["doc", FileText, "Word (.doc)", "Для согласования и правок"],
-    ["pdf", Printer, "PDF", "Системное окно откроется сразу"],
+    ["pdf", Printer, "PDF", "Без всплывающего окна"],
     ["txt", FileText, "Текст", "Без оформления"],
     ["json", FileJson2, "Исходник MAILFLOW", "Резервная копия макета"],
   ] as const;
@@ -126,6 +104,7 @@ export function EmailExportMenu({ document, name }: { document: BuilderDocument;
       </Button>
       {open ? <div role="menu" className="absolute right-0 top-[calc(100%+8px)] z-50 w-72 rounded-xl border border-border bg-surface p-2 shadow-[var(--shadow-floating)]">
         <p className="px-2 pb-2 text-[10px] font-semibold uppercase tracking-[.08em] text-text-subtle">Экспорт письма</p>
+        <label className="mb-2 grid grid-cols-[1fr_42px] items-center gap-2 rounded-lg bg-surface-subtle px-2.5 py-2 text-[10px] text-text-muted"><span>Количество копий<input type="range" min="1" max="20" value={copies} onInput={(event) => setCopies(Number(event.currentTarget.value))} className="mt-1 block w-full accent-primary" /></span><strong className="rounded-md bg-surface py-1 text-center text-primary">{copies}</strong></label>
         {options.map(([format, Icon, label, hint]) => <button key={format} role="menuitem" type="button" onClick={() => void run(format)} className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
           <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary-subtle text-primary"><Icon aria-hidden="true" className="size-4" /></span>
           <span><span className="block text-[11px] font-semibold text-text-strong">{label}</span><span className="block text-[9px] text-text-subtle">{hint}</span></span>

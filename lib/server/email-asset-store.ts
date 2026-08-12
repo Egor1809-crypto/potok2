@@ -12,7 +12,7 @@ import type {
 import { ApiRequestError, cleanText, newId } from "./api-utils";
 import { ensureDatabase, WORKSPACE_ID } from "./database-init";
 
-const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/gif"] as const);
 type AllowedMime = "image/jpeg" | "image/png" | "image/gif";
 
@@ -74,7 +74,7 @@ export async function uploadEmailAsset(request: Request): Promise<EmailAssetMuta
     throw new ApiRequestError("Поддерживаются изображения PNG, JPEG и GIF.");
   }
   if (file.size < 1 || file.size > MAX_IMAGE_BYTES) {
-    throw new ApiRequestError("Размер изображения должен быть не больше 8 МБ.");
+    throw new ApiRequestError("Размер изображения должен быть не больше 4 МБ.");
   }
   const bytes = new Uint8Array(await file.arrayBuffer());
   if (!validSignature(bytes, file.type as AllowedMime)) {

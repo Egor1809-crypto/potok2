@@ -416,7 +416,7 @@ function RangeField({
         min={min}
         max={max}
         value={value}
-        onChange={(event) => onChange(Number(event.target.value))}
+        onInput={(event) => onChange(Number(event.currentTarget.value))}
         className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-surface-inset accent-primary"
       />
       <span className="rounded-md border border-border bg-surface-subtle px-1 py-0.5 text-center font-mono text-[9px] text-text-muted">

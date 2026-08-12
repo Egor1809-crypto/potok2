@@ -228,6 +228,7 @@ export type EmailAssetsListResponse = { assets: EmailAssetRecord[] };
 export type EmailAssetMutationResponse = { asset: EmailAssetRecord };
 
 export type EmailAiAction =
+  | "brief"
   | "design"
   | "compose"
   | "rewrite"
@@ -260,6 +261,7 @@ export type EmailAiSuggestion = {
   cta: string;
   document?: EmailBuilderDocumentInput;
   imagePrompts?: Array<{ blockId: string; prompt: string; alt: string; kind: "photo" | "logo" }>;
+  questions?: Array<{ id: string; question: string; placeholder: string; required: boolean }>;
 };
 
 export type EmailExportResponse = {

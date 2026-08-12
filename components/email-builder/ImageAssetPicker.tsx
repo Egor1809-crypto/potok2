@@ -40,7 +40,8 @@ export function ImageAssetPicker({ kind, value, onSelect }: {
       form.set("file", file);
       form.set("kind", kind);
       const response = await fetch("/api/assets", { method: "POST", body: form });
-      const body = await response.json() as EmailAssetMutationResponse | ApiError;
+      const raw = await response.text();
+      const body = (() => { try { return JSON.parse(raw) as EmailAssetMutationResponse | ApiError; } catch { return { error: response.status === 413 ? "Файл слишком большой. Выберите изображение до 4 МБ." : "Сервер не принял изображение." }; } })();
       if (!response.ok || !("asset" in body)) throw new Error("error" in body ? body.error : "Файл не загружен.");
       setAssets((current) => [body.asset, ...current.filter((item) => item.id !== body.asset.id)]);
       onSelect(body.asset.url, body.asset.filename);
@@ -60,7 +61,7 @@ export function ImageAssetPicker({ kind, value, onSelect }: {
         {uploading ? <LoaderCircle aria-hidden="true" className="size-3.5 animate-spin" /> : <Upload aria-hidden="true" className="size-3.5" />}
         {uploading ? "Загружаем…" : kind === "logo" ? "Загрузить логотип" : "Загрузить фотографию"}
       </Button>
-      <p className="m-0 text-[9px] leading-4 text-text-subtle">PNG, JPEG или GIF, до 8 МБ. Файл сохранится в рабочем пространстве.</p>
+      <p className="m-0 text-[9px] leading-4 text-text-subtle">PNG, JPEG или GIF, до 4 МБ. Файл сохранится в рабочем пространстве.</p>
       {error ? <p role="alert" className="m-0 rounded-lg bg-danger-subtle px-2.5 py-2 text-[10px] leading-4 text-danger">{error}</p> : null}
       {loading ? <p className="m-0 text-[10px] text-text-subtle">Загружаем медиатеку…</p> : relevantAssets.length ? (
         <div>

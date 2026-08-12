@@ -65,6 +65,19 @@ test("AI brief asks follow-up questions and accepts dragged user images", async 
   assert.match(assistant, /Какой срок или дата/);
   assert.match(assistant, /Перетащите изображение сюда/);
   assert.match(assistant, /imageSource: "none"/);
+  assert.match(assistant, /prepareImageFile/);
+  assert.match(assistant, /createImageBitmap/);
   assert.match(server, /декоративные pattern/);
   assert.match(server, /availableAssets/);
+});
+
+test("manual controls and export are wired to live updates without popup PDF", async () => {
+  const [properties, exports] = await Promise.all([
+    readFile(new URL("../components/email-builder/PropertiesPanel.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/email-builder/EmailExportMenu.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(properties, /onInput=.*onChange/);
+  assert.match(exports, /Количество копий/);
+  assert.match(exports, /contentDocument/);
+  assert.doesNotMatch(exports, /window\.open/);
 });

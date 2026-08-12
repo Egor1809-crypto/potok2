@@ -6,7 +6,7 @@ import { ApiRequestError, asObject, cleanText, optionalText } from "./api-utils"
 import { ensureDatabase } from "./database-init";
 import { parseEmailBuilderDocument } from "./email-document";
 
-const ACTIONS = new Set<EmailAiAction>(["design", "compose", "rewrite", "shorten", "subject", "cta"]);
+const ACTIONS = new Set<EmailAiAction>(["brief", "design", "compose", "rewrite", "shorten", "subject", "cta"]);
 const TONES = new Set(["business", "friendly", "expert", "concise"]);
 
 function runtime() {
@@ -148,6 +148,15 @@ function blockDefaults(type: EmailBuilderBlockInput["type"]) {
 
 function parseSuggestion(value: string, input: EmailAiRequest): EmailAiSuggestion {
   const object = parseAiJson(value);
+  if (input.action === "brief") {
+    const questions = Array.isArray(object.questions) ? object.questions.slice(0, 6).flatMap((value, index) => {
+      const row = asObject(value);
+      const question = optionalText(row.question, `Вопрос ${index + 1}`, 300);
+      if (!question) return [];
+      return [{ id: optionalText(row.id, `Ключ вопроса ${index + 1}`, 60) ?? `question-${index + 1}`, question, placeholder: optionalText(row.placeholder, `Подсказка ${index + 1}`, 300) ?? "Введите ответ", required: row.required === true }];
+    }) : [];
+    return { subject: "", previewText: "", body: "", cta: "", questions };
+  }
   const suggestion: EmailAiSuggestion = {
     subject: cleanText(object.subject, "Тема", 300),
     previewText: cleanText(object.previewText, "Прехедер", 500),
@@ -289,6 +298,15 @@ export async function generateEmailSuggestion(request: Request, value: unknown):
     throw new ApiRequestError("ИИ-помощник ещё не подключён: добавьте серверный ключ NavyAI или OpenAI.", 503);
   }
   const input = parseRequest(value);
+  const urls = input.goal.match(/https:\/\/[^\s]+/g) ?? [];
+  const linkedContext = await Promise.all(urls.slice(0, 2).map(async (url) => {
+    try {
+      const response = await fetch(url, { redirect: "follow", headers: { "User-Agent": "MAILFLOW/1.0" } });
+      if (!response.ok || !response.headers.get("content-type")?.includes("text/html")) return "";
+      return (await response.text()).replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 10_000);
+    } catch { return ""; }
+  }));
+  const modelInput = { ...input, linkedPageContext: linkedContext.filter(Boolean) };
   const response = await fetch(provider.endpoint, {
     method: "POST",
     headers: { Authorization: `Bearer ${provider.key}`, "Content-Type": "application/json" },
@@ -298,16 +316,20 @@ export async function generateEmailSuggestion(request: Request, value: unknown):
       safety_identifier: await safetyIdentifier(request),
       reasoning: { effort: "low" },
       max_output_tokens: input.action === "design" ? 6_000 : 3_000,
-      instructions: input.action === "design"
+      instructions: input.action === "brief"
+        ? "Ты продуктовый стратег. Изучи запрос и контекст страниц по ссылкам. Задавай только вопросы, без которых нельзя создать убедительное письмо: цель, аудитория, бренд, срок, оффер, ограничения и стиль. Не спрашивай то, что уже явно указано. Верни 3–6 коротких вопросов строго по JSON-схеме."
+        : input.action === "design"
         ? `Ты старший арт-директор и редактор деловых email-писем на русском языке. Создай целостное письмо полностью по описанию пользователя: сильная иерархия, конкретный текст, единый ритм, цвета и композиция. Собери 7-12 структурных блоков и избегай повторов. Не создавай HTML. Используй декоративные pattern, цветовые плашки, границы и типографику вместо случайных фотографий. ${input.includeLogo ? `Добавь logo для бренда «${input.brandName || "бренд пользователя"}». Если в availableAssets есть kind=logo, обязательно выбери его assetId и не придумывай новый.` : "Не добавляй logo."} ${(input.availableAssets ?? []).some((asset) => asset.kind === "photo") ? "Используй только действительно подходящие фотографии из availableAssets, указывая их assetId; никаких других изображений." : input.imageSource === "none" ? "Не добавляй блоки image и не придумывай изображения." : "Добавь максимум 2 блока image. Для каждого сформулируй imagePrompt на английском как короткий запрос с конкретным главным объектом и контекстом."} Не вставляй URL изображений. Не выдумывай факты, даты и цифры. Сохраняй только переменные {{first_name}}, {{last_name}}, {{company}}, {{position}}, {{city}}. Если websiteUrl отсутствует, не добавляй button или video. Учитывай primaryColor, secondaryColor и visualStyle во всех блоках. Цвета строго #RRGGBB. Ответ строго по JSON-схеме.`
         : "Ты редактор деловых email-писем на русском языке. Верни только четыре коротких поля JSON: subject, previewText, body, cta. Никакого HTML, Markdown, таблиц, дизайна или пояснений. body — обычный текст до 1800 символов. subject — до 140 символов, previewText — до 240, cta — до 80. Не выдумывай даты, цифры, ссылки и факты. Сохраняй только переменные {{first_name}}, {{last_name}}, {{company}}, {{position}}, {{city}}. Ответ строго по JSON-схеме.",
-      input: JSON.stringify(input),
+      input: JSON.stringify(modelInput),
       text: {
         format: {
           type: "json_schema",
           name: "email_suggestion",
           strict: true,
-          schema: input.action === "design" ? {
+          schema: input.action === "brief" ? {
+            type: "object", additionalProperties: false, required: ["questions"], properties: { questions: { type: "array", minItems: 3, maxItems: 6, items: { type: "object", additionalProperties: false, required: ["id", "question", "placeholder", "required"], properties: { id: { type: "string" }, question: { type: "string" }, placeholder: { type: "string" }, required: { type: "boolean" } } } } }
+          } : input.action === "design" ? {
             type: "object",
             additionalProperties: false,
             required: ["subject", "previewText", "body", "cta", "design"],
