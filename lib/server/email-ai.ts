@@ -92,6 +92,9 @@ async function safetyIdentifier(request: Request) {
 
 function outputText(response: unknown): string {
   const object = asObject(response);
+  if (typeof object.output_text === "string" && object.output_text.trim()) {
+    return object.output_text;
+  }
   if (!Array.isArray(object.output)) throw new ApiRequestError("ИИ не вернул результат. Повторите запрос.", 502);
   for (const itemValue of object.output) {
     if (!itemValue || typeof itemValue !== "object") continue;
@@ -104,6 +107,24 @@ function outputText(response: unknown): string {
     }
   }
   throw new ApiRequestError("ИИ не вернул текстовый результат. Повторите запрос.", 502);
+}
+
+export function parseAiJson(value: string): Record<string, unknown> {
+  const normalized = value.trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/, "")
+    .trim();
+  const firstBrace = normalized.indexOf("{");
+  const lastBrace = normalized.lastIndexOf("}");
+  const candidate = firstBrace >= 0 && lastBrace > firstBrace
+    ? normalized.slice(firstBrace, lastBrace + 1)
+    : normalized;
+  try {
+    const parsed: unknown = JSON.parse(candidate);
+    return asObject(parsed);
+  } catch {
+    throw new ApiRequestError("ИИ вернул текст вместо структуры письма. Нажмите «Повторить» — ваш макет не изменён.", 502);
+  }
 }
 
 function blockDefaults(type: EmailBuilderBlockInput["type"]) {
@@ -120,9 +141,7 @@ function blockDefaults(type: EmailBuilderBlockInput["type"]) {
 }
 
 function parseSuggestion(value: string, input: EmailAiRequest): EmailAiSuggestion {
-  let parsed: unknown;
-  try { parsed = JSON.parse(value); } catch { throw new ApiRequestError("ИИ вернул некорректный формат. Повторите запрос.", 502); }
-  const object = asObject(parsed);
+  const object = parseAiJson(value);
   const suggestion: EmailAiSuggestion = {
     subject: cleanText(object.subject, "Тема", 300),
     previewText: cleanText(object.previewText, "Прехедер", 500),
@@ -201,8 +220,10 @@ export async function generateEmailSuggestion(request: Request, value: unknown):
       store: false,
       safety_identifier: await safetyIdentifier(request),
       reasoning: { effort: "low" },
-      max_output_tokens: input.action === "design" ? 4_000 : 1_200,
-      instructions: "Ты арт-директор и редактор деловых email-писем на русском языке. Пиши конкретно, без выдуманных фактов, обещаний и цифр. Сохраняй только переменные {{first_name}}, {{last_name}}, {{company}}, {{position}}, {{city}}. Для design собери цельное красивое письмо из 6-12 разноплановых блоков, выбери ясную визуальную иерархию и уместно используй hero, banner, timeline, faq, coupon, video, pattern и другие блоки. Используй image только с assetId из availableAssets, logo может быть текстовым или с assetId. Не выдумывай ссылки и изображения. Если websiteUrl отсутствует, не добавляй button или video. Цвета строго #RRGGBB. Ответ строго по JSON-схеме.",
+      max_output_tokens: input.action === "design" ? 6_000 : 3_000,
+      instructions: input.action === "design"
+        ? "Ты арт-директор и редактор деловых email-писем на русском языке. Собери цельное красивое письмо из 6-12 разноплановых структурных блоков. Не создавай HTML: каждый блок передай только через поля JSON-схемы. Пиши конкретно, без выдуманных фактов, обещаний и цифр. Сохраняй только переменные {{first_name}}, {{last_name}}, {{company}}, {{position}}, {{city}}. Уместно используй hero, banner, timeline, faq, coupon, video, pattern и другие блоки. Используй image только с assetId из availableAssets. Не выдумывай ссылки и изображения. Если websiteUrl отсутствует, не добавляй button или video. Цвета строго #RRGGBB. Ответ строго по JSON-схеме."
+        : "Ты редактор деловых email-писем на русском языке. Верни только четыре коротких поля JSON: subject, previewText, body, cta. Никакого HTML, Markdown, таблиц, дизайна или пояснений. body — обычный текст до 1800 символов. subject — до 140 символов, previewText — до 240, cta — до 80. Не выдумывай даты, цифры, ссылки и факты. Сохраняй только переменные {{first_name}}, {{last_name}}, {{company}}, {{position}}, {{city}}. Ответ строго по JSON-схеме.",
       input: JSON.stringify(input),
       text: {
         format: {
@@ -214,10 +235,10 @@ export async function generateEmailSuggestion(request: Request, value: unknown):
             additionalProperties: false,
             required: ["subject", "previewText", "body", "cta", "design"],
             properties: {
-              subject: { type: "string" },
-              previewText: { type: "string" },
-              body: { type: "string" },
-              cta: { type: "string" },
+              subject: { type: "string", maxLength: 140 },
+              previewText: { type: "string", maxLength: 240 },
+              body: { type: "string", maxLength: 1800 },
+              cta: { type: "string", maxLength: 80 },
               design: {
                 type: "object",
                 additionalProperties: false,
