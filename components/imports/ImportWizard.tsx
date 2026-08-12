@@ -88,6 +88,9 @@ function delimiterLabel(delimiter: ParsedCsv["delimiter"]): string {
 
 function tableFormatLabel(parsed: ParsedCsv): string {
   if (parsed.format === "XLSX" || parsed.format === "XLS") {
+    if ((parsed.sheetNames?.length ?? 0) > 1) {
+      return `${parsed.format} · листов: ${parsed.sheetNames?.length}`;
+    }
     return `${parsed.format}${parsed.sheetName ? ` · лист «${parsed.sheetName}»` : ""}`;
   }
   return `${parsed.format} · ${parsed.encoding} · ${delimiterLabel(parsed.delimiter)}`;
@@ -622,9 +625,9 @@ export function ImportWizard() {
                   </thead>
                   <tbody>
                     {previewRows.map((row) => (
-                      <tr key={row.rowNumber} className="border-t border-[var(--border)]">
+                      <tr key={`${row.sheetName ?? "table"}-${row.rowNumber}`} className="border-t border-[var(--border)]">
                         <td className="px-5 py-3 text-[9px] sm:px-6">
-                          {row.rowNumber}
+                          {row.sheetName ? `${row.sheetName} · ${row.rowNumber}` : row.rowNumber}
                         </td>
                         <td className="px-4 py-3 text-[10px] font-medium">
                           {row.displayName || "—"}

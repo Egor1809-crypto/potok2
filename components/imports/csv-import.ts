@@ -30,6 +30,7 @@ export type FieldMapping = TargetField[];
 
 export type CsvRow = {
   rowNumber: number;
+  sheetName?: string;
   values: string[];
   columnMismatch: boolean;
 };
@@ -41,6 +42,7 @@ export type ParsedCsv = {
   encoding: "UTF-8" | "Windows-1251";
   format: "CSV" | "TSV" | "XLSX" | "XLS";
   sheetName?: string;
+  sheetNames?: string[];
 };
 
 export type RowIssue =
@@ -285,22 +287,86 @@ export async function parseCsvFile(file: File): Promise<ParsedCsv> {
   if (extension === "xlsx" || extension === "xls") {
     const XLSX = await import("@e965/xlsx");
     const workbook = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true, dense: true });
-    const sheetName = workbook.SheetNames[0];
-    if (!sheetName) throw new Error("В книге нет листов.");
-    const records = XLSX.utils.sheet_to_json<Array<string | number | boolean | Date>>(workbook.Sheets[sheetName], {
-      header: 1,
-      raw: false,
-      defval: "",
-      blankrows: false,
-      dateNF: "yyyy-mm-dd",
-    }).map((row) => row.map((value) => value instanceof Date ? value.toISOString().slice(0, 10) : String(value)));
-    return parsedRecords(records, extension === "xlsx" ? "XLSX" : "XLS", "UTF-8", sheetName);
+    if (!workbook.SheetNames.length) throw new Error("В книге нет листов.");
+    const sheets = workbook.SheetNames.flatMap((sheetName) => {
+      const sheet = workbook.Sheets[sheetName];
+      if (!sheet) return [];
+      const records = XLSX.utils.sheet_to_json<Array<string | number | boolean | Date>>(sheet, {
+        header: 1,
+        raw: false,
+        defval: "",
+        blankrows: false,
+        dateNF: "yyyy-mm-dd",
+      }).map((row) => row.map((value) => value instanceof Date ? value.toISOString().slice(0, 10) : String(value)));
+      if (!records[0]?.some((value) => value.trim().length > 0)) return [];
+      return [{ sheetName, records }];
+    });
+    if (!sheets.length) throw new Error("В книге нет листов с заголовками.");
+    return parsedWorkbook(
+      sheets,
+      extension === "xlsx" ? "XLSX" : "XLS",
+    );
   }
 
   const decoded = await decodeFile(file);
   const delimiter = extension === "tsv" ? "\t" : delimiterInFirstRecord(decoded.text);
   const records = parseRecords(decoded.text, delimiter);
   return parsedRecords(records, extension === "tsv" ? "TSV" : "CSV", decoded.encoding, undefined, delimiter);
+}
+
+function parsedWorkbook(
+  sheets: Array<{ sheetName: string; records: string[][] }>,
+  format: "XLSX" | "XLS",
+): ParsedCsv {
+  const headerKeys = new Map<string, number>();
+  const headers: string[] = [];
+  const sheetHeaders = sheets.map(({ sheetName, records }) => {
+    const localHeaders = uniqueHeaders(records[0]);
+    if (localHeaders.length < 2) {
+      throw new Error(`На листе «${sheetName}» должно быть не менее двух столбцов.`);
+    }
+    const indexes = localHeaders.map((header) => {
+      const key = normalizeHeader(header.replace(/ \(\d+\)$/, ""));
+      const existing = headerKeys.get(key);
+      if (existing !== undefined) return existing;
+      const next = headers.length;
+      headers.push(header);
+      headerKeys.set(key, next);
+      return next;
+    });
+    return { sheetName, records, indexes };
+  });
+
+  const rows = sheetHeaders.flatMap(({ sheetName, records, indexes }) =>
+    records
+      .slice(1)
+      .map((values, index) => ({ values, rowNumber: index + 2 }))
+      .filter(({ values }) => values.some((value) => value.trim().length > 0))
+      .map(({ values, rowNumber }) => {
+        const aligned = Array.from({ length: headers.length }, () => "");
+        values.forEach((value, index) => {
+          const targetIndex = indexes[index];
+          if (targetIndex !== undefined) aligned[targetIndex] = value.trim();
+        });
+        return {
+          rowNumber,
+          sheetName,
+          values: aligned,
+          columnMismatch: values.length !== indexes.length,
+        };
+      }),
+  );
+  if (!rows.length) throw new Error("В книге нет строк с контактами.");
+
+  return {
+    headers,
+    rows,
+    delimiter: "\t",
+    encoding: "UTF-8",
+    format,
+    sheetName: sheets.length === 1 ? sheets[0].sheetName : undefined,
+    sheetNames: sheets.map((sheet) => sheet.sheetName),
+  };
 }
 
 function parsedRecords(

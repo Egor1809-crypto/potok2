@@ -76,3 +76,51 @@ for (const [extension, bookType, expectedFormat] of [
     );
   });
 }
+
+test("XLSX imports all 60 contacts from every workbook sheet", async () => {
+  const workbook = XLSX.utils.book_new();
+  const headers = ["Имя", "Фамилия", "Email", "Компания"];
+  const contacts = Array.from({ length: 60 }, (_, index) => [
+    `Имя${index + 1}`,
+    `Фамилия${index + 1}`,
+    `contact${index + 1}@example.test`,
+    index < 18 ? "Первая команда" : "Вторая команда",
+  ]);
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.aoa_to_sheet([headers, ...contacts.slice(0, 18)]),
+    "Команда 1",
+  );
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.aoa_to_sheet([
+      ["Компания", "Email", "Фамилия", "Имя"],
+      ...contacts.slice(18).map(([firstName, lastName, email, company]) => [
+        company,
+        email,
+        lastName,
+        firstName,
+      ]),
+    ]),
+    "Команда 2",
+  );
+  const file = new File(
+    [XLSX.write(workbook, { type: "buffer", bookType: "xlsx" })],
+    "60-контактов.xlsx",
+  );
+
+  const parsed = await parseCsvFile(file);
+  const mapping = suggestMapping(parsed.headers);
+  const validation = validateRows(parsed.rows, mapping, {
+    emails: new Set(),
+    telegramChatIds: new Set(),
+    vkUserIds: new Set(),
+  });
+
+  assert.deepEqual(parsed.sheetNames, ["Команда 1", "Команда 2"]);
+  assert.equal(parsed.rows.length, 60);
+  assert.equal(validation.summary.ready, 60);
+  assert.equal(validation.rows.at(17)?.sheetName, "Команда 1");
+  assert.equal(validation.rows.at(18)?.sheetName, "Команда 2");
+  assert.equal(validation.rows.at(-1)?.input?.email, "contact60@example.test");
+});
