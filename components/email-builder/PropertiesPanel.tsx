@@ -36,7 +36,6 @@ import { cn } from "@/components/ui/utils";
 import type { BuilderBlock, BuilderDocument } from "./builder-types";
 import { getBlockLabel } from "./BlockLibrary";
 import { ImageAssetPicker } from "./ImageAssetPicker";
-import { AiEmailAssistant } from "./AiEmailAssistant";
 
 const personalizationFields = [
   { label: "Имя", token: "{{first_name}}", example: "Иван" },
@@ -126,7 +125,6 @@ export function PropertiesPanel({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto scrollbar-subtle">
-        <AiEmailAssistant block={block} document={document} onUpdateBlock={onUpdateBlock} onUpdateDocument={onUpdateDocument} />
         {canEditContent ? (
           <PropertySection
             icon={Type}

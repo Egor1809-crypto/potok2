@@ -37,8 +37,18 @@ test("advanced editor controls and new content blocks compile into email-safe HT
 });
 
 test("AI design remains a separate version until the user chooses it", async () => {
-  const source = await readFile(new URL("../components/email-builder/AiEmailAssistant.tsx", import.meta.url), "utf8");
-  assert.match(source, /Сравнение двух версий письма/);
-  assert.match(source, /Оставить мой вариант/);
-  assert.match(source, /Использовать вариант ИИ/);
+  const [assistant, builder, server] = await Promise.all([
+    readFile(new URL("../components/email-builder/AiEmailAssistant.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/email-builder/EmailBuilderView.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/server/email-ai.ts", import.meta.url), "utf8"),
+  ]);
+  assert.match(builder, /Собрать вручную/);
+  assert.match(builder, /Создать с ИИ/);
+  assert.match(assistant, /Мой макет и вариант ИИ/);
+  assert.match(assistant, /Оставить мой/);
+  assert.match(assistant, /Использовать вариант ИИ/);
+  assert.match(assistant, /ИИ найдёт изображения в открытой медиатеке/);
+  assert.match(assistant, /ИИ создаст новые изображения/);
+  assert.match(server, /commons\.wikimedia\.org/);
+  assert.match(server, /images\/generations/);
 });

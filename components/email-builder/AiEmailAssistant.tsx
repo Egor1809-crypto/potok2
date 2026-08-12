@@ -1,27 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { GitCompareArrows, LoaderCircle, Sparkles, WandSparkles } from "lucide-react";
+import { LoaderCircle, Sparkles, WandSparkles } from "lucide-react";
 
-import { Button, FormField, Modal, Select, Textarea } from "@/components/ui";
-import type { ApiError, EmailAiAction, EmailAiResponse, EmailAiSuggestion, EmailAssetsListResponse } from "@/types/api";
+import { Button, FormField, Input, Modal, Select, Textarea } from "@/components/ui";
+import type { ApiError, EmailAiResponse, EmailAiSuggestion } from "@/types/api";
+import type { BuilderDocument } from "./builder-types";
 
-import type { BuilderBlock, BuilderDocument } from "./builder-types";
-
-export function AiEmailAssistant({ block, document, onUpdateBlock, onUpdateDocument }: {
-  block: BuilderBlock;
-  document: BuilderDocument;
-  onUpdateBlock: (patch: Partial<BuilderBlock>) => void;
-  onUpdateDocument: (patch: Partial<BuilderDocument>) => void;
-}) {
+export function AiEmailAssistant({ document, onApply }: { document: BuilderDocument; onApply: (document: BuilderDocument) => void }) {
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [provider, setProvider] = useState<EmailAiResponse["provider"]>();
-  const [action, setAction] = useState<EmailAiAction>("compose");
-  const [tone, setTone] = useState("business");
   const [goal, setGoal] = useState("");
-  const [suggestion, setSuggestion] = useState<EmailAiSuggestion | null>(null);
-  const [assets, setAssets] = useState<EmailAssetsListResponse["assets"]>([]);
+  const [audience, setAudience] = useState("");
+  const [tone, setTone] = useState("expert");
+  const [visualStyle, setVisualStyle] = useState("editorial");
+  const [primaryColor, setPrimaryColor] = useState(document.accentColor);
+  const [secondaryColor, setSecondaryColor] = useState(document.workspaceBackground);
   const [websiteUrl, setWebsiteUrl] = useState("");
+  const [imageSource, setImageSource] = useState<"internet" | "generate" | "none">("internet");
+  const [suggestion, setSuggestion] = useState<EmailAiSuggestion | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [comparisonOpen, setComparisonOpen] = useState(false);
@@ -35,16 +32,6 @@ export function AiEmailAssistant({ block, document, onUpdateBlock, onUpdateDocum
     return () => { active = false; };
   }, []);
 
-  useEffect(() => {
-    if (action !== "design") return;
-    let active = true;
-    void fetch("/api/assets", { cache: "no-store" })
-      .then((response) => response.json() as Promise<EmailAssetsListResponse>)
-      .then((body) => { if (active && Array.isArray(body.assets)) setAssets(body.assets); })
-      .catch(() => { if (active) setAssets([]); });
-    return () => { active = false; };
-  }, [action]);
-
   const generate = async () => {
     setBusy(true);
     setError("");
@@ -52,115 +39,57 @@ export function AiEmailAssistant({ block, document, onUpdateBlock, onUpdateDocum
       const response = await fetch("/api/ai/email-assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({
-          action,
-          tone,
-          goal,
-          currentSubject: document.subject,
-          currentPreviewText: document.previewText,
-          currentText: block.content,
-          websiteUrl: websiteUrl.trim() || undefined,
-          availableAssets: assets.map(({ id, filename, kind, url }) => ({ id, filename, kind, url })),
-        }),
+        body: JSON.stringify({ action: "design", goal, audience, tone, visualStyle, primaryColor, secondaryColor, websiteUrl: websiteUrl.trim() || undefined, imageSource }),
       });
       const body = await response.json() as EmailAiResponse | ApiError;
-      if (!response.ok || !("suggestion" in body) || !body.suggestion) throw new Error("error" in body ? body.error : "Предложение не подготовлено.");
+      if (!response.ok || !("suggestion" in body) || !body.suggestion?.document) throw new Error("error" in body ? body.error : "Дизайн не подготовлен.");
       setSuggestion(body.suggestion);
       setConfigured(true);
       setProvider(body.provider);
+      setComparisonOpen(true);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Предложение не подготовлено.");
+      setError(caught instanceof Error ? caught.message : "Дизайн не подготовлен.");
     } finally { setBusy(false); }
   };
 
-  const apply = () => {
-    if (!suggestion) return;
-    if (suggestion.document) {
-      onUpdateDocument(suggestion.document as BuilderDocument);
-      setSuggestion(null);
-      return;
-    }
-    onUpdateDocument({ subject: suggestion.subject, previewText: suggestion.previewText });
-    if (block.type === "button" || block.type === "product") onUpdateBlock({ label: suggestion.cta, ...(block.type === "button" ? { content: suggestion.cta } : {}) });
-    else if (block.type === "hero") onUpdateBlock({ content: `${suggestion.subject}|${suggestion.previewText || suggestion.body}` });
-    else if (block.type === "quote") onUpdateBlock({ content: `${suggestion.body}|` });
-    else if (block.type === "checklist") onUpdateBlock({ content: suggestion.body.split(/\n+/).map((line) => line.replace(/^[-•✓]\s*/, "").trim()).filter(Boolean).join("|") });
-    else if (!["image", "logo", "divider", "spacer", "stats"].includes(block.type)) onUpdateBlock({ content: suggestion.body });
-  };
-
   return (
-    <details className="group border-b border-border bg-gradient-to-b from-primary-subtle/45 to-transparent" open>
-      <Modal
-        open={comparisonOpen}
-        onOpenChange={setComparisonOpen}
-        title="Сравнение двух версий письма"
-        description="Слева остаётся ваш текущий макет, справа — отдельный вариант ИИ. Ничего не заменится без вашего решения."
-        size="xl"
-        footer={<><Button variant="ghost" onClick={() => setComparisonOpen(false)}>Оставить мой вариант</Button><Button variant="primary" disabled={!suggestion?.document} onClick={() => { apply(); setComparisonOpen(false); }}>Использовать вариант ИИ</Button></>}
-      >
-        <div className="grid gap-4 md:grid-cols-2">
-          <DesignComparisonCard label="Мой вариант" document={document} />
-          {suggestion?.document ? <DesignComparisonCard label="Вариант ИИ" document={suggestion.document as BuilderDocument} accent /> : null}
-        </div>
+    <section className="mx-auto grid w-full max-w-5xl gap-6 p-5 sm:p-8">
+      <Modal open={comparisonOpen} onOpenChange={setComparisonOpen} title="Мой макет и вариант ИИ" description="ИИ подготовил отдельную версию. Текущий макет не изменится без вашего подтверждения." size="xl" footer={<><Button variant="ghost" onClick={() => setComparisonOpen(false)}>Оставить мой</Button><Button variant="primary" disabled={!suggestion?.document} onClick={() => { if (suggestion?.document) onApply(suggestion.document as BuilderDocument); setComparisonOpen(false); }}>Использовать вариант ИИ</Button></>}>
+        <div className="grid gap-4 md:grid-cols-2"><DesignCard label="Мой макет" document={document} /><DesignCard label="Вариант ИИ" document={(suggestion?.document ?? document) as BuilderDocument} accent /></div>
       </Modal>
-      <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between px-4 text-[11px] font-semibold text-text-strong outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30 [&::-webkit-details-marker]:hidden">
-        <span className="flex items-center gap-2"><Sparkles aria-hidden="true" className="size-4 text-primary" />ИИ-помощник</span>
-        <span className="rounded-full bg-surface px-2 py-0.5 text-[9px] font-medium text-text-subtle">{configured === null ? "Проверка" : configured ? provider === "navyai" ? "NavyAI подключён" : "OpenAI подключён" : "Нужен ключ"}</span>
-      </summary>
-      <div className="grid gap-3 px-4 pb-4">
-        <div className="grid grid-cols-2 gap-2">
-          <FormField label="Задача"><Select value={action} onChange={(event) => setAction(event.target.value as EmailAiAction)} options={[{ value: "design", label: "Собрать всё письмо" }, { value: "compose", label: "Написать текст" }, { value: "rewrite", label: "Переписать" }, { value: "shorten", label: "Сократить" }, { value: "subject", label: "Улучшить тему" }, { value: "cta", label: "Призыв к действию" }]} /></FormField>
-          <FormField label="Тон"><Select value={tone} onChange={(event) => setTone(event.target.value)} options={[{ value: "business", label: "Деловой" }, { value: "friendly", label: "Дружелюбный" }, { value: "expert", label: "Экспертный" }, { value: "concise", label: "Краткий" }]} /></FormField>
-        </div>
-        <FormField label="Что нужно сообщить" hint="Укажите факты, предложение и желаемое действие."><Textarea rows={3} value={goal} maxLength={2000} onChange={(event) => setGoal(event.target.value)} placeholder="Например: пригласить руководителей на вебинар 25 сентября и попросить зарегистрироваться" className="resize-none text-[11px]" /></FormField>
-        {action === "design" ? <>
-          <FormField label="Ссылка основной кнопки" hint="Только https://. Если оставить пустой, ИИ не добавит кнопку."><input className="input text-[11px]" type="url" value={websiteUrl} onChange={(event) => setWebsiteUrl(event.target.value)} placeholder="https://example.ru/action" /></FormField>
-          <div className="rounded-xl border border-primary/15 bg-surface p-3 text-[10px] leading-4 text-text-muted">
-            <p className="m-0 font-semibold text-text-strong">Медиатека: {assets.length} файлов</p>
-            <p className="mb-0 mt-1">ИИ использует только загруженные вами фото и логотипы — ничего не выдумывает. Добавить файлы можно в свойствах блока «Изображение» или «Логотип».</p>
-          </div>
-        </> : null}
-        <Button type="button" variant="primary" size="sm" disabled={busy || goal.trim().length < 8} onClick={() => void generate()}>{busy ? <LoaderCircle aria-hidden="true" className="size-3.5 animate-spin" /> : <WandSparkles aria-hidden="true" className="size-3.5" />}{busy ? "Собираем…" : action === "design" ? "Создать дизайн письма" : "Предложить текст"}</Button>
-        {error ? <p role="alert" className="m-0 rounded-lg bg-danger-subtle px-2.5 py-2 text-[10px] leading-4 text-danger">{error}</p> : null}
-        {suggestion ? (
-          <div className="grid gap-2 rounded-xl border border-primary/15 bg-surface p-3 shadow-[var(--shadow-xs)]">
-            <div><span className="text-[9px] font-semibold uppercase tracking-[0.08em] text-text-subtle">Тема</span><p className="mb-0 mt-1 text-[11px] font-medium text-text-strong">{suggestion.subject}</p></div>
-            <div><span className="text-[9px] font-semibold uppercase tracking-[0.08em] text-text-subtle">{suggestion.document ? "Макет" : "Текст"}</span><p className="mb-0 mt-1 whitespace-pre-wrap text-[10px] leading-4 text-text-muted">{suggestion.document ? `${suggestion.document.blocks.length} блоков · готовые цвета, тексты и изображения` : suggestion.body}</p></div>
-            {suggestion.document ? (
-              <Button type="button" variant="outline" size="sm" onClick={() => setComparisonOpen(true)}><GitCompareArrows aria-hidden="true" className="size-3.5" />Сравнить с моим письмом</Button>
-            ) : (
-              <Button type="button" variant="outline" size="sm" onClick={apply}>Применить к письму</Button>
-            )}
-          </div>
-        ) : null}
-      </div>
-    </details>
-  );
-}
 
-function DesignComparisonCard({ label, document, accent = false }: { label: string; document: BuilderDocument; accent?: boolean }) {
-  return (
-    <section className={`overflow-hidden rounded-2xl border ${accent ? "border-primary/35" : "border-border"}`}>
-      <div className="flex items-center justify-between border-b border-border bg-surface-subtle px-4 py-3">
-        <strong className="text-[13px] text-text-strong">{label}</strong>
-        <span className="text-[10px] text-text-muted">{document.blocks.length} блоков</span>
-      </div>
-      <div className="p-4" style={{ background: document.workspaceBackground }}>
-        <div className="mx-auto overflow-hidden rounded-lg shadow-sm" style={{ background: document.bodyBackground, maxWidth: 380 }}>
-          <div className="border-b border-black/5 p-4">
-            <p className="m-0 text-[13px] font-semibold" style={{ color: document.accentColor }}>{document.subject}</p>
-            <p className="mb-0 mt-1 line-clamp-2 text-[10px] text-text-muted">{document.previewText || "Без текста предпросмотра"}</p>
-          </div>
-          <div className="grid gap-2 p-4">
-            {document.blocks.slice(0, 10).map((block) => (
-              <div key={block.id} className="rounded-md border border-black/5 px-3 py-2" style={{ background: block.backgroundColor === "transparent" ? "transparent" : block.backgroundColor, color: block.textColor }}>
-                <span className="block text-[9px] font-semibold uppercase tracking-wide opacity-50">{block.type}</span>
-                <span className="mt-1 block line-clamp-2 text-[11px]">{block.label || block.content || "Декоративный блок"}</span>
-              </div>
-            ))}
-          </div>
+      <header className="text-center">
+        <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-primary text-white shadow-lg"><Sparkles aria-hidden="true" className="size-5" /></span>
+        <h2 className="mt-4 text-[28px] font-semibold tracking-[-0.04em] text-text-strong">Опишите письмо — ИИ соберёт всё</h2>
+        <p className="mx-auto mt-2 max-w-2xl text-[13px] leading-6 text-text-muted">Тексты, композиция, цвета, кнопки и новые изображения создаются по одному описанию. Затем вы сравниваете результат со своим макетом.</p>
+        <span className="mt-3 inline-flex rounded-full border border-border bg-surface px-3 py-1 text-[10px] font-medium text-text-muted">{configured === null ? "Проверяем подключение" : configured ? `${provider === "navyai" ? "NavyAI" : "OpenAI"} подключён` : "ИИ не подключён"}</span>
+      </header>
+
+      <div className="card grid gap-5 p-5 sm:p-7">
+        <FormField label="Какое письмо нужно?" hint="Опишите содержание, настроение, желаемые блоки, изображения и результат для читателя.">
+          <Textarea rows={7} maxLength={2000} value={goal} onChange={(event) => setGoal(event.target.value)} placeholder="Например: приглашение юристов на конференцию. Светлый премиальный дизайн, фиолетовые акценты, обложка с современной конференцией, программа в виде этапов, кнопка регистрации и спокойный деловой тон." className="resize-y text-[13px] leading-6" />
+        </FormField>
+        <div className="grid gap-4 md:grid-cols-2">
+          <FormField label="Для кого письмо"><Input value={audience} onChange={(event) => setAudience(event.target.value)} placeholder="Руководители юридических компаний" /></FormField>
+          <FormField label="Ссылка основной кнопки"><Input type="url" value={websiteUrl} onChange={(event) => setWebsiteUrl(event.target.value)} placeholder="https://tech-pravo.ru/" /></FormField>
+          <FormField label="Тон"><Select value={tone} onChange={(event) => setTone(event.target.value)} options={[{value:"business",label:"Деловой"},{value:"friendly",label:"Дружелюбный"},{value:"expert",label:"Экспертный"},{value:"concise",label:"Краткий"}]} /></FormField>
+          <FormField label="Стиль"><Select value={visualStyle} onChange={(event) => setVisualStyle(event.target.value)} options={[{value:"editorial",label:"Редакционный"},{value:"minimal",label:"Минималистичный"},{value:"bold",label:"Яркий"},{value:"premium",label:"Премиальный"}]} /></FormField>
+          <ColorInput label="Основной цвет" value={primaryColor} onChange={setPrimaryColor} />
+          <ColorInput label="Фоновый цвет" value={secondaryColor} onChange={setSecondaryColor} />
+          <FormField label="Изображения"><Select value={imageSource} onChange={(event) => setImageSource(event.target.value as "internet" | "generate" | "none")} options={[{value:"internet",label:"ИИ найдёт изображения в открытой медиатеке"},{value:"generate",label:"ИИ создаст новые изображения"},{value:"none",label:"Без изображений"}]} /></FormField>
         </div>
+        {error ? <p role="alert" className="m-0 rounded-xl bg-danger-subtle px-4 py-3 text-[12px] text-danger">{error}</p> : null}
+        <Button type="button" variant="primary" size="lg" disabled={busy || goal.trim().length < 8} onClick={() => void generate()}>{busy ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : <WandSparkles aria-hidden="true" className="size-4" />}{busy ? "ИИ создаёт письмо и изображения…" : "Создать готовое письмо"}</Button>
       </div>
     </section>
   );
+}
+
+function ColorInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return <FormField label={label}><label className="flex h-10 items-center gap-3 rounded-lg border border-border bg-surface px-3"><input type="color" value={value} onChange={(event) => onChange(event.target.value)} className="size-6 cursor-pointer border-0 bg-transparent" /><span className="font-mono text-[11px] uppercase text-text-muted">{value}</span></label></FormField>;
+}
+
+/* eslint-disable @next/next/no-img-element -- email designs use dynamic external and generated image URLs. */
+function DesignCard({ label, document, accent = false }: { label: string; document: BuilderDocument; accent?: boolean }) {
+  return <section className={`overflow-hidden rounded-2xl border ${accent ? "border-primary/40" : "border-border"}`}><div className="flex items-center justify-between border-b border-border bg-surface-subtle px-4 py-3"><strong className="text-[13px]">{label}</strong><span className="text-[10px] text-text-muted">{document.blocks.length} блоков</span></div><div className="p-4" style={{background:document.workspaceBackground}}><div className="mx-auto grid gap-2 rounded-lg p-4 shadow-sm" style={{background:document.bodyBackground}}><strong className="text-[12px]" style={{color:document.accentColor}}>{document.subject}</strong>{document.blocks.slice(0,10).map((block)=><div key={block.id} className="rounded-md border border-black/5 px-3 py-2" style={{background:block.backgroundColor === "transparent" ? "transparent" : block.backgroundColor,color:block.textColor}}><span className="block text-[8px] uppercase opacity-45">{block.type}</span><span className="mt-1 block line-clamp-2 text-[10px]">{block.label || block.content || "Декоративный блок"}</span>{block.type === "image" && block.href ? <img src={block.href} alt="" className="mt-2 aspect-video w-full rounded object-cover" /> : null}</div>)}</div></div></section>;
 }

@@ -10,7 +10,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import Link from "next/link";
-import { Blocks, SlidersHorizontal, SquareDashedMousePointer } from "lucide-react";
+import { Blocks, PenTool, SlidersHorizontal, Sparkles, SquareDashedMousePointer } from "lucide-react";
 
 import type { EmailBlockType, TemplateCategory } from "@/types";
 import type {
@@ -41,6 +41,7 @@ import { BuilderTopbar, MobilePreviewToggle } from "./BuilderTopbar";
 import { EmailExportMenu } from "./EmailExportMenu";
 import { EmailCanvas } from "./EmailCanvas";
 import { PropertiesPanel } from "./PropertiesPanel";
+import { AiEmailAssistant } from "./AiEmailAssistant";
 import {
   cloneBlock,
   createBlankDocument,
@@ -417,6 +418,7 @@ function EmailBuilderWorkspace({
   const [previewMode, setPreviewMode] = useState<PreviewMode>("desktop");
   const [mobilePanel, setMobilePanel] = useState<BuilderPanel>("canvas");
   const [dirty, setDirty] = useState(mode === "template" ? !templateRecord : true);
+  const [creationMode, setCreationMode] = useState<"manual" | "ai">("manual");
   const editRevisionRef = useRef(0);
   const savingTemplateRef = useRef(false);
 
@@ -716,6 +718,16 @@ function EmailBuilderWorkspace({
         tools={<EmailExportMenu document={document} name={campaignName} />}
       />
 
+      <div className="flex items-center justify-center gap-1 border-b border-border bg-surface px-4 py-2.5" role="tablist" aria-label="Способ создания письма">
+        <button type="button" role="tab" aria-selected={creationMode === "manual"} onClick={() => setCreationMode("manual")} className="inline-flex h-9 items-center gap-2 rounded-lg px-4 text-[12px] font-semibold text-text-muted outline-none transition hover:bg-surface-subtle aria-selected:bg-primary aria-selected:text-white focus-visible:ring-2 focus-visible:ring-primary/30"><PenTool aria-hidden="true" className="size-4" />Собрать вручную</button>
+        <button type="button" role="tab" aria-selected={creationMode === "ai"} onClick={() => setCreationMode("ai")} className="inline-flex h-9 items-center gap-2 rounded-lg px-4 text-[12px] font-semibold text-text-muted outline-none transition hover:bg-surface-subtle aria-selected:bg-primary aria-selected:text-white focus-visible:ring-2 focus-visible:ring-primary/30"><Sparkles aria-hidden="true" className="size-4" />Создать с ИИ</button>
+      </div>
+
+      {creationMode === "ai" ? (
+        <AiEmailAssistant document={document} onApply={(next) => { mutateDocument(() => next); setSelectedBlockId(next.blocks[0]?.id ?? ""); setCreationMode("manual"); }} />
+      ) : (
+        <>
+
       {mode === "template" ? (
         <div className="grid gap-3 border-b border-border bg-surface-subtle/45 px-4 py-3 md:grid-cols-[190px_minmax(260px,1fr)] md:items-end">
           <FormField label="Категория" htmlFor="builder-template-category">
@@ -814,6 +826,8 @@ function EmailBuilderWorkspace({
           )}
         />
       </div>
+        </>
+      )}
     </div>
   );
 }

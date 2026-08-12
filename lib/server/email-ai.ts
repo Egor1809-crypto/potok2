@@ -80,6 +80,10 @@ function parseRequest(value: unknown): EmailAiRequest {
     currentPreviewText: optionalText(object.currentPreviewText, "Текущий прехедер", 500),
     currentText: optionalText(object.currentText, "Текущий текст", 8_000),
     websiteUrl,
+    primaryColor: optionalText(object.primaryColor, "Основной цвет", 20),
+    secondaryColor: optionalText(object.secondaryColor, "Дополнительный цвет", 20),
+    visualStyle: (["minimal", "editorial", "bold", "premium"] as const).includes(object.visualStyle as never) ? object.visualStyle as EmailAiRequest["visualStyle"] : "editorial",
+    imageSource: object.imageSource === "none" || object.imageSource === "generate" ? object.imageSource : "internet",
     availableAssets,
   };
 }
@@ -159,18 +163,19 @@ function parseSuggestion(value: string, input: EmailAiRequest): EmailAiSuggestio
     const raw = asObject(value);
     const type = optionalText(raw.type, `Тип блока ${index + 1}`, 30) as EmailBuilderBlockInput["type"] | undefined;
     if (!type || !allowedTypes.has(type)) return [];
-    const assetId = optionalText(raw.assetId, `Изображение блока ${index + 1}`, 160);
+    const assetId = raw.assetId === null ? undefined : optionalText(raw.assetId, `Изображение блока ${index + 1}`, 160);
     const asset = assetId ? assetById.get(assetId) : undefined;
-    if (type === "image" && !asset) return [];
+    const imagePrompt = raw.imagePrompt === null ? undefined : optionalText(raw.imagePrompt, `Описание изображения блока ${index + 1}`, 800);
+    if (type === "image" && !asset && !imagePrompt) return [];
     if (type === "button" && !input.websiteUrl) return [];
     const content = optionalText(raw.content, `Контент блока ${index + 1}`, 20_000) ?? "";
-    const label = optionalText(raw.label, `Подпись блока ${index + 1}`, 2_000);
+    const label = raw.label === null ? undefined : optionalText(raw.label, `Подпись блока ${index + 1}`, 2_000);
     return [{
       id: `ai-${type}-${crypto.randomUUID()}`,
       type,
       content: content || (asset?.filename ?? ""),
       ...(label ? { label } : {}),
-      ...(asset ? { href: asset.url } : type === "button" && input.websiteUrl ? { href: input.websiteUrl } : {}),
+      ...(asset ? { href: asset.url } : type === "image" ? { href: "https://placehold.co/1200x675/png" } : type === "button" && input.websiteUrl ? { href: input.websiteUrl } : {}),
       ...blockDefaults(type),
       fontFamily: "Arial" as const,
       fontWeight: type === "heading" || type === "hero" || type === "banner" ? 700 as const : 400 as const,
@@ -202,7 +207,81 @@ function parseSuggestion(value: string, input: EmailAiRequest): EmailAiSuggestio
   });
   if (!parsedDocument) throw new ApiRequestError("ИИ не собрал макет письма. Повторите запрос.", 502);
   suggestion.document = parsedDocument;
+  suggestion.imagePrompts = design.blocks.slice(0, 20).flatMap((value, index) => {
+    const raw = asObject(value);
+    const imagePrompt = raw.imagePrompt === null ? undefined : optionalText(raw.imagePrompt, `Описание изображения блока ${index + 1}`, 800);
+    if (raw.type !== "image" || !imagePrompt || input.imageSource === "none") return [];
+    const matching = blocks.find((block) => block.type === "image" && block.content === (optionalText(raw.content, `Контент блока ${index + 1}`, 20_000) ?? ""));
+    return matching ? [{ blockId: matching.id, prompt: imagePrompt, alt: matching.content }] : [];
+  });
   return suggestion;
+}
+
+async function generateDesignImages(provider: NonNullable<ReturnType<typeof aiProvider>>, suggestion: EmailAiSuggestion) {
+  if (!suggestion.document || !suggestion.imagePrompts?.length || provider.provider !== "navyai") return suggestion;
+  for (const image of suggestion.imagePrompts.slice(0, 2)) {
+    try {
+      const response = await fetch(provider.endpoint.replace(/\/responses$/, "/images/generations"), {
+        method: "POST",
+        headers: { Authorization: `Bearer ${provider.key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "flux", prompt: `${image.prompt}. Горизонтальная иллюстрация для email, без текста, логотипа и водяных знаков.`, size: "1024x1024", response_format: "url", sync: true }),
+      });
+      const body = asObject(await response.json());
+      const data = Array.isArray(body.data) ? body.data : [];
+      const first = data[0] && typeof data[0] === "object" ? data[0] as Record<string, unknown> : null;
+      const block = suggestion.document.blocks.find((item) => item.id === image.blockId);
+      if (block && first && typeof first.url === "string" && first.url.startsWith("https://")) block.href = first.url;
+    } catch {
+      // Keep the complete text design if optional image generation is unavailable.
+    }
+  }
+  return suggestion;
+}
+
+async function findInternetImages(suggestion: EmailAiSuggestion) {
+  if (!suggestion.document || !suggestion.imagePrompts?.length) return suggestion;
+  const used = new Set<string>();
+  for (const image of suggestion.imagePrompts.slice(0, 2)) {
+    try {
+      const prompt = image.prompt.toLowerCase();
+      const conciseQuery = prompt.includes("conference")
+        ? "modern technology conference auditorium"
+        : prompt.includes("laptop")
+          ? "modern laptop office technology"
+          : image.prompt.replace(/#[\da-f]{6}/gi, "").split(/[,.]/)[0]?.trim().split(/\s+/).slice(0, 6).join(" ") || image.alt;
+      const candidate = await searchCommonsImage(conciseQuery, used) ?? await searchCommonsImage(image.alt, used);
+      const block = suggestion.document.blocks.find((item) => item.id === image.blockId);
+      if (block && candidate) {
+        block.href = candidate;
+        used.add(candidate);
+      }
+    } catch {
+      // Keep the complete design if public image search is unavailable.
+    }
+  }
+  return suggestion;
+}
+
+async function searchCommonsImage(search: string, used: Set<string>) {
+  const url = new URL("https://commons.wikimedia.org/w/api.php");
+  url.search = new URLSearchParams({ action: "query", generator: "search", gsrsearch: search, gsrnamespace: "6", gsrlimit: "24", prop: "imageinfo", iiprop: "url|mime", iiurlwidth: "1200", format: "json", origin: "*" }).toString();
+  const response = await fetch(url, { headers: { "User-Agent": "MAILFLOW/1.0 (info@tech-pravo.ru)" } });
+  if (!response.ok) return undefined;
+  const body = asObject(await response.json());
+  const query = asObject(body.query);
+  const pages = query.pages && typeof query.pages === "object" && !Array.isArray(query.pages) ? Object.values(query.pages as Record<string, unknown>) : [];
+  return pages.flatMap((page) => {
+    const row = asObject(page);
+    const title = typeof row.title === "string" ? row.title.toLowerCase() : "";
+    if (title.includes(".pdf") || title.includes(".djvu")) return [];
+    if (!Array.isArray(row.imageinfo)) return [];
+    return row.imageinfo.flatMap((value) => {
+      const info = asObject(value);
+      if (typeof info.mime !== "string" || !info.mime.startsWith("image/")) return [];
+      const imageUrl = typeof info.thumburl === "string" ? info.thumburl : typeof info.url === "string" ? info.url : "";
+      return imageUrl.startsWith("https://upload.wikimedia.org/") && !used.has(imageUrl) ? [imageUrl] : [];
+    });
+  })[0];
 }
 
 export async function generateEmailSuggestion(request: Request, value: unknown): Promise<EmailAiResponse> {
@@ -222,7 +301,7 @@ export async function generateEmailSuggestion(request: Request, value: unknown):
       reasoning: { effort: "low" },
       max_output_tokens: input.action === "design" ? 6_000 : 3_000,
       instructions: input.action === "design"
-        ? "Ты арт-директор и редактор деловых email-писем на русском языке. Собери цельное красивое письмо из 6-12 разноплановых структурных блоков. Не создавай HTML: каждый блок передай только через поля JSON-схемы. Пиши конкретно, без выдуманных фактов, обещаний и цифр. Сохраняй только переменные {{first_name}}, {{last_name}}, {{company}}, {{position}}, {{city}}. Уместно используй hero, banner, timeline, faq, coupon, video, pattern и другие блоки. Используй image только с assetId из availableAssets. Не выдумывай ссылки и изображения. Если websiteUrl отсутствует, не добавляй button или video. Цвета строго #RRGGBB. Ответ строго по JSON-схеме."
+        ? `Ты арт-директор и редактор деловых email-писем на русском языке. Создай письмо полностью по описанию пользователя: содержание, цвета, стиль и композицию. Собери 6-12 структурных блоков. Не создавай HTML. ${input.imageSource === "none" ? "Не добавляй блоки image." : "Обязательно добавь 1-2 блока image и подробно заполни imagePrompt на английском языке для каждого; система сама найдёт или создаст изображения."} Не вставляй URL изображений. Пиши конкретно, не выдумывай факты и цифры. Сохраняй только переменные {{first_name}}, {{last_name}}, {{company}}, {{position}}, {{city}}. Если websiteUrl отсутствует, не добавляй button или video. Учитывай заданные primaryColor, secondaryColor и visualStyle. Цвета строго #RRGGBB. Ответ строго по JSON-схеме.`
         : "Ты редактор деловых email-писем на русском языке. Верни только четыре коротких поля JSON: subject, previewText, body, cta. Никакого HTML, Markdown, таблиц, дизайна или пояснений. body — обычный текст до 1800 символов. subject — до 140 символов, previewText — до 240, cta — до 80. Не выдумывай даты, цифры, ссылки и факты. Сохраняй только переменные {{first_name}}, {{last_name}}, {{company}}, {{position}}, {{city}}. Ответ строго по JSON-схеме.",
       input: JSON.stringify(input),
       text: {
@@ -254,12 +333,13 @@ export async function generateEmailSuggestion(request: Request, value: unknown):
                     items: {
                       type: "object",
                       additionalProperties: false,
-                      required: ["type", "content", "label", "assetId"],
+                      required: ["type", "content", "label", "assetId", "imagePrompt"],
                       properties: {
                         type: { type: "string", enum: ["logo", "heading", "text", "image", "button", "columns", "divider", "spacer", "social", "footer", "hero", "quote", "checklist", "stats", "product", "signature", "pattern", "banner", "timeline", "faq", "coupon", "video"] },
                         content: { type: "string" },
                         label: { type: ["string", "null"] },
                         assetId: { type: ["string", "null"] },
+                        imagePrompt: { type: ["string", "null"] },
                       },
                     },
                   },
@@ -286,5 +366,7 @@ export async function generateEmailSuggestion(request: Request, value: unknown):
     console.error("OpenAI email assistant error", response.status, responseBody);
     throw new ApiRequestError(response.status === 429 ? "ИИ-помощник занят. Повторите через минуту." : "ИИ-помощник не смог подготовить текст. Повторите попытку.", 502);
   }
-  return { configured: true, provider: provider.provider, suggestion: parseSuggestion(outputText(responseBody), input) };
+  const suggestion = parseSuggestion(outputText(responseBody), input);
+  const designed = input.action !== "design" ? suggestion : input.imageSource === "internet" ? await findInternetImages(suggestion) : input.imageSource === "generate" ? await generateDesignImages(provider, suggestion) : suggestion;
+  return { configured: true, provider: provider.provider, suggestion: designed };
 }

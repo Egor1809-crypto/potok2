@@ -244,6 +244,10 @@ export type EmailAiRequest = {
   currentPreviewText?: string;
   currentText?: string;
   websiteUrl?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  visualStyle?: "minimal" | "editorial" | "bold" | "premium";
+  imageSource?: "internet" | "generate" | "none";
   availableAssets?: Array<Pick<EmailAssetRecord, "id" | "filename" | "kind" | "url">>;
 };
 
@@ -253,6 +257,7 @@ export type EmailAiSuggestion = {
   body: string;
   cta: string;
   document?: EmailBuilderDocumentInput;
+  imagePrompts?: Array<{ blockId: string; prompt: string; alt: string }>;
 };
 
 export type EmailExportResponse = {
