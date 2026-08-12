@@ -483,6 +483,10 @@ function BlockContent({
     );
   }
 
+  if (block.type === "pattern") {
+    return <div aria-hidden="true" className="rounded-xl py-3 text-center font-semibold tracking-[.32em]" style={{ backgroundColor: block.backgroundColor === "transparent" ? `${accentColor}12` : block.backgroundColor, borderRadius: block.borderRadius, color: block.textColor, fontSize: block.fontSize }}>{block.content}</div>;
+  }
+
   return (
     <p className="m-0 leading-5" style={{ fontSize: block.fontSize }}>
       {renderTokens(block.content)}

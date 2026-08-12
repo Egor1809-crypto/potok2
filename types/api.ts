@@ -158,7 +158,8 @@ export type EmailBuilderBlockInput = {
     | "checklist"
     | "stats"
     | "product"
-    | "signature";
+    | "signature"
+    | "pattern";
   content: string;
   label?: string;
   href?: string;
@@ -212,6 +213,7 @@ export type EmailAssetsListResponse = { assets: EmailAssetRecord[] };
 export type EmailAssetMutationResponse = { asset: EmailAssetRecord };
 
 export type EmailAiAction =
+  | "design"
   | "compose"
   | "rewrite"
   | "shorten"
@@ -226,6 +228,8 @@ export type EmailAiRequest = {
   currentSubject?: string;
   currentPreviewText?: string;
   currentText?: string;
+  websiteUrl?: string;
+  availableAssets?: Array<Pick<EmailAssetRecord, "id" | "filename" | "kind" | "url">>;
 };
 
 export type EmailAiSuggestion = {
@@ -233,6 +237,12 @@ export type EmailAiSuggestion = {
   previewText: string;
   body: string;
   cta: string;
+  document?: EmailBuilderDocumentInput;
+};
+
+export type EmailExportResponse = {
+  html: string;
+  text: string;
 };
 
 export type EmailAiResponse = {

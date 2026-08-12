@@ -38,6 +38,7 @@ import {
 
 import { BlockLibrary, blockLibrary } from "./BlockLibrary";
 import { BuilderTopbar, MobilePreviewToggle } from "./BuilderTopbar";
+import { EmailExportMenu } from "./EmailExportMenu";
 import { EmailCanvas } from "./EmailCanvas";
 import { PropertiesPanel } from "./PropertiesPanel";
 import {
@@ -706,6 +707,7 @@ function EmailBuilderWorkspace({
         onSave={save}
         onContinue={continueFromEditor}
         continueHref={continueHref}
+        tools={<EmailExportMenu document={document} name={campaignName} />}
       />
 
       {mode === "template" ? (

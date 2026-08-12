@@ -8,7 +8,6 @@ import {
   Megaphone,
   PenLine,
   Settings,
-  Shapes,
   UsersRound,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -29,13 +28,12 @@ export type ProductNavGroup = {
 };
 
 /**
- * Разделы повторяют реальный рабочий маршрут: база → аудитория → сообщение →
- * кампания → каналы → результат. Инструменты подготовки письма должны быть
- * видны постоянно, а не прятаться внутри мастера кампании.
+ * Главный продукт — визуальная студия писем. Аудитории и доставка вынесены
+ * в отдельные группы, чтобы отправка не затмевала создание макета.
  */
 export const productNavigation: ProductNavGroup[] = [
   {
-    label: "Рабочий процесс",
+    label: "Студия писем",
     items: [
       {
         label: "Обзор",
@@ -44,27 +42,6 @@ export const productNavigation: ProductNavGroup[] = [
         icon: LayoutDashboard,
         exact: true,
         keywords: ["главная", "сводка"],
-      },
-      {
-        label: "Контакты",
-        description: "Люди, каналы связи и согласия",
-        href: "/contacts",
-        icon: ContactRound,
-        keywords: ["люди", "crm", "база", "импорт"],
-      },
-      {
-        label: "Аудитории",
-        description: "Сегменты по правилам контактов",
-        href: "/segments",
-        icon: UsersRound,
-        keywords: ["сегменты", "аудитория", "фильтры"],
-      },
-      {
-        label: "Кампании",
-        description: "Сообщения, проверка и запуск",
-        href: "/campaigns",
-        icon: Megaphone,
-        keywords: ["рассылка", "email", "telegram", "вконтакте", "шаблоны"],
       },
       {
         label: "Шаблоны писем",
@@ -82,6 +59,37 @@ export const productNavigation: ProductNavGroup[] = [
             keywords: ["редактор", "контент", "блоки", "email"],
           },
         ],
+      },
+    ],
+  },
+  {
+    label: "Аудитории",
+    items: [
+      {
+        label: "Контакты",
+        description: "Люди, команды, фильтры и согласия",
+        href: "/contacts",
+        icon: ContactRound,
+        keywords: ["люди", "crm", "база", "импорт", "команды"],
+      },
+      {
+        label: "Сегменты",
+        description: "Динамические аудитории по правилам",
+        href: "/segments",
+        icon: UsersRound,
+        keywords: ["аудитория", "фильтры", "команды"],
+      },
+    ],
+  },
+  {
+    label: "Доставка · дополнительно",
+    items: [
+      {
+        label: "Кампании",
+        description: "Отправка уже готового письма",
+        href: "/campaigns",
+        icon: Megaphone,
+        keywords: ["рассылка", "email", "telegram", "вконтакте"],
       },
       {
         label: "Каналы",
@@ -110,19 +118,19 @@ export const productRoutes = primaryProductRoutes.flatMap((item) => [
 
 export const quickCreateRoutes: ProductNavItem[] = [
   {
-    label: "Создать кампанию",
-    description: "Выбрать аудиторию, сообщение и каналы",
-    href: "/campaigns/new",
-    icon: Shapes,
+    label: "Создать письмо",
+    description: "Собрать красивое письмо с нуля или с ИИ",
+    href: "/email-builder?new=1",
+    icon: PenLine,
     exact: true,
-    keywords: ["новая", "создать", "отправить"],
+    keywords: ["новое", "создать", "дизайн", "ии"],
   },
 ];
 
 export const secondaryProductRoutes: ProductNavItem[] = [
   {
     label: "Импорт контактов",
-    description: "Загрузить и проверить файл CSV",
+    description: "Загрузить CSV, XLSX, XLS или TSV",
     href: "/import",
     icon: FileUp,
     exact: true,

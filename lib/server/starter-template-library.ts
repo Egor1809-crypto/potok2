@@ -149,6 +149,14 @@ const BLOCK_STYLES: Record<EmailBuilderBlockInput["type"], BlockStyle> = {
     fontSize: 13,
     borderRadius: 10,
   },
+  pattern: {
+    paddingTop: 16,
+    paddingBottom: 16,
+    backgroundColor: "#f3edff",
+    textColor: "#7c3aed",
+    fontSize: 18,
+    borderRadius: 12,
+  },
 };
 
 export type StarterEmailTemplateValue = {

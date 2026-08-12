@@ -27,9 +27,9 @@ test("server-renders the finished MAILFLOW landing page", async () => {
 
   const html = await response.text();
   assert.match(html, /MAILFLOW/);
-  assert.match(html, /Деловые рассылки/);
-  assert.match(html, /Во всех нужных каналах/);
-  assert.match(html, /Начать работу/);
+  assert.match(html, /Красивые письма/);
+  assert.match(html, /Без дизайнера и кода/);
+  assert.match(html, /Создать первое письмо/);
   assert.match(html, /Все деловые связи/);
   assert.match(html, /<html[^>]+lang="ru"/);
   assert.doesNotMatch(html, /codex-preview|SkeletonPreview|Your site is taking shape|react-loading-skeleton/i);

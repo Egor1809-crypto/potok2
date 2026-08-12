@@ -67,7 +67,7 @@ export function PropertiesPanel({
   const canEditContent = !["divider", "spacer"].includes(block.type);
   const supportsTypography = !["image", "divider", "spacer"].includes(block.type);
   const supportsAlignment = !["divider", "spacer"].includes(block.type);
-  const supportsRadius = ["button", "image", "columns", "hero", "quote", "stats", "product", "signature"].includes(block.type);
+  const supportsRadius = ["button", "image", "columns", "hero", "quote", "stats", "product", "signature", "pattern"].includes(block.type);
 
   const updateContent = (content: string) => {
     onUpdateBlock(

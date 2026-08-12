@@ -19,6 +19,7 @@ import {
   PackageOpen,
   Quote,
   Sparkles,
+  Shapes,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -49,6 +50,7 @@ export const blockLibrary: BlockLibraryItem[] = [
   { type: "stats", label: "Показатели", description: "Цифры и результаты", icon: ChartNoAxesColumnIncreasing },
   { type: "product", label: "Карточка", description: "Продукт или услуга", icon: PackageOpen },
   { type: "signature", label: "Подпись", description: "Отправитель и контакты", icon: ContactRound },
+  { type: "pattern", label: "Узор", description: "Декоративная полоса", icon: Shapes },
 ];
 
 export const getBlockLabel = (type: EmailBlockType) =>

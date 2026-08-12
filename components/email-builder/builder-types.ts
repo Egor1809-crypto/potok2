@@ -169,6 +169,14 @@ const blockDefaults: Record<
     fontSize: 13,
     borderRadius: 10,
   },
+  pattern: {
+    paddingTop: 16,
+    paddingBottom: 16,
+    backgroundColor: "#f3edff",
+    textColor: "#7c3aed",
+    fontSize: 18,
+    borderRadius: 12,
+  },
 };
 
 const initialContent: Record<EmailBlockType, Pick<EmailBlock, "content" | "label" | "href">> = {
@@ -233,6 +241,11 @@ const initialContent: Record<EmailBlockType, Pick<EmailBlock, "content" | "label
   },
   signature: {
     content: "Егор Сабалин|Основатель MAILFLOW|egor@example.ru",
+    label: undefined,
+    href: undefined,
+  },
+  pattern: {
+    content: "✦  ·  ✧  ·  ✦  ·  ✧  ·  ✦",
     label: undefined,
     href: undefined,
   },

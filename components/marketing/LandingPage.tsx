@@ -44,16 +44,16 @@ export function LandingPage() {
         <div className="container-shell relative text-center">
           <div className="mx-auto mb-7 flex w-fit items-center gap-2 rounded-full border border-border bg-primary-subtle px-3 py-1.5 text-[11px] font-semibold text-primary shadow-sm">
             <span className="size-1.5 rounded-full bg-primary shadow-[0_0_0_3px_rgba(124,53,242,.14)]" />
-            Спокойный порядок в каждой коммуникации
+            Визуальная студия деловых писем
           </div>
           <h1 className="mx-auto max-w-[930px] text-[clamp(3.4rem,8.2vw,7.3rem)] font-medium leading-[.91] tracking-[-.065em] text-text-strong">
-            Деловые рассылки.<br /><span className="text-primary">Во всех нужных каналах.</span>
+            Красивые письма.<br /><span className="text-primary">Без дизайнера и кода.</span>
           </h1>
           <p className="mx-auto mt-8 max-w-[650px] text-[17px] leading-7 text-[#686a78] sm:text-[19px] sm:leading-8">
-            Храните контакты и запускайте персональные кампании по email, в Telegram и ВКонтакте — через VK WorkSpace и подключённые сервисы.
+            Создавайте фирменные письма из блоков, логотипов и фотографий, подключайте ИИ, скачивайте макеты и при необходимости отправляйте через VK WorkSpace.
           </p>
           <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Link href="/register" className="btn btn-primary min-h-12 w-full justify-center gap-2 px-5 text-[14px] sm:w-auto">Начать работу <ArrowRight size={16} /></Link>
+            <Link href="/email-builder?new=1" className="btn btn-primary min-h-12 w-full justify-center gap-2 px-5 text-[14px] sm:w-auto">Создать первое письмо <ArrowRight size={16} /></Link>
             <Link href="/dashboard" className="btn btn-secondary min-h-12 w-full justify-center gap-2 px-5 text-[14px] sm:w-auto"><Play size={14} fill="currentColor" /> Посмотреть платформу</Link>
           </div>
           <p className="mt-4 text-[11px] text-[#9a9ca8]">Один участник · Полный доступ ко всем функциям</p>

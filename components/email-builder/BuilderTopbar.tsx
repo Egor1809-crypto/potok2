@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import {
   ArrowRight,
   Check,
@@ -37,6 +38,7 @@ type BuilderTopbarProps = {
   onSave: () => void;
   onContinue: (event: React.MouseEvent<HTMLAnchorElement>) => void;
   continueHref: string;
+  tools?: ReactNode;
 };
 
 export function BuilderTopbar({
@@ -59,6 +61,7 @@ export function BuilderTopbar({
   onSave,
   onContinue,
   continueHref,
+  tools,
 }: BuilderTopbarProps) {
   return (
     <div className="flex min-h-[60px] shrink-0 items-center justify-between gap-3 border-b border-border bg-surface px-3 sm:px-4">
@@ -106,6 +109,7 @@ export function BuilderTopbar({
       </div>
 
       <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+        {tools}
         <div className="hidden items-center rounded-[9px] bg-surface-subtle p-1 md:flex" aria-label="Размер предпросмотра">
           <button
             type="button"

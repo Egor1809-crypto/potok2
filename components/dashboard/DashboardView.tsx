@@ -9,12 +9,12 @@ import {
   Clock3,
   ContactRound,
   FileText,
+  LayoutTemplate,
   LoaderCircle,
   Megaphone,
   Plus,
   RefreshCw,
   Send,
-  UsersRound,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -118,8 +118,8 @@ export function DashboardView() {
   const participantName = snapshot.participant.displayName || "Участник";
   const firstName = participantName.split(" ")[0];
   const metrics = [
+    { label: "Шаблоны", value: number.format(snapshot.templates.length), note: "Макеты можно редактировать и клонировать", Icon: LayoutTemplate, href: "/templates" },
     { label: "Контакты", value: number.format(snapshot.stats.totalContacts), note: `${number.format(snapshot.stats.activeContacts)} доступны для работы`, Icon: ContactRound, href: "/contacts" },
-    { label: "Сегменты", value: number.format(snapshot.stats.totalSegments), note: "Аудитории обновляются по правилам", Icon: UsersRound, href: "/segments" },
     { label: "Кампании", value: number.format(snapshot.stats.totalCampaigns), note: `${number.format(snapshot.stats.activeCampaigns)} требуют внимания`, Icon: Megaphone, href: "/campaigns" },
     { label: "Подключённые каналы", value: number.format(snapshot.stats.connectedIntegrations), note: "Email, Telegram или ВКонтакте", Icon: Cable, href: "/integrations" },
   ];
@@ -129,10 +129,10 @@ export function DashboardView() {
       <section className="grid gap-5 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm md:grid-cols-[minmax(0,1fr)_auto] md:items-center sm:p-7">
         <div>
           <p className="section-eyebrow">{snapshot.workspace.name}</p>
-          <h1 className="text-[28px] font-semibold tracking-[-.04em] sm:text-[32px]">{firstName ? `${firstName}, вот что важно сейчас` : "Что важно сейчас"}</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-muted)]">MAILFLOW ведёт по одному рабочему маршруту: база → аудитория → сообщение → каналы → проверка → запуск.</p>
+          <h1 className="text-[28px] font-semibold tracking-[-.04em] sm:text-[32px]">{firstName ? `${firstName}, создадим красивое письмо` : "Создадим красивое письмо"}</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-muted)]">Начните с шаблона или соберите макет с ИИ. Контакты и доставка через VK WorkSpace подключаются, когда письмо уже готово.</p>
         </div>
-        <Link href="/campaigns/new" className="btn btn-primary w-fit gap-2"><Plus aria-hidden="true" className="size-4" />Новая кампания</Link>
+        <Link href="/email-builder?new=1" className="btn btn-primary w-fit gap-2"><Plus aria-hidden="true" className="size-4" />Создать письмо</Link>
       </section>
 
       <section className={`rounded-2xl border p-5 sm:p-6 ${nextAction.tone}`} aria-labelledby="next-action-title">
@@ -188,13 +188,14 @@ export function DashboardView() {
 }
 
 function getNextAction(snapshot: WorkspaceSnapshot) {
+  if (snapshot.templates.length === 0) return { title: "Создайте первый шаблон", description: "Соберите визуальное письмо из блоков или попросите ИИ подготовить весь макет.", action: "Открыть студию", href: "/email-builder?new=1", Icon: LayoutTemplate, tone: "border-primary/20 bg-primary-subtle/55" };
   if (snapshot.stats.totalContacts === 0) return { title: "Добавьте первые контакты", description: "Импортируйте CSV или создайте контакт вручную. Без аудитории запуск невозможен.", action: "Добавить контакты", href: "/contacts", Icon: ContactRound, tone: "border-primary/20 bg-primary-subtle/55" };
   if (snapshot.stats.connectedIntegrations === 0) return { title: "Подключите канал доставки", description: "Выберите email, Telegram или ВКонтакте и завершите настройку провайдера.", action: "Настроить канал", href: "/integrations", Icon: Cable, tone: "border-primary/20 bg-primary-subtle/55" };
   const blocked = snapshot.campaigns.find((campaign) => campaign.status === "blocked");
   if (blocked) return { title: `Исправьте кампанию «${blocked.name}»`, description: blocked.statusReason || "Кампания не прошла проверку готовности.", action: "Открыть кампанию", href: `/campaigns/${blocked.id}`, Icon: CircleAlert, tone: "border-[#f0d8dc] bg-[#fff5f6]" };
   const draft = snapshot.campaigns.find((campaign) => campaign.status === "draft");
   if (draft) return { title: `Продолжите «${draft.name}»`, description: "Аудитория и черновик уже сохранены. Завершите каналы и проверку.", action: "Продолжить", href: `/campaigns/${draft.id}`, Icon: FileText, tone: "border-primary/20 bg-primary-subtle/55" };
-  return { title: "Создайте следующую кампанию", description: "Контакты и канал готовы. Выберите аудиторию, сообщение и проверьте маршрут доставки.", action: "Создать кампанию", href: "/campaigns/new", Icon: Send, tone: "border-[#d9eadf] bg-[#f2faf5]" };
+  return { title: "Создайте новое письмо", description: "Возьмите шаблон, добавьте фирменные фото и логотип — отправку можно настроить позже.", action: "Создать письмо", href: "/email-builder?new=1", Icon: Send, tone: "border-[#d9eadf] bg-[#f2faf5]" };
 }
 
 function CampaignRow({ campaign, timeZone }: { campaign: CampaignRecord; timeZone: string }) {

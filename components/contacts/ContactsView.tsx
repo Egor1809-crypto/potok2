@@ -14,6 +14,7 @@ import {
   SendHorizontal,
   Trash2,
   Upload,
+  UsersRound,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
@@ -109,6 +110,11 @@ export function ContactsView() {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
+  const [company, setCompany] = useState("all");
+  const [city, setCity] = useState("all");
+  const [team, setTeam] = useState("all");
+  const [channel, setChannel] = useState("all");
+  const [teamName, setTeamName] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [drawerContact, setDrawerContact] = useState<ContactRecord | null>(null);
   const [editing, setEditing] = useState<ContactRecord | "new" | null>(null);
@@ -142,13 +148,25 @@ export function ContactsView() {
     const needle = search.trim().toLocaleLowerCase("ru-RU");
     return contacts.filter((contact) => {
       if (status !== "all" && contact.status !== status) return false;
+      if (company !== "all" && contact.companyName !== company) return false;
+      if (city !== "all" && contact.city !== city) return false;
+      if (team !== "all" && !contact.tags.includes(`Команда: ${team}`)) return false;
+      if (channel === "email" && !(contact.status === "active" && contact.email && contact.emailConsent)) return false;
+      if (channel === "telegram" && !(contact.status === "active" && contact.telegramChatId && contact.telegramConsent)) return false;
+      if (channel === "vk" && !(contact.status === "active" && contact.vkUserId && contact.vkConsent)) return false;
       if (!needle) return true;
       return [contact.fullName, contact.email, contact.phone, contact.companyName, contact.jobTitle, contact.city, contact.tags.join(" ")]
         .join(" ")
         .toLocaleLowerCase("ru-RU")
         .includes(needle);
     });
-  }, [contacts, search, status]);
+  }, [channel, city, company, contacts, search, status, team]);
+
+  const filterOptions = useMemo(() => ({
+    companies: [...new Set(contacts.map((contact) => contact.companyName).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ru")),
+    cities: [...new Set(contacts.map((contact) => contact.city).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ru")),
+    teams: [...new Set(contacts.flatMap((contact) => contact.tags.filter((tag) => tag.startsWith("Команда: ")).map((tag) => tag.slice(9))))].sort((a, b) => a.localeCompare(b, "ru")),
+  }), [contacts]);
 
   const selectedIds = useMemo(() => [...selected], [selected]);
   const dateFormatter = useMemo(() => {
@@ -249,6 +267,34 @@ export function ContactsView() {
     }
   };
 
+  const assignTeam = async () => {
+    const normalized = teamName.trim().replace(/^команда\s*:\s*/i, "");
+    if (!selectedIds.length || !normalized) return;
+    setBusy(true);
+    setError("");
+    try {
+      const updated = new Map<string, ContactRecord>();
+      for (let start = 0; start < selectedIds.length; start += 10) {
+        const ids = selectedIds.slice(start, start + 10);
+        const records = await Promise.all(ids.map(async (id) => {
+          const contact = contacts.find((item) => item.id === id);
+          if (!contact) return null;
+          const tags = [...new Set([...contact.tags, `Команда: ${normalized}`])];
+          const response = await fetch("/api/contacts", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, tags }) });
+          const payload = await response.json() as ContactMutationResponse | ApiError;
+          if (!response.ok || !("contact" in payload)) throw new Error(messageFrom(payload, "Не удалось добавить контакты в команду"));
+          return payload.contact;
+        }));
+        records.forEach((record) => { if (record) updated.set(record.id, record); });
+      }
+      setContacts((current) => current.map((contact) => updated.get(contact.id) ?? contact));
+      setTeamName("");
+      notify(`В команду «${normalized}» добавлено: ${updated.size}`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Не удалось добавить контакты в команду");
+    } finally { setBusy(false); }
+  };
+
   const exportCsv = () => {
     const source = selectedIds.length ? contacts.filter((contact) => selected.has(contact.id)) : visible;
     const escape = (value: string) => {
@@ -323,7 +369,7 @@ export function ContactsView() {
           <p className="mt-2 text-sm text-[var(--text-muted)]">{loading ? "Загружаем базу…" : `${contacts.length} контактов · ${activeCount} активных`}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link href="/import" className="btn btn-secondary gap-2"><Upload aria-hidden="true" className="size-4" />Импорт CSV</Link>
+          <Link href="/import" className="btn btn-secondary gap-2"><Upload aria-hidden="true" className="size-4" />Импорт таблицы</Link>
           <button type="button" onClick={() => setEditing("new")} className="btn btn-secondary gap-2"><Plus aria-hidden="true" className="size-4" />Добавить контакт</button>
           <Link href={campaignHref(selectedIds)} className="btn btn-primary gap-2"><SendHorizontal aria-hidden="true" className="size-4" />{selectedIds.length ? `Кампания · ${selectedIds.length}` : "Новая кампания"}</Link>
         </div>
@@ -338,10 +384,18 @@ export function ContactsView() {
       {error && <div role="alert" className="flex items-start gap-3 rounded-xl border border-[var(--danger)]/20 bg-[var(--danger-subtle)] p-4 text-[12px] text-[var(--danger)]"><CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" /><span className="flex-1">{error}</span><button type="button" onClick={() => void load()} className="font-semibold underline underline-offset-2">Повторить</button></div>}
 
       <section className="card overflow-hidden">
-        <div className="flex flex-col gap-3 border-b border-[var(--border)] p-3 sm:flex-row sm:items-center">
+        <div className="grid gap-3 border-b border-[var(--border)] p-3 lg:grid-cols-[minmax(220px,1fr)_repeat(4,minmax(140px,190px))_auto]">
           <label className="relative min-w-0 flex-1"><span className="sr-only">Поиск контактов</span><Search aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--text-subtle)]" /><input className="input pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Имя, email, компания или тег" /></label>
-          <label className="sm:w-52"><span className="sr-only">Фильтр по статусу</span><select className="input" value={status} onChange={(event) => setStatus(event.target.value as StatusFilter)}><option value="all">Все статусы</option><option value="active">Активные</option><option value="unsubscribed">Отписанные</option><option value="bounced">Недоставляемые</option><option value="invalid">Некорректные</option></select></label>
+          <label><span className="sr-only">Фильтр по компании</span><select className="input" value={company} onChange={(event) => setCompany(event.target.value)}><option value="all">Все компании</option>{filterOptions.companies.map((value) => <option key={value}>{value}</option>)}</select></label>
+          <label><span className="sr-only">Фильтр по городу</span><select className="input" value={city} onChange={(event) => setCity(event.target.value)}><option value="all">Все города</option>{filterOptions.cities.map((value) => <option key={value}>{value}</option>)}</select></label>
+          <label><span className="sr-only">Фильтр по команде</span><select className="input" value={team} onChange={(event) => setTeam(event.target.value)}><option value="all">Все команды</option>{filterOptions.teams.map((value) => <option key={value}>{value}</option>)}</select></label>
+          <label><span className="sr-only">Фильтр по каналу</span><select className="input" value={channel} onChange={(event) => setChannel(event.target.value)}><option value="all">Все каналы</option><option value="email">Доступен Email</option><option value="telegram">Доступен Telegram</option><option value="vk">Доступен ВКонтакте</option></select></label>
           <button type="button" onClick={exportCsv} disabled={!selectedIds.length && !visible.length} className="btn btn-secondary gap-2"><Download aria-hidden="true" className="size-4" />Экспорт</button>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border)] bg-[var(--surface-subtle)]/65 px-3 py-2.5">
+          <button type="button" onClick={toggleAll} disabled={!visible.length} className="btn btn-secondary btn-sm gap-2"><Check aria-hidden="true" className="size-3.5" />{allVisibleSelected ? "Снять выбор найденных" : `Выбрать всех найденных · ${visible.length}`}</button>
+          {(company !== "all" || city !== "all" || team !== "all" || channel !== "all" || status !== "all" || search) ? <button type="button" onClick={() => { setSearch(""); setStatus("all"); setCompany("all"); setCity("all"); setTeam("all"); setChannel("all"); }} className="btn btn-ghost btn-sm">Сбросить фильтры</button> : null}
+          <span className="ml-auto text-[10px] text-[var(--text-muted)]">Фильтры формируют аудиторию без ручных галочек</span>
         </div>
 
         {loading ? (
@@ -362,7 +416,7 @@ export function ContactsView() {
           <div className="px-6 py-12 text-center"><Search aria-hidden="true" className="mx-auto size-7 text-[var(--text-subtle)]" /><p className="mt-3 text-[13px] font-semibold">Контакты не найдены</p><p className="mt-1 text-[11px] text-[var(--text-muted)]">Измените поиск или добавьте новый контакт.</p><button type="button" onClick={() => setEditing("new")} className="btn btn-primary mt-4">Добавить контакт</button></div>
         )}
 
-        <div className="flex flex-col gap-2 border-t border-[var(--border)] px-4 py-3 text-[11px] text-[var(--text-muted)] sm:flex-row sm:items-center sm:justify-between"><span>Найдено: {visible.length}</span>{selectedIds.length > 0 && <div className="flex flex-wrap items-center gap-2"><span className="font-semibold text-[var(--text-strong)]">Выбрано: {selectedIds.length}</span><button type="button" onClick={() => void removeSelected()} disabled={busy} className="btn btn-danger btn-sm gap-2"><Trash2 aria-hidden="true" className="size-3.5" />Удалить</button><button type="button" onClick={() => setSelected(new Set())} className="btn btn-ghost btn-sm gap-2"><X aria-hidden="true" className="size-3.5" />Снять выбор</button></div>}</div>
+        <div className="flex flex-col gap-2 border-t border-[var(--border)] px-4 py-3 text-[11px] text-[var(--text-muted)] xl:flex-row xl:items-center xl:justify-between"><span>Найдено: {visible.length}</span>{selectedIds.length > 0 && <div className="flex flex-wrap items-center gap-2"><span className="font-semibold text-[var(--text-strong)]">Выбрано: {selectedIds.length}</span><div className="flex items-center gap-1 rounded-lg border border-[var(--border)] bg-white p-1"><UsersRound aria-hidden="true" className="ml-1 size-3.5 text-[var(--primary)]" /><input value={teamName} onChange={(event) => setTeamName(event.target.value)} className="h-7 w-36 border-0 bg-transparent px-1 text-[11px] outline-none" placeholder="Название команды" /><button type="button" onClick={() => void assignTeam()} disabled={busy || !teamName.trim()} className="btn btn-primary btn-sm">Добавить</button></div><button type="button" onClick={() => void removeSelected()} disabled={busy} className="btn btn-danger btn-sm gap-2"><Trash2 aria-hidden="true" className="size-3.5" />Удалить</button><button type="button" onClick={() => setSelected(new Set())} className="btn btn-ghost btn-sm gap-2"><X aria-hidden="true" className="size-3.5" />Снять выбор</button></div>}</div>
       </section>
 
       {drawerContact && <ContactDrawer contact={drawerContact} timezone={timezone} onClose={() => setDrawerContact(null)} onEdit={(contact) => { setDrawerContact(null); setEditing(contact); }} />}

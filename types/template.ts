@@ -22,7 +22,8 @@ export type EmailBlockType =
   | "checklist"
   | "stats"
   | "product"
-  | "signature";
+  | "signature"
+  | "pattern";
 
 export interface EmailBlock {
   id: string;

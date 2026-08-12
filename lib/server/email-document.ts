@@ -21,6 +21,7 @@ const BLOCK_TYPES = new Set<EmailBuilderBlockInput["type"]>([
   "stats",
   "product",
   "signature",
+  "pattern",
 ]);
 const COLOR = /^#[0-9a-f]{6}$/i;
 
@@ -173,6 +174,8 @@ function blockHtml(block: EmailBuilderBlockInput, accent: string) {
   } else if (block.type === "product") {
     const [name = "", description = "", price = ""] = block.content.split("|");
     content = `<div style="padding:22px;border:1px solid #e5e7eb;border-radius:${block.borderRadius}px;background:${block.backgroundColor === "transparent" ? "#ffffff" : block.backgroundColor};font-family:Arial,sans-serif;color:${block.textColor};"><div style="font-size:20px;font-weight:700;">${lineBreaks(name)}</div><div style="margin-top:8px;font-size:${block.fontSize}px;line-height:1.55;">${lineBreaks(description)}</div><div style="margin-top:14px;font-size:18px;font-weight:700;">${lineBreaks(price)}</div><a href="${escapeHtml(block.href ?? "")}" style="display:inline-block;margin-top:16px;padding:10px 18px;border-radius:8px;background:${accent};color:#fff;text-decoration:none;font-size:13px;font-weight:700;">${lineBreaks(block.label || "Узнать подробнее")}</a></div>`;
+  } else if (block.type === "pattern") {
+    content = `<div aria-hidden="true" style="padding:10px;border-radius:${block.borderRadius}px;background:${block.backgroundColor === "transparent" ? `${accent}12` : block.backgroundColor};font-family:Arial,sans-serif;font-size:${block.fontSize}px;line-height:1.2;letter-spacing:.32em;color:${block.textColor};text-align:center;">${lineBreaks(block.content)}</div>`;
   }
   return `<tr><td style="${wrapper}">${content}</td></tr>`;
 }
@@ -190,7 +193,7 @@ export function emailDocumentPlainText(
   document: EmailBuilderDocumentInput,
 ): string {
   const sections = document.blocks.flatMap((block) => {
-    if (block.type === "divider" || block.type === "spacer") return [];
+    if (block.type === "divider" || block.type === "spacer" || block.type === "pattern") return [];
     if (block.type === "button") return [block.label || block.content];
     if (block.type === "columns") {
       return block.content.split("|").map((value) => value.trim());
