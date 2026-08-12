@@ -237,7 +237,7 @@ export const emailAssets = sqliteTable(
     objectKey: text("object_key").notNull(),
     filename: text("filename").notNull(),
     mimeType: text("mime_type")
-      .$type<"image/jpeg" | "image/png" | "image/gif">()
+      .$type<"image/jpeg" | "image/png" | "image/gif" | "image/webp">()
       .notNull(),
     size: integer("size").notNull(),
     kind: text("kind").$type<"photo" | "logo">().notNull(),

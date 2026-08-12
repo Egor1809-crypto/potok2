@@ -5,6 +5,7 @@ import type { EmailAiAction, EmailAiRequest, EmailAiResponse, EmailAiSuggestion,
 import { ApiRequestError, asObject, cleanText, optionalText } from "./api-utils";
 import { ensureDatabase } from "./database-init";
 import { parseEmailBuilderDocument } from "./email-document";
+import { storeGeneratedEmailAsset } from "./email-asset-store";
 
 const ACTIONS = new Set<EmailAiAction>(["brief", "design", "compose", "rewrite", "shorten", "subject", "cta"]);
 const TONES = new Set(["business", "friendly", "expert", "concise"]);
@@ -334,10 +335,11 @@ function parseSuggestion(value: string, input: EmailAiRequest): EmailAiSuggestio
   return suggestion;
 }
 
-async function generateDesignImages(provider: NonNullable<ReturnType<typeof aiProvider>>, suggestion: EmailAiSuggestion, onlyLogos = false) {
+async function generateDesignImages(request: Request, provider: NonNullable<ReturnType<typeof aiProvider>>, suggestion: EmailAiSuggestion, onlyLogos = false) {
   if (!suggestion.document || !suggestion.imagePrompts?.length || provider.provider !== "navyai") return suggestion;
   const prompts = onlyLogos ? suggestion.imagePrompts.filter((item) => item.kind === "logo") : suggestion.imagePrompts;
   for (const image of prompts.slice(0, 3)) {
+    const block = suggestion.document.blocks.find((item) => item.id === image.blockId);
     try {
       const response = await fetch(provider.endpoint.replace(/\/responses$/, "/images/generations"), {
         method: "POST",
@@ -347,10 +349,13 @@ async function generateDesignImages(provider: NonNullable<ReturnType<typeof aiPr
       const body = asObject(await response.json());
       const data = Array.isArray(body.data) ? body.data : [];
       const first = data[0] && typeof data[0] === "object" ? data[0] as Record<string, unknown> : null;
-      const block = suggestion.document.blocks.find((item) => item.id === image.blockId);
-      if (block && first && typeof first.url === "string" && first.url.startsWith("https://")) block.href = first.url;
+      if (block && first && typeof first.url === "string" && first.url.startsWith("https://")) {
+        const stored = await storeGeneratedEmailAsset(request, first.url, image.kind, image.kind === "logo" ? "Логотип, созданный ИИ" : "Иллюстрация, созданная ИИ");
+        block.href = stored.url;
+      }
     } catch {
-      // Keep the complete text design if optional image generation is unavailable.
+      // Never leave an expiring provider URL or placeholder in a finished email.
+      if (block) suggestion.document.blocks = suggestion.document.blocks.filter((item) => item.id !== block.id);
     }
   }
   return suggestion;
@@ -534,11 +539,11 @@ export async function generateEmailSuggestion(request: Request, value: unknown):
   const designed = input.action !== "design"
     ? suggestion
     : input.imageSource === "internet"
-      ? await generateDesignImages(provider, await findInternetImages(suggestion), true)
+      ? await generateDesignImages(request, provider, await findInternetImages(suggestion), true)
       : input.imageSource === "generate"
-        ? await generateDesignImages(provider, suggestion)
+        ? await generateDesignImages(request, provider, suggestion)
         : input.includeLogo
-          ? await generateDesignImages(provider, suggestion, true)
+          ? await generateDesignImages(request, provider, suggestion, true)
           : suggestion;
   return { configured: true, provider: provider.provider, suggestion: designed };
 }

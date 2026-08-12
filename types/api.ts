@@ -218,7 +218,7 @@ export type EmailAssetRecord = {
   id: string;
   workspaceId: string;
   filename: string;
-  mimeType: "image/jpeg" | "image/png" | "image/gif";
+  mimeType: "image/jpeg" | "image/png" | "image/gif" | "image/webp";
   size: number;
   kind: "photo" | "logo";
   url: string;

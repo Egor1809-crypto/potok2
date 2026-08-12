@@ -11,6 +11,7 @@ type Stage = "prompt" | "questions";
 type ComparisonView = "ai" | "current" | "split";
 
 function nextPromptSuggestion(value: string) {
+  if (!value.trim()) return "";
   const normalized = value.toLocaleLowerCase("ru-RU");
   if (value.trim().length < 12) return " для конкретной аудитории и с одним главным действием";
   if (!/(для кого|аудитор|юрист|руководител|клиент|партн[её]р|участник)/.test(normalized)) return ". Получатели — укажите должности или тип компаний";
@@ -158,8 +159,8 @@ export function AiEmailAssistant({ document, onApply }: { document: BuilderDocum
         <div className="card grid gap-4 p-5 sm:p-7">
           <div className="relative overflow-hidden rounded-xl">
             <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words px-4 py-3 text-[16px] font-medium leading-7"><span className="text-transparent">{goal}</span><span className="text-text-subtle/70">{promptSuggestion}</span></div>
-            <Textarea rows={9} maxLength={2000} value={goal} onChange={(event) => setGoal(event.target.value)} onKeyDown={(event) => { if ((event.key === "Enter" || event.key === "Tab") && !event.shiftKey && promptSuggestion) { event.preventDefault(); setGoal((value) => `${value}${promptSuggestion}`); } }} placeholder="Например: премиальное приглашение на конференцию для юристов. Тёмный графитовый фон, изумрудные акценты, тонкие геометрические линии. Цель — регистрация до 20 сентября…" className="relative z-10 resize-y !bg-transparent pb-11 font-medium text-text-strong caret-primary" style={{ fontSize: 16, lineHeight: "28px", color: "var(--text-strong)" }} />
-            <p className="pointer-events-none absolute bottom-3 right-3 z-20 m-0 text-[10px] text-text-subtle"><span className="rounded bg-surface-subtle px-1.5 py-1">Enter</span> принять серое продолжение</p>
+            <Textarea aria-describedby="ai-inline-suggestion-help" rows={9} maxLength={2000} value={goal} onChange={(event) => setGoal(event.target.value)} onKeyDown={(event) => { if ((event.key === "Enter" || event.key === "Tab") && !event.shiftKey && promptSuggestion) { event.preventDefault(); setGoal((value) => `${value}${promptSuggestion}`); } }} placeholder="Например: премиальное приглашение на конференцию для юристов. Тёмный графитовый фон, изумрудные акценты, тонкие геометрические линии. Цель — регистрация до 20 сентября…" className="relative z-10 resize-y !bg-transparent font-medium text-text-strong caret-primary" style={{ fontSize: 16, lineHeight: "28px", color: "var(--text-strong)" }} />
+            <span id="ai-inline-suggestion-help" className="sr-only">Серый текст рядом с курсором — предлагаемое продолжение. Нажмите Enter или Tab, чтобы принять его.</span>
           </div>
           {detectedUrl ? <div className="flex items-center gap-2 rounded-xl border border-primary/20 bg-primary-subtle/40 px-3 py-2.5 text-[11px]"><input id="ai-use-linked-context" type="checkbox" checked={useLinkedContext} onChange={(event) => setUseLinkedContext(event.target.checked)} className="accent-primary" /><label htmlFor="ai-use-linked-context" className="min-w-0"><strong className="block">Изучить страницу по ссылке</strong><span className="block truncate text-text-muted">{detectedUrl}</span></label></div> : null}
           <Button type="button" variant="primary" size="lg" disabled={busy || goal.trim().length < 8} onClick={() => void prepareQuestions()}>{busy ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : <Sparkles aria-hidden="true" className="size-4" />}{busy ? "Анализируем задачу…" : "Продолжить — уточнить детали"}</Button>

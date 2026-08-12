@@ -53,6 +53,7 @@ test("AI design remains a separate version until the user chooses it", async () 
   assert.match(server, /license_type/);
   assert.match(server, /aspect_ratio/);
   assert.match(server, /images\/generations/);
+  assert.match(server, /storeGeneratedEmailAsset/);
 });
 
 test("AI brief asks follow-up questions and accepts dragged user images", async () => {
@@ -67,6 +68,7 @@ test("AI brief asks follow-up questions and accepts dragged user images", async 
   assert.match(assistant, /imageSource: \/без/);
   assert.match(assistant, /: "generate"/);
   assert.match(assistant, /prepareImageFile/);
+  assert.match(assistant, /if \(!value\.trim\(\)\) return ""/);
   assert.match(assistant, /createImageBitmap/);
   assert.match(server, /выразительных приёма/);
   assert.match(server, /availableAssets/);
