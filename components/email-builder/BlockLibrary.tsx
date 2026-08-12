@@ -34,6 +34,8 @@ import type { LucideIcon } from "lucide-react";
 
 import type { EmailBlockType } from "@/types";
 import { cn } from "@/components/ui/utils";
+import type { BuilderDocument } from "./builder-types";
+import { emailFrameCss, emailFramePresets } from "./frame-presets";
 
 export type BlockLibraryItem = {
   type: EmailBlockType;
@@ -72,16 +74,21 @@ export const getBlockLabel = (type: EmailBlockType) =>
 
 export function BlockLibrary({
   onAdd,
+  document,
+  onUpdateDocument,
   className,
 }: {
   onAdd: (type: EmailBlockType) => void;
+  document: BuilderDocument;
+  onUpdateDocument: (patch: Partial<BuilderDocument>) => void;
   className?: string;
 }) {
   const [query, setQuery] = useState("");
-  const [tab, setTab] = useState<"content" | "layout">("content");
+  const [tab, setTab] = useState<"content" | "layout" | "frame">("content");
   const visibleItems = useMemo(() => {
     const layoutTypes = new Set<EmailBlockType>(["columns", "hero", "banner", "timeline", "product", "stats"]);
     const normalized = query.trim().toLowerCase();
+    if (tab === "frame") return [];
     return blockLibrary.filter((item) => (tab === "layout" ? layoutTypes.has(item.type) : !layoutTypes.has(item.type)) && (!normalized || `${item.label} ${item.description}`.toLowerCase().includes(normalized)));
   }, [query, tab]);
   return (
@@ -102,13 +109,34 @@ export function BlockLibrary({
           <span className="sr-only">Найти блок</span>
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Найти блок" className="min-w-0 flex-1 border-0 bg-transparent text-[11px] text-text-strong outline-none placeholder:text-text-subtle" />
         </label>
-        <div className="mt-3 grid grid-cols-2 rounded-lg bg-surface-subtle p-1" role="tablist" aria-label="Тип элементов">
+        <div className="mt-3 grid grid-cols-3 rounded-lg bg-surface-subtle p-1" role="tablist" aria-label="Тип элементов">
           <LibraryTab active={tab === "content"} onClick={() => setTab("content")} icon={AlignJustify}>Контент</LibraryTab>
           <LibraryTab active={tab === "layout"} onClick={() => setTab("layout")} icon={LayoutTemplate}>Структуры</LibraryTab>
+          <LibraryTab active={tab === "frame"} onClick={() => setTab("frame")} icon={Shapes}>Окантовки</LibraryTab>
         </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3 scrollbar-subtle">
+        {tab === "frame" ? (
+          <div>
+            <p className="mb-3 mt-0 text-[10px] leading-4 text-text-muted">Окантовка применяется ко всему письму и сохраняется в итоговом HTML.</p>
+            <div className="grid grid-cols-2 gap-2 lg:grid-cols-1 xl:grid-cols-2" role="radiogroup" aria-label="Окантовка письма">
+              {emailFramePresets.map((preset) => (
+                <button key={preset.id} type="button" role="radio" aria-checked={document.frameStyle === preset.id} onClick={() => onUpdateDocument({ frameStyle: preset.id, frameRadius: preset.radius })} className="rounded-[9px] border border-border bg-surface p-2 text-left outline-none transition hover:border-primary/40 hover:bg-primary-subtle/30 focus-visible:ring-2 focus-visible:ring-primary/30 aria-checked:border-primary aria-checked:bg-primary-subtle/60">
+                  <span aria-hidden="true" className="block h-12 bg-white" style={emailFrameCss(preset.id, document.frameColor, preset.radius)} />
+                  <span className="mt-2 block text-[10px] font-semibold text-text-strong">{preset.name}</span>
+                  <span className="mt-0.5 block text-[9px] text-text-subtle">{preset.description}</span>
+                </button>
+              ))}
+            </div>
+            <label className="mt-4 block text-[10px] font-semibold text-text-strong">Цвет окантовки
+              <span className="mt-1.5 flex h-9 items-center gap-2 rounded-lg border border-border bg-surface px-2">
+                <input type="color" value={document.frameColor} onChange={(event) => onUpdateDocument({ frameColor: event.target.value })} className="size-6 cursor-pointer rounded border-0 bg-transparent p-0" />
+                <span className="font-mono text-[9px] text-text-muted">{document.frameColor.toUpperCase()}</span>
+              </span>
+            </label>
+          </div>
+        ) : (
         <div className="grid grid-cols-2 gap-2 lg:grid-cols-1 xl:grid-cols-2">
           {visibleItems.map((item) => {
             const Icon = item.icon;
@@ -132,8 +160,9 @@ export function BlockLibrary({
             );
           })}
         </div>
+        )}
 
-        {visibleItems.length === 0 ? <p className="py-8 text-center text-[11px] text-text-muted">Подходящих элементов нет</p> : null}
+        {tab !== "frame" && visibleItems.length === 0 ? <p className="py-8 text-center text-[11px] text-text-muted">Подходящих элементов нет</p> : null}
 
         <div className="mt-4 rounded-[11px] border border-primary/15 bg-primary-subtle/55 p-3">
           <div className="flex items-center gap-2 text-[11px] font-semibold text-primary">

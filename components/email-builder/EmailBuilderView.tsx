@@ -175,8 +175,10 @@ function isBuilderDocument(value: unknown): value is BuilderDocument {
     typeof value.bodyBackground === "string" &&
     typeof value.workspaceBackground === "string" &&
     isFiniteNumber(value.contentWidth) &&
+    (value.frameStyle === undefined || ["none", "hairline", "accent", "double", "dashed", "top-bottom", "left-band", "soft"].includes(String(value.frameStyle))) &&
+    (value.frameColor === undefined || typeof value.frameColor === "string") &&
+    (value.frameRadius === undefined || isFiniteNumber(value.frameRadius)) &&
     Array.isArray(value.blocks) &&
-    value.blocks.length > 0 &&
     value.blocks.every(isBuilderBlock)
   );
 }
@@ -367,9 +369,15 @@ export function EmailBuilderView(props: EmailBuilderViewProps) {
       : templateRecord
         ? documentFromApiTemplate(templateRecord)
         : createBlankDocument());
+  const normalizedBaseDocument: BuilderDocument = {
+    ...baseDocument,
+    frameStyle: baseDocument.frameStyle ?? "none",
+    frameColor: baseDocument.frameColor ?? baseDocument.accentColor,
+    frameRadius: baseDocument.frameRadius ?? 0,
+  };
   const metadataDocument = campaignMode && restoredState.templateId === null
-    ? { ...baseDocument, templateId: "" }
-    : baseDocument;
+    ? { ...normalizedBaseDocument, templateId: "" }
+    : normalizedBaseDocument;
   const initialDocument = campaignMode && !createNew
     ? overlayEmailDocumentMetadata(metadataDocument, {
         subject: restoredState.subject,
@@ -576,6 +584,10 @@ function EmailBuilderWorkspace({
       toast.warning("Нужно название", "Укажите понятное название шаблона.");
       return;
     }
+    if (document.blocks.length === 0) {
+      toast.warning("Холст пуст", "Добавьте хотя бы один блок перед сохранением шаблона.");
+      return;
+    }
     if (savedTemplateId && !templateRevision) {
       toast.warning("Версия шаблона неизвестна", "Перезагрузите редактор перед сохранением.");
       return;
@@ -715,8 +727,6 @@ function EmailBuilderWorkspace({
     markDirty();
   };
 
-  if (!selectedBlock) return null;
-
   return (
     <div className="overflow-hidden rounded-[14px] border border-border bg-surface shadow-[var(--shadow-sm)]">
       <BuilderTopbar
@@ -851,6 +861,8 @@ function EmailBuilderWorkspace({
       <div className="grid h-[calc(100dvh-176px)] min-h-[620px] lg:grid-cols-[210px_minmax(560px,1fr)_285px] xl:grid-cols-[220px_minmax(680px,1fr)_305px]">
         <BlockLibrary
           onAdd={addBlock}
+          document={document}
+          onUpdateDocument={updateDocument}
           className={cn(
             "min-h-0 border-r border-border",
             mobilePanel === "blocks" ? "flex" : "hidden",
@@ -860,7 +872,7 @@ function EmailBuilderWorkspace({
         <EmailCanvas
           document={document}
           previewMode={previewMode}
-          selectedBlockId={selectedBlock.id}
+          selectedBlockId={selectedBlock?.id ?? ""}
           onSelect={setSelectedBlockId}
           onMove={moveBlock}
           onDuplicate={duplicateBlock}
@@ -873,7 +885,7 @@ function EmailBuilderWorkspace({
             "lg:flex",
           )}
         />
-        <PropertiesPanel
+        {selectedBlock ? <PropertiesPanel
           block={selectedBlock}
           document={document}
           onUpdateBlock={(patch) => updateBlock(selectedBlock.id, patch)}
@@ -885,7 +897,12 @@ function EmailBuilderWorkspace({
             mobilePanel === "properties" ? "flex" : "hidden",
             "lg:flex",
           )}
-        />
+        /> : (
+          <aside aria-label="Свойства пустого холста" className={cn("min-h-0 border-l border-border bg-surface p-5", mobilePanel === "properties" ? "block" : "hidden", "lg:block")}>
+            <h2 className="m-0 text-[13px] font-semibold text-text-strong">Холст пуст</h2>
+            <p className="mt-2 text-[11px] leading-5 text-text-muted">Добавьте блок на панели слева. Окантовку всего письма можно выбрать на вкладке «Окантовки».</p>
+          </aside>
+        )}
       </div>
         </>
       )}

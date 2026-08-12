@@ -6,6 +6,7 @@ import type {
 import type { EmailBuilderDocumentInput, EmailTemplateRecord } from "@/types/api";
 import { BRAND_NAME } from "@/config/brand";
 import { emailPatternPresets } from "./pattern-presets";
+import type { EmailFrameStyle } from "./frame-presets";
 
 export type PreviewMode = "desktop" | "mobile";
 export type BuilderPanel = "blocks" | "canvas" | "properties";
@@ -37,6 +38,9 @@ export type BuilderDocument = {
   bodyBackground: string;
   workspaceBackground: string;
   contentWidth: number;
+  frameStyle: EmailFrameStyle;
+  frameColor: string;
+  frameRadius: number;
   blocks: BuilderBlock[];
 };
 
@@ -309,6 +313,9 @@ export function documentFromTemplate(template: EmailTemplate): BuilderDocument {
     bodyBackground: "#ffffff",
     workspaceBackground: template.backgroundColor,
     contentWidth: 640,
+    frameStyle: "none",
+    frameColor: template.accentColor,
+    frameRadius: 0,
     blocks: template.blocks.map(extendBlock),
   };
 }
@@ -317,19 +324,15 @@ export function documentFromApiTemplate(
   template: EmailTemplateRecord,
 ): BuilderDocument {
   return {
+    frameStyle: "none",
+    frameColor: template.builderDocument.accentColor,
+    frameRadius: 0,
     ...template.builderDocument,
     blocks: template.builderDocument.blocks.map((block) => ({ ...blockDefaults[block.type], ...block })),
   };
 }
 
 export function createBlankDocument(): BuilderDocument {
-  const blocks = [
-    createBlock("logo"),
-    createBlock("heading"),
-    createBlock("text"),
-    createBlock("button"),
-    createBlock("footer"),
-  ];
   return {
     templateId: "",
     subject: "Тема письма",
@@ -338,7 +341,10 @@ export function createBlankDocument(): BuilderDocument {
     bodyBackground: "#ffffff",
     workspaceBackground: "#f3f4f8",
     contentWidth: 640,
-    blocks,
+    frameStyle: "none",
+    frameColor: "#7c3aed",
+    frameRadius: 0,
+    blocks: [],
   } satisfies EmailBuilderDocumentInput;
 }
 

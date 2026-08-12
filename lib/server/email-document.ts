@@ -2,6 +2,7 @@ import type {
   EmailBuilderBlockInput,
   EmailBuilderDocumentInput,
 } from "@/types/api";
+import { emailFrameInlineCss, type EmailFrameStyle } from "@/components/email-builder/frame-presets";
 import { ApiRequestError } from "./api-utils";
 
 const BLOCK_TYPES = new Set<EmailBuilderBlockInput["type"]>([
@@ -80,7 +81,7 @@ export function parseEmailBuilderDocument(
   if (value === null || value === undefined) return null;
   const source = record(value);
   if (!Array.isArray(source.blocks) || source.blocks.length < 1 || source.blocks.length > 80) {
-    throw new ApiRequestError("Email-макет должен содержать от 1 до 80 блоков.");
+    throw new ApiRequestError("Перед сохранением добавьте в email-макет хотя бы один блок.");
   }
   const blocks = source.blocks.map((rawBlock, index): EmailBuilderBlockInput => {
     const block = record(rawBlock);
@@ -122,6 +123,8 @@ export function parseEmailBuilderDocument(
       buttonStyle: block.buttonStyle === "outline" || block.buttonStyle === "soft" ? block.buttonStyle : "solid",
     };
   });
+  const frameStyles = new Set<EmailFrameStyle>(["none", "hairline", "accent", "double", "dashed", "top-bottom", "left-band", "soft"]);
+  const frameStyle = frameStyles.has(source.frameStyle as EmailFrameStyle) ? source.frameStyle as EmailFrameStyle : "none";
   return {
     templateId: text(source.templateId, "ID шаблона", 160),
     subject: text(source.subject, "Тема", 300),
@@ -130,6 +133,9 @@ export function parseEmailBuilderDocument(
     bodyBackground: color(source.bodyBackground, "Фон письма"),
     workspaceBackground: color(source.workspaceBackground, "Фон рабочей области"),
     contentWidth: number(source.contentWidth, "Ширина письма", 320, 760),
+    frameStyle,
+    frameColor: source.frameColor === undefined ? color(source.accentColor, "Цвет окантовки") : color(source.frameColor, "Цвет окантовки"),
+    frameRadius: source.frameRadius === undefined ? 0 : number(source.frameRadius, "Скругление окантовки", 0, 32),
     blocks,
   };
 }
@@ -218,7 +224,8 @@ function blockHtml(block: EmailBuilderBlockInput, accent: string) {
 
 export function compileEmailDocument(document: EmailBuilderDocumentInput) {
   const blocks = document.blocks.map((block) => blockHtml(block, document.accentColor)).join("");
-  const html = `<!doctype html><html><body style="margin:0;padding:0;background:${document.workspaceBackground};"><div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(document.previewText)}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:${document.workspaceBackground};"><tr><td align="center" style="padding:24px 12px;"><table role="presentation" width="${document.contentWidth}" cellspacing="0" cellpadding="0" style="width:100%;max-width:${document.contentWidth}px;background:${document.bodyBackground};">${blocks}</table></td></tr></table></body></html>`;
+  const frameCss = emailFrameInlineCss(document.frameStyle ?? "none", document.frameColor ?? document.accentColor, document.frameRadius ?? 0);
+  const html = `<!doctype html><html><body style="margin:0;padding:0;background:${document.workspaceBackground};"><div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(document.previewText)}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:${document.workspaceBackground};"><tr><td align="center" style="padding:24px 12px;"><table role="presentation" width="${document.contentWidth}" cellspacing="0" cellpadding="0" style="width:100%;max-width:${document.contentWidth}px;background:${document.bodyBackground};${frameCss}overflow:hidden;">${blocks}</table></td></tr></table></body></html>`;
   if (html.length > 500_000) {
     throw new ApiRequestError("Скомпилированный HTML письма превышает 500 КБ.");
   }

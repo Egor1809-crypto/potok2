@@ -146,3 +146,19 @@ test("pattern gallery offers varied email-safe designs", async () => {
   assert.match(canvas, /whitespace-pre-line/);
   assert.match(compiler, /letter-spacing:\$\{tracking\}px/);
 });
+
+test("a new letter starts empty and offers full-email frame presets", async () => {
+  const [builderTypes, canvas, library, frames, compiler] = await Promise.all([
+    readFile(new URL("../components/email-builder/builder-types.ts", import.meta.url), "utf8"),
+    readFile(new URL("../components/email-builder/EmailCanvas.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/email-builder/BlockLibrary.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/email-builder/frame-presets.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/server/email-document.ts", import.meta.url), "utf8"),
+  ]);
+  assert.match(builderTypes, /blocks: \[\]/);
+  assert.match(canvas, /Пустой холст/);
+  assert.match(canvas, /Добавить первый блок/);
+  assert.match(library, />Окантовки</);
+  assert.ok((frames.match(/id: "/g) ?? []).length >= 8);
+  assert.match(compiler, /emailFrameInlineCss/);
+});

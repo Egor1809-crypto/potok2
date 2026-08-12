@@ -20,6 +20,7 @@ import type {
   PreviewMode,
 } from "./builder-types";
 import { getBlockLabel } from "./BlockLibrary";
+import { emailFrameCss } from "./frame-presets";
 
 type EmailCanvasProps = {
   document: BuilderDocument;
@@ -94,8 +95,22 @@ export function EmailCanvas({
 
           <div
             className="overflow-visible rounded-[3px] border border-black/5 shadow-[0_18px_50px_rgba(28,32,44,0.12)]"
-            style={{ backgroundColor: document.bodyBackground }}
+            style={{ backgroundColor: document.bodyBackground, ...emailFrameCss(document.frameStyle, document.frameColor, document.frameRadius) }}
           >
+            {document.blocks.length === 0 ? (
+              <div className="grid min-h-[420px] place-items-center px-8 py-14 text-center">
+                <div className="max-w-[320px]">
+                  <span className="mx-auto grid size-12 place-items-center rounded-2xl border border-dashed border-primary/40 bg-primary-subtle text-primary">
+                    <Plus aria-hidden="true" className="size-5" />
+                  </span>
+                  <strong className="mt-4 block text-[16px] text-text-strong">Пустой холст</strong>
+                  <p className="mt-2 text-[11px] leading-5 text-text-muted">Добавьте первый блок слева или откройте «Окантовки», чтобы оформить край письма.</p>
+                  <button type="button" onClick={onOpenBlocks} className="mt-4 inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-4 text-[11px] font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
+                    <Plus aria-hidden="true" className="size-3.5" />Добавить первый блок
+                  </button>
+                </div>
+              </div>
+            ) : null}
             {document.blocks.map((block, index) => (
               <CanvasBlock
                 key={block.id}
