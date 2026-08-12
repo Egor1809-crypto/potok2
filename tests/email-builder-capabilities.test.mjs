@@ -44,10 +44,10 @@ test("AI design remains a separate version until the user chooses it", async () 
   ]);
   assert.match(builder, /Собрать вручную/);
   assert.match(builder, /Создать с ИИ/);
-  assert.match(assistant, /Мой макет и вариант ИИ/);
+  assert.match(assistant, /Сравнение редакций/);
   assert.match(assistant, /Оставить мой/);
   assert.match(assistant, /Использовать вариант ИИ/);
-  assert.match(assistant, /Настройки появятся только после отправки/);
+  assert.match(assistant, /Опишите задачу, настроение, стиль и желаемые цвета/);
   assert.match(assistant, /Без файлов ИИ использует только узоры/);
   assert.match(server, /api\.openverse\.org/);
   assert.match(server, /license_type/);
@@ -61,14 +61,24 @@ test("AI brief asks follow-up questions and accepts dragged user images", async 
     readFile(new URL("../lib/server/email-ai.ts", import.meta.url), "utf8"),
   ]);
   assert.match(assistant, /Продолжить — уточнить детали/);
-  assert.match(assistant, /Как называется компания/);
-  assert.match(assistant, /Какой срок или дата/);
+  assert.match(assistant, /Ответьте на вопросы по смыслу и предложению/);
+  assert.match(assistant, /Цвета повторно не спрашиваем/);
   assert.match(assistant, /Перетащите изображение сюда/);
   assert.match(assistant, /imageSource: "none"/);
   assert.match(assistant, /prepareImageFile/);
   assert.match(assistant, /createImageBitmap/);
-  assert.match(server, /декоративные pattern/);
+  assert.match(server, /выразительных приёма/);
   assert.match(server, /availableAssets/);
+  assert.match(server, /Не спрашивай цвета/);
+  assert.match(server, /Каждый ответ из briefAnswers обязан повлиять/);
+  assert.match(server, /visibleBlockContent/);
+  assert.match(server, /creativeBlockStyle/);
+  assert.match(server, /artDirection/);
+  assert.match(server, /contentStrategy/);
+  assert.match(assistant, /Сравнение редакций/);
+  assert.match(assistant, /Контекст, который передан ИИ/);
+  assert.doesNotMatch(assistant, /Основной цвет/);
+  assert.doesNotMatch(assistant, /Фоновый цвет/);
 });
 
 test("manual controls and export are wired to live updates without popup PDF", async () => {
@@ -90,6 +100,8 @@ test("starter edits become personal templates and uploads work in every manual e
     readFile(new URL("../lib/server/template-store.ts", import.meta.url), "utf8"),
   ]);
   assert.match(builder, /Сохранить в мои шаблоны/);
+  assert.match(builder, /Сохраните результат как рабочий шаблон/);
+  assert.match(builder, /Текущий дизайн, текст, логотипы и фотографии появятся/);
   assert.match(builder, /editingStarter \? null/);
   assert.match(library, /Мои шаблоны/);
   assert.match(library, /!template\.isStarter/);

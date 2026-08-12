@@ -253,6 +253,7 @@ export type EmailAiRequest = {
   visualStyle?: "minimal" | "editorial" | "bold" | "premium";
   imageSource?: "internet" | "generate" | "none";
   availableAssets?: Array<Pick<EmailAssetRecord, "id" | "filename" | "kind" | "url">>;
+  briefAnswers?: Array<{ question: string; answer: string }>;
 };
 
 export type EmailAiSuggestion = {
@@ -263,6 +264,8 @@ export type EmailAiSuggestion = {
   document?: EmailBuilderDocumentInput;
   imagePrompts?: Array<{ blockId: string; prompt: string; alt: string; kind: "photo" | "logo" }>;
   questions?: Array<{ id: string; question: string; placeholder: string; required: boolean }>;
+  artDirection?: string;
+  contentStrategy?: string;
 };
 
 export type EmailExportResponse = {

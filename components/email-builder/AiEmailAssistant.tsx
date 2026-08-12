@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Check, ImagePlus, LoaderCircle, Sparkles, Upload, WandSparkles } from "lucide-react";
 
-import { Button, FormField, Input, Modal, Select, Textarea } from "@/components/ui";
+import { Badge, Button, FormField, Input, Modal, Select, Textarea } from "@/components/ui";
 import type { ApiError, EmailAiResponse, EmailAiSuggestion, EmailAssetMutationResponse, EmailAssetRecord } from "@/types/api";
 import type { BuilderDocument } from "./builder-types";
 
@@ -15,13 +15,6 @@ export function AiEmailAssistant({ document, onApply }: { document: BuilderDocum
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [provider, setProvider] = useState<EmailAiResponse["provider"]>();
   const [goal, setGoal] = useState("");
-  const [brandName, setBrandName] = useState("");
-  const [deadline, setDeadline] = useState("");
-  const [audience, setAudience] = useState("");
-  const [visualStyle, setVisualStyle] = useState("minimal");
-  const [primaryColor, setPrimaryColor] = useState(document.accentColor);
-  const [secondaryColor, setSecondaryColor] = useState(document.workspaceBackground);
-  const [websiteUrl, setWebsiteUrl] = useState("");
   const [useLinkedContext, setUseLinkedContext] = useState(true);
   const [questions, setQuestions] = useState<Array<{ id: string; question: string; placeholder: string; required: boolean }>>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -75,6 +68,7 @@ export function AiEmailAssistant({ document, onApply }: { document: BuilderDocum
       const body = await response.json() as EmailAiResponse | ApiError;
       if (!response.ok || !("suggestion" in body)) throw new Error("error" in body ? body.error : "Не удалось подготовить вопросы.");
       setQuestions(body.suggestion?.questions ?? []);
+      setAnswers({});
       setStage("questions");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Не удалось подготовить вопросы.");
@@ -90,17 +84,13 @@ export function AiEmailAssistant({ document, onApply }: { document: BuilderDocum
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
           action: "design",
-          goal: `${useLinkedContext ? goal : goal.replace(/https:\/\/[^\s]+/g, "")}\n${deadline ? `Срок или дата: ${deadline}.` : ""}\n${questions.map((question) => `${question.question}: ${answers[question.id] ?? ""}`).join("\n")}`,
-          audience,
+          goal: useLinkedContext ? goal : goal.replace(/https:\/\/[^\s]+/g, ""),
           tone: "expert",
-          visualStyle,
-          primaryColor,
-          secondaryColor,
-          websiteUrl: websiteUrl.trim() || undefined,
-          brandName: brandName.trim() || undefined,
+          websiteUrl: [...goal.matchAll(/https:\/\/[^\s]+/g)].map((item) => item[0])[0],
           includeLogo: assets.some((asset) => asset.kind === "logo"),
           imageSource: "none",
           availableAssets: assets.map(({ id, filename, kind, url }) => ({ id, filename, kind, url })),
+          briefAnswers: questions.map((question) => ({ question: question.question, answer: answers[question.id]?.trim() ?? "" })).filter((item) => item.answer),
         }),
       });
       const body = await response.json() as EmailAiResponse | ApiError;
@@ -118,21 +108,25 @@ export function AiEmailAssistant({ document, onApply }: { document: BuilderDocum
 
   return (
     <section className="mx-auto grid w-full max-w-4xl gap-6 p-5 sm:p-8">
-      <Modal open={comparisonOpen} onOpenChange={setComparisonOpen} title="Мой макет и вариант ИИ" description="ИИ подготовил отдельную версию. Текущий макет не изменится без подтверждения." size="xl" footer={<><Button variant="ghost" onClick={() => setComparisonOpen(false)}>Оставить мой</Button><Button variant="primary" disabled={!suggestion?.document} onClick={() => { if (suggestion?.document) onApply(suggestion.document as BuilderDocument); setComparisonOpen(false); }}>Использовать вариант ИИ</Button></>}>
-        <div className="mb-4 grid grid-cols-2 gap-3"><Metric label="Текущий макет" value={`${document.blocks.length} блоков`} /><Metric label="Вариант ИИ" value={`${suggestion?.document?.blocks.length ?? 0} блоков · новая структура`} accent /></div>
+      <Modal open={comparisonOpen} onOpenChange={setComparisonOpen} title="Сравнение редакций" description="Сравните не число блоков, а композицию, визуальную систему и смысл письма. Ваш макет не изменится без подтверждения." size="xl" footer={<><Button variant="ghost" onClick={() => setComparisonOpen(false)}>Оставить мой</Button><Button variant="primary" disabled={!suggestion?.document} onClick={() => { if (suggestion?.document) onApply(suggestion.document as BuilderDocument); setComparisonOpen(false); }}>Использовать вариант ИИ</Button></>}>
+        <div className="mb-4 grid gap-3 lg:grid-cols-2">
+          <DesignReport title="Моя редакция" document={document} />
+          <DesignReport title="Редакция ИИ" document={suggestion?.document as BuilderDocument | undefined} accent artDirection={suggestion?.artDirection} strategy={suggestion?.contentStrategy} />
+        </div>
+        {questions.some((question) => answers[question.id]?.trim()) ? <div className="mb-4 rounded-xl border border-border bg-surface-subtle p-3"><strong className="text-[11px] text-text-strong">Контекст, который передан ИИ</strong><div className="mt-2 flex flex-wrap gap-1.5">{questions.filter((question) => answers[question.id]?.trim()).map((question) => <Badge key={question.id} variant="neutral" title={question.question}>{answers[question.id]}</Badge>)}</div></div> : null}
         <div className="grid gap-4 md:grid-cols-2"><EmailPreview label="Мой макет" html={previewHtml?.current} /><EmailPreview label="Вариант ИИ" html={previewHtml?.ai} accent /></div>
       </Modal>
 
       <header className="text-center">
         <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-primary text-white shadow-lg"><Sparkles aria-hidden="true" className="size-5" /></span>
         <h2 className="mt-4 text-[28px] font-semibold tracking-[-0.04em] text-text-strong">{stage === "prompt" ? "Что нужно создать?" : "Уточним детали"}</h2>
-        <p className="mx-auto mt-2 max-w-2xl text-[13px] leading-6 text-text-muted">{stage === "prompt" ? "Сначала опишите идею своими словами. Настройки появятся только после отправки." : "Ответьте на короткие вопросы. Если изображения не загрузить, письмо будет оформлено цветами, типографикой и узорами."}</p>
+        <p className="mx-auto mt-2 max-w-2xl text-[13px] leading-6 text-text-muted">{stage === "prompt" ? "Опишите задачу, настроение, стиль и желаемые цвета прямо здесь. Чем конкретнее исходное описание, тем точнее арт-направление." : "Ответьте на вопросы по смыслу и предложению. Цвета повторно не спрашиваем — ИИ берёт их только из исходного описания."}</p>
         <span className="mt-3 inline-flex rounded-full border border-border bg-surface px-3 py-1 text-[10px] font-medium text-text-muted">{configured === null ? "Проверяем подключение" : configured ? `${provider === "navyai" ? "NavyAI" : "OpenAI"} подключён` : "ИИ не подключён"}</span>
       </header>
 
       {stage === "prompt" ? (
         <div className="card grid gap-4 p-5 sm:p-7">
-          <div className="relative"><Textarea rows={9} maxLength={2000} value={goal} onChange={(event) => setGoal(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && promptSuggestion) { event.preventDefault(); setGoal((value) => `${value}${promptSuggestion}`); } }} placeholder="Например: сделай премиальное приглашение на конференцию для юристов. Добавьте ссылку — ИИ изучит страницу." className="resize-y pb-11 text-[14px] leading-6" />{promptSuggestion ? <p className="pointer-events-none absolute bottom-3 left-3 right-3 m-0 truncate text-[11px] text-text-subtle"><span className="rounded bg-surface-subtle px-1.5 py-1">Enter</span> добавить: <span className="text-text-muted">{promptSuggestion.trim()}</span></p> : null}</div>
+          <div className="relative"><Textarea rows={9} maxLength={2000} value={goal} onChange={(event) => setGoal(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && promptSuggestion) { event.preventDefault(); setGoal((value) => `${value}${promptSuggestion}`); } }} placeholder="Например: премиальное приглашение на конференцию для юристов. Тёмный графитовый фон, изумрудные акценты, тонкие геометрические линии, без фотографий. Цель — регистрация до 20 сентября…" className="resize-y pb-11 text-[14px] leading-6" />{promptSuggestion ? <p className="pointer-events-none absolute bottom-3 left-3 right-3 m-0 truncate text-[11px] text-text-subtle"><span className="rounded bg-surface-subtle px-1.5 py-1">Enter</span> добавить: <span className="text-text-muted">{promptSuggestion.trim()}</span></p> : null}</div>
           {detectedUrl ? <div className="flex items-center gap-2 rounded-xl border border-primary/20 bg-primary-subtle/40 px-3 py-2.5 text-[11px]"><input id="ai-use-linked-context" type="checkbox" checked={useLinkedContext} onChange={(event) => setUseLinkedContext(event.target.checked)} className="accent-primary" /><label htmlFor="ai-use-linked-context" className="min-w-0"><strong className="block">Изучить страницу по ссылке</strong><span className="block truncate text-text-muted">{detectedUrl}</span></label></div> : null}
           <Button type="button" variant="primary" size="lg" disabled={busy || goal.trim().length < 8} onClick={() => void prepareQuestions()}>{busy ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : <Sparkles aria-hidden="true" className="size-4" />}{busy ? "Анализируем задачу…" : "Продолжить — уточнить детали"}</Button>
         </div>
@@ -141,13 +135,6 @@ export function AiEmailAssistant({ document, onApply }: { document: BuilderDocum
           <nav className="flex flex-wrap items-center gap-2 text-[10px] font-semibold text-text-muted"><span className="rounded-full bg-primary px-2.5 py-1 text-white">1 · Идея</span><span>→</span><span className="rounded-full bg-primary px-2.5 py-1 text-white">2 · Уточнения</span><span>→</span><span className="rounded-full bg-surface-subtle px-2.5 py-1">3 · Вариант</span>{detectedUrl ? <span className="ml-auto inline-flex items-center gap-1 text-success"><Check className="size-3" />{useLinkedContext ? "Ссылка учитывается" : "Ссылка не учитывается"}</span> : null}</nav>
           <div className="grid gap-4 md:grid-cols-2">
             {questions.map((question) => <FormField key={question.id} label={question.question}><Input required={question.required} value={answers[question.id] ?? ""} onChange={(event) => setAnswers((current) => ({ ...current, [question.id]: event.target.value }))} placeholder={question.placeholder} /></FormField>)}
-            <FormField label="Как называется компания?"><Input value={brandName} onChange={(event) => setBrandName(event.target.value)} placeholder="Tech‑Pravo" /></FormField>
-            <FormField label="Какой срок или дата?"><Input value={deadline} onChange={(event) => setDeadline(event.target.value)} placeholder="До 20 сентября или без срока" /></FormField>
-            <FormField label="Для кого письмо?"><Input value={audience} onChange={(event) => setAudience(event.target.value)} placeholder="Руководители юридических компаний" /></FormField>
-            <FormField label="Какой стиль?"><Select value={visualStyle} onChange={(event) => setVisualStyle(event.target.value)} options={[{value:"minimal",label:"Чистый и минималистичный"},{value:"editorial",label:"Редакционный"},{value:"bold",label:"Яркий"},{value:"premium",label:"Премиальный"}]} /></FormField>
-            <ColorInput label="Основной цвет" value={primaryColor} onChange={setPrimaryColor} />
-            <ColorInput label="Фоновый цвет" value={secondaryColor} onChange={setSecondaryColor} />
-            <FormField label="Куда ведёт кнопка?"><Input type="url" value={websiteUrl} onChange={(event) => setWebsiteUrl(event.target.value)} placeholder="https://tech-pravo.ru/" /></FormField>
           </div>
 
           <div>
@@ -160,19 +147,22 @@ export function AiEmailAssistant({ document, onApply }: { document: BuilderDocum
           </div>
 
           {error ? <p role="alert" className="m-0 rounded-xl bg-danger-subtle px-4 py-3 text-[12px] text-danger">{error}</p> : null}
-          <div className="flex flex-wrap gap-2"><Button type="button" variant="ghost" onClick={() => setStage("prompt")}><ArrowLeft aria-hidden="true" className="size-4" />Изменить описание</Button><Button type="button" variant="primary" size="lg" className="min-w-52 flex-1" disabled={busy || uploading || !brandName.trim() || !audience.trim()} onClick={() => void generate()}>{busy ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : <WandSparkles aria-hidden="true" className="size-4" />}{busy ? "ИИ собирает письмо…" : "Создать вариант письма"}</Button></div>
+          <div className="flex flex-wrap gap-2"><Button type="button" variant="ghost" onClick={() => setStage("prompt")}><ArrowLeft aria-hidden="true" className="size-4" />Изменить описание</Button><Button type="button" variant="primary" size="lg" className="min-w-52 flex-1" disabled={busy || uploading || questions.some((question) => question.required && !answers[question.id]?.trim())} onClick={() => void generate()}>{busy ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : <WandSparkles aria-hidden="true" className="size-4" />}{busy ? "ИИ проектирует письмо…" : "Создать дизайнерскую редакцию"}</Button></div>
         </div>
       )}
     </section>
   );
 }
 
-function ColorInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return <FormField label={label}><label className="flex h-10 items-center gap-3 rounded-lg border border-border bg-surface px-3"><input type="color" value={value} onChange={(event) => onChange(event.target.value)} className="size-6 cursor-pointer border-0 bg-transparent" /><span className="font-mono text-[11px] uppercase text-text-muted">{value}</span></label></FormField>;
+function DesignReport({ title, document, accent = false, artDirection, strategy }: { title: string; document?: BuilderDocument; accent?: boolean; artDirection?: string; strategy?: string }) {
+  const expressive = document?.blocks.filter((block) => ["hero", "banner", "pattern", "quote", "columns", "stats", "coupon"].includes(block.type)).map((block) => block.type) ?? [];
+  const actions = document?.blocks.filter((block) => block.type === "button").length ?? 0;
+  const personalized = new Set(document?.blocks.flatMap((block) => block.content.match(/{{[^}]+}}/g) ?? []) ?? []).size;
+  return <section className={`rounded-xl border p-4 ${accent ? "border-primary/30 bg-primary-subtle/30" : "border-border bg-surface-subtle"}`}><div className="flex items-center justify-between gap-3"><strong className="text-[13px] text-text-strong">{title}</strong><div className="flex gap-1"><span className="size-4 rounded-full border border-black/10" style={{backgroundColor:document?.accentColor}} /><span className="size-4 rounded-full border border-black/10" style={{backgroundColor:document?.bodyBackground}} /><span className="size-4 rounded-full border border-black/10" style={{backgroundColor:document?.workspaceBackground}} /></div></div><p className="mb-0 mt-2 text-[10px] leading-4 text-text-muted">{artDirection ?? (expressive.length ? `Композиция: ${[...new Set(expressive)].join(", ")}` : "Базовая линейная композиция без выраженного арт-направления.")}</p>{strategy ? <p className="mb-0 mt-1 text-[10px] leading-4 text-text-muted">{strategy}</p> : null}<div className="mt-3 grid grid-cols-3 gap-2 text-center"><MetricValue label="Акценты" value={String(new Set(expressive).size)} /><MetricValue label="Действия" value={String(actions)} /><MetricValue label="Персонализация" value={String(personalized)} /></div><p className="mb-0 mt-3 line-clamp-2 text-[10px] font-medium text-text-strong">{document?.subject ?? "Версия не готова"}</p></section>;
 }
 
-function Metric({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
-  return <div className={`rounded-xl border p-3 ${accent ? "border-primary/30 bg-primary-subtle/35" : "border-border bg-surface-subtle"}`}><span className="block text-[9px] uppercase tracking-wider text-text-subtle">{label}</span><strong className="mt-1 block text-[12px] text-text-strong">{value}</strong></div>;
+function MetricValue({ label, value }: { label: string; value: string }) {
+  return <span className="rounded-lg border border-border/70 bg-surface/70 px-2 py-1.5"><strong className="block text-[12px] text-text-strong">{value}</strong><span className="text-[8px] uppercase tracking-wide text-text-subtle">{label}</span></span>;
 }
 
 function EmailPreview({ label, html, accent = false }: { label: string; html?: string; accent?: boolean }) {

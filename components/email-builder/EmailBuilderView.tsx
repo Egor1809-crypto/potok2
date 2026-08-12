@@ -10,7 +10,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import Link from "next/link";
-import { Blocks, PenTool, SlidersHorizontal, Sparkles, SquareDashedMousePointer } from "lucide-react";
+import { Blocks, Library, PenTool, Save, SlidersHorizontal, Sparkles, SquareDashedMousePointer } from "lucide-react";
 
 import type { EmailBlockType, TemplateCategory } from "@/types";
 import type {
@@ -20,6 +20,7 @@ import type {
 } from "@/types/api";
 import {
   Alert,
+  Button,
   FormField,
   Input,
   Select,
@@ -771,6 +772,25 @@ function EmailBuilderWorkspace({
               placeholder="Для какой задачи подходит этот макет"
             />
           </FormField>
+          </div>
+        </div>
+      ) : null}
+
+      {mode === "template" && creationMode === "manual" ? (
+        <div className="flex flex-col gap-3 border-b border-primary/15 bg-primary-subtle/35 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <strong className="block text-[12px] text-text-strong">Сохраните результат как рабочий шаблон</strong>
+            <span className="mt-0.5 block text-[10px] leading-4 text-text-muted">Текущий дизайн, текст, логотипы и фотографии появятся в разделе «Мои шаблоны».</span>
+          </div>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <Link href="/templates?scope=mine" onClick={continueFromEditor} className={buttonVariants({ variant: "secondary", size: "sm" })}>
+              <Library aria-hidden="true" className="size-3.5" />
+              Мои шаблоны
+            </Link>
+            <Button type="button" variant="primary" size="md" loading={savingTemplate} loadingText="Сохраняем…" onClick={save}>
+              <Save aria-hidden="true" className="size-4" />
+              {savedTemplateId ? "Сохранить изменения" : "Сохранить в «Мои шаблоны»"}
+            </Button>
           </div>
         </div>
       ) : null}
