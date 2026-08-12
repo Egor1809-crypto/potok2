@@ -9,13 +9,13 @@ export function MarketingHeader() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 border-b border-black/[0.055] bg-white/85 backdrop-blur-xl">
+    <header className="fixed inset-x-0 top-0 z-50 border-b border-border bg-surface/85 backdrop-blur-xl">
       <div className="container-shell flex h-[72px] items-center justify-between">
         <Link href="/" className="group flex items-center gap-2.5" aria-label={`${BRAND_NAME}: главная`}>
-          <span className="grid size-8 place-items-center rounded-[9px] bg-[#625cf6] text-[13px] font-semibold text-white shadow-[0_6px_18px_rgba(98,92,246,.25)] transition-transform group-hover:-rotate-3">
+          <span className="grid size-8 place-items-center rounded-[9px] bg-primary text-[13px] font-semibold text-white shadow-[0_6px_18px_rgba(124,53,242,.25)] transition-transform group-hover:-rotate-3">
             M
           </span>
-          <span className="text-[15px] font-semibold tracking-[.12em] text-[#171825]">{BRAND_NAME}</span>
+          <span className="text-[15px] font-semibold tracking-[.12em] text-text-strong">{BRAND_NAME}</span>
         </Link>
 
         <nav className="hidden items-center gap-6 xl:flex" aria-label="Главная навигация">
@@ -26,7 +26,7 @@ export function MarketingHeader() {
             ["Шаблоны", "#templates"],
             ["Начать", "#start"],
           ].map(([label, href]) => (
-            <a key={label} href={href} className="text-sm font-medium text-[#626474] transition-colors hover:text-[#171825]">
+            <a key={label} href={href} className="text-sm font-medium text-text-muted transition-colors hover:text-text-strong">
               {label}
             </a>
           ))}
@@ -49,7 +49,7 @@ export function MarketingHeader() {
       </div>
 
       {open && (
-        <div className="border-t border-black/[0.06] bg-white px-5 py-5 xl:hidden">
+        <div className="border-t border-border bg-surface px-5 py-5 xl:hidden">
           <nav className="mx-auto flex max-w-xl flex-col gap-1" aria-label="Мобильная навигация">
             {[
               ["Продукт", "#product"],
@@ -58,7 +58,7 @@ export function MarketingHeader() {
               ["Шаблоны", "#templates"],
               ["Начать", "#start"],
             ].map(([label, href]) => (
-              <a key={label} href={href} onClick={() => setOpen(false)} className="rounded-lg px-3 py-3 text-sm font-medium text-[#454754] hover:bg-[#f4f5f8]">
+              <a key={label} href={href} onClick={() => setOpen(false)} className="rounded-lg px-3 py-3 text-sm font-medium text-text hover:bg-surface-subtle">
                 {label}
               </a>
             ))}

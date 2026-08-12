@@ -132,7 +132,7 @@ export function SegmentEditor({
 
   const [name, setName] = useState(segment?.name ?? "");
   const [description, setDescription] = useState(segment?.description ?? "");
-  const [color, setColor] = useState(segment?.color ?? "#625cf6");
+  const [color, setColor] = useState(segment?.color ?? "#7c35f2");
   const [rules, setRules] = useState<RuleDraft[]>(() =>
     segment?.rules.length ? segment.rules.map(ruleToDraft) : [makeRule()],
   );
@@ -352,7 +352,7 @@ export function SegmentEditor({
                     >
                       <div className="mb-2 flex items-center justify-between gap-2">
                         {index === 0 ? (
-                          <span className="text-[9px] font-semibold uppercase tracking-[.08em] text-[#625cf6]">
+                          <span className="text-[9px] font-semibold uppercase tracking-[.08em] text-primary">
                             Где
                           </span>
                         ) : (

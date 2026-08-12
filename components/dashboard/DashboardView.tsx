@@ -188,12 +188,12 @@ export function DashboardView() {
 }
 
 function getNextAction(snapshot: WorkspaceSnapshot) {
-  if (snapshot.stats.totalContacts === 0) return { title: "Добавьте первые контакты", description: "Импортируйте CSV или создайте контакт вручную. Без аудитории запуск невозможен.", action: "Добавить контакты", href: "/contacts", Icon: ContactRound, tone: "border-[#d9e7f5] bg-[#f3f8fd]" };
-  if (snapshot.stats.connectedIntegrations === 0) return { title: "Подключите канал доставки", description: "Выберите email, Telegram или ВКонтакте и завершите настройку провайдера.", action: "Настроить канал", href: "/integrations", Icon: Cable, tone: "border-[#eadfbd] bg-[#fff9eb]" };
+  if (snapshot.stats.totalContacts === 0) return { title: "Добавьте первые контакты", description: "Импортируйте CSV или создайте контакт вручную. Без аудитории запуск невозможен.", action: "Добавить контакты", href: "/contacts", Icon: ContactRound, tone: "border-primary/20 bg-primary-subtle/55" };
+  if (snapshot.stats.connectedIntegrations === 0) return { title: "Подключите канал доставки", description: "Выберите email, Telegram или ВКонтакте и завершите настройку провайдера.", action: "Настроить канал", href: "/integrations", Icon: Cable, tone: "border-primary/20 bg-primary-subtle/55" };
   const blocked = snapshot.campaigns.find((campaign) => campaign.status === "blocked");
   if (blocked) return { title: `Исправьте кампанию «${blocked.name}»`, description: blocked.statusReason || "Кампания не прошла проверку готовности.", action: "Открыть кампанию", href: `/campaigns/${blocked.id}`, Icon: CircleAlert, tone: "border-[#f0d8dc] bg-[#fff5f6]" };
   const draft = snapshot.campaigns.find((campaign) => campaign.status === "draft");
-  if (draft) return { title: `Продолжите «${draft.name}»`, description: "Аудитория и черновик уже сохранены. Завершите каналы и проверку.", action: "Продолжить", href: `/campaigns/${draft.id}`, Icon: FileText, tone: "border-[#dedcff] bg-[#f6f5ff]" };
+  if (draft) return { title: `Продолжите «${draft.name}»`, description: "Аудитория и черновик уже сохранены. Завершите каналы и проверку.", action: "Продолжить", href: `/campaigns/${draft.id}`, Icon: FileText, tone: "border-primary/20 bg-primary-subtle/55" };
   return { title: "Создайте следующую кампанию", description: "Контакты и канал готовы. Выберите аудиторию, сообщение и проверьте маршрут доставки.", action: "Создать кампанию", href: "/campaigns/new", Icon: Send, tone: "border-[#d9eadf] bg-[#f2faf5]" };
 }
 

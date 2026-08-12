@@ -295,7 +295,7 @@ export function SegmentsView() {
           </div>
         ) : visibleSegments.length === 0 ? (
           <div className="flex min-h-52 flex-col items-center justify-center p-8 text-center">
-            <span className="grid size-11 place-items-center rounded-xl bg-[#eeedff] text-[#625cf6]">
+            <span className="grid size-11 place-items-center rounded-xl bg-primary-subtle text-primary">
               <UsersRound size={19} />
             </span>
             <p className="mt-3 text-sm font-semibold">

@@ -345,7 +345,7 @@ export function ImportWizard() {
               aria-current={index === step ? "step" : undefined}
               className={`flex items-center gap-2 rounded-lg px-2 py-2 text-[9px] font-semibold sm:px-3 sm:text-[10px] ${
                 index === step
-                  ? "bg-[#eeedff] text-[#5149d8]"
+                  ? "bg-primary-subtle text-primary"
                   : index < step
                     ? "text-[#3f805b]"
                     : "text-[var(--text-tertiary)]"
@@ -356,7 +356,7 @@ export function ImportWizard() {
                   index < step
                     ? "border-[#59a676] bg-[#59a676] text-white"
                     : index === step
-                      ? "border-[#625cf6] bg-white text-[#625cf6]"
+                      ? "border-primary bg-surface text-primary"
                       : "border-[var(--border-strong)] bg-white"
                 }`}
               >
@@ -383,8 +383,8 @@ export function ImportWizard() {
           <label
             className={`mx-auto mt-6 flex max-w-[760px] cursor-pointer flex-col items-center rounded-2xl border border-dashed px-6 py-10 text-center transition-colors ${
               reading
-                ? "cursor-wait border-[#aaa6ed] bg-[#f8f7ff]"
-                : "border-[#cfd0db] bg-[#fafafd] hover:border-[#8a84f8] hover:bg-[#f8f7ff]"
+                ? "cursor-wait border-primary/50 bg-primary-subtle/45"
+                : "border-border-strong bg-surface hover:border-primary/60 hover:bg-primary-subtle/35"
             }`}
             onDragOver={(event) => event.preventDefault()}
             onDrop={(event) => {
@@ -404,7 +404,7 @@ export function ImportWizard() {
                 if (selectedFile) void chooseFile(selectedFile);
               }}
             />
-            <span className="grid size-12 place-items-center rounded-2xl bg-[#eeedff] text-[#625cf6]">
+            <span className="grid size-12 place-items-center rounded-2xl bg-primary-subtle text-primary">
               {reading ? (
                 <Loader2 size={21} className="animate-spin" />
               ) : (
@@ -663,7 +663,7 @@ export function ImportWizard() {
                       setEmailConsentConfirmed(event.target.checked);
                       setImportRun(emptyImportRun);
                     }}
-                    className="mt-0.5 size-4 shrink-0 accent-[#625cf6]"
+                    className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]"
                   />
                   <span>
                     <label
@@ -715,7 +715,7 @@ export function ImportWizard() {
                   ? "bg-[#eaf8ef] text-[#3f805b]"
                   : importRun.status === "error"
                     ? "bg-[#fff0ed] text-[#a94b43]"
-                    : "bg-[#eeedff] text-[#625cf6]"
+                    : "bg-primary-subtle text-primary"
               }`}
             >
               {importRun.status === "importing" ? (
@@ -756,7 +756,7 @@ export function ImportWizard() {
             >
               <div
                 className={`h-full rounded-full transition-[width] ${
-                  importRun.status === "error" ? "bg-[#cf6658]" : "bg-[#625cf6]"
+                  importRun.status === "error" ? "bg-[#cf6658]" : "bg-primary"
                 }`}
                 style={{ width: `${importProgress}%` }}
               />

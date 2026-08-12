@@ -22,7 +22,7 @@ const allData = [
 ];
 
 const metrics = [
-  { key: "sent", label: "Отправлено", color: "#625cf6" },
+  { key: "sent", label: "Отправлено", color: "#7c35f2" },
   { key: "opened", label: "Открыто", color: "#33a3d6" },
   { key: "clicked", label: "Переходы", color: "#45a36c" },
 ] as const;
@@ -47,14 +47,14 @@ export function PerformanceChart({ compact = false }: { compact?: boolean }) {
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 8, right: 6, left: -18, bottom: 0 }}>
             <defs>
-              <linearGradient id="mailflowSent" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#625cf6" stopOpacity={0.18}/><stop offset="100%" stopColor="#625cf6" stopOpacity={0}/></linearGradient>
+              <linearGradient id="mailflowSent" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#7c35f2" stopOpacity={0.18}/><stop offset="100%" stopColor="#7c35f2" stopOpacity={0}/></linearGradient>
               <linearGradient id="mailflowOpened" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#33a3d6" stopOpacity={0.13}/><stop offset="100%" stopColor="#33a3d6" stopOpacity={0}/></linearGradient>
             </defs>
-            <CartesianGrid vertical={false} stroke="#ececf1" strokeDasharray="3 3" />
+            <CartesianGrid vertical={false} stroke="#e7d8e5" strokeDasharray="3 3" />
             <XAxis dataKey="day" axisLine={false} tickLine={false} minTickGap={32} tick={{ fontSize: 9, fill: "#999ba7" }} dy={10} />
             <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: "#999ba7" }} tickFormatter={(value) => `${Math.round(value / 1000)} тыс.`} />
             <Tooltip formatter={(value) => new Intl.NumberFormat("ru-RU").format(Number(value))} contentStyle={{ borderRadius: 10, border: "1px solid #e2e3e9", boxShadow: "0 12px 30px rgba(29,30,45,.12)", fontSize: 11 }} labelStyle={{ color: "#777986", marginBottom: 4 }} />
-            {visible.includes("sent") && <Area name="Отправлено" type="monotone" dataKey="sent" stroke="#625cf6" strokeWidth={2} fill="url(#mailflowSent)" dot={false} activeDot={{ r: 4, strokeWidth: 2, fill: "white" }} />}
+            {visible.includes("sent") && <Area name="Отправлено" type="monotone" dataKey="sent" stroke="#7c35f2" strokeWidth={2} fill="url(#mailflowSent)" dot={false} activeDot={{ r: 4, strokeWidth: 2, fill: "#fffaf3" }} />}
             {visible.includes("opened") && <Area name="Открыто" type="monotone" dataKey="opened" stroke="#33a3d6" strokeWidth={2} fill="url(#mailflowOpened)" dot={false} activeDot={{ r: 4, strokeWidth: 2, fill: "white" }} />}
             {visible.includes("clicked") && <Area name="Переходы" type="monotone" dataKey="clicked" stroke="#45a36c" strokeWidth={2} fill="transparent" dot={false} activeDot={{ r: 4, strokeWidth: 2, fill: "white" }} />}
           </AreaChart>

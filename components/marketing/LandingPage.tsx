@@ -37,17 +37,17 @@ const footerGroups = [
 
 export function LandingPage() {
   return (
-    <main className="min-h-screen overflow-hidden bg-white text-[#181923]">
+    <main className="mailflow-marketing min-h-screen overflow-hidden bg-background text-text-strong">
       <MarketingHeader />
       <section className="relative pb-20 pt-36 sm:pb-28 sm:pt-44">
-        <div className="pointer-events-none absolute left-1/2 top-10 h-[560px] w-[900px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(107,99,255,.10),transparent_68%)]" />
+        <div className="pointer-events-none absolute left-1/2 top-10 h-[560px] w-[900px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(124,53,242,.12),transparent_68%)]" />
         <div className="container-shell relative text-center">
-          <div className="mx-auto mb-7 flex w-fit items-center gap-2 rounded-full border border-[#deddf8] bg-[#f7f6ff] px-3 py-1.5 text-[11px] font-semibold text-[#5c56d7] shadow-sm">
-            <span className="size-1.5 rounded-full bg-[#6b64f7] shadow-[0_0_0_3px_rgba(107,100,247,.14)]" />
+          <div className="mx-auto mb-7 flex w-fit items-center gap-2 rounded-full border border-border bg-primary-subtle px-3 py-1.5 text-[11px] font-semibold text-primary shadow-sm">
+            <span className="size-1.5 rounded-full bg-primary shadow-[0_0_0_3px_rgba(124,53,242,.14)]" />
             Спокойный порядок в каждой коммуникации
           </div>
-          <h1 className="mx-auto max-w-[930px] text-[clamp(3.4rem,8.2vw,7.3rem)] font-medium leading-[.91] tracking-[-.065em] text-[#181923]">
-            Деловые рассылки.<br /><span className="text-[#625cf6]">Во всех нужных каналах.</span>
+          <h1 className="mx-auto max-w-[930px] text-[clamp(3.4rem,8.2vw,7.3rem)] font-medium leading-[.91] tracking-[-.065em] text-text-strong">
+            Деловые рассылки.<br /><span className="text-primary">Во всех нужных каналах.</span>
           </h1>
           <p className="mx-auto mt-8 max-w-[650px] text-[17px] leading-7 text-[#686a78] sm:text-[19px] sm:leading-8">
             Храните контакты и запускайте персональные кампании по email, в Telegram и ВКонтакте — через VK WorkSpace и подключённые сервисы.
@@ -61,7 +61,7 @@ export function LandingPage() {
         <ProductPreview />
       </section>
 
-      <section className="border-y border-[#ececf1] bg-[#fbfbfc] py-10">
+      <section className="border-y border-border bg-surface-subtle/55 py-10">
         <div className="container-shell">
           <p className="text-center text-[11px] font-medium uppercase tracking-[.14em] text-[#9698a5]">Для специалистов, которые работают с большой аудиторией</p>
           <div className="mt-7 grid grid-cols-2 items-center gap-x-8 gap-y-7 text-center sm:grid-cols-3 lg:grid-cols-6">
@@ -86,9 +86,9 @@ export function LandingPage() {
         </div>
       </section>
 
-      <footer className="border-t border-[#e9eaf0] bg-[#fbfbfc]">
+      <footer className="border-t border-border bg-surface-subtle/55">
         <div className="container-shell grid gap-10 py-12 sm:grid-cols-[1.5fr_repeat(3,1fr)]">
-          <div><Link href="/" className="flex items-center gap-2.5"><span className="grid size-8 place-items-center rounded-[9px] bg-[#625cf6] text-[13px] font-semibold text-white">M</span><span className="text-[14px] font-semibold tracking-[.12em]">{BRAND_NAME}</span></Link><p className="mt-4 max-w-xs text-[12px] leading-5 text-[#858793]">Единое пространство для контактов, кампаний и всех диалогов между ними.</p></div>
+          <div><Link href="/" className="flex items-center gap-2.5"><span className="grid size-8 place-items-center rounded-[9px] bg-primary text-[13px] font-semibold text-white">M</span><span className="text-[14px] font-semibold tracking-[.12em]">{BRAND_NAME}</span></Link><p className="mt-4 max-w-xs text-[12px] leading-5 text-text-muted">Единое пространство для контактов, кампаний и всех диалогов между ними.</p></div>
           {footerGroups.map(group=><div key={group.title}><p className="text-[11px] font-semibold text-[#393a46]">{group.title}</p><div className="mt-4 space-y-3">{group.links.map(([label,href])=><Link key={label} href={href} className="block text-[12px] text-[#858793] hover:text-[#4d4f5c]">{label}</Link>)}</div></div>)}
         </div>
         <div className="container-shell flex flex-col gap-3 border-t border-[#e9eaf0] py-5 text-[10px] text-[#9698a5] sm:flex-row sm:items-center sm:justify-between"><span>© 2026 {BRAND_NAME}.</span><span>Контакты, согласия и кампании — в одном рабочем пространстве.</span></div>

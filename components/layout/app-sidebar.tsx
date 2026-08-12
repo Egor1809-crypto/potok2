@@ -191,7 +191,7 @@ export function AppSidebar({
           className={buttonVariants({
             variant: "primary",
             size: "sm",
-            className: "mb-3 w-full justify-center shadow-[0_5px_16px_rgba(99,91,255,0.22)]",
+            className: "mb-3 w-full justify-center shadow-[0_5px_16px_rgba(124,53,242,0.24)]",
           })}
         >
           <Plus aria-hidden="true" className="size-4" />

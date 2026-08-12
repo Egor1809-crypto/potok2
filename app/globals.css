@@ -8,32 +8,32 @@
 :root {
   color-scheme: light;
 
-  --background: #f7f8fb;
-  --foreground: #171923;
-  --surface: #ffffff;
-  --surface-raised: #ffffff;
-  --surface-subtle: #f1f3f8;
-  --surface-inset: #eef0f5;
+  --background: #f7f0e7;
+  --foreground: #160f1b;
+  --surface: #fffaf3;
+  --surface-raised: #fffcf8;
+  --surface-subtle: #f1e7e2;
+  --surface-inset: #ece0dc;
 
-  --primary: #635bff;
-  --primary-hover: #554ee7;
-  --primary-active: #4942cf;
-  --primary-subtle: #efeeff;
-  --primary-muted: #dedbff;
+  --primary: #7c35f2;
+  --primary-hover: #6a29dd;
+  --primary-active: #5920c5;
+  --primary-subtle: #ebdff0;
+  --primary-muted: #dcc7e8;
   --primary-foreground: #ffffff;
 
-  --text-strong: #171923;
-  --text: #303341;
-  --text-muted: #6b7080;
-  --text-subtle: #9297a6;
+  --text-strong: #160f1b;
+  --text: #382f3e;
+  --text-muted: #706476;
+  --text-subtle: #9a8d9f;
   --text-inverse: #ffffff;
   --text-primary: var(--text-strong);
   --text-secondary: var(--text-muted);
   --text-tertiary: var(--text-subtle);
 
-  --border: #e3e6ed;
-  --border-strong: #d5d9e2;
-  --border-focus: #7a73ff;
+  --border: #dfcfe3;
+  --border-strong: #ceb9d6;
+  --border-focus: #7c35f2;
 
   --success: #16855b;
   --success-subtle: #e8f7f0;
@@ -45,11 +45,11 @@
   --info: #2878c7;
   --info-subtle: #ebf5ff;
 
-  --chart-1: #635bff;
-  --chart-2: #4e9ad8;
+  --chart-1: #7c35f2;
+  --chart-2: #aa6cf5;
   --chart-3: #1e9b72;
   --chart-4: #b88532;
-  --chart-grid: #eceef3;
+  --chart-grid: #e7d8e5;
 
   --radius-xs: 5px;
   --radius-sm: 8px;
@@ -58,15 +58,15 @@
   --radius-xl: 18px;
   --radius-pill: 999px;
 
-  --shadow-xs: 0 1px 2px rgb(17 24 39 / 0.04);
+  --shadow-xs: 0 1px 2px rgb(48 25 43 / 0.05);
   --shadow-sm:
-    0 1px 2px rgb(17 24 39 / 0.04), 0 3px 10px rgb(17 24 39 / 0.035);
+    0 1px 2px rgb(48 25 43 / 0.05), 0 3px 10px rgb(48 25 43 / 0.04);
   --shadow-md:
-    0 2px 5px rgb(17 24 39 / 0.04), 0 12px 28px rgb(17 24 39 / 0.07);
+    0 2px 5px rgb(48 25 43 / 0.05), 0 12px 28px rgb(75 39 69 / 0.08);
   --shadow-lg:
-    0 4px 12px rgb(17 24 39 / 0.06), 0 24px 56px rgb(17 24 39 / 0.11);
+    0 4px 12px rgb(48 25 43 / 0.07), 0 24px 56px rgb(75 39 69 / 0.12);
   --shadow-floating: var(--shadow-lg);
-  --shadow-focus: 0 0 0 3px rgb(99 91 255 / 0.18);
+  --shadow-focus: 0 0 0 3px rgb(124 53 242 / 0.2);
 
   --sidebar-width: 252px;
   --topbar-height: 68px;
@@ -253,6 +253,34 @@ a {
   text-wrap: balance;
 }
 
+/* The marketing product mockups use compact literal utilities. Keep them in
+ * the same warm cream and vivid violet family as the application shell. */
+.mailflow-marketing [class~="bg-[#625cf6]"] {
+  background-color: var(--primary);
+}
+
+.mailflow-marketing [class~="text-[#625cf6]"] {
+  color: var(--primary);
+}
+
+.mailflow-marketing [class~="bg-[#eeedff]"],
+.mailflow-marketing [class~="bg-[#f7f6ff]"],
+.mailflow-marketing [class~="bg-[#f8f7ff]"] {
+  background-color: var(--primary-subtle);
+}
+
+.mailflow-marketing [class~="bg-[#fbfbfc]"],
+.mailflow-marketing [class~="bg-[#fafafb]"] {
+  background-color: var(--surface);
+}
+
+.mailflow-marketing [class~="border-[#ececf1]"],
+.mailflow-marketing [class~="border-[#e9eaf0]"],
+.mailflow-marketing [class~="border-[#e2e3e9]"],
+.mailflow-marketing [class~="border-[#dddfe6]"] {
+  border-color: var(--border);
+}
+
 .truncate-lines-2 {
   display: -webkit-box;
   overflow: hidden;
@@ -320,13 +348,13 @@ a {
   border-color: var(--primary);
   background: var(--primary);
   color: var(--primary-foreground);
-  box-shadow: 0 1px 2px rgb(39 35 120 / 0.18);
+  box-shadow: 0 1px 2px rgb(86 31 143 / 0.2);
 }
 
 .btn-primary:hover:not(:disabled) {
   border-color: var(--primary-hover);
   background: var(--primary-hover);
-  box-shadow: 0 5px 14px rgb(66 57 190 / 0.18);
+  box-shadow: 0 5px 14px rgb(104 38 184 / 0.2);
 }
 
 .btn-primary:active:not(:disabled) {
