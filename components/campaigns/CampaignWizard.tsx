@@ -230,6 +230,20 @@ function formatNumber(value: number) {
   return new Intl.NumberFormat("ru-RU").format(value);
 }
 
+function formatRecipientCount(value: number) {
+  const absolute = Math.abs(value);
+  const lastTwoDigits = absolute % 100;
+  const lastDigit = absolute % 10;
+  const noun = lastTwoDigits >= 11 && lastTwoDigits <= 14
+    ? "получателей"
+    : lastDigit === 1
+      ? "получатель"
+      : lastDigit >= 2 && lastDigit <= 4
+        ? "получателя"
+        : "получателей";
+  return `${formatNumber(value)} ${noun}`;
+}
+
 function isProviderId(value: unknown): value is IntegrationProviderId {
   return typeof value === "string" && value in integrationProviderById;
 }
@@ -319,7 +333,7 @@ function CampaignWizardTokenBootstrap() {
     });
     return () => window.cancelAnimationFrame(frame);
   }, []);
-  return <div className="card grid min-h-64 place-items-center p-8 text-center text-[12px] text-text-muted">Готовим изолированный черновик кампании…</div>;
+  return <div className="card grid min-h-64 place-items-center p-8 text-center text-[12px] text-text-muted">Готовим изолированный черновик рассылки…</div>;
 }
 
 function CampaignWizardState({
@@ -354,7 +368,7 @@ function CampaignWizardState({
   );
   const [campaignName, setCampaignName] = React.useState(
     builderResult?.campaignName ??
-      params.get("name") ?? seedDraft?.campaignName ?? "Новая кампания",
+      params.get("name") ?? seedDraft?.campaignName ?? "Новая рассылка",
   );
   const [audienceType, setAudienceType] = React.useState<"none" | "segment" | "contacts">(
     queryContactIds.length > 0 || params.get("audienceType") === "contacts"
@@ -416,6 +430,7 @@ function CampaignWizardState({
   const [finishedCampaign, setFinishedCampaign] = React.useState<{ id: string; status: string } | null>(null);
   const hydratedCampaignId = React.useRef<string | null>(null);
   const hydratedQueryTemplateId = React.useRef<string | null>(null);
+  const recoveredCampaignId = seedDraft?.campaignId;
 
   // Setter identities are stable; only the source and copy mode alter hydration.
   // eslint-disable-next-line react-hooks/preserve-manual-memoization
@@ -447,6 +462,14 @@ function CampaignWizardState({
       if (!sourceId) {
         setSenderName((current) => current || body.workspace.defaultSenderName);
         setSenderEmail((current) => current || body.workspace.defaultSenderEmail);
+        if (
+          recoveredCampaignId &&
+          !body.campaigns?.some((campaign) => campaign.id === recoveredCampaignId)
+        ) {
+          setCampaignId((current) => current === recoveredCampaignId ? null : current);
+          setEvaluation(null);
+          setNotice("Предыдущий серверный черновик уже удалён. При проверке будет создана новая рассылка.");
+        }
       }
 
       if (sourceId && hydratedCampaignId.current !== sourceId) {
@@ -491,7 +514,7 @@ function CampaignWizardState({
       setTemplateLoadState("error");
       setApiMode("offline");
     }
-  }, [duplicate, sourceId]);
+  }, [duplicate, recoveredCampaignId, sourceId]);
 
   React.useEffect(() => {
     const frame = window.requestAnimationFrame(() => void loadWorkspace());
@@ -561,7 +584,7 @@ function CampaignWizardState({
           : "Выберите хотя бы один контакт.",
       );
     }
-    if (!campaignName.trim()) blockers.push("Укажите название кампании.");
+    if (!campaignName.trim()) blockers.push("Укажите внутреннее название рассылки.");
     if (channels.length === 0) blockers.push("Выберите хотя бы один канал доставки.");
     if (channels.includes("email") && !subject.trim()) blockers.push("Добавьте тему email-письма.");
     if (channels.includes("email") && !emailBodyText.trim()) blockers.push("Добавьте текст email-письма.");
@@ -641,7 +664,7 @@ function CampaignWizardState({
         ? "В выбранной аудитории пока нет контактов. Добавьте подходящие контакты или выберите другую аудиторию."
         : "Выберите хотя бы один контакт.";
     }
-    if (step === 1 && !campaignName.trim()) message = "Укажите название кампании.";
+    if (step === 1 && !campaignName.trim()) message = "Укажите внутреннее название рассылки.";
     if (step === 1 && channels.includes("email") && (!subject.trim() || !emailBodyText.trim())) {
       message = "Заполните тему и текст email-письма.";
     }
@@ -715,7 +738,7 @@ function CampaignWizardState({
     setNotice(null);
     try {
       let id = campaignId;
-      if (!id) {
+      const createDraft = async () => {
         const createResponse = await fetch("/api/campaigns", {
           method: "POST",
           headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -725,16 +748,30 @@ function CampaignWizardState({
         if (!createResponse.ok || !("campaign" in createBody)) {
           throw new Error("error" in createBody ? createBody.error : "Не удалось создать черновик кампании.");
         }
-        id = createBody.campaign.id;
-        setCampaignId(id);
-      }
+        setCampaignId(createBody.campaign.id);
+        return createBody.campaign.id;
+      };
+      if (!id) id = await createDraft();
 
-      const updateResponse = await fetch("/api/campaigns", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ id, ...campaignPayload(), action }),
-      });
-      const updateBody = await updateResponse.json() as CampaignMutationResponse | ApiError;
+      const updateDraft = async (campaignDraftId: string) => {
+        const response = await fetch("/api/campaigns", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ id: campaignDraftId, ...campaignPayload(), action }),
+        });
+        const body = await response.json() as CampaignMutationResponse | ApiError;
+        return { response, body };
+      };
+      let { response: updateResponse, body: updateBody } = await updateDraft(id);
+      if (
+        updateResponse.status === 404 &&
+        !sourceId &&
+        "error" in updateBody &&
+        updateBody.error.includes("Кампания не найдена")
+      ) {
+        id = await createDraft();
+        ({ response: updateResponse, body: updateBody } = await updateDraft(id));
+      }
       if (!updateResponse.ok || !("campaign" in updateBody)) {
         throw new Error("error" in updateBody ? updateBody.error : "Сервер не сохранил кампанию.");
       }
@@ -792,7 +829,7 @@ function CampaignWizardState({
             Внешняя отправка не выполнялась.
           </p>
           <div className="mt-7 flex flex-col justify-center gap-2 sm:flex-row">
-            <Link href="/campaigns" className={buttonVariants({ variant: "secondary" })}>Все кампании</Link>
+            <Link href="/campaigns" className={buttonVariants({ variant: "secondary" })}>Все рассылки</Link>
             <Link href={`/campaigns/${finishedCampaign.id}`} className={buttonVariants({ variant: "primary" })}>
               Открыть кампанию
               <ArrowRight aria-hidden="true" className="size-4" />
@@ -813,7 +850,7 @@ function CampaignWizardState({
         size="md"
         footer={(
           <>
-            <Button variant="ghost" onClick={() => setSetupDialogOpen(false)}>Вернуться к кампании</Button>
+            <Button variant="ghost" onClick={() => setSetupDialogOpen(false)}>Вернуться к рассылке</Button>
             <Link href="/settings" className={buttonVariants({ variant: "secondary" })}>Данные отправителя</Link>
             <Link href="/integrations" className={buttonVariants({ variant: "primary" })}>Настроить провайдера</Link>
           </>
@@ -838,7 +875,7 @@ function CampaignWizardState({
             Кампании
           </Link>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <h1 className="text-[28px] font-semibold tracking-[-0.04em] text-text-strong">Новая кампания</h1>
+            <h1 className="text-[28px] font-semibold tracking-[-0.04em] text-text-strong">Новая рассылка</h1>
             <Badge variant={apiMode === "online" ? "success" : "warning"} dot>
               {campaignId ? "Черновик на сервере" : "Не сохранена"}
             </Badge>
@@ -874,8 +911,8 @@ function CampaignWizardState({
         </Alert>
       ) : null}
 
-      <section className="card px-4 py-5 sm:px-7" aria-label="Этапы создания кампании">
-        <Stepper steps={steps} currentStep={currentStep} aria-label="Этапы создания кампании" />
+      <section className="card px-4 py-5 sm:px-7" aria-label="Этапы создания рассылки">
+        <Stepper steps={steps} currentStep={currentStep} aria-label="Этапы создания рассылки" />
       </section>
 
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
@@ -989,6 +1026,7 @@ function CampaignWizardState({
               coveragePending={audienceType === "segment" && !evaluation}
               clientBlockers={clientBlockers}
               evaluation={evaluation}
+              manualVkWorkspace={channels.includes("email") && providers.email === "vk-workspace"}
             />
           ) : null}
 
@@ -1014,7 +1052,11 @@ function CampaignWizardState({
                 loadingText="Проверяем…"
                 leadingIcon={<Send className="size-4" />}
               >
-                {evaluation?.blockers.length ? "Проверить повторно" : "Проверить готовность"}
+                {evaluation?.blockers.length
+                  ? "Проверить повторно"
+                  : channels.includes("email") && providers.email === "vk-workspace"
+                    ? "Подготовить запуск через VK WorkSpace"
+                    : "Проверить готовность"}
               </Button>
             )}
           </footer>
@@ -1160,7 +1202,7 @@ function AudienceStep({
       <div className="mt-6 grid gap-3 sm:grid-cols-2">
         {([
           { value: "segment" as const, title: "Сегмент", text: "Динамическая аудитория по сохранённым правилам", icon: UsersRound },
-          { value: "contacts" as const, title: "Контакты", text: "Точный список получателей для этой кампании", icon: UserRound },
+          { value: "contacts" as const, title: "Контакты", text: "Точный список получателей для этой рассылки", icon: UserRound },
         ]).map((option) => {
           const Icon = option.icon;
           const selected = audienceType === option.value;
@@ -1332,7 +1374,7 @@ function MessageStep({
     <div>
       <StepIntro number={2} title="Подготовьте сообщение" description="Создайте email-версию и короткий вариант для мессенджеров. На следующем шаге выберите, какие версии отправлять." />
       <div className="mt-6">
-        <FormField label="Название кампании" htmlFor="campaign-name" required hint="Видно только внутри MAILFLOW.">
+        <FormField label="Название рассылки" htmlFor="campaign-name" required hint="Внутреннее название для вашего списка. Получателю оно не показывается.">
           <Input id="campaign-name" value={campaignName} onChange={(event) => onCampaignNameChange(event.target.value)} />
         </FormField>
       </div>
@@ -1553,6 +1595,7 @@ function ReviewStep({
   coveragePending,
   clientBlockers,
   evaluation,
+  manualVkWorkspace,
 }: {
   campaignName: string;
   audienceLabel: string;
@@ -1563,14 +1606,15 @@ function ReviewStep({
   coveragePending: boolean;
   clientBlockers: string[];
   evaluation: Evaluation | null;
+  manualVkWorkspace: boolean;
 }) {
   const blockers = evaluation?.blockers.length ? evaluation.blockers : clientBlockers;
   return (
     <div>
       <StepIntro number={4} title="Проверьте готовность" description="Сервер рассчитает точный охват, проверит согласия, подключения и сохранит план. Внешняя отправка на этом шаге не выполняется." />
       <div className="mt-6 divide-y divide-border rounded-xl border border-border">
-        <ReviewRow label="Кампания" value={campaignName || "Без названия"} />
-        <ReviewRow label="Аудитория" value={`${audienceLabel} · ${formatNumber(recipientCount)} получателей`} />
+        <ReviewRow label="Название рассылки" value={campaignName || "Без названия"} />
+        <ReviewRow label="Аудитория" value={`${audienceLabel} · ${formatRecipientCount(recipientCount)}`} />
         {channels.map((channel) => (
           <ReviewRow
             key={channel}
@@ -1582,9 +1626,10 @@ function ReviewStep({
         ))}
       </div>
 
-      <Alert tone="info" title="Запуск выполняется отдельно" className="mt-6">
-        Проверка только фиксирует готовую версию. После неё откройте кампанию и нажмите
-        «Начать отправку». Автоматического запуска по расписанию в текущей версии нет.
+      <Alert tone="info" title={manualVkWorkspace ? "VK WorkSpace: отправка вручную" : "Запуск выполняется отдельно"} className="mt-6">
+        {manualVkWorkspace
+          ? "MAILFLOW подготовит адресатов и письмо. Затем на странице рассылки скачайте CSV и загрузите его в раздел «Рассылки» VK WorkSpace. Автоматически письмо не отправляется."
+          : "Проверка только фиксирует готовую версию. После неё откройте рассылку и нажмите «Начать отправку». Автоматического запуска по расписанию в текущей версии нет."}
       </Alert>
 
       <section className={cn("mt-6 rounded-xl border p-5", blockers.length ? "border-warning/30 bg-warning-subtle" : "border-success/25 bg-success-subtle")} aria-labelledby="blockers-title">
@@ -1634,13 +1679,13 @@ function CampaignSummary({
   blockers: string[];
 }) {
   return (
-    <aside className="card p-5 xl:sticky xl:top-5" aria-label="Сводка кампании">
+    <aside className="card p-5 xl:sticky xl:top-5" aria-label="Сводка рассылки">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-[15px] font-semibold text-text-strong">Сводка</h2>
         <Badge variant={blockers.length === 0 ? "success" : "warning"} dot>{blockers.length === 0 ? "Готово" : `Нужно исправить: ${blockers.length}`}</Badge>
       </div>
       <dl className="mt-5 space-y-4">
-        <SummaryRow icon={<Send aria-hidden="true" className="size-4" />} label="Кампания" value={campaignName || "Не названа"} />
+        <SummaryRow icon={<Send aria-hidden="true" className="size-4" />} label="Рассылка" value={campaignName || "Не названа"} />
         <SummaryRow icon={<UsersRound aria-hidden="true" className="size-4" />} label="Аудитория" value={`${audienceLabel} · ${formatNumber(recipientCount)}`} />
         <SummaryRow
           icon={<ShieldCheck aria-hidden="true" className="size-4" />}
