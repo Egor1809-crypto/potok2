@@ -104,7 +104,7 @@ export function AppSidebar({
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-4 pt-2"
       >
         {productNavigation.map((group) => (
-          <div key={group.label}>
+          <div key={group.label} className="mb-4 last:mb-0">
             <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.13em] text-text-subtle">
               {group.label}
             </p>

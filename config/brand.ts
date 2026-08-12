@@ -1,29 +1,25 @@
-/**
- * Product identity and demo-workspace defaults.
- * Keep product copy and branding imports pointed here so MAILFLOW can be
- * rebranded without hunting through feature code.
- */
+/** Product identity and safe fallbacks shown before the workspace API loads. */
 export const brandConfig = {
   name: "MAILFLOW",
   legalName: "MAILFLOW",
-  tagline: "Рассылки по email и в мессенджерах. Всё в порядке.",
+  tagline: "Студия красивых писем и управляемой доставки.",
   description:
-    "Управляйте контактами и запускайте персональные кампании по email, в Telegram и ВКонтакте из единого рабочего пространства.",
-  shortDescription: "Контакты, сообщения и все каналы в одном пространстве.",
+    "Создавайте красивые персональные письма, управляйте контактами и передавайте готовые кампании проверенным провайдерам.",
+  shortDescription: "Дизайн писем, аудитории и доставка в одном пространстве.",
   accentColor: "#635BFF",
   secondaryAccentColor: "#34B6E4",
   logoMark: "M",
-  website: "https://mailflow.example",
-  supportEmail: "hello@mailflow.example",
+  website: "https://tech-pravo.ru/",
+  supportEmail: "info@tech-pravo.ru",
   social: {
-    linkedin: "https://linkedin.com/company/mailflow-demo",
-    x: "https://x.com/mailflow_demo",
+    linkedin: "",
+    x: "",
   },
 } as const;
 
 export const workspaceConfig = {
   id: "workspace-main",
-  name: "Моё пространство",
+  name: "ТехнологИИ права",
   plan: "Масштаб",
   timezone: "Europe/Moscow",
   locale: "ru-RU",
@@ -33,10 +29,10 @@ export const workspaceConfig = {
 
 export const demoUser = {
   id: "participant-main",
-  name: "Егор Сабалин",
-  firstName: "Егор",
-  email: "egor@mailflow.example",
-  initials: "ЕС",
+  name: "Участник",
+  firstName: "Участник",
+  email: "info@tech-pravo.ru",
+  initials: "У",
   role: "Участник · полный доступ",
   avatarColor: "#675CF5",
 } as const;

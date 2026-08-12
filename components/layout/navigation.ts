@@ -36,7 +36,7 @@ export const productNavigation: ProductNavGroup[] = [
     label: "Студия писем",
     items: [
       {
-        label: "Обзор",
+        label: "Главная",
         description: "Что требует внимания сейчас",
         href: "/dashboard",
         icon: LayoutDashboard,
@@ -49,16 +49,14 @@ export const productNavigation: ProductNavGroup[] = [
         href: "/templates",
         icon: LayoutTemplate,
         keywords: ["письмо", "дизайн", "типограф", "редактор", "email"],
-        children: [
-          {
-            label: "Конструктор писем",
-            description: "Собрать письмо из блоков",
-            href: "/email-builder",
-            icon: PenLine,
-            exact: true,
-            keywords: ["редактор", "контент", "блоки", "email"],
-          },
-        ],
+      },
+      {
+        label: "Конструктор",
+        description: "Собрать письмо из блоков или с ИИ",
+        href: "/email-builder",
+        icon: PenLine,
+        exact: true,
+        keywords: ["редактор", "контент", "блоки", "email", "ии"],
       },
     ],
   },
@@ -73,6 +71,14 @@ export const productNavigation: ProductNavGroup[] = [
         keywords: ["люди", "crm", "база", "импорт", "команды"],
       },
       {
+        label: "Импорт",
+        description: "Загрузить CSV, XLSX, XLS или TSV",
+        href: "/import",
+        icon: FileUp,
+        exact: true,
+        keywords: ["таблица", "загрузка", "добавить контакты"],
+      },
+      {
         label: "Сегменты",
         description: "Динамические аудитории по правилам",
         href: "/segments",
@@ -82,28 +88,41 @@ export const productNavigation: ProductNavGroup[] = [
     ],
   },
   {
-    label: "Доставка · дополнительно",
+    label: "Проверка и отправка",
     items: [
       {
-        label: "Кампании",
-        description: "Отправка уже готового письма",
+        label: "Тест и отправка",
+        description: "Проверить письмо и передать провайдеру",
         href: "/campaigns",
         icon: Megaphone,
         keywords: ["рассылка", "email", "telegram", "вконтакте"],
       },
       {
-        label: "Каналы",
-        description: "Провайдеры email, Telegram и ВК",
+        label: "Подключения",
+        description: "Настроить реальных провайдеров доставки",
         href: "/integrations",
         icon: Cable,
         keywords: ["vk workspace", "telegram", "вконтакте", "smtp", "api", "интеграции"],
       },
       {
-        label: "Результаты",
-        description: "Задания провайдерам и ошибки",
+        label: "История",
+        description: "Переданные задания и ошибки",
         href: "/analytics",
         icon: BarChart3,
         keywords: ["аналитика", "отчёты", "задания", "ошибки", "экспорт"],
+      },
+    ],
+  },
+  {
+    label: "Рабочее пространство",
+    items: [
+      {
+        label: "Настройки",
+        description: "Компания, отправитель и аккаунт",
+        href: "/settings",
+        icon: Settings,
+        exact: true,
+        keywords: ["аккаунт", "профиль", "часовой пояс", "данные"],
       },
     ],
   },
@@ -125,26 +144,17 @@ export const quickCreateRoutes: ProductNavItem[] = [
     exact: true,
     keywords: ["новое", "создать", "дизайн", "ии"],
   },
+  {
+    label: "Отправить тест",
+    description: "Проверить письмо на одном реальном адресе",
+    href: "/campaigns/new?channel=email",
+    icon: Megaphone,
+    exact: true,
+    keywords: ["тест", "проверка", "отправка"],
+  },
 ];
 
-export const secondaryProductRoutes: ProductNavItem[] = [
-  {
-    label: "Импорт контактов",
-    description: "Загрузить CSV, XLSX, XLS или TSV",
-    href: "/import",
-    icon: FileUp,
-    exact: true,
-    keywords: ["csv", "загрузка", "добавить контакты"],
-  },
-  {
-    label: "Настройки",
-    description: "Аккаунт, отправитель и данные",
-    href: "/settings",
-    icon: Settings,
-    exact: true,
-    keywords: ["аккаунт", "профиль", "часовой пояс", "экспорт"],
-  },
-];
+export const secondaryProductRoutes: ProductNavItem[] = [];
 
 function isOwnRouteActive(pathname: string, item: ProductNavItem) {
   if (item.exact) return pathname === item.href;

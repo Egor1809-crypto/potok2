@@ -29,6 +29,7 @@ import {
   Button,
   FormField,
   Input,
+  Modal,
   Select,
   Stepper,
   Textarea,
@@ -411,6 +412,7 @@ function CampaignWizardState({
   const [error, setError] = React.useState<string | null>(null);
   const [notice, setNotice] = React.useState<string | null>(null);
   const [evaluation, setEvaluation] = React.useState<Evaluation | null>(null);
+  const [setupDialogOpen, setSetupDialogOpen] = React.useState(false);
   const [finishedCampaign, setFinishedCampaign] = React.useState<{ id: string; status: string } | null>(null);
   const hydratedCampaignId = React.useRef<string | null>(null);
   const hydratedQueryTemplateId = React.useRef<string | null>(null);
@@ -704,6 +706,7 @@ function CampaignWizardState({
     if (action === "launch" && clientBlockers.some((blocker) => !blocker.includes("не подключён"))) {
       setEvaluation({ status: "blocked", eligibleByChannel: {}, blockers: clientBlockers });
       setError("Исправьте обязательные поля перед серверной проверкой.");
+      setSetupDialogOpen(true);
       return;
     }
 
@@ -752,6 +755,7 @@ function CampaignWizardState({
       setEvaluation(serverEvaluation);
       if (serverEvaluation.blockers.length > 0 || serverEvaluation.status === "blocked") {
         setError("План не готов: устраните причины, затем повторите проверку.");
+        setSetupDialogOpen(true);
       } else {
         try {
           window.sessionStorage.removeItem(handoffStorageKey);
@@ -801,6 +805,32 @@ function CampaignWizardState({
 
   return (
     <div className="mx-auto max-w-6xl space-y-5 pb-10">
+      <Modal
+        open={setupDialogOpen}
+        onOpenChange={setSetupDialogOpen}
+        title="Что нужно для реальной отправки"
+        description="Платформа не скрывает обязательные действия и не показывает фиктивный успех. Выполните пункты ниже и повторите проверку."
+        size="md"
+        footer={(
+          <>
+            <Button variant="ghost" onClick={() => setSetupDialogOpen(false)}>Вернуться к кампании</Button>
+            <Link href="/settings" className={buttonVariants({ variant: "secondary" })}>Данные отправителя</Link>
+            <Link href="/integrations" className={buttonVariants({ variant: "primary" })}>Настроить провайдера</Link>
+          </>
+        )}
+      >
+        <ol className="m-0 grid list-none gap-3 p-0">
+          {(evaluation?.blockers.length ? evaluation.blockers : clientBlockers).map((blocker, index) => (
+            <li key={blocker} className="flex gap-3 rounded-xl border border-border bg-surface-subtle p-4">
+              <span className="grid size-7 shrink-0 place-items-center rounded-full bg-primary-subtle text-[12px] font-semibold text-primary">{index + 1}</span>
+              <p className="m-0 pt-0.5 text-[13px] leading-5 text-text-strong">{blocker}</p>
+            </li>
+          ))}
+        </ol>
+        <p className="mt-4 text-[12px] leading-5 text-text-muted">
+          Пароль или ключ провайдера хранится только на сервере. Браузерное разрешение для этого не требуется.
+        </p>
+      </Modal>
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <Link href="/campaigns" className="inline-flex items-center gap-1.5 text-[13px] font-medium text-text-muted hover:text-text-strong">
