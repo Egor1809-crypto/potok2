@@ -5,6 +5,7 @@ import type {
 } from "@/types";
 import type { EmailBuilderDocumentInput, EmailTemplateRecord } from "@/types/api";
 import { BRAND_NAME } from "@/config/brand";
+import { emailPatternPresets } from "./pattern-presets";
 
 export type PreviewMode = "desktop" | "mobile";
 export type BuilderPanel = "blocks" | "canvas" | "properties";
@@ -268,7 +269,7 @@ const initialContent: Record<EmailBlockType, Pick<EmailBlock, "content" | "label
     href: undefined,
   },
   pattern: {
-    content: "✦  ·  ✧  ·  ✦  ·  ✧  ·  ✦",
+    content: emailPatternPresets[0].content,
     label: undefined,
     href: undefined,
   },

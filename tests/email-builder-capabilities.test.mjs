@@ -122,3 +122,27 @@ test("visible typography properties drive the live canvas", async () => {
   assert.ok((canvas.match(/letterSpacing: block\.letterSpacing/g) ?? []).length >= 8);
   assert.ok((canvas.match(/fontWeight: block\.fontWeight/g) ?? []).length >= 4);
 });
+
+test("new templates expose a clear name field and resolve occupied names", async () => {
+  const builder = await readFile(new URL("../components/email-builder/EmailBuilderView.tsx", import.meta.url), "utf8");
+  assert.match(builder, /label="Имя шаблона"/);
+  assert.match(builder, /Так он появится в разделе «Мои шаблоны»/);
+  assert.match(builder, /occupied\.has\(saveName\.toLocaleLowerCase/);
+  assert.match(builder, /Название было занято/);
+});
+
+test("pattern gallery offers varied email-safe designs", async () => {
+  const [presets, properties, canvas, compiler] = await Promise.all([
+    readFile(new URL("../components/email-builder/pattern-presets.ts", import.meta.url), "utf8"),
+    readFile(new URL("../components/email-builder/PropertiesPanel.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/email-builder/EmailCanvas.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/server/email-document.ts", import.meta.url), "utf8"),
+  ]);
+  assert.ok((presets.match(/id: "/g) ?? []).length >= 12);
+  for (const name of ["Искры", "Точки", "Сетка", "Ромбы", "Волны", "Конфетти"]) assert.match(presets, new RegExp(name));
+  assert.match(properties, /title="Рисунок узора"/);
+  assert.match(properties, /label="Масштаб"/);
+  assert.match(properties, /label="Расстояние"/);
+  assert.match(canvas, /whitespace-pre-line/);
+  assert.match(compiler, /letter-spacing:\$\{tracking\}px/);
+});

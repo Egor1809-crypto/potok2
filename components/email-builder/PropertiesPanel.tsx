@@ -14,6 +14,7 @@ import {
   Type,
   Box,
   Maximize2,
+  Shapes,
 } from "lucide-react";
 
 import {
@@ -36,6 +37,7 @@ import { cn } from "@/components/ui/utils";
 import type { BuilderBlock, BuilderDocument } from "./builder-types";
 import { getBlockLabel } from "./BlockLibrary";
 import { ImageAssetPicker } from "./ImageAssetPicker";
+import { emailPatternPresets } from "./pattern-presets";
 
 const personalizationFields = [
   { label: "Имя", token: "{{first_name}}", example: "Иван" },
@@ -224,6 +226,45 @@ export function PropertiesPanel({
                 </div>
               </FormField>
             ) : null}
+          </PropertySection>
+        ) : null}
+
+        {block.type === "pattern" ? (
+          <PropertySection icon={Shapes} title="Рисунок узора">
+            <p className="m-0 text-[10px] leading-4 text-text-muted">
+              Выберите основу, затем настройте её размер, воздух и цвета ниже.
+            </p>
+            <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Вариант узора">
+              {emailPatternPresets.map((preset) => {
+                const selected = block.content === preset.content;
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    onClick={() => onUpdateBlock({
+                      content: preset.content,
+                      fontSize: preset.fontSize,
+                      letterSpacing: preset.letterSpacing,
+                      lineHeight: 115,
+                      alignment: "center",
+                    })}
+                    className="min-w-0 rounded-[9px] border border-border bg-surface p-2 text-left outline-none transition hover:border-primary/40 hover:bg-primary-subtle/30 focus-visible:ring-2 focus-visible:ring-primary/30 aria-checked:border-primary aria-checked:bg-primary-subtle/60"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="block h-8 overflow-hidden whitespace-pre-line rounded-md bg-primary-subtle px-1 py-1 text-center text-[8px] leading-3 text-primary"
+                    >
+                      {preset.content}
+                    </span>
+                    <span className="mt-1.5 block truncate text-[10px] font-semibold text-text-strong">{preset.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <RangeField label="Масштаб" value={block.fontSize} min={8} max={32} onChange={(fontSize) => onUpdateBlock({ fontSize })} />
+            <RangeField label="Расстояние" value={block.letterSpacing} min={0} max={12} onChange={(letterSpacing) => onUpdateBlock({ letterSpacing })} />
           </PropertySection>
         ) : null}
 

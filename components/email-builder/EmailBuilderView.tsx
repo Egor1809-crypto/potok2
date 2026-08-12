@@ -16,6 +16,7 @@ import type { EmailBlockType, TemplateCategory } from "@/types";
 import type {
   ApiError,
   EmailTemplateMutationResponse,
+  EmailTemplatesListResponse,
   EmailTemplateRecord,
 } from "@/types/api";
 import {
@@ -182,7 +183,7 @@ function isBuilderDocument(value: unknown): value is BuilderDocument {
 
 function documentToPlainText(document: BuilderDocument) {
   return document.blocks
-    .filter((block) => !["logo", "image", "divider", "spacer", "social"].includes(block.type))
+    .filter((block) => !["logo", "image", "divider", "spacer", "social", "pattern"].includes(block.type))
     .map((block) => block.content.trim())
     .filter(Boolean)
     .join("\n\n");
@@ -583,6 +584,21 @@ function EmailBuilderWorkspace({
     savingTemplateRef.current = true;
     setSavingTemplate(true);
     try {
+      let saveName = campaignName.trim();
+      let renamedCopy = false;
+      if (!savedTemplateId) {
+        const listResponse = await fetch("/api/templates", { headers: { Accept: "application/json" } });
+        const listBody = await listResponse.json() as EmailTemplatesListResponse | ApiError;
+        if (!listResponse.ok || !("templates" in listBody)) {
+          throw new Error("error" in listBody ? listBody.error : "Не удалось проверить название шаблона.");
+        }
+        const occupied = new Set(listBody.templates.map((template) => template.name.trim().toLocaleLowerCase("ru-RU")));
+        const root = saveName;
+        for (let copyNumber = 1; occupied.has(saveName.toLocaleLowerCase("ru-RU")); copyNumber += 1) {
+          saveName = `${root} — вариант ${copyNumber + 1}`;
+          renamedCopy = true;
+        }
+      }
       const response = await fetch("/api/templates", {
         method: savedTemplateId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -590,7 +606,7 @@ function EmailBuilderWorkspace({
           ...(savedTemplateId
             ? { id: savedTemplateId, expectedUpdatedAt: templateRevision }
             : {}),
-          name: campaignName.trim(),
+          name: saveName,
           description: templateDescription.trim(),
           category: templateCategory,
           subject: document.subject.trim(),
@@ -621,7 +637,9 @@ function EmailBuilderWorkspace({
       );
       toast.success(
         savedTemplateId ? "Изменения сохранены" : "Добавлено в «Мои шаблоны»",
-        hasNewerLocalChanges
+        renamedCopy
+          ? `Название было занято. Шаблон сохранён как «${body.template.name}» — его можно изменить в поле имени.`
+          : hasNewerLocalChanges
           ? "Версия на момент нажатия сохранена. Более новые правки остаются в редакторе и требуют повторного сохранения."
           : "HTML и текстовая версия повторно собраны на сервере.",
       );
@@ -741,7 +759,17 @@ function EmailBuilderWorkspace({
               Это готовый макет из библиотеки. Кнопка «Сохранить в мои шаблоны» создаст вашу отдельную копию — исходный шаблон останется без изменений.
             </div>
           ) : null}
-          <div className="grid gap-3 md:grid-cols-[190px_minmax(260px,1fr)] md:items-end">
+          <div className="grid gap-3 md:grid-cols-[minmax(240px,1fr)_190px] md:items-end">
+          <FormField label="Имя шаблона" htmlFor="builder-template-name" hint="Так он появится в разделе «Мои шаблоны»">
+            <Input
+              id="builder-template-name"
+              value={campaignName}
+              maxLength={160}
+              onChange={(event) => setCampaignNameDirty(event.target.value)}
+              placeholder="Например, Приглашение на конференцию"
+              className="font-semibold"
+            />
+          </FormField>
           <FormField label="Категория" htmlFor="builder-template-category">
             <Select
               id="builder-template-category"
@@ -760,7 +788,7 @@ function EmailBuilderWorkspace({
               ]}
             />
           </FormField>
-          <FormField label="Описание" htmlFor="builder-template-description" hint="Помогает найти нужный шаблон в библиотеке">
+          <FormField label="Описание" htmlFor="builder-template-description" hint="Помогает найти нужный шаблон в библиотеке" className="md:col-span-2">
             <Input
               id="builder-template-description"
               value={templateDescription}
