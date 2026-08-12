@@ -12,6 +12,8 @@ import {
   SlidersHorizontal,
   Trash2,
   Type,
+  Box,
+  Maximize2,
 } from "lucide-react";
 
 import {
@@ -248,15 +250,21 @@ export function PropertiesPanel({
               </FormField>
             ) : null}
             {supportsTypography ? (
-              <FormField label="Размер текста" htmlFor="builder-font-size">
-                <Select
-                  id="builder-font-size"
-                  value={String(block.fontSize)}
-                  onChange={(event) => onUpdateBlock({ fontSize: Number(event.target.value) })}
-                  options={fontSizeOptions(block.type)}
-                  className="text-[12px]"
-                />
-              </FormField>
+              <>
+                <div className="grid grid-cols-2 gap-2">
+                  <FormField label="Шрифт" htmlFor="builder-font-family">
+                    <Select id="builder-font-family" value={block.fontFamily} onChange={(event) => onUpdateBlock({ fontFamily: event.target.value as BuilderBlock["fontFamily"] })} options={[{value:"Arial",label:"Arial"},{value:"Georgia",label:"Georgia"},{value:"Verdana",label:"Verdana"},{value:"Trebuchet MS",label:"Trebuchet"}]} />
+                  </FormField>
+                  <FormField label="Начертание" htmlFor="builder-font-weight">
+                    <Select id="builder-font-weight" value={String(block.fontWeight)} onChange={(event) => onUpdateBlock({ fontWeight: Number(event.target.value) as BuilderBlock["fontWeight"] })} options={[{value:"400",label:"Обычное"},{value:"500",label:"Среднее"},{value:"600",label:"Полужирное"},{value:"700",label:"Жирное"}]} />
+                  </FormField>
+                </div>
+                <FormField label="Размер текста" htmlFor="builder-font-size">
+                  <Select id="builder-font-size" value={String(block.fontSize)} onChange={(event) => onUpdateBlock({ fontSize: Number(event.target.value) })} options={fontSizeOptions(block.type)} className="text-[12px]" />
+                </FormField>
+                <RangeField label="Строки" value={block.lineHeight} min={90} max={220} onChange={(lineHeight) => onUpdateBlock({ lineHeight })} />
+                <RangeField label="Буквы" value={block.letterSpacing} min={-2} max={12} onChange={(letterSpacing) => onUpdateBlock({ letterSpacing })} />
+              </>
             ) : null}
           </PropertySection>
         ) : null}
@@ -276,6 +284,8 @@ export function PropertiesPanel({
             max={64}
             onChange={(value) => onUpdateBlock({ paddingBottom: value })}
           />
+          <RangeField label="Слева" value={block.paddingLeft} min={0} max={80} onChange={(paddingLeft) => onUpdateBlock({ paddingLeft })} />
+          <RangeField label="Справа" value={block.paddingRight} min={0} max={80} onChange={(paddingRight) => onUpdateBlock({ paddingRight })} />
           {supportsRadius ? (
             <RangeField
               label="Скругление"
@@ -284,6 +294,17 @@ export function PropertiesPanel({
               max={24}
               onChange={(value) => onUpdateBlock({ borderRadius: value })}
             />
+          ) : null}
+        </PropertySection>
+
+        <PropertySection icon={Box} title="Размер и рамка">
+          <RangeField label="Ширина" value={block.widthPercent} min={25} max={100} onChange={(widthPercent) => onUpdateBlock({ widthPercent })} />
+          <RangeField label="Рамка" value={block.borderWidth} min={0} max={8} onChange={(borderWidth) => onUpdateBlock({ borderWidth })} />
+          <ColorField label="Цвет рамки" value={block.borderColor} onChange={(borderColor) => onUpdateBlock({ borderColor })} />
+          {block.type === "button" ? (
+            <FormField label="Стиль кнопки" htmlFor="builder-button-style">
+              <Select id="builder-button-style" value={block.buttonStyle} onChange={(event) => onUpdateBlock({ buttonStyle: event.target.value as BuilderBlock["buttonStyle"] })} options={[{value:"solid",label:"Заливка"},{value:"outline",label:"Контур"},{value:"soft",label:"Мягкий фон"}]} />
+            </FormField>
           ) : null}
         </PropertySection>
 
@@ -337,6 +358,13 @@ export function PropertiesPanel({
               value={document.bodyBackground}
               onChange={(bodyBackground) => onUpdateDocument({ bodyBackground })}
             />
+            <ColorField label="Внешний фон" value={document.workspaceBackground} onChange={(workspaceBackground) => onUpdateDocument({ workspaceBackground })} />
+            <FormField label="Ширина письма" htmlFor="builder-content-width">
+              <div className="flex items-center gap-2">
+                <Maximize2 aria-hidden="true" className="size-4 text-text-subtle" />
+                <Select id="builder-content-width" value={String(document.contentWidth)} onChange={(event) => onUpdateDocument({ contentWidth: Number(event.target.value) })} options={[{value:"480",label:"Узкое · 480"},{value:"560",label:"Компактное · 560"},{value:"640",label:"Стандарт · 640"},{value:"720",label:"Широкое · 720"}]} />
+              </div>
+            </FormField>
           </div>
         </details>
       </div>

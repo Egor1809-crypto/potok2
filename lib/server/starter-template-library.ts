@@ -157,6 +157,11 @@ const BLOCK_STYLES: Record<EmailBuilderBlockInput["type"], BlockStyle> = {
     fontSize: 18,
     borderRadius: 12,
   },
+  banner: { paddingTop: 18, paddingBottom: 18, backgroundColor: "#1f1433", textColor: "#ffffff", fontSize: 16, borderRadius: 14 },
+  timeline: { paddingTop: 20, paddingBottom: 20, backgroundColor: "transparent", textColor: "#302938", fontSize: 14, borderRadius: 12 },
+  faq: { paddingTop: 18, paddingBottom: 18, backgroundColor: "#f8f6fb", textColor: "#302938", fontSize: 14, borderRadius: 12 },
+  coupon: { paddingTop: 20, paddingBottom: 20, backgroundColor: "#f3edff", textColor: "#24182d", fontSize: 18, borderRadius: 14 },
+  video: { paddingTop: 18, paddingBottom: 18, backgroundColor: "#17121c", textColor: "#ffffff", fontSize: 15, borderRadius: 14 },
 };
 
 export type StarterEmailTemplateValue = {

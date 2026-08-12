@@ -181,11 +181,15 @@ function CanvasBlock({
       style={{
         paddingTop: block.paddingTop,
         paddingBottom: block.paddingBottom,
-        paddingLeft: horizontalPadding,
-        paddingRight: horizontalPadding,
+        paddingLeft: compact ? Math.min(block.paddingLeft, horizontalPadding) : block.paddingLeft,
+        paddingRight: compact ? Math.min(block.paddingRight, horizontalPadding) : block.paddingRight,
         backgroundColor,
         color: block.textColor,
         textAlign: block.alignment ?? "left",
+        fontFamily: block.fontFamily,
+        fontWeight: block.fontWeight,
+        lineHeight: block.lineHeight / 100,
+        letterSpacing: block.letterSpacing,
       }}
     >
       {selected ? (
@@ -234,7 +238,9 @@ function CanvasBlock({
         </div>
       ) : null}
 
-      <BlockContent block={block} accentColor={accentColor} compact={compact} selected={selected} />
+      <div style={{ width: `${block.widthPercent}%`, marginLeft: block.alignment === "right" ? "auto" : block.alignment === "center" ? "auto" : 0, marginRight: block.alignment === "center" ? "auto" : 0, border: `${block.borderWidth}px solid ${block.borderColor}`, borderRadius: block.borderRadius }}>
+        <BlockContent block={block} accentColor={accentColor} compact={compact} selected={selected} />
+      </div>
     </div>
   );
 }
@@ -296,13 +302,16 @@ function BlockContent({
   }
 
   if (block.type === "button") {
+    const buttonBackground = block.buttonStyle === "outline" ? "transparent" : block.buttonStyle === "soft" ? `${accentColor}18` : accentColor;
+    const buttonColor = block.buttonStyle === "solid" ? block.textColor : accentColor;
     return (
       <span
         className="inline-flex min-h-10 items-center justify-center px-5 font-semibold text-white shadow-[0_4px_12px_rgba(30,32,60,0.14)]"
         style={{
           borderRadius: block.borderRadius,
-          backgroundColor: accentColor,
-          color: block.textColor,
+          backgroundColor: buttonBackground,
+          color: buttonColor,
+          border: block.buttonStyle === "outline" ? `2px solid ${accentColor}` : undefined,
           fontSize: block.fontSize,
         }}
       >
@@ -485,6 +494,27 @@ function BlockContent({
 
   if (block.type === "pattern") {
     return <div aria-hidden="true" className="rounded-xl py-3 text-center font-semibold tracking-[.32em]" style={{ backgroundColor: block.backgroundColor === "transparent" ? `${accentColor}12` : block.backgroundColor, borderRadius: block.borderRadius, color: block.textColor, fontSize: block.fontSize }}>{block.content}</div>;
+  }
+
+  if (block.type === "banner") {
+    const [title, subtitle] = block.content.split("|");
+    return <div className="p-6 text-left" style={{ backgroundColor: block.backgroundColor, borderRadius: block.borderRadius }}><strong className="block text-[24px]">{renderTokens(title || "Важное объявление")}</strong><span className="mt-2 block opacity-75">{renderTokens(subtitle || "Короткое пояснение")}</span></div>;
+  }
+  if (block.type === "timeline") {
+    const items = block.content.split("|");
+    return <ol className="m-0 grid list-none gap-3 p-0 text-left">{Array.from({length:Math.ceil(items.length/2)},(_,index)=><li key={index} className="flex gap-3"><span className="grid size-7 shrink-0 place-items-center rounded-full text-xs font-bold text-white" style={{backgroundColor:accentColor}}>{index+1}</span><span><strong className="block">{renderTokens(items[index*2]||"")}</strong><span className="opacity-65">{renderTokens(items[index*2+1]||"")}</span></span></li>)}</ol>;
+  }
+  if (block.type === "faq") {
+    const items = block.content.split("|");
+    return <div className="grid text-left">{Array.from({length:Math.ceil(items.length/2)},(_,index)=><div key={index} className="border-b border-black/10 py-3"><strong className="block">{renderTokens(items[index*2]||"")}</strong><span className="mt-1 block opacity-65">{renderTokens(items[index*2+1]||"")}</span></div>)}</div>;
+  }
+  if (block.type === "coupon") {
+    const [eyebrow, code, note] = block.content.split("|");
+    return <div className="border-2 border-dashed p-5 text-center" style={{borderColor:accentColor,borderRadius:block.borderRadius,backgroundColor:block.backgroundColor}}><span className="block text-[11px] uppercase tracking-wider">{eyebrow}</span><strong className="my-2 block text-[26px] tracking-wider" style={{color:accentColor}}>{code}</strong><span className="block text-[11px] opacity-65">{note}</span></div>;
+  }
+  if (block.type === "video") {
+    const [title, duration] = block.content.split("|");
+    return <div className="grid min-h-44 place-items-center p-6 text-center" style={{backgroundColor:block.backgroundColor,borderRadius:block.borderRadius}}><div><span className="mx-auto grid size-12 place-items-center rounded-full bg-white/15 text-xl">▶</span><strong className="mt-3 block">{renderTokens(title||"Видео")}</strong><span className="mt-1 block text-xs opacity-60">{duration}</span></div></div>;
   }
 
   return (

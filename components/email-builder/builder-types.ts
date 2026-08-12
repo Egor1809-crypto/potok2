@@ -16,6 +16,16 @@ export type BuilderBlock = EmailBlock & {
   textColor: string;
   fontSize: number;
   borderRadius: number;
+  fontFamily: "Arial" | "Georgia" | "Verdana" | "Trebuchet MS";
+  fontWeight: 400 | 500 | 600 | 700;
+  lineHeight: number;
+  letterSpacing: number;
+  paddingLeft: number;
+  paddingRight: number;
+  borderWidth: number;
+  borderColor: string;
+  widthPercent: number;
+  buttonStyle: "solid" | "outline" | "soft";
 };
 
 export type BuilderDocument = {
@@ -29,18 +39,22 @@ export type BuilderDocument = {
   blocks: BuilderBlock[];
 };
 
-const blockDefaults: Record<
-  EmailBlockType,
-  Pick<
-    BuilderBlock,
-    | "paddingTop"
-    | "paddingBottom"
-    | "backgroundColor"
-    | "textColor"
-    | "fontSize"
-    | "borderRadius"
-  >
-> = {
+const advancedBlockDefaults = Object.fromEntries(([
+  "logo", "heading", "text", "image", "button", "columns", "divider", "spacer", "social", "footer", "hero", "quote", "checklist", "stats", "product", "signature", "pattern", "banner", "timeline", "faq", "coupon", "video",
+] satisfies EmailBlockType[]).map((type) => [type, {
+  fontFamily: "Arial",
+  fontWeight: type === "heading" || type === "hero" || type === "logo" ? 700 : 400,
+  lineHeight: type === "heading" || type === "hero" ? 115 : 155,
+  letterSpacing: type === "logo" || type === "pattern" ? 2 : 0,
+  paddingLeft: 40,
+  paddingRight: 40,
+  borderWidth: 0,
+  borderColor: "#e5e7eb",
+  widthPercent: 100,
+  buttonStyle: "solid",
+}])) as Record<EmailBlockType, Pick<BuilderBlock, "fontFamily" | "fontWeight" | "lineHeight" | "letterSpacing" | "paddingLeft" | "paddingRight" | "borderWidth" | "borderColor" | "widthPercent" | "buttonStyle">>;
+
+const legacyBlockDefaults: Record<EmailBlockType, Pick<BuilderBlock, "paddingTop" | "paddingBottom" | "backgroundColor" | "textColor" | "fontSize" | "borderRadius">> = {
   logo: {
     paddingTop: 28,
     paddingBottom: 14,
@@ -177,7 +191,16 @@ const blockDefaults: Record<
     fontSize: 18,
     borderRadius: 12,
   },
+  banner: { paddingTop: 18, paddingBottom: 18, backgroundColor: "#1f1433", textColor: "#ffffff", fontSize: 16, borderRadius: 14 },
+  timeline: { paddingTop: 20, paddingBottom: 20, backgroundColor: "transparent", textColor: "#302938", fontSize: 14, borderRadius: 12 },
+  faq: { paddingTop: 18, paddingBottom: 18, backgroundColor: "#f8f6fb", textColor: "#302938", fontSize: 14, borderRadius: 12 },
+  coupon: { paddingTop: 20, paddingBottom: 20, backgroundColor: "#f3edff", textColor: "#24182d", fontSize: 18, borderRadius: 14 },
+  video: { paddingTop: 18, paddingBottom: 18, backgroundColor: "#17121c", textColor: "#ffffff", fontSize: 15, borderRadius: 14 },
 };
+
+const blockDefaults = Object.fromEntries(
+  (Object.keys(legacyBlockDefaults) as EmailBlockType[]).map((type) => [type, { ...legacyBlockDefaults[type], ...advancedBlockDefaults[type] }]),
+) as Record<EmailBlockType, Pick<BuilderBlock, "paddingTop" | "paddingBottom" | "backgroundColor" | "textColor" | "fontSize" | "borderRadius" | "fontFamily" | "fontWeight" | "lineHeight" | "letterSpacing" | "paddingLeft" | "paddingRight" | "borderWidth" | "borderColor" | "widthPercent" | "buttonStyle">>;
 
 const initialContent: Record<EmailBlockType, Pick<EmailBlock, "content" | "label" | "href">> = {
   logo: { content: BRAND_NAME, label: undefined, href: undefined },
@@ -249,6 +272,11 @@ const initialContent: Record<EmailBlockType, Pick<EmailBlock, "content" | "label
     label: undefined,
     href: undefined,
   },
+  banner: { content: "Важное объявление|Короткое пояснение", label: "Подробнее", href: "https://tech-pravo.ru/" },
+  timeline: { content: "Шаг 1|Подготовка|Шаг 2|Согласование|Шаг 3|Результат", label: undefined, href: undefined },
+  faq: { content: "Что входит?|Короткий и понятный ответ|Как начать?|Оставьте заявку по кнопке", label: undefined, href: undefined },
+  coupon: { content: "ПРОМОКОД|TECH2026|Действует до конца месяца", label: "Скопировать код", href: undefined },
+  video: { content: "Посмотрите короткое видео|2 минуты", label: "Смотреть видео", href: "https://tech-pravo.ru/" },
 };
 
 let blockSequence = 0;
@@ -289,7 +317,7 @@ export function documentFromApiTemplate(
 ): BuilderDocument {
   return {
     ...template.builderDocument,
-    blocks: template.builderDocument.blocks.map((block) => ({ ...block })),
+    blocks: template.builderDocument.blocks.map((block) => ({ ...blockDefaults[block.type], ...block })),
   };
 }
 

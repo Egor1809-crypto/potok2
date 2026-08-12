@@ -108,7 +108,7 @@ function parseSuggestion(value: string, input: EmailAiRequest): EmailAiSuggestio
   if (!Array.isArray(design.blocks)) throw new ApiRequestError("ИИ не вернул структуру письма. Повторите запрос.", 502);
   const assetById = new Map((input.availableAssets ?? []).map((asset) => [asset.id, asset]));
   const allowedTypes = new Set<EmailBuilderBlockInput["type"]>([
-    "logo", "heading", "text", "image", "button", "columns", "divider", "spacer", "social", "footer", "hero", "quote", "checklist", "stats", "product", "signature", "pattern",
+    "logo", "heading", "text", "image", "button", "columns", "divider", "spacer", "social", "footer", "hero", "quote", "checklist", "stats", "product", "signature", "pattern", "banner", "timeline", "faq", "coupon", "video",
   ]);
   const blocks = design.blocks.slice(0, 20).flatMap((value, index) => {
     const raw = asObject(value);
@@ -127,13 +127,23 @@ function parseSuggestion(value: string, input: EmailAiRequest): EmailAiSuggestio
       ...(label ? { label } : {}),
       ...(asset ? { href: asset.url } : type === "button" && input.websiteUrl ? { href: input.websiteUrl } : {}),
       ...blockDefaults(type),
+      fontFamily: "Arial" as const,
+      fontWeight: type === "heading" || type === "hero" || type === "banner" ? 700 as const : 400 as const,
+      lineHeight: type === "heading" || type === "hero" ? 115 : 155,
+      letterSpacing: type === "pattern" || type === "logo" ? 2 : 0,
+      paddingLeft: 40,
+      paddingRight: 40,
+      borderWidth: 0,
+      borderColor: "#e5e7eb",
+      widthPercent: 100,
+      buttonStyle: "solid" as const,
     }];
   });
   if (!blocks.some((block) => block.type === "heading" || block.type === "hero")) {
-    blocks.unshift({ id: `ai-heading-${crypto.randomUUID()}`, type: "heading", content: suggestion.subject, ...blockDefaults("heading") });
+    blocks.unshift({ id: `ai-heading-${crypto.randomUUID()}`, type: "heading", content: suggestion.subject, ...blockDefaults("heading"), fontFamily:"Arial", fontWeight:700, lineHeight:115, letterSpacing:0, paddingLeft:40, paddingRight:40, borderWidth:0, borderColor:"#e5e7eb", widthPercent:100, buttonStyle:"solid" });
   }
   if (!blocks.some((block) => block.type === "text")) {
-    blocks.push({ id: `ai-text-${crypto.randomUUID()}`, type: "text", content: suggestion.body, ...blockDefaults("text") });
+    blocks.push({ id: `ai-text-${crypto.randomUUID()}`, type: "text", content: suggestion.body, ...blockDefaults("text"), fontFamily:"Arial", fontWeight:400, lineHeight:155, letterSpacing:0, paddingLeft:40, paddingRight:40, borderWidth:0, borderColor:"#e5e7eb", widthPercent:100, buttonStyle:"solid" });
   }
   const parsedDocument = parseEmailBuilderDocument({
     templateId: "",
@@ -166,7 +176,7 @@ export async function generateEmailSuggestion(request: Request, value: unknown):
       safety_identifier: await safetyIdentifier(request),
       reasoning: { effort: "low" },
       max_output_tokens: input.action === "design" ? 4_000 : 1_200,
-      instructions: "Ты арт-директор и редактор деловых email-писем на русском языке. Пиши конкретно, без выдуманных фактов, обещаний и цифр. Сохраняй только переменные {{first_name}}, {{last_name}}, {{company}}, {{position}}, {{city}}. Для design собери цельное красивое письмо из 5-10 разноплановых блоков. Используй image только с assetId из availableAssets, logo может быть текстовым или с assetId. Не выдумывай ссылки и изображения. Если websiteUrl отсутствует, не добавляй button. Цвета строго #RRGGBB. Ответ строго по JSON-схеме.",
+      instructions: "Ты арт-директор и редактор деловых email-писем на русском языке. Пиши конкретно, без выдуманных фактов, обещаний и цифр. Сохраняй только переменные {{first_name}}, {{last_name}}, {{company}}, {{position}}, {{city}}. Для design собери цельное красивое письмо из 6-12 разноплановых блоков, выбери ясную визуальную иерархию и уместно используй hero, banner, timeline, faq, coupon, video, pattern и другие блоки. Используй image только с assetId из availableAssets, logo может быть текстовым или с assetId. Не выдумывай ссылки и изображения. Если websiteUrl отсутствует, не добавляй button или video. Цвета строго #RRGGBB. Ответ строго по JSON-схеме.",
       input: JSON.stringify(input),
       text: {
         format: {
@@ -199,7 +209,7 @@ export async function generateEmailSuggestion(request: Request, value: unknown):
                       additionalProperties: false,
                       required: ["type", "content", "label", "assetId"],
                       properties: {
-                        type: { type: "string", enum: ["logo", "heading", "text", "image", "button", "columns", "divider", "spacer", "social", "footer", "hero", "quote", "checklist", "stats", "product", "signature", "pattern"] },
+                        type: { type: "string", enum: ["logo", "heading", "text", "image", "button", "columns", "divider", "spacer", "social", "footer", "hero", "quote", "checklist", "stats", "product", "signature", "pattern", "banner", "timeline", "faq", "coupon", "video"] },
                         content: { type: "string" },
                         label: { type: ["string", "null"] },
                         assetId: { type: ["string", "null"] },

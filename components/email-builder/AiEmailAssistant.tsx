@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { LoaderCircle, Sparkles, WandSparkles } from "lucide-react";
+import { GitCompareArrows, LoaderCircle, Sparkles, WandSparkles } from "lucide-react";
 
-import { Button, FormField, Select, Textarea } from "@/components/ui";
+import { Button, FormField, Modal, Select, Textarea } from "@/components/ui";
 import type { ApiError, EmailAiAction, EmailAiResponse, EmailAiSuggestion, EmailAssetsListResponse } from "@/types/api";
 
 import type { BuilderBlock, BuilderDocument } from "./builder-types";
@@ -23,6 +23,7 @@ export function AiEmailAssistant({ block, document, onUpdateBlock, onUpdateDocum
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [comparisonOpen, setComparisonOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -87,6 +88,19 @@ export function AiEmailAssistant({ block, document, onUpdateBlock, onUpdateDocum
 
   return (
     <details className="group border-b border-border bg-gradient-to-b from-primary-subtle/45 to-transparent" open>
+      <Modal
+        open={comparisonOpen}
+        onOpenChange={setComparisonOpen}
+        title="Сравнение двух версий письма"
+        description="Слева остаётся ваш текущий макет, справа — отдельный вариант ИИ. Ничего не заменится без вашего решения."
+        size="xl"
+        footer={<><Button variant="ghost" onClick={() => setComparisonOpen(false)}>Оставить мой вариант</Button><Button variant="primary" disabled={!suggestion?.document} onClick={() => { apply(); setComparisonOpen(false); }}>Использовать вариант ИИ</Button></>}
+      >
+        <div className="grid gap-4 md:grid-cols-2">
+          <DesignComparisonCard label="Мой вариант" document={document} />
+          {suggestion?.document ? <DesignComparisonCard label="Вариант ИИ" document={suggestion.document as BuilderDocument} accent /> : null}
+        </div>
+      </Modal>
       <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between px-4 text-[11px] font-semibold text-text-strong outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30 [&::-webkit-details-marker]:hidden">
         <span className="flex items-center gap-2"><Sparkles aria-hidden="true" className="size-4 text-primary" />ИИ-помощник</span>
         <span className="rounded-full bg-surface px-2 py-0.5 text-[9px] font-medium text-text-subtle">{configured === null ? "Проверка" : configured ? "Подключён" : "Нужен ключ"}</span>
@@ -110,10 +124,41 @@ export function AiEmailAssistant({ block, document, onUpdateBlock, onUpdateDocum
           <div className="grid gap-2 rounded-xl border border-primary/15 bg-surface p-3 shadow-[var(--shadow-xs)]">
             <div><span className="text-[9px] font-semibold uppercase tracking-[0.08em] text-text-subtle">Тема</span><p className="mb-0 mt-1 text-[11px] font-medium text-text-strong">{suggestion.subject}</p></div>
             <div><span className="text-[9px] font-semibold uppercase tracking-[0.08em] text-text-subtle">{suggestion.document ? "Макет" : "Текст"}</span><p className="mb-0 mt-1 whitespace-pre-wrap text-[10px] leading-4 text-text-muted">{suggestion.document ? `${suggestion.document.blocks.length} блоков · готовые цвета, тексты и изображения` : suggestion.body}</p></div>
-            <Button type="button" variant="outline" size="sm" onClick={apply}>{suggestion.document ? "Заменить письмо этим макетом" : "Применить к письму"}</Button>
+            {suggestion.document ? (
+              <Button type="button" variant="outline" size="sm" onClick={() => setComparisonOpen(true)}><GitCompareArrows aria-hidden="true" className="size-3.5" />Сравнить с моим письмом</Button>
+            ) : (
+              <Button type="button" variant="outline" size="sm" onClick={apply}>Применить к письму</Button>
+            )}
           </div>
         ) : null}
       </div>
     </details>
+  );
+}
+
+function DesignComparisonCard({ label, document, accent = false }: { label: string; document: BuilderDocument; accent?: boolean }) {
+  return (
+    <section className={`overflow-hidden rounded-2xl border ${accent ? "border-primary/35" : "border-border"}`}>
+      <div className="flex items-center justify-between border-b border-border bg-surface-subtle px-4 py-3">
+        <strong className="text-[13px] text-text-strong">{label}</strong>
+        <span className="text-[10px] text-text-muted">{document.blocks.length} блоков</span>
+      </div>
+      <div className="p-4" style={{ background: document.workspaceBackground }}>
+        <div className="mx-auto overflow-hidden rounded-lg shadow-sm" style={{ background: document.bodyBackground, maxWidth: 380 }}>
+          <div className="border-b border-black/5 p-4">
+            <p className="m-0 text-[13px] font-semibold" style={{ color: document.accentColor }}>{document.subject}</p>
+            <p className="mb-0 mt-1 line-clamp-2 text-[10px] text-text-muted">{document.previewText || "Без текста предпросмотра"}</p>
+          </div>
+          <div className="grid gap-2 p-4">
+            {document.blocks.slice(0, 10).map((block) => (
+              <div key={block.id} className="rounded-md border border-black/5 px-3 py-2" style={{ background: block.backgroundColor === "transparent" ? "transparent" : block.backgroundColor, color: block.textColor }}>
+                <span className="block text-[9px] font-semibold uppercase tracking-wide opacity-50">{block.type}</span>
+                <span className="mt-1 block line-clamp-2 text-[11px]">{block.label || block.content || "Декоративный блок"}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }

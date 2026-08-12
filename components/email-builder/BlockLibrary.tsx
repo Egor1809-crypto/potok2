@@ -20,6 +20,11 @@ import {
   Quote,
   Sparkles,
   Shapes,
+  TicketPercent,
+  ListTree,
+  CircleHelp,
+  Megaphone,
+  PlaySquare,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -51,6 +56,11 @@ export const blockLibrary: BlockLibraryItem[] = [
   { type: "product", label: "Карточка", description: "Продукт или услуга", icon: PackageOpen },
   { type: "signature", label: "Подпись", description: "Отправитель и контакты", icon: ContactRound },
   { type: "pattern", label: "Узор", description: "Декоративная полоса", icon: Shapes },
+  { type: "banner", label: "Баннер", description: "Яркое объявление", icon: Megaphone },
+  { type: "timeline", label: "Этапы", description: "Путь или программа", icon: ListTree },
+  { type: "faq", label: "Вопросы", description: "Вопросы и ответы", icon: CircleHelp },
+  { type: "coupon", label: "Промокод", description: "Купон или бонус", icon: TicketPercent },
+  { type: "video", label: "Видео", description: "Обложка со ссылкой", icon: PlaySquare },
 ];
 
 export const getBlockLabel = (type: EmailBlockType) =>

@@ -20,3 +20,25 @@ test("uploaded logos are compiled as real images", async () => {
   assert.match(source, /block\.type === "logo" && block\.href/);
   assert.match(source, /max-width:220px/);
 });
+
+test("advanced editor controls and new content blocks compile into email-safe HTML", async () => {
+  const [compiler, properties, library] = await Promise.all([
+    readFile(new URL("../lib/server/email-document.ts", import.meta.url), "utf8"),
+    readFile(new URL("../components/email-builder/PropertiesPanel.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/email-builder/BlockLibrary.tsx", import.meta.url), "utf8"),
+  ]);
+  for (const type of ["banner", "timeline", "faq", "coupon", "video"]) {
+    assert.match(compiler, new RegExp(`block\\.type === "${type}"`));
+    assert.match(library, new RegExp(`type: "${type}"`));
+  }
+  for (const control of ["fontFamily", "fontWeight", "lineHeight", "letterSpacing", "widthPercent", "buttonStyle"]) {
+    assert.match(properties, new RegExp(control));
+  }
+});
+
+test("AI design remains a separate version until the user chooses it", async () => {
+  const source = await readFile(new URL("../components/email-builder/AiEmailAssistant.tsx", import.meta.url), "utf8");
+  assert.match(source, /Сравнение двух версий письма/);
+  assert.match(source, /Оставить мой вариант/);
+  assert.match(source, /Использовать вариант ИИ/);
+});

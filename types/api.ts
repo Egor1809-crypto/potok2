@@ -159,7 +159,12 @@ export type EmailBuilderBlockInput = {
     | "stats"
     | "product"
     | "signature"
-    | "pattern";
+    | "pattern"
+    | "banner"
+    | "timeline"
+    | "faq"
+    | "coupon"
+    | "video";
   content: string;
   label?: string;
   href?: string;
@@ -170,6 +175,16 @@ export type EmailBuilderBlockInput = {
   textColor: string;
   fontSize: number;
   borderRadius: number;
+  fontFamily?: "Arial" | "Georgia" | "Verdana" | "Trebuchet MS";
+  fontWeight?: 400 | 500 | 600 | 700;
+  lineHeight?: number;
+  letterSpacing?: number;
+  paddingLeft?: number;
+  paddingRight?: number;
+  borderWidth?: number;
+  borderColor?: string;
+  widthPercent?: number;
+  buttonStyle?: "solid" | "outline" | "soft";
 };
 
 export type EmailBuilderDocumentInput = {

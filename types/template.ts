@@ -23,7 +23,12 @@ export type EmailBlockType =
   | "stats"
   | "product"
   | "signature"
-  | "pattern";
+  | "pattern"
+  | "banner"
+  | "timeline"
+  | "faq"
+  | "coupon"
+  | "video";
 
 export interface EmailBlock {
   id: string;

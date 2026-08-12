@@ -86,6 +86,12 @@ const emailBlockTypes = new Set<EmailBlockType>([
   "stats",
   "product",
   "signature",
+  "pattern",
+  "banner",
+  "timeline",
+  "faq",
+  "coupon",
+  "video",
 ]);
 
 function subscribeToLocation(onStoreChange: () => void) {
