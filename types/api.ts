@@ -246,6 +246,8 @@ export type EmailAiRequest = {
   websiteUrl?: string;
   primaryColor?: string;
   secondaryColor?: string;
+  brandName?: string;
+  includeLogo?: boolean;
   visualStyle?: "minimal" | "editorial" | "bold" | "premium";
   imageSource?: "internet" | "generate" | "none";
   availableAssets?: Array<Pick<EmailAssetRecord, "id" | "filename" | "kind" | "url">>;
@@ -257,7 +259,7 @@ export type EmailAiSuggestion = {
   body: string;
   cta: string;
   document?: EmailBuilderDocumentInput;
-  imagePrompts?: Array<{ blockId: string; prompt: string; alt: string }>;
+  imagePrompts?: Array<{ blockId: string; prompt: string; alt: string; kind: "photo" | "logo" }>;
 };
 
 export type EmailExportResponse = {

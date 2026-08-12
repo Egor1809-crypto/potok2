@@ -47,8 +47,11 @@ test("AI design remains a separate version until the user chooses it", async () 
   assert.match(assistant, /Мой макет и вариант ИИ/);
   assert.match(assistant, /Оставить мой/);
   assert.match(assistant, /Использовать вариант ИИ/);
-  assert.match(assistant, /ИИ найдёт изображения в открытой медиатеке/);
-  assert.match(assistant, /ИИ создаст новые изображения/);
-  assert.match(server, /commons\.wikimedia\.org/);
+  assert.match(assistant, /Найти релевантные с открытой лицензией/);
+  assert.match(assistant, /Лучшее качество — создать новые/);
+  assert.match(assistant, /Создать новый логотип под письмо/);
+  assert.match(server, /api\.openverse\.org/);
+  assert.match(server, /license_type/);
+  assert.match(server, /aspect_ratio/);
   assert.match(server, /images\/generations/);
 });

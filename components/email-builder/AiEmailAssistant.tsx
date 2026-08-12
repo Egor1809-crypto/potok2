@@ -17,7 +17,9 @@ export function AiEmailAssistant({ document, onApply }: { document: BuilderDocum
   const [primaryColor, setPrimaryColor] = useState(document.accentColor);
   const [secondaryColor, setSecondaryColor] = useState(document.workspaceBackground);
   const [websiteUrl, setWebsiteUrl] = useState("");
-  const [imageSource, setImageSource] = useState<"internet" | "generate" | "none">("internet");
+  const [brandName, setBrandName] = useState("MAILFLOW");
+  const [includeLogo, setIncludeLogo] = useState(true);
+  const [imageSource, setImageSource] = useState<"internet" | "generate" | "none">("generate");
   const [suggestion, setSuggestion] = useState<EmailAiSuggestion | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -39,7 +41,7 @@ export function AiEmailAssistant({ document, onApply }: { document: BuilderDocum
       const response = await fetch("/api/ai/email-assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ action: "design", goal, audience, tone, visualStyle, primaryColor, secondaryColor, websiteUrl: websiteUrl.trim() || undefined, imageSource }),
+        body: JSON.stringify({ action: "design", goal, audience, tone, visualStyle, primaryColor, secondaryColor, websiteUrl: websiteUrl.trim() || undefined, brandName: brandName.trim() || undefined, includeLogo, imageSource }),
       });
       const body = await response.json() as EmailAiResponse | ApiError;
       if (!response.ok || !("suggestion" in body) || !body.suggestion?.document) throw new Error("error" in body ? body.error : "Дизайн не подготовлен.");
@@ -72,11 +74,13 @@ export function AiEmailAssistant({ document, onApply }: { document: BuilderDocum
         <div className="grid gap-4 md:grid-cols-2">
           <FormField label="Для кого письмо"><Input value={audience} onChange={(event) => setAudience(event.target.value)} placeholder="Руководители юридических компаний" /></FormField>
           <FormField label="Ссылка основной кнопки"><Input type="url" value={websiteUrl} onChange={(event) => setWebsiteUrl(event.target.value)} placeholder="https://tech-pravo.ru/" /></FormField>
+          <FormField label="Название бренда"><Input value={brandName} onChange={(event) => setBrandName(event.target.value)} placeholder="Tech‑Pravo" /></FormField>
+          <FormField label="Логотип"><Select value={includeLogo ? "yes" : "no"} onChange={(event) => setIncludeLogo(event.target.value === "yes")} options={[{value:"yes",label:"Создать новый логотип под письмо"},{value:"no",label:"Не добавлять логотип"}]} /></FormField>
           <FormField label="Тон"><Select value={tone} onChange={(event) => setTone(event.target.value)} options={[{value:"business",label:"Деловой"},{value:"friendly",label:"Дружелюбный"},{value:"expert",label:"Экспертный"},{value:"concise",label:"Краткий"}]} /></FormField>
           <FormField label="Стиль"><Select value={visualStyle} onChange={(event) => setVisualStyle(event.target.value)} options={[{value:"editorial",label:"Редакционный"},{value:"minimal",label:"Минималистичный"},{value:"bold",label:"Яркий"},{value:"premium",label:"Премиальный"}]} /></FormField>
           <ColorInput label="Основной цвет" value={primaryColor} onChange={setPrimaryColor} />
           <ColorInput label="Фоновый цвет" value={secondaryColor} onChange={setSecondaryColor} />
-          <FormField label="Изображения"><Select value={imageSource} onChange={(event) => setImageSource(event.target.value as "internet" | "generate" | "none")} options={[{value:"internet",label:"ИИ найдёт изображения в открытой медиатеке"},{value:"generate",label:"ИИ создаст новые изображения"},{value:"none",label:"Без изображений"}]} /></FormField>
+          <FormField label="Изображения"><Select value={imageSource} onChange={(event) => setImageSource(event.target.value as "internet" | "generate" | "none")} options={[{value:"generate",label:"Лучшее качество — создать новые"},{value:"internet",label:"Найти релевантные с открытой лицензией"},{value:"none",label:"Без изображений"}]} /></FormField>
         </div>
         {error ? <p role="alert" className="m-0 rounded-xl bg-danger-subtle px-4 py-3 text-[12px] text-danger">{error}</p> : null}
         <Button type="button" variant="primary" size="lg" disabled={busy || goal.trim().length < 8} onClick={() => void generate()}>{busy ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : <WandSparkles aria-hidden="true" className="size-4" />}{busy ? "ИИ создаёт письмо и изображения…" : "Создать готовое письмо"}</Button>
