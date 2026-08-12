@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { Download, FileCode2, FileJson2, FileText, Printer } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { AlertCircle, Download, FileCode2, FileJson2, FileText, Printer, X } from "lucide-react";
 
 import { Button } from "@/components/ui";
 import type { ApiError, EmailExportResponse } from "@/types/api";
 
 import type { BuilderDocument } from "./builder-types";
+
+type ExportFormat = "html" | "doc" | "txt" | "json" | "pdf";
 
 function safeName(value: string) {
   return (value.trim() || "письмо").replace(/[\\/:*?"<>|]+/g, "-").slice(0, 80);
@@ -17,14 +20,30 @@ function saveBlob(content: BlobPart, type: string, filename: string) {
   const anchor = window.document.createElement("a");
   anchor.href = url;
   anchor.download = filename;
+  anchor.hidden = true;
+  window.document.body.appendChild(anchor);
   anchor.click();
-  URL.revokeObjectURL(url);
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+}
+
+function loadingPage() {
+  return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Подготовка PDF</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f7f2e9;color:#211924;font-family:Arial,sans-serif}.card{max-width:420px;padding:32px;border:1px solid #dfd1e8;border-radius:18px;background:#fff;text-align:center}.dot{width:30px;height:30px;margin:0 auto 18px;border:3px solid #eadcf5;border-top-color:#7c3aed;border-radius:50%;animation:s .8s linear infinite}@keyframes s{to{transform:rotate(360deg)}}</style></head><body><div class="card"><div class="dot"></div><strong>Подготавливаем PDF</strong><p>Окно печати откроется автоматически.</p></div></body></html>`;
 }
 
 export function EmailExportMenu({ document, name }: { document: BuilderDocument; name: string }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [dialog, setDialog] = useState<{ title: string; message: string; retryPdf?: boolean } | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!dialog) return;
+    dialogRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") setDialog(null); };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [dialog]);
 
   const compiled = async () => {
     const response = await fetch("/api/email-export", {
@@ -37,9 +56,29 @@ export function EmailExportMenu({ document, name }: { document: BuilderDocument;
     return body;
   };
 
-  const run = async (format: "html" | "doc" | "txt" | "json" | "pdf") => {
+  const run = async (format: ExportFormat) => {
+    // PDF-окно создаётся синхронно внутри пользовательского клика. Только так
+    // браузер показывает собственный запрос разрешения вместо тихой блокировки.
+    const printWindow = format === "pdf" ? window.open("about:blank", "_blank") : null;
+    if (format === "pdf" && !printWindow) {
+      setOpen(false);
+      setDialog({
+        title: "Браузер заблокировал окно PDF",
+        message: "Нажмите «Разрешить и повторить». Если браузер покажет системный запрос, разрешите всплывающие окна для MAILFLOW — окно печати откроется сразу.",
+        retryPdf: true,
+      });
+      return;
+    }
+    if (printWindow) {
+      printWindow.opener = null;
+      printWindow.document.open();
+      printWindow.document.write(loadingPage());
+      printWindow.document.close();
+    }
+
     setBusy(true);
-    setError("");
+    setOpen(false);
+    setDialog(null);
     try {
       const filename = safeName(name);
       if (format === "json") {
@@ -49,42 +88,66 @@ export function EmailExportMenu({ document, name }: { document: BuilderDocument;
         if (format === "html") saveBlob(result.html, "text/html;charset=utf-8", `${filename}.html`);
         if (format === "txt") saveBlob(result.text, "text/plain;charset=utf-8", `${filename}.txt`);
         if (format === "doc") {
-          const wordHtml = `<!doctype html><html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>${filename}</title></head><body>${result.html}</body></html>`;
+          const wordBody = new DOMParser().parseFromString(result.html, "text/html").body.innerHTML;
+          const wordHtml = `<!doctype html><html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" lang="ru"><head><meta charset="utf-8"><title>${filename}</title></head><body>${wordBody}</body></html>`;
           saveBlob(wordHtml, "application/msword;charset=utf-8", `${filename}.doc`);
         }
-        if (format === "pdf") {
-          const frame = window.open("", "_blank", "noopener,noreferrer");
-          if (!frame) throw new Error("Разрешите всплывающие окна, чтобы сохранить PDF.");
-          frame.document.write(result.html);
-          frame.document.close();
-          frame.addEventListener("load", () => { frame.focus(); frame.print(); }, { once: true });
+        if (format === "pdf" && printWindow) {
+          printWindow.document.open();
+          printWindow.document.write(result.html);
+          printWindow.document.close();
+          window.setTimeout(() => {
+            try { printWindow.focus(); printWindow.print(); }
+            catch { setDialog({ title: "Не удалось открыть печать", message: "Окно письма уже открыто. В нём нажмите ⌘P или Ctrl+P и выберите «Сохранить как PDF»." }); }
+          }, 350);
         }
       }
-      setOpen(false);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Не удалось подготовить файл.");
+      printWindow?.close();
+      setDialog({
+        title: "Экспорт не выполнен",
+        message: caught instanceof Error ? caught.message : "Не удалось подготовить файл. Повторите попытку.",
+      });
     } finally { setBusy(false); }
   };
 
   const options = [
     ["html", FileCode2, "HTML", "Для отправки и публикации"],
     ["doc", FileText, "Word (.doc)", "Для согласования и правок"],
-    ["pdf", Printer, "PDF", "Через системное окно печати"],
+    ["pdf", Printer, "PDF", "Системное окно откроется сразу"],
     ["txt", FileText, "Текст", "Без оформления"],
     ["json", FileJson2, "Исходник MAILFLOW", "Резервная копия макета"],
   ] as const;
 
-  return <div className="relative">
-    <Button type="button" variant="secondary" size="sm" disabled={busy} onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-haspopup="menu">
-      <Download aria-hidden="true" className="size-3.5" /><span className="hidden xl:inline">Скачать</span>
-    </Button>
-    {open ? <div role="menu" className="absolute right-0 top-[calc(100%+8px)] z-50 w-72 rounded-xl border border-border bg-surface p-2 shadow-[var(--shadow-floating)]">
-      <p className="px-2 pb-2 text-[10px] font-semibold uppercase tracking-[.08em] text-text-subtle">Экспорт письма</p>
-      {options.map(([format, Icon, label, hint]) => <button key={format} role="menuitem" type="button" onClick={() => void run(format)} className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
-        <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary-subtle text-primary"><Icon aria-hidden="true" className="size-4" /></span>
-        <span><span className="block text-[11px] font-semibold text-text-strong">{label}</span><span className="block text-[9px] text-text-subtle">{hint}</span></span>
-      </button>)}
-      {error ? <p role="alert" className="m-2 rounded-lg bg-danger-subtle p-2 text-[10px] text-danger">{error}</p> : null}
-    </div> : null}
-  </div>;
+  return <>
+    <div className="relative">
+      <Button type="button" variant="secondary" size="sm" disabled={busy} onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-haspopup="menu">
+        <Download aria-hidden="true" className="size-3.5" /><span className="hidden xl:inline">{busy ? "Готовим…" : "Скачать"}</span>
+      </Button>
+      {open ? <div role="menu" className="absolute right-0 top-[calc(100%+8px)] z-50 w-72 rounded-xl border border-border bg-surface p-2 shadow-[var(--shadow-floating)]">
+        <p className="px-2 pb-2 text-[10px] font-semibold uppercase tracking-[.08em] text-text-subtle">Экспорт письма</p>
+        {options.map(([format, Icon, label, hint]) => <button key={format} role="menuitem" type="button" onClick={() => void run(format)} className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
+          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary-subtle text-primary"><Icon aria-hidden="true" className="size-4" /></span>
+          <span><span className="block text-[11px] font-semibold text-text-strong">{label}</span><span className="block text-[9px] text-text-subtle">{hint}</span></span>
+        </button>)}
+      </div> : null}
+    </div>
+
+    {dialog && typeof window !== "undefined" ? createPortal(
+      <div className="fixed inset-0 z-[1000] grid place-items-center bg-[#211924]/45 p-4 backdrop-blur-[2px]" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setDialog(null); }}>
+        <div ref={dialogRef} tabIndex={-1} role="alertdialog" aria-modal="true" aria-labelledby="export-dialog-title" aria-describedby="export-dialog-description" className="w-full max-w-md rounded-2xl border border-border bg-surface p-5 shadow-[var(--shadow-floating)] outline-none sm:p-6">
+          <div className="flex items-start gap-3">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-warning-subtle text-warning"><AlertCircle aria-hidden="true" className="size-5" /></span>
+            <div className="min-w-0 flex-1"><h2 id="export-dialog-title" className="m-0 text-[16px] font-semibold text-text-strong">{dialog.title}</h2><p id="export-dialog-description" className="mb-0 mt-2 text-[12px] leading-5 text-text-muted">{dialog.message}</p></div>
+            <button type="button" onClick={() => setDialog(null)} className="grid size-8 shrink-0 place-items-center rounded-lg text-text-muted hover:bg-surface-subtle" aria-label="Закрыть"><X aria-hidden="true" className="size-4" /></button>
+          </div>
+          <div className="mt-5 flex justify-end gap-2">
+            <Button type="button" variant="secondary" size="sm" onClick={() => setDialog(null)}>Закрыть</Button>
+            {dialog.retryPdf ? <Button type="button" variant="primary" size="sm" onClick={() => void run("pdf")}><Printer aria-hidden="true" className="size-4" />Разрешить и повторить</Button> : null}
+          </div>
+        </div>
+      </div>,
+      window.document.body,
+    ) : null}
+  </>;
 }
