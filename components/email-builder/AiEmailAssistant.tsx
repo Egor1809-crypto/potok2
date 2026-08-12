@@ -15,6 +15,7 @@ export function AiEmailAssistant({ block, document, onUpdateBlock, onUpdateDocum
   onUpdateDocument: (patch: Partial<BuilderDocument>) => void;
 }) {
   const [configured, setConfigured] = useState<boolean | null>(null);
+  const [provider, setProvider] = useState<EmailAiResponse["provider"]>();
   const [action, setAction] = useState<EmailAiAction>("compose");
   const [tone, setTone] = useState("business");
   const [goal, setGoal] = useState("");
@@ -29,7 +30,7 @@ export function AiEmailAssistant({ block, document, onUpdateBlock, onUpdateDocum
     let active = true;
     void fetch("/api/ai/email-assistant", { cache: "no-store" })
       .then((response) => response.json() as Promise<EmailAiResponse>)
-      .then((body) => { if (active) setConfigured(body.configured); })
+      .then((body) => { if (active) { setConfigured(body.configured); setProvider(body.provider); } })
       .catch(() => { if (active) setConfigured(false); });
     return () => { active = false; };
   }, []);
@@ -66,6 +67,7 @@ export function AiEmailAssistant({ block, document, onUpdateBlock, onUpdateDocum
       if (!response.ok || !("suggestion" in body) || !body.suggestion) throw new Error("error" in body ? body.error : "Предложение не подготовлено.");
       setSuggestion(body.suggestion);
       setConfigured(true);
+      setProvider(body.provider);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Предложение не подготовлено.");
     } finally { setBusy(false); }
@@ -103,7 +105,7 @@ export function AiEmailAssistant({ block, document, onUpdateBlock, onUpdateDocum
       </Modal>
       <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between px-4 text-[11px] font-semibold text-text-strong outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30 [&::-webkit-details-marker]:hidden">
         <span className="flex items-center gap-2"><Sparkles aria-hidden="true" className="size-4 text-primary" />ИИ-помощник</span>
-        <span className="rounded-full bg-surface px-2 py-0.5 text-[9px] font-medium text-text-subtle">{configured === null ? "Проверка" : configured ? "Подключён" : "Нужен ключ"}</span>
+        <span className="rounded-full bg-surface px-2 py-0.5 text-[9px] font-medium text-text-subtle">{configured === null ? "Проверка" : configured ? provider === "navyai" ? "NavyAI подключён" : "OpenAI подключён" : "Нужен ключ"}</span>
       </summary>
       <div className="grid gap-3 px-4 pb-4">
         <div className="grid grid-cols-2 gap-2">

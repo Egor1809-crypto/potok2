@@ -10,12 +10,38 @@ const ACTIONS = new Set<EmailAiAction>(["design", "compose", "rewrite", "shorten
 const TONES = new Set(["business", "friendly", "expert", "concise"]);
 
 function runtime() {
-  return env as unknown as { OPENAI_API_KEY?: string; OPENAI_EMAIL_MODEL?: string };
+  return env as unknown as {
+    NAVYAI_API_KEY?: string;
+    NAVYAI_BASE_URL?: string;
+    NAVYAI_EMAIL_MODEL?: string;
+    OPENAI_API_KEY?: string;
+    OPENAI_EMAIL_MODEL?: string;
+  };
+}
+
+function aiProvider() {
+  const navyKey = runtime().NAVYAI_API_KEY?.trim();
+  if (navyKey) {
+    return {
+      key: navyKey,
+      provider: "navyai" as const,
+      endpoint: `${runtime().NAVYAI_BASE_URL?.trim().replace(/\/$/, "") || "https://api.navy/v1"}/responses`,
+      model: runtime().NAVYAI_EMAIL_MODEL?.trim() || "gpt-5.2",
+    };
+  }
+  const openAiKey = runtime().OPENAI_API_KEY?.trim();
+  return openAiKey ? {
+    key: openAiKey,
+    provider: "openai" as const,
+    endpoint: "https://api.openai.com/v1/responses",
+    model: runtime().OPENAI_EMAIL_MODEL?.trim() || "gpt-5.2",
+  } : null;
 }
 
 export async function emailAiStatus(request: Request): Promise<EmailAiResponse> {
   await ensureDatabase(request);
-  return { configured: Boolean(runtime().OPENAI_API_KEY?.trim()) };
+  const provider = aiProvider();
+  return { configured: Boolean(provider), ...(provider ? { provider: provider.provider } : {}) };
 }
 
 function parseRequest(value: unknown): EmailAiRequest {
@@ -162,16 +188,16 @@ function parseSuggestion(value: string, input: EmailAiRequest): EmailAiSuggestio
 
 export async function generateEmailSuggestion(request: Request, value: unknown): Promise<EmailAiResponse> {
   await ensureDatabase(request);
-  const apiKey = runtime().OPENAI_API_KEY?.trim();
-  if (!apiKey) {
-    throw new ApiRequestError("ИИ-помощник ещё не подключён: добавьте секрет OPENAI_API_KEY в настройках публикации.", 503);
+  const provider = aiProvider();
+  if (!provider) {
+    throw new ApiRequestError("ИИ-помощник ещё не подключён: добавьте серверный ключ NavyAI или OpenAI.", 503);
   }
   const input = parseRequest(value);
-  const response = await fetch("https://api.openai.com/v1/responses", {
+  const response = await fetch(provider.endpoint, {
     method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    headers: { Authorization: `Bearer ${provider.key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: runtime().OPENAI_EMAIL_MODEL?.trim() || "gpt-5.6-luna",
+      model: provider.model,
       store: false,
       safety_identifier: await safetyIdentifier(request),
       reasoning: { effort: "low" },
@@ -239,5 +265,5 @@ export async function generateEmailSuggestion(request: Request, value: unknown):
     console.error("OpenAI email assistant error", response.status, responseBody);
     throw new ApiRequestError(response.status === 429 ? "ИИ-помощник занят. Повторите через минуту." : "ИИ-помощник не смог подготовить текст. Повторите попытку.", 502);
   }
-  return { configured: true, suggestion: parseSuggestion(outputText(responseBody), input) };
+  return { configured: true, provider: provider.provider, suggestion: parseSuggestion(outputText(responseBody), input) };
 }
