@@ -45,6 +45,20 @@ const personalizationFields = [
   { label: "Город", token: "{{city}}", example: "Москва" },
 ];
 
+const compoundContentLabels: Partial<Record<BuilderBlock["type"], string[]>> = {
+  hero: ["Главный заголовок", "Пояснение"],
+  banner: ["Сообщение", "Пояснение"],
+  quote: ["Цитата", "Автор или источник"],
+  columns: ["Левый столбец", "Правый столбец"],
+  stats: ["Первое число", "Подпись к нему", "Второе число", "Подпись к нему"],
+  product: ["Название", "Описание", "Цена или условие"],
+  signature: ["Имя", "Должность", "Контакты"],
+  coupon: ["Подводка", "Промокод", "Условие"],
+  video: ["Название видео", "Длительность"],
+  timeline: ["Шаг 1", "Описание шага 1", "Шаг 2", "Описание шага 2"],
+  faq: ["Вопрос 1", "Ответ 1", "Вопрос 2", "Ответ 2"],
+};
+
 type PropertiesPanelProps = {
   block: BuilderBlock;
   document: BuilderDocument;
@@ -155,27 +169,19 @@ export function PropertiesPanel({
               ) : undefined
             }
           >
-            <FormField
-              htmlFor="builder-block-content"
-              hint={
-                block.type === "columns"
-                  ? "Разделите столбцы вертикальной чертой (|)."
-                  : block.type === "image"
-                    ? "Опишите изображение для получателей, использующих экранные дикторы."
-                    : ["hero", "quote", "checklist", "stats", "product", "signature"].includes(block.type)
-                      ? "Разделяйте части блока вертикальной чертой (|)."
-                    : "Изменения сразу появятся в предпросмотре."
-              }
-            >
-              <Textarea
-                ref={contentRef}
-                id="builder-block-content"
-                rows={block.type === "heading" || block.type === "button" || block.type === "logo" ? 2 : 4}
-                value={block.type === "button" ? block.label || block.content : block.content}
-                onChange={(event) => updateContent(event.target.value)}
-                className="resize-none text-[12px] leading-5"
-              />
-            </FormField>
+            {compoundContentLabels[block.type] ? (
+              <div className="grid gap-2 rounded-xl border border-border bg-surface-subtle p-2.5">
+                {compoundContentLabels[block.type]?.map((label, index) => {
+                  const parts = block.content.split("|");
+                  return <FormField key={`${block.id}-${label}`} label={label}><Input value={parts[index] ?? ""} onChange={(event) => { const next = [...parts]; while (next.length <= index) next.push(""); next[index] = event.target.value; updateContent(next.join("|")); }} className="bg-surface text-[11px]" /></FormField>;
+                })}
+                <p className="m-0 text-[9px] leading-4 text-text-subtle">Каждая часть редактируется отдельно и сразу меняется на холсте.</p>
+              </div>
+            ) : (
+              <FormField htmlFor="builder-block-content" hint={block.type === "image" ? "Опишите изображение для получателей, использующих экранные дикторы." : "Изменения сразу появятся в предпросмотре."}>
+                <Textarea ref={contentRef} id="builder-block-content" rows={block.type === "heading" || block.type === "button" || block.type === "logo" ? 2 : 4} value={block.type === "button" ? block.label || block.content : block.content} onChange={(event) => updateContent(event.target.value)} className="resize-none text-[12px] leading-5" />
+              </FormField>
+            )}
 
             {block.type === "button" || block.type === "product" || block.type === "video" ? (
               <FormField label="Целевая ссылка" htmlFor="builder-button-link">

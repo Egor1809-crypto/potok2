@@ -27,10 +27,62 @@ function saveBlob(content: BlobPart, type: string, filename: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
 }
 
+async function renderPdf(html: string) {
+  const frame = window.document.createElement("iframe");
+  frame.setAttribute("aria-hidden", "true");
+  Object.assign(frame.style, {
+    position: "fixed",
+    left: "-10000px",
+    top: "0",
+    width: "760px",
+    height: "1200px",
+    border: "0",
+    opacity: "0",
+    pointerEvents: "none",
+  });
+  window.document.body.appendChild(frame);
+  try {
+    const frameDocument = frame.contentDocument;
+    if (!frameDocument) throw new Error("Браузер не открыл область экспорта.");
+    frameDocument.open();
+    frameDocument.write(html);
+    frameDocument.close();
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 450));
+    await frameDocument.fonts?.ready;
+    await Promise.all(Array.from(frameDocument.images).map((image) => image.complete ? Promise.resolve() : new Promise<void>((resolve) => { image.addEventListener("load", () => resolve(), { once: true }); image.addEventListener("error", () => resolve(), { once: true }); window.setTimeout(resolve, 2_500); })));
+    const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import("html2canvas"), import("jspdf")]);
+    const canvas = await html2canvas(frameDocument.body, {
+      backgroundColor: "#ffffff",
+      scale: 2,
+      useCORS: true,
+      allowTaint: false,
+      logging: false,
+      windowWidth: 760,
+    });
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
+    const margin = 10;
+    const pageWidth = 210 - margin * 2;
+    const pageHeight = 297 - margin * 2;
+    const imageHeight = canvas.height * pageWidth / canvas.width;
+    const imageData = canvas.toDataURL("image/jpeg", 0.94);
+    let offset = 0;
+    let page = 0;
+    while (offset < imageHeight) {
+      if (page > 0) pdf.addPage();
+      pdf.addImage(imageData, "JPEG", margin, margin - offset, pageWidth, imageHeight, undefined, "FAST");
+      offset += pageHeight;
+      page += 1;
+    }
+    return pdf.output("blob");
+  } finally {
+    frame.remove();
+  }
+}
+
 export function EmailExportMenu({ document, name }: { document: BuilderDocument; name: string }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [dialog, setDialog] = useState<{ title: string; message: string; retryPdf?: boolean } | null>(null);
+  const [dialog, setDialog] = useState<{ title: string; message: string; retryPdf?: boolean; download?: { url: string; filename: string } } | null>(null);
   const [copies, setCopies] = useState(1);
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -39,7 +91,10 @@ export function EmailExportMenu({ document, name }: { document: BuilderDocument;
     dialogRef.current?.focus();
     const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") setDialog(null); };
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      if (dialog.download) URL.revokeObjectURL(dialog.download.url);
+    };
   }, [dialog]);
 
   const compiled = async () => {
@@ -71,14 +126,10 @@ export function EmailExportMenu({ document, name }: { document: BuilderDocument;
           for (let index = 1; index <= copies; index += 1) saveBlob(wordHtml, "application/msword;charset=utf-8", `${filename}${copies > 1 ? `-${index}` : ""}.doc`);
         }
         if (format === "pdf") {
-          const frame = window.document.createElement("iframe");
-          frame.setAttribute("aria-hidden", "true");
-          frame.style.position = "fixed"; frame.style.width = "1px"; frame.style.height = "1px"; frame.style.right = "0"; frame.style.bottom = "0"; frame.style.opacity = "0";
-          window.document.body.appendChild(frame);
-          const frameDocument = frame.contentDocument;
-          if (!frameDocument) throw new Error("Не удалось подготовить PDF.");
-          frameDocument.open(); frameDocument.write(result.html); frameDocument.close();
-          window.setTimeout(() => { try { frame.contentWindow?.focus(); frame.contentWindow?.print(); } finally { window.setTimeout(() => frame.remove(), 2_000); } }, 500);
+          const pdf = await renderPdf(result.html);
+          for (let index = 1; index <= copies; index += 1) saveBlob(pdf, "application/pdf", `${filename}${copies > 1 ? `-${index}` : ""}.pdf`);
+          const downloadName = `${filename}.pdf`;
+          setDialog({ title: "PDF готов", message: copies === 1 ? "Скачивание началось. Если браузер его остановил, нажмите кнопку ниже." : `Подготовлено файлов: ${copies}. Если браузер остановил загрузки, скачайте первый файл кнопкой ниже.`, download: { url: URL.createObjectURL(pdf), filename: downloadName } });
         }
       }
     } catch (caught) {
@@ -122,6 +173,7 @@ export function EmailExportMenu({ document, name }: { document: BuilderDocument;
           </div>
           <div className="mt-5 flex justify-end gap-2">
             <Button type="button" variant="secondary" size="sm" onClick={() => setDialog(null)}>Закрыть</Button>
+            {dialog.download ? <a href={dialog.download.url} download={dialog.download.filename} className="btn btn-primary btn-sm"><Download aria-hidden="true" className="size-4" />Скачать PDF</a> : null}
             {dialog.retryPdf ? <Button type="button" variant="primary" size="sm" onClick={() => void run("pdf")}><Printer aria-hidden="true" className="size-4" />Разрешить и повторить</Button> : null}
           </div>
         </div>

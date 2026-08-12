@@ -820,7 +820,7 @@ function EmailBuilderWorkspace({
         <MobilePreviewToggle value={previewMode} onChange={setPreviewMode} />
       </div>
 
-      <div className="grid h-[calc(100dvh-176px)] min-h-[620px] lg:grid-cols-[260px_minmax(440px,1fr)_310px] xl:grid-cols-[280px_minmax(560px,1fr)_330px]">
+      <div className="grid h-[calc(100dvh-176px)] min-h-[620px] lg:grid-cols-[210px_minmax(560px,1fr)_285px] xl:grid-cols-[220px_minmax(680px,1fr)_305px]">
         <BlockLibrary
           onAdd={addBlock}
           className={cn(

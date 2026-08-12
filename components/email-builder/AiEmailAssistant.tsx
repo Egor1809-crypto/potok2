@@ -8,6 +8,20 @@ import type { ApiError, EmailAiResponse, EmailAiSuggestion, EmailAssetMutationRe
 import type { BuilderDocument } from "./builder-types";
 
 type Stage = "prompt" | "questions";
+type ComparisonView = "ai" | "current" | "split";
+
+function nextPromptSuggestion(value: string) {
+  const normalized = value.toLocaleLowerCase("ru-RU");
+  if (value.trim().length < 12) return " для конкретной аудитории и с одним главным действием";
+  if (!/(для кого|аудитор|юрист|руководител|клиент|партн[её]р|участник)/.test(normalized)) return ". Получатели — укажите должности или тип компаний";
+  if (!/(цель|регистрац|купить|заказ|ответ|встреч|скачать|перейти|приглас)/.test(normalized)) return ". Цель письма — укажите одно действие читателя";
+  if (!/(стил|минимал|премиаль|редакцион|современн|делов|ярк|строг)/.test(normalized)) return ". Стиль — современный, деловой и уверенный";
+  if (!/(цвет|фон|графит|бел|фиолет|син|зел[её]н|красн|беж|ч[её]рн|пастел)/.test(normalized)) return ". Палитра — укажите основной цвет и фон";
+  if (!/(до \d|срок|дат|сентябр|октябр|ноябр|декабр|январ|феврал|март|апрел|ма[йя]|июн|июл|август)/.test(normalized)) return ". Срок или дата — укажите, если они важны";
+  if (!/https:\/\//.test(normalized)) return ". Ссылка главной кнопки — https://…";
+  if (!/(фото|изображен|иллюстрац|узор|паттерн|без фотограф)/.test(normalized)) return ". Визуальный приём — фото, иллюстрация или геометрический узор";
+  return ". Обязательно сохранить факты из запроса и не добавлять неподтверждённые обещания";
+}
 
 export function AiEmailAssistant({ document, onApply }: { document: BuilderDocument; onApply: (document: BuilderDocument) => void }) {
   const fileInput = useRef<HTMLInputElement>(null);
@@ -26,9 +40,10 @@ export function AiEmailAssistant({ document, onApply }: { document: BuilderDocum
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [comparisonOpen, setComparisonOpen] = useState(false);
+  const [comparisonView, setComparisonView] = useState<ComparisonView>("ai");
   const [previewHtml, setPreviewHtml] = useState<{ current: string; ai: string } | null>(null);
   const detectedUrl = goal.match(/https:\/\/[^\s]+/)?.[0] ?? "";
-  const promptSuggestion = goal.trim().length > 12 && !/[.!?]$/.test(goal.trim()) ? " в современном стиле, с ясной структурой и одним главным действием" : "";
+  const promptSuggestion = nextPromptSuggestion(goal);
 
   useEffect(() => {
     let active = true;
@@ -88,7 +103,11 @@ export function AiEmailAssistant({ document, onApply }: { document: BuilderDocum
           tone: "expert",
           websiteUrl: [...goal.matchAll(/https:\/\/[^\s]+/g)].map((item) => item[0])[0],
           includeLogo: assets.some((asset) => asset.kind === "logo"),
-          imageSource: "none",
+          imageSource: /без (?:фото|изображений)|только узор/i.test(goal)
+            ? "none"
+            : assets.some((asset) => asset.kind === "photo")
+              ? "none"
+              : "generate",
           availableAssets: assets.map(({ id, filename, kind, url }) => ({ id, filename, kind, url })),
           briefAnswers: questions.map((question) => ({ question: question.question, answer: answers[question.id]?.trim() ?? "" })).filter((item) => item.answer),
         }),
@@ -100,6 +119,7 @@ export function AiEmailAssistant({ document, onApply }: { document: BuilderDocum
       setPreviewHtml({ current: currentPreview, ai: aiPreview });
       setConfigured(true);
       setProvider(body.provider);
+      setComparisonView("ai");
       setComparisonOpen(true);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Дизайн не подготовлен.");
@@ -108,13 +128,23 @@ export function AiEmailAssistant({ document, onApply }: { document: BuilderDocum
 
   return (
     <section className="mx-auto grid w-full max-w-4xl gap-6 p-5 sm:p-8">
-      <Modal open={comparisonOpen} onOpenChange={setComparisonOpen} title="Сравнение редакций" description="Сравните не число блоков, а композицию, визуальную систему и смысл письма. Ваш макет не изменится без подтверждения." size="xl" footer={<><Button variant="ghost" onClick={() => setComparisonOpen(false)}>Оставить мой</Button><Button variant="primary" disabled={!suggestion?.document} onClick={() => { if (suggestion?.document) onApply(suggestion.document as BuilderDocument); setComparisonOpen(false); }}>Использовать вариант ИИ</Button></>}>
-        <div className="mb-4 grid gap-3 lg:grid-cols-2">
-          <DesignReport title="Моя редакция" document={document} />
-          <DesignReport title="Редакция ИИ" document={suggestion?.document as BuilderDocument | undefined} accent artDirection={suggestion?.artDirection} strategy={suggestion?.contentStrategy} />
+      <Modal open={comparisonOpen} onOpenChange={setComparisonOpen} title="Сравнение редакций" description="Проверяйте письмо целиком или переключайтесь между версиями. Ваш макет не изменится без подтверждения." size="full" contentClassName="!p-4 sm:!p-5" footer={<><Button variant="ghost" onClick={() => setComparisonOpen(false)}>Продолжить с моим</Button><Button variant="primary" disabled={!suggestion?.document} onClick={() => { if (suggestion?.document) onApply(suggestion.document as BuilderDocument); setComparisonOpen(false); }}>Заменить на вариант ИИ</Button></>}>
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface-subtle p-2">
+          {([['ai','Вариант ИИ'],['current','Мой макет'],['split','Рядом']] as const).map(([value,label]) => <button key={value} type="button" aria-pressed={comparisonView === value} onClick={() => setComparisonView(value)} className="rounded-lg px-3 py-2 text-[11px] font-semibold text-text-muted outline-none transition hover:bg-surface aria-pressed:bg-surface aria-pressed:text-primary aria-pressed:shadow-sm focus-visible:ring-2 focus-visible:ring-primary/30">{label}</button>)}
+          <span className="ml-auto text-[10px] text-text-subtle">Предпросмотр настоящего HTML · 640 пикс.</span>
         </div>
-        {questions.some((question) => answers[question.id]?.trim()) ? <div className="mb-4 rounded-xl border border-border bg-surface-subtle p-3"><strong className="text-[11px] text-text-strong">Контекст, который передан ИИ</strong><div className="mt-2 flex flex-wrap gap-1.5">{questions.filter((question) => answers[question.id]?.trim()).map((question) => <Badge key={question.id} variant="neutral" title={question.question}>{answers[question.id]}</Badge>)}</div></div> : null}
-        <div className="grid gap-4 md:grid-cols-2"><EmailPreview label="Мой макет" html={previewHtml?.current} /><EmailPreview label="Вариант ИИ" html={previewHtml?.ai} accent /></div>
+        <details className="mb-4 rounded-xl border border-border bg-surface" open>
+          <summary className="cursor-pointer px-4 py-3 text-[11px] font-semibold text-text-strong">Что изменил ИИ и какой контекст использовал</summary>
+          <div className="grid gap-3 border-t border-border p-3 lg:grid-cols-2">
+            <DesignReport title="Моя редакция" document={document} />
+            <DesignReport title="Редакция ИИ" document={suggestion?.document as BuilderDocument | undefined} accent artDirection={suggestion?.artDirection} strategy={suggestion?.contentStrategy} />
+          </div>
+          <div className="border-t border-border px-4 py-3"><strong className="text-[10px] uppercase tracking-wide text-text-subtle">Исходная задача</strong><p className="mb-0 mt-1 whitespace-pre-wrap text-[11px] leading-5 text-text-strong">{goal}</p>{questions.some((question) => answers[question.id]?.trim()) ? <div className="mt-3 flex flex-wrap gap-1.5">{questions.filter((question) => answers[question.id]?.trim()).map((question) => <Badge key={question.id} variant="neutral" title={question.question}>{answers[question.id]}</Badge>)}</div> : null}</div>
+        </details>
+        <div className={comparisonView === "split" ? "grid gap-4 xl:grid-cols-2" : "mx-auto max-w-[760px]"}>
+          {comparisonView === "current" || comparisonView === "split" ? <EmailPreview label="Мой макет" html={previewHtml?.current} /> : null}
+          {comparisonView === "ai" || comparisonView === "split" ? <EmailPreview label="Вариант ИИ" html={previewHtml?.ai} accent /> : null}
+        </div>
       </Modal>
 
       <header className="text-center">
@@ -126,7 +156,11 @@ export function AiEmailAssistant({ document, onApply }: { document: BuilderDocum
 
       {stage === "prompt" ? (
         <div className="card grid gap-4 p-5 sm:p-7">
-          <div className="relative"><Textarea rows={9} maxLength={2000} value={goal} onChange={(event) => setGoal(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && promptSuggestion) { event.preventDefault(); setGoal((value) => `${value}${promptSuggestion}`); } }} placeholder="Например: премиальное приглашение на конференцию для юристов. Тёмный графитовый фон, изумрудные акценты, тонкие геометрические линии, без фотографий. Цель — регистрация до 20 сентября…" className="resize-y pb-11 text-[14px] leading-6" />{promptSuggestion ? <p className="pointer-events-none absolute bottom-3 left-3 right-3 m-0 truncate text-[11px] text-text-subtle"><span className="rounded bg-surface-subtle px-1.5 py-1">Enter</span> добавить: <span className="text-text-muted">{promptSuggestion.trim()}</span></p> : null}</div>
+          <div className="relative overflow-hidden rounded-xl">
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words px-4 py-3 text-[16px] font-medium leading-7"><span className="text-transparent">{goal}</span><span className="text-text-subtle/70">{promptSuggestion}</span></div>
+            <Textarea rows={9} maxLength={2000} value={goal} onChange={(event) => setGoal(event.target.value)} onKeyDown={(event) => { if ((event.key === "Enter" || event.key === "Tab") && !event.shiftKey && promptSuggestion) { event.preventDefault(); setGoal((value) => `${value}${promptSuggestion}`); } }} placeholder="Например: премиальное приглашение на конференцию для юристов. Тёмный графитовый фон, изумрудные акценты, тонкие геометрические линии. Цель — регистрация до 20 сентября…" className="relative z-10 resize-y !bg-transparent pb-11 font-medium text-text-strong caret-primary" style={{ fontSize: 16, lineHeight: "28px", color: "var(--text-strong)" }} />
+            <p className="pointer-events-none absolute bottom-3 right-3 z-20 m-0 text-[10px] text-text-subtle"><span className="rounded bg-surface-subtle px-1.5 py-1">Enter</span> принять серое продолжение</p>
+          </div>
           {detectedUrl ? <div className="flex items-center gap-2 rounded-xl border border-primary/20 bg-primary-subtle/40 px-3 py-2.5 text-[11px]"><input id="ai-use-linked-context" type="checkbox" checked={useLinkedContext} onChange={(event) => setUseLinkedContext(event.target.checked)} className="accent-primary" /><label htmlFor="ai-use-linked-context" className="min-w-0"><strong className="block">Изучить страницу по ссылке</strong><span className="block truncate text-text-muted">{detectedUrl}</span></label></div> : null}
           <Button type="button" variant="primary" size="lg" disabled={busy || goal.trim().length < 8} onClick={() => void prepareQuestions()}>{busy ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : <Sparkles aria-hidden="true" className="size-4" />}{busy ? "Анализируем задачу…" : "Продолжить — уточнить детали"}</Button>
         </div>
@@ -143,7 +177,7 @@ export function AiEmailAssistant({ document, onApply }: { document: BuilderDocum
             <button type="button" onClick={() => fileInput.current?.click()} onDragEnter={(event) => { event.preventDefault(); setDragging(true); }} onDragOver={(event) => event.preventDefault()} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); const file = event.dataTransfer.files[0]; if (file) void upload(file); }} className={`grid min-h-32 w-full place-items-center rounded-2xl border-2 border-dashed p-5 text-center outline-none transition focus-visible:ring-2 focus-visible:ring-primary/30 ${dragging ? "border-primary bg-primary-subtle" : "border-border-strong bg-surface-subtle hover:border-primary/45"}`}>
               <span><span className="mx-auto grid size-10 place-items-center rounded-xl bg-surface text-primary shadow-sm">{uploading ? <LoaderCircle aria-hidden="true" className="size-5 animate-spin" /> : <Upload aria-hidden="true" className="size-5" />}</span><strong className="mt-3 block text-[13px] text-text-strong">Перетащите изображение сюда</strong><span className="mt-1 block text-[11px] text-text-muted">или нажмите и выберите файл с компьютера · PNG, JPEG, GIF до 4 МБ</span></span>
             </button>
-            {assets.length ? <div className="mt-3 flex flex-wrap gap-2">{assets.map((asset) => <span key={asset.id} className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-2 py-1.5 text-[10px]"><ImagePlus aria-hidden="true" className="size-3 text-primary" />{asset.filename}<span className="text-text-subtle">· {asset.kind === "logo" ? "логотип" : "фото"}</span></span>)}</div> : <p className="mt-2 text-[10px] text-text-subtle">Необязательно. Без файлов ИИ использует только узоры, цветовые плашки и типографику.</p>}
+            {assets.length ? <div className="mt-3 flex flex-wrap gap-2">{assets.map((asset) => <span key={asset.id} className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-2 py-1.5 text-[10px]"><ImagePlus aria-hidden="true" className="size-3 text-primary" />{asset.filename}<span className="text-text-subtle">· {asset.kind === "logo" ? "логотип" : "фото"}</span></span>)}</div> : <p className="mt-2 text-[10px] text-text-subtle">Необязательно. Если в исходном запросе не сказано «без изображений», ИИ создаст одну предметную иллюстрацию по смыслу письма.</p>}
           </div>
 
           {error ? <p role="alert" className="m-0 rounded-xl bg-danger-subtle px-4 py-3 text-[12px] text-danger">{error}</p> : null}
