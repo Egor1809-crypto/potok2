@@ -424,6 +424,7 @@ export type CampaignRecord = {
   segmentId: string | null;
   contactIds: string[];
   templateId: string | null;
+  presentationId: string | null;
   senderName: string;
   senderEmail: string;
   subject: string;
@@ -496,6 +497,7 @@ export type CampaignVersionSnapshot = {
   segmentId: string | null;
   contactIds: string[];
   audienceContactIds: string[];
+  presentationId: string | null;
   senderName: string;
   senderEmail: string;
   subject: string;
@@ -721,6 +723,7 @@ export type CampaignCreateInput = {
   segmentId?: string | null;
   contactIds?: string[];
   templateId?: string | null;
+  presentationId?: string | null;
   senderName?: string;
   senderEmail?: string;
   subject?: string;

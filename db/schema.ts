@@ -359,6 +359,9 @@ export const campaigns = sqliteTable(
       .notNull()
       .default(sql`'[]'`),
     templateId: text("template_id"),
+    presentationId: text("presentation_id").references(() => presentationProjects.id, {
+      onDelete: "set null",
+    }),
     senderName: text("sender_name").notNull().default(""),
     senderEmail: text("sender_email").notNull().default(""),
     subject: text("subject").notNull().default(""),

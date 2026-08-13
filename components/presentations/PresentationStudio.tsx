@@ -7,13 +7,17 @@ import {
   ArrowLeft,
   ArrowUp,
   Check,
+  CheckCircle2,
+  ChevronRight,
   Copy,
   Download,
   FilePlus2,
   LayoutTemplate,
   Mail,
+  LockKeyhole,
   Plus,
   Save,
+  Send,
   Sparkles,
   Trash2,
 } from "lucide-react";
@@ -237,6 +241,7 @@ export function PresentationStudio() {
   const [presentations, setPresentations] = useState<PresentationProjectRecord[]>([]);
   const [project, setProject] = useState<PresentationProjectRecord | null>(null);
   const [selectedSlideId, setSelectedSlideId] = useState<string | null>(null);
+  const [reviewedSlideIds, setReviewedSlideIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
@@ -279,6 +284,14 @@ export function PresentationStudio() {
       if ("presentation" in body) {
         setProject(body.presentation);
         setSelectedSlideId(body.presentation.slides[0]?.id ?? null);
+        try {
+          const stored = window.localStorage.getItem(`potok:presentation-review:${body.presentation.id}`);
+          const parsed = stored ? JSON.parse(stored) : [];
+          const knownIds = new Set(body.presentation.slides.map((slide) => slide.id));
+          setReviewedSlideIds(Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string" && knownIds.has(id)) : []);
+        } catch {
+          setReviewedSlideIds([]);
+        }
         setDirty(false);
         editRevisionRef.current = 0;
       } else if ("presentations" in body) {
@@ -473,10 +486,25 @@ export function PresentationStudio() {
 
   const updateSlide = (patch: Partial<PresentationSlide>) => {
     if (!project || !selectedSlideId) return;
+    const changedIndex = project.slides.findIndex((slide) => slide.id === selectedSlideId);
+    setReviewedSlideIds((current) => {
+      const next = current.filter((id) => project.slides.findIndex((slide) => slide.id === id) < changedIndex);
+      try { window.localStorage.setItem(`potok:presentation-review:${project.id}`, JSON.stringify(next)); } catch { /* review state is optional */ }
+      return next;
+    });
     updateProject({ slides: project.slides.map((slide) => slide.id === selectedSlideId ? { ...slide, ...patch } : slide) });
   };
 
   const selectedSlide = project?.slides.find((slide) => slide.id === selectedSlideId) ?? project?.slides[0];
+  const selectedSlideIndex = project && selectedSlide
+    ? project.slides.findIndex((slide) => slide.id === selectedSlide.id)
+    : 0;
+  const firstUnreviewedIndex = project
+    ? project.slides.findIndex((slide) => !reviewedSlideIds.includes(slide.id))
+    : 0;
+  const unlockedSlideIndex = project
+    ? firstUnreviewedIndex === -1 ? project.slides.length - 1 : firstUnreviewedIndex
+    : 0;
 
   const saveProject = async () => {
     if (!project) return false;
@@ -559,6 +587,32 @@ export function PresentationStudio() {
     updateProject({ themeId, accentColor: theme.accentColor, backgroundColor: theme.backgroundColor, textColor: theme.textColor });
   };
 
+  const confirmCurrentSlide = async () => {
+    if (!project || !selectedSlide) return;
+    if (!selectedSlide.title.trim()) {
+      setError("Добавьте заголовок-вывод: без него слайд нельзя подтвердить.");
+      return;
+    }
+    if (dirty && !(await saveProject())) return;
+    const index = project.slides.findIndex((slide) => slide.id === selectedSlide.id);
+    const nextReviewed = Array.from(new Set([...reviewedSlideIds, selectedSlide.id]));
+    setReviewedSlideIds(nextReviewed);
+    try { window.localStorage.setItem(`potok:presentation-review:${project.id}`, JSON.stringify(nextReviewed)); } catch { /* review state is optional */ }
+    setError("");
+    if (index < project.slides.length - 1) {
+      setSelectedSlideId(project.slides[index + 1].id);
+      setNotice(`Слайд ${index + 1} подтверждён. Теперь проверьте слайд ${index + 2}.`);
+    } else {
+      setNotice("Все слайды подтверждены. Презентацию можно скачать или приложить к письму.");
+    }
+  };
+
+  const openEmailCampaign = async () => {
+    if (!project) return;
+    if (dirty && !(await saveProject())) return;
+    router.push(`/campaigns/new?step=message&presentation=${encodeURIComponent(project.id)}`);
+  };
+
   const filteredProjects = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase("ru-RU");
     return presentations.filter((item) => !normalized || `${item.name} ${item.description}`.toLocaleLowerCase("ru-RU").includes(normalized));
@@ -593,21 +647,31 @@ export function PresentationStudio() {
           <Button size="sm" leadingIcon={<Save className="size-3.5" />} onClick={() => void saveProject()} loading={busy === "save"} loadingText="Сохраняем">Сохранить</Button>
         </div>
         {error ? <Alert tone="danger" className="mb-4">{error}</Alert> : null}
-        <div className="grid min-h-[calc(100dvh-185px)] grid-cols-1 overflow-hidden rounded-xl border border-border bg-surface shadow-[var(--shadow-sm)] xl:grid-cols-[220px_minmax(0,1fr)_330px]">
-          <aside className="border-b border-border bg-surface-subtle/45 p-3 xl:border-b-0 xl:border-r">
-            <div className="mb-3 flex items-center justify-between"><strong className="text-[12px]">Слайды · {project.slides.length}</strong><Button size="icon" variant="ghost" aria-label="Добавить слайд" onClick={() => { const slide = emptySlide(); updateProject({ slides: [...project.slides, slide] }); setSelectedSlideId(slide.id); }}><Plus className="size-4" /></Button></div>
-            <div className="grid max-h-[calc(100dvh-245px)] grid-cols-2 gap-2 overflow-y-auto pr-1 xl:grid-cols-1">
-              {project.slides.map((slide, index) => <button key={slide.id} type="button" onClick={() => setSelectedSlideId(slide.id)} aria-pressed={slide.id === selectedSlide.id} className="rounded-lg border border-border bg-surface p-1.5 text-left transition hover:border-primary/40 aria-pressed:border-primary aria-pressed:ring-2 aria-pressed:ring-primary/15"><span className="mb-1 flex items-center justify-between px-0.5 text-[9px] text-text-subtle"><span>{index + 1}</span><span>{layoutLabels[slide.layout]}</span></span><div className="overflow-hidden rounded-md"><SlidePreview project={project} slide={slide} compact /></div></button>)}
+        <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-[var(--shadow-sm)]">
+          <div className="grid min-h-[calc(100dvh-220px)] grid-cols-1 lg:grid-cols-[176px_minmax(0,1fr)] 2xl:grid-cols-[176px_minmax(0,1fr)_340px]">
+          <aside className="border-b border-border bg-[#F2E9DF]/60 p-3 lg:border-b-0 lg:border-r">
+            <div className="mb-3 flex items-center justify-between"><div><strong className="block text-[12px]">Слайды</strong><span className="text-[9px] text-text-subtle">{reviewedSlideIds.length} из {project.slides.length} подтверждено</span></div><Button size="icon" variant="ghost" aria-label="Добавить слайд" onClick={() => { const slide = emptySlide(); updateProject({ slides: [...project.slides, slide] }); setSelectedSlideId(slide.id); }}><Plus className="size-4" /></Button></div>
+            <div className="flex max-h-48 gap-2 overflow-x-auto pb-1 lg:grid lg:max-h-[calc(100dvh-290px)] lg:grid-cols-1 lg:overflow-x-hidden lg:overflow-y-auto lg:pr-1">
+              {project.slides.map((slide, index) => {
+                const reviewed = reviewedSlideIds.includes(slide.id);
+                const locked = index > unlockedSlideIndex;
+                return <button key={slide.id} type="button" disabled={locked} onClick={() => setSelectedSlideId(slide.id)} aria-pressed={slide.id === selectedSlide.id} aria-label={`${reviewed ? "Подтверждён" : locked ? "Заблокирован" : "Редактируется"}: слайд ${index + 1}, ${slide.title || layoutLabels[slide.layout]}`} className="w-36 shrink-0 rounded-lg border border-border bg-surface p-1.5 text-left transition enabled:hover:border-primary/40 disabled:cursor-not-allowed disabled:opacity-45 aria-pressed:border-primary aria-pressed:ring-2 aria-pressed:ring-primary/20 lg:w-auto"><span className="mb-1 flex items-center justify-between px-0.5 text-[9px] text-text-subtle"><span className="flex items-center gap-1">{index + 1}{reviewed ? <CheckCircle2 className="size-2.5 text-success" /> : locked ? <LockKeyhole className="size-2.5" /> : null}</span><span>{layoutLabels[slide.layout]}</span></span><div className="overflow-hidden rounded-md"><SlidePreview project={project} slide={slide} compact /></div></button>;
+              })}
             </div>
           </aside>
-          <section className="min-w-0 bg-surface-inset/55 p-4 sm:p-6 lg:p-8">
-            <div className="mx-auto max-w-[1120px] overflow-hidden rounded-[18px] border border-border bg-surface shadow-[0_24px_80px_rgb(48_25_43/0.16)]"><SlidePreview project={project} slide={selectedSlide} /></div>
-            <div className="mx-auto mt-4 flex max-w-[1120px] flex-wrap items-center justify-between gap-2">
-              <span className="text-[11px] text-text-subtle">Слайд {project.slides.findIndex((slide) => slide.id === selectedSlide.id) + 1} из {project.slides.length}</span>
-              <div className="flex gap-1"><Button variant="ghost" size="sm" onClick={() => moveSlide(-1)} leadingIcon={<ArrowUp className="size-3.5" />}>Выше</Button><Button variant="ghost" size="sm" onClick={() => moveSlide(1)} leadingIcon={<ArrowDown className="size-3.5" />}>Ниже</Button><Button variant="ghost" size="sm" onClick={duplicateSlide} leadingIcon={<Copy className="size-3.5" />}>Дублировать</Button><Button variant="ghost" size="sm" disabled={project.slides.length <= 1} onClick={removeSlide} leadingIcon={<Trash2 className="size-3.5" />}>Удалить</Button></div>
+          <section className="flex min-w-0 flex-col bg-[#E9E2DE]/65">
+            <div className="flex items-center justify-between border-b border-border bg-surface/85 px-4 py-2.5">
+              <div><span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-primary">Слайд {selectedSlideIndex + 1} из {project.slides.length}</span><p className="m-0 text-[12px] font-semibold text-text-strong">{reviewedSlideIds.includes(selectedSlide.id) ? "Подтверждён — можно уточнить" : "Проверьте содержание и оформление"}</p></div>
+              <div className="hidden items-center gap-1 sm:flex"><Button variant="ghost" size="sm" onClick={() => moveSlide(-1)} leadingIcon={<ArrowUp className="size-3.5" />}>Выше</Button><Button variant="ghost" size="sm" onClick={() => moveSlide(1)} leadingIcon={<ArrowDown className="size-3.5" />}>Ниже</Button><Button variant="ghost" size="sm" onClick={duplicateSlide} leadingIcon={<Copy className="size-3.5" />}>Дублировать</Button><Button variant="ghost" size="sm" disabled={project.slides.length <= 1} onClick={removeSlide} leadingIcon={<Trash2 className="size-3.5" />}>Удалить</Button></div>
+            </div>
+            <div className="grid flex-1 place-items-center p-4 sm:p-6 xl:p-8">
+              <div className="w-full max-w-[1180px] overflow-hidden rounded-[14px] border border-border bg-surface shadow-[0_30px_90px_rgb(48_25_43/0.18)]"><SlidePreview project={project} slide={selectedSlide} /></div>
+            </div>
+            <div className="sticky bottom-0 z-10 border-t border-border bg-surface/95 px-4 py-3 backdrop-blur sm:px-6">
+              <div className="mx-auto flex max-w-[1180px] items-center justify-between gap-4"><div className="min-w-0 flex-1"><div className="h-1.5 overflow-hidden rounded-full bg-surface-inset"><div className="h-full rounded-full bg-success transition-all" style={{ width: `${Math.round(reviewedSlideIds.length / project.slides.length * 100)}%` }} /></div><p className="mb-0 mt-1 text-[10px] text-text-subtle">Следующий слайд откроется после подтверждения текущего.</p></div><Button onClick={() => void confirmCurrentSlide()} loading={busy === "save"} trailingIcon={selectedSlideIndex < project.slides.length - 1 ? <ChevronRight className="size-4" /> : <Check className="size-4" />}>{selectedSlideIndex < project.slides.length - 1 ? "Готово — следующий слайд" : "Подтвердить презентацию"}</Button></div>
             </div>
           </section>
-          <aside className="border-t border-border p-4 xl:border-l xl:border-t-0">
+          <aside className="border-t border-border bg-surface p-4 lg:col-start-2 2xl:col-start-auto 2xl:border-l 2xl:border-t-0">
             <div className="grid max-h-[calc(100dvh-220px)] gap-5 overflow-y-auto pr-1">
               <section><h3 className="mb-2 mt-0 text-[12px] font-semibold">Композиция</h3><Select value={selectedSlide.layout} onChange={(event) => updateSlide({ layout: event.target.value as PresentationSlideLayout })} options={Object.entries(layoutLabels).map(([value, label]) => ({ value, label }))} /></section>
               <section className="grid gap-3"><h3 className="m-0 text-[12px] font-semibold">Содержание</h3><FormField label="Надзаголовок" htmlFor="slide-eyebrow"><Input id="slide-eyebrow" value={selectedSlide.eyebrow} onChange={(event) => updateSlide({ eyebrow: event.target.value })} placeholder="Например: ИССЛЕДОВАНИЕ" /></FormField><FormField label="Заголовок-вывод" htmlFor="slide-title"><Textarea id="slide-title" value={selectedSlide.title} onChange={(event) => updateSlide({ title: event.target.value })} rows={3} /></FormField><FormField label="Пояснение" htmlFor="slide-body"><Textarea id="slide-body" value={selectedSlide.body} onChange={(event) => updateSlide({ body: event.target.value })} rows={4} /></FormField><FormField label={selectedSlide.layout === "stats" ? "Показатели: число | подпись" : "Пункты — один на строку"} htmlFor="slide-bullets"><Textarea id="slide-bullets" value={selectedSlide.bullets.join("\n")} onChange={(event) => updateSlide({ bullets: event.target.value.split("\n").slice(0, 8) })} rows={5} /></FormField></section>
@@ -616,6 +680,8 @@ export function PresentationStudio() {
               <section><FormField label="Заметки выступающего" hint="Факты и внешние источники указывайте здесь. Они сохраняются в проекте." htmlFor="slide-notes"><Textarea id="slide-notes" value={selectedSlide.speakerNotes} onChange={(event) => updateSlide({ speakerNotes: event.target.value })} rows={5} /></FormField></section>
             </div>
           </aside>
+          </div>
+          <div className="flex flex-col gap-3 border-t border-border bg-[#1C171B] px-4 py-4 text-white sm:flex-row sm:items-center sm:justify-between sm:px-6"><div><p className="m-0 text-[12px] font-semibold">Презентация готова для письма</p><p className="mb-0 mt-1 text-[10px] text-white/60">В кампании выберите UniSender: Поток приложит сохранённый PPTX к email.</p></div><Button onClick={() => void openEmailCampaign()} leadingIcon={<Send className="size-4" />}>Отправить вместе с письмом</Button></div>
         </div>
       </div>
     );

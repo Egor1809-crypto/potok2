@@ -109,6 +109,18 @@ function formBody(entries: Array<[string, string | number]>): URLSearchParams {
   return body;
 }
 
+function encodedBinaryField(name: string, bytes: Uint8Array) {
+  const encodedName = encodeURIComponent(name);
+  let encodedValue = "";
+  for (const byte of bytes) {
+    const character = String.fromCharCode(byte);
+    encodedValue += /[A-Za-z0-9_.~-]/.test(character)
+      ? character
+      : `%${byte.toString(16).toUpperCase().padStart(2, "0")}`;
+  }
+  return `${encodedName}=${encodedValue}`;
+}
+
 export async function checkTelegramBot(input: {
   token: string;
   expectedUsername?: string;
@@ -298,6 +310,7 @@ async function callUniSender<T>(input: {
   method: string;
   apiKey: string;
   parameters?: Array<[string, string | number]>;
+  binaryParameters?: Array<[string, Uint8Array]>;
   fetchFn: FetchLike;
   signal?: AbortSignal;
 }): Promise<{ response: Response; body: UniSenderEnvelope<T> | null }> {
@@ -306,10 +319,11 @@ async function callUniSender<T>(input: {
     ["api_key", input.apiKey],
     ...(input.parameters ?? []),
   ]);
+  const encoded = [body.toString(), ...(input.binaryParameters ?? []).map(([name, bytes]) => encodedBinaryField(name, bytes))].filter(Boolean).join("&");
   const response = await input.fetchFn(`${UNISENDER_API}/${input.method}`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
+    body: encoded,
     signal: input.signal,
   });
   return { response, body: await responseJson(response) as UniSenderEnvelope<T> | null };
@@ -378,6 +392,7 @@ export async function createUniSenderCampaign(input: {
   subject: string;
   textBody: string;
   htmlBody?: string;
+  attachments?: Array<{ filename: string; bytes: Uint8Array }>;
   recipients: UniSenderRecipient[];
   fetchFn?: FetchLike;
   signal?: AbortSignal;
@@ -557,6 +572,10 @@ export async function createUniSenderCampaign(input: {
         ["list_id", input.listId],
         ["lang", "ru"],
       ],
+      binaryParameters: input.attachments?.map((attachment) => [
+        `attachments[${attachment.filename.replace(/[^a-zA-Z0-9а-яА-ЯёЁ._ -]/g, "_")}]`,
+        attachment.bytes,
+      ]),
       fetchFn,
       signal: input.signal,
     });

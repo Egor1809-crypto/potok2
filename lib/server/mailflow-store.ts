@@ -97,6 +97,8 @@ import {
   assertEmailTemplateReference,
   toEmailTemplateRecord,
 } from "./template-store";
+import { getPresentationProject } from "./presentation-store";
+import { buildPresentationPptx, safePresentationFilename } from "./presentation-pptx";
 
 type ContactRow = typeof contacts.$inferSelect;
 type SegmentRow = typeof segments.$inferSelect;
@@ -217,6 +219,7 @@ function toCampaign(row: CampaignRow): CampaignRecord {
     segmentId: row.segmentId,
     contactIds: row.contactIds,
     templateId: row.templateId,
+    presentationId: row.presentationId,
     senderName: row.senderName,
     senderEmail: row.senderEmail,
     subject: row.subject,
@@ -1661,6 +1664,7 @@ type ParsedCampaign = {
   segmentId: string | null;
   contactIds: string[];
   templateId: string | null;
+  presentationId: string | null;
   senderName: string;
   senderEmail: string;
   subject: string;
@@ -1764,6 +1768,10 @@ function parseCampaign(
     templateId: (() => {
       const parsed = nullableText(object.templateId, "Шаблон", 120);
       return parsed === undefined ? (existing?.templateId ?? null) : parsed;
+    })(),
+    presentationId: (() => {
+      const parsed = nullableText(object.presentationId, "Презентация", 160);
+      return parsed === undefined ? (existing?.presentationId ?? null) : parsed;
     })(),
     senderName:
       optionalText(object.senderName, "Имя отправителя", 160) ??
@@ -1975,6 +1983,7 @@ export async function createCampaign(
     segmentId: input.segmentId ?? null,
     contactIds: input.contactIds ?? [],
     templateId: input.templateId ?? null,
+    presentationId: input.presentationId ?? null,
     senderName: input.senderName,
     senderEmail: input.senderEmail,
     subject: input.subject,
@@ -2081,6 +2090,7 @@ async function ensureCampaignVersion(
     audienceType: campaign.audienceType,
     segmentId: campaign.segmentId,
     contactIds: campaign.contactIds,
+    presentationId: campaign.presentationId,
     audienceContactIds: audience.map((contact) => contact.id).sort(),
     senderName: campaign.senderName,
     senderEmail: campaign.senderEmail,
@@ -2176,6 +2186,7 @@ function renderContactTemplate(value: string, contact: ContactRecord) {
 }
 
 async function evaluateLaunch(
+  request: Request,
   campaignId: string,
 ): Promise<{
   evaluation: CampaignEvaluation;
@@ -2205,6 +2216,20 @@ async function evaluateLaunch(
   }
   if (!audience.length) blockers.push("В аудитории нет подходящих контактов.");
   if (!plans.length) blockers.push("В кампании не настроен ни один канал.");
+  if (campaign.presentationId) {
+    const emailPlan = plans.find((plan) => plan.channel === "email");
+    if (!emailPlan || emailPlan.providerId !== "unisender") {
+      blockers.push("Презентацию во вложении можно отправить только через Email → UniSender.");
+    } else {
+      try {
+        const { presentation } = await getPresentationProject(request, campaign.presentationId);
+        const pptx = await buildPresentationPptx(request, presentation);
+        if (pptx.byteLength > 500_000) blockers.push("Презентация больше 500 КБ — уменьшите изображения перед отправкой через UniSender.");
+      } catch (error) {
+        blockers.push(error instanceof Error ? error.message : "Презентация для вложения недоступна.");
+      }
+    }
+  }
   if (
     campaign.scheduledAt &&
     Date.parse(campaign.scheduledAt) <= Date.now()
@@ -2474,6 +2499,7 @@ async function processDirectOutbox(
 }
 
 async function processUniSenderOutbox(
+  request: Request,
   rows: DeliveryOutboxRecord[],
   integration: IntegrationRecord,
   version: CampaignVersionRecord,
@@ -2499,6 +2525,16 @@ async function processUniSenderOutbox(
   const credentials = automaticProviderSecrets("unisender") as {
     apiKey?: string;
   };
+  const attachment = version.snapshot.presentationId
+    ? await (async () => {
+        const { presentation } = await getPresentationProject(request, version.snapshot.presentationId);
+        const bytes = await buildPresentationPptx(request, presentation);
+        if (bytes.byteLength > 500_000) {
+          throw new ApiRequestError("Презентация больше 500 КБ — UniSender не примет такое вложение. Уменьшите изображения или отправьте ссылку.", 422);
+        }
+        return { filename: safePresentationFilename(presentation.name), bytes };
+      })()
+    : null;
   const result = await createUniSenderCampaign({
     apiKey: credentials.apiKey ?? "",
     listId: integration.publicConfig.listId ?? "",
@@ -2507,6 +2543,7 @@ async function processUniSenderOutbox(
     subject: version.snapshot.subject,
     textBody: version.snapshot.emailBodyText,
     htmlBody: version.snapshot.emailBodyHtml,
+    attachments: attachment ? [attachment] : undefined,
     recipients: rows.map((row) => ({
       email: row.recipientEndpoint,
       name: contactsById.get(row.contactId)?.fullName ?? "",
@@ -2556,6 +2593,7 @@ async function processUniSenderOutbox(
 }
 
 async function dispatchCampaign(
+  request: Request,
   campaignId: string,
   requestedIdempotencyKey: unknown,
 ): Promise<CampaignMutationResponse> {
@@ -2820,6 +2858,7 @@ async function dispatchCampaign(
       providerExternalIds = {
         ...providerExternalIds,
         unisender: await processUniSenderOutbox(
+          request,
           unisenderRows,
           integration,
           version,
@@ -3050,7 +3089,7 @@ export async function updateCampaign(
   }
   const current = await campaignBundle(id);
   if (action === "dispatch") {
-    return dispatchCampaign(id, object.idempotencyKey);
+    return dispatchCampaign(request, id, object.idempotencyKey);
   }
   if (["sending", "completed"].includes(current.campaign.status)) {
     throw new ApiRequestError(
@@ -3098,6 +3137,7 @@ export async function updateCampaign(
       segmentId: input.segmentId ?? null,
       contactIds: input.contactIds ?? [],
       templateId: input.templateId ?? null,
+      presentationId: input.presentationId ?? null,
       senderName: input.senderName,
       senderEmail: input.senderEmail,
       subject: input.subject,
@@ -3117,7 +3157,7 @@ export async function updateCampaign(
   await savePlans(id, input.channels, current.plans, now);
 
   if (action === "launch") {
-    return evaluateLaunch(id);
+    return evaluateLaunch(request, id);
   }
   const event = await appendEvent(
     id,

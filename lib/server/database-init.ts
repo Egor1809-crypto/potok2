@@ -161,6 +161,7 @@ const schemaStatements = [
     segment_id TEXT REFERENCES segments(id) ON DELETE SET NULL,
     contact_ids TEXT NOT NULL DEFAULT '[]',
     template_id TEXT,
+    presentation_id TEXT REFERENCES presentation_projects(id) ON DELETE SET NULL,
     sender_name TEXT NOT NULL DEFAULT '',
     sender_email TEXT NOT NULL DEFAULT '',
     subject TEXT NOT NULL DEFAULT '',
@@ -408,6 +409,11 @@ async function createSchema() {
   if (!campaignColumns.results.some((column) => column.name === "email_builder_document")) {
     await d1
       .prepare("ALTER TABLE campaigns ADD COLUMN email_builder_document TEXT")
+      .run();
+  }
+  if (!campaignColumns.results.some((column) => column.name === "presentation_id")) {
+    await d1
+      .prepare("ALTER TABLE campaigns ADD COLUMN presentation_id TEXT REFERENCES presentation_projects(id) ON DELETE SET NULL")
       .run();
   }
   const integrationColumns = await d1

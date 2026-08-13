@@ -1,0 +1,1 @@
+ALTER TABLE `campaigns` ADD `presentation_id` text REFERENCES presentation_projects(id);

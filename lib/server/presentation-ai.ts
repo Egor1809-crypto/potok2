@@ -25,7 +25,7 @@ const LAYOUTS = new Set<PresentationSlideLayout>(["title", "statement", "split",
 const GENERATION_WINDOW_MS = 10 * 60 * 1_000;
 const GENERATION_LIMIT = 8;
 const IDEMPOTENCY_STALE_MS = 15 * 60 * 1_000;
-const PROVIDER_TIMEOUT_MS = 60_000;
+const PROVIDER_TIMEOUT_MS = 38_000;
 const MAX_PROVIDER_RESPONSE_BYTES = 1_000_000;
 
 function runtime() {
@@ -332,7 +332,7 @@ async function callPresentationProvider(endpoint: string, init: RequestInit) {
     const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
     throw new ApiRequestError(
       timedOut
-        ? "ИИ не ответил за одну минуту. Повторите запрос позже."
+        ? "ИИ не ответил за 38 секунд. Повторите запрос позже."
         : "Не удалось связаться с ИИ-провайдером. Повторите запрос позже.",
       timedOut ? 504 : 502,
     );
@@ -439,14 +439,14 @@ export async function generatePresentationOutline(request: Request, value: unkno
       body: JSON.stringify(selected.provider === "navyai" ? {
         model: selected.model,
         messages: [{ role: "system", content: instructions }, { role: "user", content: JSON.stringify(modelInput) }],
-        max_tokens: input.slideCount > 12 ? 4_500 : 3_500,
+        max_tokens: input.slideCount > 12 ? 3_800 : 2_900,
         response_format: { type: "json_object" },
       } : {
         model: selected.model,
         store: false,
         safety_identifier: await safetyIdentifier(request),
         reasoning: { effort: "low" },
-        max_output_tokens: input.slideCount > 12 ? 4_500 : 3_500,
+        max_output_tokens: input.slideCount > 12 ? 3_800 : 2_900,
         instructions,
         input: JSON.stringify(modelInput),
         text: { format: { type: "json_schema", name: "presentation_outline", strict: true, schema } },

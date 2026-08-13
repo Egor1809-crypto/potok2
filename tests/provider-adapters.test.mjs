@@ -158,6 +158,32 @@ test("UniSender maps MAILFLOW merge fields into imported provider fields", async
   ]);
 });
 
+test("UniSender attaches a generated PowerPoint file to the email message", async () => {
+  let attachmentEncoded = false;
+  const result = await createUniSenderCampaign({
+    apiKey: "api-key",
+    listId: "88",
+    senderName: "Поток",
+    senderEmail: "sender@example.test",
+    subject: "Презентация",
+    textBody: "Файл во вложении",
+    attachments: [{ filename: "Доклад Поток.pptx", bytes: new Uint8Array([0x50, 0x4b, 0x03, 0x04]) }],
+    recipients: [{ email: "reader@example.test", name: "Получатель", outboxId: "outbox-pptx" }],
+    fetchFn: async (url, init) => {
+      const method = String(url).split("/").at(-1);
+      if (method === "importContacts") return jsonResponse({ result: { invalid: 0, log: [] } });
+      if (method === "createEmailMessage") {
+        const body = String(init.body);
+        attachmentEncoded = body.includes("attachments%5B") && body.includes("%50%4B%03%04") === false && body.includes("PK%03%04");
+        return jsonResponse({ result: { message_id: 1234 } });
+      }
+      return jsonResponse({ result: { campaign_id: 5678 } });
+    },
+  });
+  assert.equal(result.status, "accepted");
+  assert.equal(attachmentEncoded, true);
+});
+
 test("UniSender imports in batches of at most 500 then creates one campaign", async () => {
   const recipients = Array.from({ length: 501 }, (_, index) => ({
     email: `user${index}@example.test`,

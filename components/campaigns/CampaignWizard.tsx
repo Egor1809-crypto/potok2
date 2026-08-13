@@ -75,6 +75,8 @@ import type {
   EmailTemplateRecord,
   EmailTemplatesListResponse,
   IntegrationConnectionStatus,
+  PresentationProjectRecord,
+  PresentationsListResponse,
   SegmentRecord,
   WorkspaceSnapshot,
 } from "@/types/api";
@@ -114,6 +116,7 @@ type WizardDraft = {
   emailBodyText: string;
   emailBuilderDocument: EmailBuilderDocumentInput | null;
   templateId: string | null;
+  presentationId: string | null;
   consumedTemplateQueryId: string | null;
   messengerMessage: string;
   channels: CampaignChannel[];
@@ -352,6 +355,7 @@ function CampaignWizardState({
   const sourceId = params.get("campaign") ?? params.get("draft") ?? params.get("duplicate");
   const duplicate = params.has("duplicate") || params.get("copy") === "1";
   const queryTemplateId = params.get("template")?.trim() || null;
+  const queryPresentationId = params.get("presentation")?.trim() || null;
   const querySegmentId = params.get("segment") ?? params.get("audience");
   const queryContactIds = params.getAll("contact").filter(Boolean);
   const seedDraft = recoveredDraft;
@@ -360,6 +364,7 @@ function CampaignWizardState({
   const [workspaceContacts, setWorkspaceContacts] = React.useState<AudienceContact[]>([]);
   const [workspaceSegments, setWorkspaceSegments] = React.useState<AudienceSegment[]>([]);
   const [workspaceTemplates, setWorkspaceTemplates] = React.useState<EmailTemplateRecord[]>([]);
+  const [workspacePresentations, setWorkspacePresentations] = React.useState<PresentationProjectRecord[]>([]);
   const [templateLoadState, setTemplateLoadState] = React.useState<"loading" | "ready" | "error">("loading");
   const [integrations, setIntegrations] = React.useState<IntegrationSnapshot[]>([]);
   const [currentStep, setCurrentStep] = React.useState(() => parseStep(params.get("step")));
@@ -407,6 +412,7 @@ function CampaignWizardState({
   const [consumedTemplateQueryId, setConsumedTemplateQueryId] = React.useState<string | null>(
     seedDraft?.consumedTemplateQueryId ?? null,
   );
+  const [presentationId, setPresentationId] = React.useState<string | null>(queryPresentationId ?? seedDraft?.presentationId ?? null);
   const [messengerMessage, setMessengerMessage] = React.useState(
     params.get("message") ?? seedDraft?.messengerMessage ?? "",
   );
@@ -437,9 +443,10 @@ function CampaignWizardState({
   const loadWorkspace = React.useCallback(async () => {
     setApiMode("loading");
     try {
-      const [response, templatesResponse] = await Promise.all([
+      const [response, templatesResponse, presentationsResponse] = await Promise.all([
         fetch("/api/workspace", { headers: { Accept: "application/json" } }),
         fetch("/api/templates", { headers: { Accept: "application/json" } }),
+        fetch("/api/presentations", { headers: { Accept: "application/json" } }),
       ]);
       if (!response.ok) throw new Error("Рабочее пространство недоступно");
       const body = await response.json() as WorkspaceSnapshot;
@@ -450,6 +457,12 @@ function CampaignWizardState({
       } else {
         setWorkspaceTemplates([]);
         setTemplateLoadState("error");
+      }
+      if (presentationsResponse.ok) {
+        const presentationBody = await presentationsResponse.json() as PresentationsListResponse;
+        setWorkspacePresentations(Array.isArray(presentationBody.presentations) ? presentationBody.presentations : []);
+      } else {
+        setWorkspacePresentations([]);
       }
       if (Array.isArray(body.contacts)) setWorkspaceContacts(body.contacts);
       if (Array.isArray(body.segments)) setWorkspaceSegments(body.segments);
@@ -489,6 +502,7 @@ function CampaignWizardState({
             setEmailBodyText,
             setEmailBuilderDocument,
             setTemplateId,
+            setPresentationId,
             setMessengerMessage,
             setChannels,
             setProviders,
@@ -510,6 +524,7 @@ function CampaignWizardState({
       setWorkspaceContacts([]);
       setWorkspaceSegments([]);
       setWorkspaceTemplates([]);
+      setWorkspacePresentations([]);
       setIntegrations([]);
       setTemplateLoadState("error");
       setApiMode("offline");
@@ -594,6 +609,9 @@ function CampaignWizardState({
     if (channels.includes("email") && (!senderName.trim() || !/^\S+@\S+\.\S+$/.test(senderEmail))) {
       blockers.push("Укажите имя и корректный email отправителя.");
     }
+    if (presentationId && (!channels.includes("email") || providers.email !== "unisender")) {
+      blockers.push("Презентацию во вложении можно отправить только по Email через UniSender.");
+    }
     channels.forEach((channel) => {
       const providerId = providers[channel];
       if (!providerId) blockers.push(`Выберите провайдера для канала ${getCampaignChannelDefinition(channel).shortLabel}.`);
@@ -602,7 +620,7 @@ function CampaignWizardState({
       }
     });
     return Array.from(new Set(blockers));
-  }, [audienceType, campaignName, channels, emailBodyText, integrationByProvider, messengerMessage, providers, recipientCount, senderEmail, senderName, subject]);
+  }, [audienceType, campaignName, channels, emailBodyText, integrationByProvider, messengerMessage, presentationId, providers, recipientCount, senderEmail, senderName, subject]);
 
   const draft: WizardDraft = {
     campaignId,
@@ -616,6 +634,7 @@ function CampaignWizardState({
     emailBodyText,
     emailBuilderDocument,
     templateId,
+    presentationId,
     consumedTemplateQueryId,
     messengerMessage,
     channels,
@@ -717,6 +736,7 @@ function CampaignWizardState({
     emailBodyText: emailBodyText.trim(),
     emailBuilderDocument,
     templateId,
+    presentationId,
     messengerMessage: messengerMessage.trim(),
     channels: channels.map((channel) => ({
       channel,
@@ -960,6 +980,9 @@ function CampaignWizardState({
               templates={workspaceTemplates}
               templateId={templateId}
               templateLoadState={templateLoadState}
+              presentations={workspacePresentations}
+              presentationId={presentationId}
+              onPresentationChange={setPresentationId}
               onTemplateChange={(nextTemplateId) => {
                 if (!nextTemplateId) {
                   setTemplateId(null);
@@ -1103,6 +1126,7 @@ function hydrateFromApiCampaign(
     setEmailBodyText: (value: string) => void;
     setEmailBuilderDocument: (value: EmailBuilderDocumentInput | null) => void;
     setTemplateId: (value: string | null) => void;
+    setPresentationId: (value: string | null) => void;
     setMessengerMessage: (value: string) => void;
     setChannels: (value: CampaignChannel[]) => void;
     setProviders: React.Dispatch<React.SetStateAction<Record<CampaignChannel, IntegrationProviderId>>>;
@@ -1120,6 +1144,7 @@ function hydrateFromApiCampaign(
   setters.setEmailBodyText(item.emailBodyText);
   setters.setEmailBuilderDocument(item.emailBuilderDocument);
   setters.setTemplateId(item.templateId);
+  setters.setPresentationId(item.presentationId);
   setters.setMessengerMessage(item.messengerMessage);
   setters.setSenderName(item.senderName);
   setters.setSenderEmail(item.senderEmail);
@@ -1345,6 +1370,9 @@ function MessageStep({
   templates,
   templateId,
   templateLoadState,
+  presentations,
+  presentationId,
+  onPresentationChange,
   onTemplateChange,
   messengerMessage,
   onMessengerMessageChange,
@@ -1363,6 +1391,9 @@ function MessageStep({
   templates: EmailTemplateRecord[];
   templateId: string | null;
   templateLoadState: "loading" | "ready" | "error";
+  presentations: PresentationProjectRecord[];
+  presentationId: string | null;
+  onPresentationChange: (value: string | null) => void;
   onTemplateChange: (value: string) => void;
   messengerMessage: string;
   onMessengerMessageChange: (value: string) => void;
@@ -1409,6 +1440,15 @@ function MessageStep({
             Письмо можно заполнить вручную, но выбрать серверный шаблон до восстановления связи нельзя.
           </Alert>
         ) : null}
+      </section>
+      <section className="mt-4 rounded-xl border border-border bg-surface p-4" aria-labelledby="campaign-presentation-title">
+        <div className="grid gap-3 md:grid-cols-[minmax(240px,1fr)_auto] md:items-end">
+          <FormField label="Презентация во вложении" htmlFor="campaign-presentation" hint={presentationId ? "Сохранённый PPTX будет приложен при отправке через UniSender." : "Необязательно. VK WorkSpace не принимает вложение через API Поток."}>
+            <Select id="campaign-presentation" value={presentationId ?? ""} onChange={(event) => onPresentationChange(event.target.value || null)} options={[{ value: "", label: "Без презентации" }, ...presentations.map((item) => ({ value: item.id, label: `${item.name} · ${item.slides.length} слайдов` }))]} />
+          </FormField>
+          <Link href="/presentations" className={buttonVariants({ variant: "secondary", size: "sm" })}>Открыть презентации</Link>
+        </div>
+        {presentationId ? <p className="mb-0 mt-3 rounded-lg bg-info-subtle px-3 py-2 text-[10px] leading-4 text-text-muted">Для автоматической отправки вложения выберите на следующем шаге Email → UniSender. Лимит вложения — 500 КБ; Поток проверит размер перед передачей провайдеру.</p> : null}
       </section>
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <section className="rounded-xl border border-border p-5" aria-labelledby="email-message-title">
