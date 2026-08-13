@@ -526,6 +526,30 @@ async function seedDatabase(request: Request) {
     });
   }
 
+  const [templateHeadersState] = await db
+    .select({ key: systemState.key })
+    .from(systemState)
+    .where(eq(systemState.key, "email-template-library-headers-v1"))
+    .limit(1);
+  if (!templateHeadersState) {
+    for (const template of starterEmailTemplateValues()) {
+      await db.update(emailTemplates).set({
+        builderDocument: template.builderDocument,
+        emailBodyHtml: template.emailBodyHtml,
+        emailBodyText: template.emailBodyText,
+        updatedAt: now,
+      }).where(and(eq(emailTemplates.id, template.id), eq(emailTemplates.workspaceId, WORKSPACE_ID)));
+    }
+    await db.insert(systemState).values({
+      key: "email-template-library-headers-v1",
+      value: "seeded",
+      updatedAt: now,
+    }).onConflictDoUpdate({
+      target: systemState.key,
+      set: { value: "seeded", updatedAt: now },
+    });
+  }
+
   if (!initializationState) {
     await db.insert(systemState).values({
       key: "initial-data-version",

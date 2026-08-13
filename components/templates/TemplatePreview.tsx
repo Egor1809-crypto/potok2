@@ -133,7 +133,7 @@ export function TemplateThumbnail({ template }: { template: EmailTemplateRecord 
 
   return (
     <div
-      className="relative grid h-[280px] place-items-center overflow-hidden p-5 sm:h-[300px]"
+      className="relative grid h-[300px] place-items-center overflow-hidden p-4 sm:h-[320px]"
       style={{ backgroundColor: template.builderDocument.workspaceBackground }}
     >
       <span aria-hidden="true" className="absolute -right-12 -top-14 size-40 rounded-full opacity-[0.09]" style={{ backgroundColor: accentColor }} />
@@ -146,14 +146,14 @@ export function TemplateThumbnail({ template }: { template: EmailTemplateRecord 
       ) : null}
 
       <div
-        className="relative h-[244px] w-[190px] overflow-hidden bg-white shadow-[0_18px_45px_rgba(30,25,38,0.18)] transition-transform duration-300 group-hover:scale-[1.025] sm:h-[258px] sm:w-[202px]"
+        className="relative h-[266px] w-[204px] overflow-hidden bg-white shadow-[0_18px_45px_rgba(30,25,38,0.18)] ring-1 ring-black/[0.04] transition-transform duration-300 group-hover:scale-[1.025] sm:h-[280px] sm:w-[216px]"
         style={{
           backgroundColor: template.builderDocument.bodyBackground,
           ...emailFrameCss(frameStyle, frameColor, Math.min(frameRadius, 14)),
         }}
       >
-        <div className="absolute left-1/2 top-0 w-[340px] origin-top -translate-x-1/2 scale-[0.58] sm:scale-[0.62]">
-          {blocks.slice(0, 8).map((block) => (
+        <div className="absolute left-1/2 top-0 w-[340px] origin-top -translate-x-1/2 scale-[0.6] sm:scale-[0.64]">
+          {blocks.slice(0, 9).map((block) => (
             <TemplateMiniBlock key={block.id} block={block} accentColor={accentColor} />
           ))}
         </div>

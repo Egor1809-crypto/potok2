@@ -191,6 +191,37 @@ export type StarterEmailTemplateValue = {
   updatedAt: string;
 };
 
+function starterHeaderBlock(template: (typeof templates)[number]): EmailBuilderBlockInput {
+  const darkHeader = template.id.includes("noir") || template.id.includes("ai-policy") || template.id.includes("vip");
+  return {
+    id: `${template.id}-library-header`,
+    type: "logo",
+    content: `TECH‑PRAVO  ·  ${template.category === "Transactional" ? "LEGAL NOTICE" : template.category.toUpperCase()}`,
+    alignment: "left",
+    paddingTop: 24,
+    paddingBottom: 18,
+    paddingLeft: 32,
+    paddingRight: 32,
+    backgroundColor: darkHeader ? template.bodyBackground ?? "#181B18" : "#ffffff",
+    textColor: darkHeader ? template.accentColor : template.accentColor,
+    fontSize: 11,
+    borderRadius: 0,
+    fontFamily: "Arial",
+    fontWeight: 700,
+    lineHeight: 120,
+    letterSpacing: 2,
+    borderWidth: 0,
+    borderColor: template.frameColor ?? template.accentColor,
+    widthPercent: 100,
+    buttonStyle: "solid",
+  };
+}
+
+function ensureStarterHeader(template: (typeof templates)[number], blocks: EmailBuilderBlockInput[]) {
+  if (blocks[0]?.type === "logo") return blocks;
+  return [starterHeaderBlock(template), ...blocks];
+}
+
 export function starterEmailTemplateValues(): StarterEmailTemplateValue[] {
   return templates.map((template) => {
     const rawDocument: EmailBuilderDocumentInput = {
@@ -204,11 +235,11 @@ export function starterEmailTemplateValues(): StarterEmailTemplateValue[] {
       frameStyle: template.frameStyle ?? "none",
       frameColor: template.frameColor ?? template.accentColor,
       frameRadius: template.frameRadius ?? 0,
-      blocks: template.blocks.map((block) => ({
+      blocks: ensureStarterHeader(template, template.blocks.map((block) => ({
         ...BLOCK_STYLES[block.type],
         ...block,
         alignment: block.alignment ?? "left",
-      })),
+      }))),
     };
     const builderDocument = parseEmailBuilderDocument(rawDocument);
     if (!builderDocument) {

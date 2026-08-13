@@ -56,6 +56,19 @@ test("legal collection adds original scenarios and editable legal blocks", async
   assert.match(seed, /email-template-library-v4-legal/);
 });
 
+test("every starter template has a real branded header in its saved document", async () => {
+  const [starter, database, preview] = await Promise.all([
+    readFile(new URL("../lib/server/starter-template-library.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/server/database-init.ts", import.meta.url), "utf8"),
+    readFile(new URL("../components/templates/TemplatePreview.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(starter, /ensureStarterHeader/);
+  assert.match(starter, /TECH‑PRAVO/);
+  assert.match(starter, /blocks\[0\]\?\.type === "logo"/);
+  assert.match(database, /email-template-library-headers-v1/);
+  assert.match(preview, /blocks\.slice\(0, 9\)/);
+});
+
 test("AI design remains a separate version until the user chooses it", async () => {
   const [assistant, builder, server] = await Promise.all([
     readFile(new URL("../components/email-builder/AiEmailAssistant.tsx", import.meta.url), "utf8"),
