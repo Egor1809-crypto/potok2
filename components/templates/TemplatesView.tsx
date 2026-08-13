@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { ArrowLeft, FileText, PenTool, RefreshCw, SearchX, Upload } from "lucide-react";
+import { ArrowLeft, FileText, PenTool, RefreshCw, SearchX, Sparkles, Upload } from "lucide-react";
 
 import type { TemplateCategory } from "@/types";
 import type {
@@ -40,6 +40,7 @@ const categories = [
 
 type CategoryFilter = (typeof categories)[number];
 type ScopeFilter = "all" | "mine";
+type CollectionFilter = "studio" | "all";
 type SortMode = "recent" | "name" | "blocks";
 type StyleFilter = "all" | "minimal" | "editorial" | "bold";
 type DensityFilter = "all" | "compact" | "balanced" | "rich";
@@ -147,6 +148,7 @@ export function TemplatesView() {
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [category, setCategory] = useState<CategoryFilter>("All");
   const [scope, setScope] = useState<ScopeFilter>(() => new URLSearchParams(browserSearch).get("scope") === "mine" ? "mine" : "all");
+  const [collection, setCollection] = useState<CollectionFilter>(() => new URLSearchParams(browserSearch).get("scope") === "mine" ? "all" : "studio");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortMode>("recent");
   const [style, setStyle] = useState<StyleFilter>("all");
@@ -192,6 +194,7 @@ export function TemplatesView() {
     const normalized = query.trim().toLocaleLowerCase("ru-RU");
     return templates
       .filter((template) => scope === "all" || !template.isStarter)
+      .filter((template) => scope === "mine" || collection === "all" || template.id.startsWith("template-v7-studio-"))
       .filter((template) => category === "All" || template.category === category)
       .filter((template) => {
         if (style === "all") return true;
@@ -222,11 +225,13 @@ export function TemplatesView() {
         }
         return Date.parse(second.updatedAt) - Date.parse(first.updatedAt);
       });
-  }, [category, density, palette, query, scope, sort, style, templates]);
+  }, [category, collection, density, palette, query, scope, sort, style, templates]);
 
   const scopedTemplates = useMemo(
-    () => templates.filter((template) => scope === "all" || !template.isStarter),
-    [scope, templates],
+    () => templates
+      .filter((template) => scope === "all" || !template.isStarter)
+      .filter((template) => scope === "mine" || collection === "all" || template.id.startsWith("template-v7-studio-")),
+    [collection, scope, templates],
   );
 
   const cloneTemplate = async (template: EmailTemplateRecord) => {
@@ -373,14 +378,28 @@ export function TemplatesView() {
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="inline-flex rounded-xl border border-border bg-surface p-1" role="group" aria-label="Раздел шаблонов">
-            <button type="button" aria-pressed={scope === "all"} onClick={() => setScope("all")} className="rounded-lg px-4 py-2 text-[12px] font-semibold text-text-muted outline-none transition hover:text-text-strong aria-pressed:bg-primary aria-pressed:text-white focus-visible:ring-2 focus-visible:ring-primary/30">
-              Библиотека <span className="ml-1 opacity-70">{templates.length}</span>
+          <div className="inline-flex flex-wrap rounded-xl border border-border bg-surface p-1" role="group" aria-label="Раздел шаблонов">
+            <button type="button" aria-pressed={scope === "all" && collection === "studio"} onClick={() => { setScope("all"); setCollection("studio"); }} className="rounded-lg px-4 py-2 text-[12px] font-semibold text-text-muted outline-none transition hover:text-text-strong aria-pressed:bg-primary aria-pressed:text-white focus-visible:ring-2 focus-visible:ring-primary/30">
+              <Sparkles aria-hidden="true" className="mr-1.5 inline size-3.5" />Подборка студии <span className="ml-1 opacity-70">{templates.filter((template) => template.id.startsWith("template-v7-studio-")).length}</span>
             </button>
-            <button type="button" aria-pressed={scope === "mine"} onClick={() => setScope("mine")} className="rounded-lg px-4 py-2 text-[12px] font-semibold text-text-muted outline-none transition hover:text-text-strong aria-pressed:bg-primary aria-pressed:text-white focus-visible:ring-2 focus-visible:ring-primary/30">
+            <button type="button" aria-pressed={scope === "all" && collection === "all"} onClick={() => { setScope("all"); setCollection("all"); }} className="rounded-lg px-4 py-2 text-[12px] font-semibold text-text-muted outline-none transition hover:text-text-strong aria-pressed:bg-primary aria-pressed:text-white focus-visible:ring-2 focus-visible:ring-primary/30">
+              Вся библиотека <span className="ml-1 opacity-70">{templates.length}</span>
+            </button>
+            <button type="button" aria-pressed={scope === "mine"} onClick={() => { setScope("mine"); setCollection("all"); }} className="rounded-lg px-4 py-2 text-[12px] font-semibold text-text-muted outline-none transition hover:text-text-strong aria-pressed:bg-primary aria-pressed:text-white focus-visible:ring-2 focus-visible:ring-primary/30">
               Мои шаблоны <span className="ml-1 opacity-70">{templates.filter((template) => !template.isStarter).length}</span>
             </button>
           </div>
+          {scope === "all" && collection === "studio" ? (
+            <div className="overflow-hidden rounded-[18px] border border-[#28231F] bg-[#211D1A] p-5 text-[#F8F2E8] shadow-[0_18px_46px_rgba(35,28,23,0.12)] sm:p-6">
+              <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(340px,.8fr)] lg:items-end">
+                <div>
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#C7FF65]">MAILFLOW DESIGN STUDIO / 01</span>
+                  <h2 className="mb-0 mt-3 max-w-3xl text-balance text-[28px] font-semibold leading-[1.04] tracking-[-0.04em] sm:text-[38px]">Не шаблоны по палитрам, а разные арт-направления</h2>
+                </div>
+                <p className="m-0 max-w-xl text-[12px] leading-6 text-[#C9C0B7]">Швейцарская сетка, газетная редакция, neon terminal, музейное приглашение, bento-отчёт, документальное досье, брутализм и сервисные продукты. Каждый макет собран с собственной логикой композиции.</p>
+              </div>
+            </div>
+          ) : null}
         <Tabs value={category} onValueChange={(value) => setCategory(value as CategoryFilter)} className="min-w-0">
           <TabsList className="-mb-px">
             {categories.map((item) => (

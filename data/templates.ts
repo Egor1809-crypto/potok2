@@ -1,6 +1,7 @@
 import type { EmailTemplate } from "@/types";
 import { BRAND_NAME } from "@/config/brand";
 import { generatedTemplates } from "./generated-template-library";
+import { studioTemplates } from "./studio-template-library";
 
 const curatedTemplates: EmailTemplate[] = [
   {
@@ -1357,7 +1358,7 @@ const curatedTemplates: EmailTemplate[] = [
   },
 ];
 
-export const templates: EmailTemplate[] = [...curatedTemplates, ...generatedTemplates];
+export const templates: EmailTemplate[] = [...curatedTemplates, ...generatedTemplates, ...studioTemplates];
 
 export const emailTemplates = templates;
 export const mockTemplates = templates;

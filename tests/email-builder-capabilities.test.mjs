@@ -236,3 +236,20 @@ test("scaled library offers 150+ original templates and useful discovery filters
   assert.match(builder, /С чего начнём письмо/);
   assert.match(builder, /150\+ готовых макетов/);
 });
+
+test("studio picks use distinct art directions instead of palette duplicates", async () => {
+  const [studio, templatesView, preview, database] = await Promise.all([
+    readFile(new URL("../data/studio-template-library.ts", import.meta.url), "utf8"),
+    readFile(new URL("../components/templates/TemplatesView.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/templates/TemplatePreview.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/server/database-init.ts", import.meta.url), "utf8"),
+  ]);
+  assert.ok((studio.match(/id: "(?:swiss-red-grid|editorial-gazette|neon-terminal|museum-invitation|bento-quarterly|document-dossier|brutalist-notice|midnight-gala|blueprint-process|soft-service-card|kinetic-poster|travel-feedback|security-obsidian)"/g) ?? []).length >= 13);
+  for (const direction of ["Swiss Grid", "Газетный выпуск", "Neon Terminal", "Премиальное приглашение", "Bento Board", "Юридическое досье", "Brutalist", "Midnight Gala", "Blueprint", "Soft Cloud", "Kinetic Type"]) {
+    assert.match(studio, new RegExp(direction));
+  }
+  assert.match(templatesView, /Подборка студии/);
+  assert.match(templatesView, /Не шаблоны по палитрам/);
+  assert.match(preview, /Выбор студии/);
+  assert.match(database, /email-template-library-v7-studio/);
+});

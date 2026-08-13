@@ -35,7 +35,8 @@ export function TemplateCard({
   onDelete: () => void;
   busyAction?: "clone" | "delete";
 }) {
-  const isDesignerCollection = template.id.startsWith("template-v3-");
+  const isStudioPick = template.id.startsWith("template-v7-studio-");
+  const isDesignerCollection = isStudioPick || template.id.startsWith("template-v3-");
   return (
     <article className="group min-w-0 overflow-hidden rounded-[14px] border border-border bg-surface shadow-[var(--shadow-xs)] transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-1 hover:border-border-strong hover:shadow-[var(--shadow-md)]">
       <Link
@@ -58,7 +59,7 @@ export function TemplateCard({
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1">
             <Badge variant={isDesignerCollection || !template.isStarter ? "accent" : "neutral"}>
-              {isDesignerCollection ? "Новая коллекция" : template.isStarter ? "Из библиотеки" : "Мой шаблон"}
+              {isStudioPick ? "Выбор студии" : isDesignerCollection ? "Дизайнерский" : template.isStarter ? "Из библиотеки" : "Мой шаблон"}
             </Badge>
             <span className="text-[9px] text-text-subtle">{templateCategoryLabels[template.category]}</span>
           </div>
@@ -130,18 +131,28 @@ export function TemplateThumbnail({ template }: { template: EmailTemplateRecord 
   const frameStyle = template.builderDocument.frameStyle ?? "none";
   const frameColor = template.builderDocument.frameColor ?? accentColor;
   const frameRadius = template.builderDocument.frameRadius ?? 0;
+  const isStudioPick = template.id.startsWith("template-v7-studio-");
 
   return (
     <div
       className="relative grid h-[300px] place-items-center overflow-hidden p-4 sm:h-[320px]"
       style={{ backgroundColor: template.builderDocument.workspaceBackground }}
     >
-      <span aria-hidden="true" className="absolute -right-12 -top-14 size-40 rounded-full opacity-[0.09]" style={{ backgroundColor: accentColor }} />
-      <span aria-hidden="true" className="absolute -bottom-14 -left-12 size-32 rounded-full bg-white/30" />
-      {template.id.startsWith("template-v3-") ? (
+      {isStudioPick ? (
+        <>
+          <span aria-hidden="true" className="absolute inset-x-0 top-0 h-px opacity-35" style={{ backgroundColor: accentColor }} />
+          <span aria-hidden="true" className="absolute bottom-3 left-3 font-mono text-[7px] uppercase tracking-[0.16em] opacity-40">Art direction / 2026</span>
+        </>
+      ) : (
+        <>
+          <span aria-hidden="true" className="absolute -right-12 -top-14 size-40 rounded-full opacity-[0.09]" style={{ backgroundColor: accentColor }} />
+          <span aria-hidden="true" className="absolute -bottom-14 -left-12 size-32 rounded-full bg-white/30" />
+        </>
+      )}
+      {template.id.startsWith("template-v3-") || isStudioPick ? (
         <span className="absolute left-3 top-3 z-20 inline-flex items-center gap-1 rounded-full border border-white/60 bg-white/85 px-2 py-1 text-[8px] font-semibold uppercase tracking-[0.08em] text-[#312a3b] shadow-sm backdrop-blur">
           <Sparkles aria-hidden="true" className="size-2.5" />
-          Дизайнерский
+          {isStudioPick ? "Studio pick" : "Дизайнерский"}
         </span>
       ) : null}
 
