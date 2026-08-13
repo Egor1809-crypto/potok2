@@ -81,6 +81,9 @@ test("AI presentation outline follows a narrative and does not invent evidence",
   assert.match(server, /Не повторяй одинаковую композицию подряд/);
   assert.match(server, /slides\[index\]\.layout !== slides\[index - 1\]\.layout/);
   assert.match(server, /safeFallbackOutline/);
+  assert.match(server, /Криптовалюты: возможности, риски и осознанные решения/);
+  assert.match(server, /generationMode: "topic_fallback"/);
+  assert.match(server, /NAVYAI_PRESENTATION_MODEL\?\.trim\(\) \|\| "gemini-2\.5-flash-lite"/);
   assert.match(server, /GENERATION_LIMIT = 8/);
   assert.match(server, /INSERT INTO ai_request_limits/);
   assert.match(server, /INSERT OR IGNORE INTO ai_idempotency/);

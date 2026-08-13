@@ -303,6 +303,13 @@ export function PresentationStudio() {
         setProject(body.presentation);
         setSelectedSlideId(body.presentation.slides[0]?.id ?? null);
         try {
+          const generationNotice = window.sessionStorage.getItem(`potok:presentation-notice:${body.presentation.id}`);
+          if (generationNotice) {
+            setNotice(generationNotice);
+            window.sessionStorage.removeItem(`potok:presentation-notice:${body.presentation.id}`);
+          } else {
+            setNotice("");
+          }
           const stored = window.localStorage.getItem(`potok:presentation-review:${body.presentation.id}`);
           const parsed = stored ? JSON.parse(stored) : [];
           const knownIds = new Set(body.presentation.slides.map((slide) => slide.id));
@@ -444,6 +451,9 @@ export function PresentationStudio() {
       if (!response.ok || !("outline" in body) || !body.outline) throw new Error(apiError(body, "ИИ не подготовил презентацию."));
       const created = await createProject({ ...body.outline, sourceType: "ai" }, "ai-save");
       if (created) {
+        if (body.generationNotice) {
+          window.sessionStorage.setItem(`potok:presentation-notice:${created.id}`, body.generationNotice);
+        }
         aiIdempotencyKeyRef.current = "";
         setAiOpen(false);
       }

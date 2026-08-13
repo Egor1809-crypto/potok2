@@ -47,8 +47,10 @@ function provider() {
       key: navyKey,
       provider: "navyai" as const,
       endpoint: `${runtime().NAVYAI_BASE_URL?.trim().replace(/\/$/, "") || "https://api.navy/v1"}/chat/completions`,
-      model: runtime().NAVYAI_PRESENTATION_MODEL?.trim() || runtime().NAVYAI_EMAIL_MODEL?.trim() || "gpt-5.2",
-      fallbackModel: "gemini-2.5-flash-lite",
+      // Presentations need predictable latency more than deep reasoning. Do not
+      // inherit the slower email model when a presentation model is not set.
+      model: runtime().NAVYAI_PRESENTATION_MODEL?.trim() || "gemini-2.5-flash-lite",
+      fallbackModel: runtime().NAVYAI_PRESENTATION_MODEL?.trim() ? "gemini-2.5-flash-lite" : undefined,
     };
   }
   const openAiKey = runtime().OPENAI_API_KEY?.trim();
@@ -377,10 +379,71 @@ function responseSchema(slideCount: number) {
 }
 
 function safeFallbackOutline(input: ReturnType<typeof parseRequest>) {
-  const summary = input.goal.split(/[.!?\n]/)[0]?.trim().slice(0, 120).trim() || "Новая презентация";
+  const rawSummary = input.goal.split(/[.!?\n]/)[0]?.trim() || "Новая презентация";
+  const topic = rawSummary
+    .replace(/^(?:сделай|создай|подготовь|нужна|нужно сделать)\s+(?:мне\s+)?(?:презентацию|доклад)(?:\s+на\s+тему)?\s*[:—-]?\s*/i, "")
+    .replace(/^на\s+тему\s*[:—-]?\s*/i, "")
+    .trim();
+  const summary = (topic || rawSummary).slice(0, 120).trim();
   const audience = input.audience || "целевая аудитория";
   const facts = input.context?.trim() || "Подтверждённые данные не указаны; этот слайд нужно дополнить фактами перед показом.";
   const action = input.desiredAction?.trim() || "Согласовать следующий шаг";
+  const cryptoTopic = /крипт|биткоин|блокчейн|цифров(?:ая|ые) валют/i.test(`${summary} ${input.context ?? ""}`);
+  if (cryptoTopic) {
+    const cryptoSlides: PresentationSlide[] = [
+      {
+        id: newId("slide"), layout: "title", eyebrow: "КРИПТОВАЛЮТЫ",
+        title: "Криптовалюты: возможности, риски и осознанные решения",
+        body: input.audience ? `Практический обзор для аудитории: ${input.audience}` : "Практический обзор без инвестиционных обещаний",
+        bullets: [], speakerNotes: "Начните с цели: разобраться в механике и критериях решения, а не угадать цену актива.",
+      },
+      {
+        id: newId("slide"), layout: "statement", eyebrow: "ОСНОВА",
+        title: "Криптовалюта — цифровой актив, учёт которого ведёт распределённая сеть",
+        body: "Передача прав фиксируется в блокчейне, а доступ к активу подтверждается криптографическим ключом. Банк не является обязательным посредником, но ответственность за хранение и проверку операций возрастает.",
+        bullets: [], speakerNotes: "Разделите понятия: актив, блокчейн, кошелёк и биржа — это не одно и то же.",
+      },
+      {
+        id: newId("slide"), layout: "split", eyebrow: "КАК ЭТО РАБОТАЕТ",
+        title: "Операция проходит путь от подписи до подтверждения сетью",
+        body: "Пользователь подписывает перевод приватным ключом. Узлы сети проверяют операцию, после чего запись включается в блок и становится частью общей истории.",
+        bullets: ["Кошелёк хранит ключи, а не монеты", "Адрес служит реквизитом получателя", "Правила подтверждения зависят от сети"],
+        speakerNotes: "Подчеркните: потеря ключа и ошибка в адресе могут быть необратимыми.",
+      },
+      {
+        id: newId("slide"), layout: "bullets", eyebrow: "ВОЗМОЖНОСТИ",
+        title: "Ценность появляется там, где программируемость важнее привычного посредника",
+        body: "Технология применима не только к оплате: она позволяет задавать правила владения и исполнения операций в коде.",
+        bullets: ["Международные переводы", "Токенизация цифровых и реальных прав", "Смарт-контракты и автоматизация расчётов", "Доступ к децентрализованным сервисам"],
+        speakerNotes: "Не называйте каждое применение выгодным: полезность зависит от юрисдикции, стоимости и конкретного сценария.",
+      },
+      {
+        id: newId("slide"), layout: "split", eyebrow: "РИСКИ",
+        title: "Главные риски связаны не только с ценой, но и с контролем доступа",
+        body: "Высокая волатильность заметна первой, однако критичны также ошибки хранения, мошенничество, технические уязвимости и изменение правовых требований.",
+        bullets: ["Рыночный риск", "Потеря или компрометация ключей", "Риск контрагента и биржи", "Налоги и регулирование"],
+        speakerNotes: "Отделите риск самого протокола от риска сервиса, через который пользователь покупает или хранит актив.",
+      },
+      {
+        id: newId("slide"), layout: "bullets", eyebrow: "ПРОВЕРКА РЕШЕНИЯ",
+        title: "До использования нужно ответить на пять практических вопросов",
+        body: "Решение должно начинаться со сценария и допустимого риска, а не с выбора популярной монеты.",
+        bullets: ["Какую задачу решает актив?", "Кто контролирует приватные ключи?", "Как проверяется контрагент?", "Какие комиссии и ограничения действуют?", "Каковы правовые и налоговые последствия?"],
+        speakerNotes: "Эти вопросы превращают обсуждение из эмоционального в управляемое.",
+      },
+      {
+        id: newId("slide"), layout: "closing", eyebrow: "ВЫВОД",
+        title: action,
+        body: "Выберите один сценарий, проверьте правовые условия и начните с суммы или процесса, потеря которого не создаст критического ущерба.",
+        bullets: [], speakerNotes: "Завершите конкретным действием, указанным пользователем, либо предложите отдельную оценку сценария.",
+      },
+    ];
+    return {
+      name: "Криптовалюты: возможности и риски",
+      description: "Содержательная презентация о принципах работы криптовалют, сценариях применения, рисках и критериях принятия решения.",
+      slides: cryptoSlides.slice(0, Math.max(3, input.slideCount - 1)).concat(cryptoSlides.at(-1)!).slice(0, input.slideCount),
+    };
+  }
   const middle: Array<Pick<PresentationSlide, "layout" | "eyebrow" | "title" | "body" | "bullets">> = [
     { layout: "statement", eyebrow: "ЗАДАЧА", title: "Презентация должна привести аудиторию к одному понятному решению", body: input.goal.slice(0, 700), bullets: [] },
     { layout: "split", eyebrow: "КОНТЕКСТ", title: "Исходная ситуация задаёт границы сильного предложения", body: facts, bullets: ["Что уже известно", "Что остаётся гипотезой", "Что нужно проверить"] },
@@ -469,6 +532,7 @@ export async function generatePresentationOutline(request: Request, value: unkno
     }
     let parsed: Record<string, unknown>;
     let slides: PresentationSlide[];
+    let usedTopicFallback = false;
     try {
       parsed = parseJson(outputText(responseBody));
       slides = parseSlides(parsed.slides, input.slideCount);
@@ -500,11 +564,16 @@ export async function generatePresentationOutline(request: Request, value: unkno
         const fallback = safeFallbackOutline(input);
         parsed = { name: fallback.name, description: fallback.description };
         slides = fallback.slides;
+        usedTopicFallback = true;
       }
     }
     const result: PresentationAiResponse = {
       configured: true,
       provider: selected.provider,
+      generationMode: usedTopicFallback ? "topic_fallback" : "provider",
+      ...(usedTopicFallback ? {
+        generationNotice: "Ответ ИИ не прошёл проверку структуры, поэтому Поток собрал содержательную редактируемую версию по теме запроса.",
+      } : {}),
       outline: {
         name: optionalText(parsed.name, "Название презентации", 120) || input.goal.split(/[.!?\n]/)[0]?.slice(0, 120) || "Новая презентация",
         description: optionalText(parsed.description, "Описание презентации", 500) ?? "Создано ИИ-помощником Поток.",
@@ -524,6 +593,8 @@ export async function generatePresentationOutline(request: Request, value: unkno
       const result: PresentationAiResponse = {
         configured: true,
         provider: selected.provider,
+        generationMode: "topic_fallback",
+        generationNotice: "ИИ-провайдер не ответил вовремя, поэтому Поток подготовил содержательную редактируемую версию по теме запроса.",
         outline: {
           ...fallback,
           themeId: input.themeId,

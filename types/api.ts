@@ -403,6 +403,8 @@ export type PresentationAiRequest = {
 export type PresentationAiResponse = {
   configured: boolean;
   provider?: "navyai" | "openai";
+  generationMode?: "provider" | "topic_fallback";
+  generationNotice?: string;
   outline?: Pick<
     PresentationProjectRecord,
     | "name"
