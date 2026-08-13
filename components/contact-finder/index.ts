@@ -1,0 +1,1 @@
+export { ContactFinderView } from "./ContactFinderView";

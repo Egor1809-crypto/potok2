@@ -95,8 +95,8 @@ export function Topbar({
           <div className="flex items-center">{action}</div>
         ) : (
           <Link
-            href="/email-builder?new=1"
-            aria-label="Создать письмо"
+            href="/dashboard#creative-studio"
+            aria-label="Создать проект"
             className={buttonVariants({
               variant: "primary",
               size: "sm",
@@ -104,7 +104,7 @@ export function Topbar({
             })}
           >
             <Plus aria-hidden="true" className="size-4" />
-            <span className="hidden sm:inline">Создать письмо</span>
+            <span className="hidden sm:inline">Создать</span>
           </Link>
         )}
 

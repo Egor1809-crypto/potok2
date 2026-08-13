@@ -13,6 +13,7 @@ import { ApiRequestError, cleanText, newId } from "./api-utils";
 import { ensureDatabase, WORKSPACE_ID } from "./database-init";
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+const MAX_GENERATED_IMAGE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"] as const);
 type AllowedMime = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
 
@@ -82,6 +83,17 @@ export async function listEmailAssets(request: Request): Promise<EmailAssetsList
   return { assets: rows.map((row) => toRecord(request, row)) };
 }
 
+export async function getEmailAssetRecord(request: Request, idValue: unknown): Promise<EmailAssetRecord> {
+  const id = cleanText(idValue, "Изображение", 160);
+  const [row] = await getDb()
+    .select()
+    .from(emailAssets)
+    .where(and(eq(emailAssets.id, id), eq(emailAssets.workspaceId, WORKSPACE_ID)))
+    .limit(1);
+  if (!row) throw new ApiRequestError("Изображение не найдено.", 404);
+  return toRecord(request, row);
+}
+
 export async function uploadEmailAsset(request: Request): Promise<EmailAssetMutationResponse> {
   await ensureDatabase(request);
   const form = await request.formData();
@@ -113,10 +125,33 @@ export async function storeGeneratedEmailAsset(request: Request, sourceUrl: stri
   const mimeType = (response.headers.get("content-type")?.split(";")[0]?.trim() ?? "") as AllowedMime;
   if (!ALLOWED_TYPES.has(mimeType)) throw new ApiRequestError("ИИ вернул неподдерживаемый формат изображения.", 502);
   const contentLength = Number(response.headers.get("content-length") ?? 0);
-  if (contentLength > MAX_IMAGE_BYTES) throw new ApiRequestError("Сгенерированное изображение превышает 4 МБ.", 502);
+  if (contentLength > MAX_GENERATED_IMAGE_BYTES) throw new ApiRequestError("Сгенерированное изображение превышает 10 МБ.", 502);
   const bytes = new Uint8Array(await response.arrayBuffer());
-  if (bytes.byteLength < 1 || bytes.byteLength > MAX_IMAGE_BYTES || !validSignature(bytes, mimeType)) throw new ApiRequestError("ИИ вернул повреждённое изображение.", 502);
+  if (bytes.byteLength < 1 || bytes.byteLength > MAX_GENERATED_IMAGE_BYTES || !validSignature(bytes, mimeType)) throw new ApiRequestError("ИИ вернул повреждённое изображение.", 502);
   return persistEmailAsset(request, bytes, mimeType, cleanText(filename, "Название изображения", 180), kind);
+}
+
+export async function storeGeneratedEmailAssetBytes(
+  request: Request,
+  bytes: Uint8Array,
+  mimeType: AllowedMime,
+  kind: "photo" | "logo",
+  filename: string,
+) {
+  await ensureDatabase(request);
+  if (!ALLOWED_TYPES.has(mimeType)) {
+    throw new ApiRequestError("ИИ вернул неподдерживаемый формат изображения.", 502);
+  }
+  if (bytes.byteLength < 1 || bytes.byteLength > MAX_GENERATED_IMAGE_BYTES || !validSignature(bytes, mimeType)) {
+    throw new ApiRequestError("ИИ вернул повреждённое или слишком большое изображение.", 502);
+  }
+  return persistEmailAsset(
+    request,
+    bytes,
+    mimeType,
+    cleanText(filename, "Название изображения", 180),
+    kind,
+  );
 }
 
 export async function getEmailAsset(request: Request, idValue: unknown): Promise<Response> {
@@ -129,14 +164,19 @@ export async function getEmailAsset(request: Request, idValue: unknown): Promise
   if (!row) throw new ApiRequestError("Изображение не найдено.", 404);
   const object = await bucket().get(row.objectKey);
   if (!object) throw new ApiRequestError("Файл изображения не найден в хранилище.", 404);
+  const download = new URL(request.url).searchParams.get("download") === "1";
+  const headers: Record<string, string> = {
+    "Content-Type": row.mimeType,
+    "Content-Length": String(row.size),
+    "Cache-Control": "public, max-age=31536000, immutable",
+    "X-Content-Type-Options": "nosniff",
+    "Content-Security-Policy": "default-src 'none'; sandbox",
+  };
+  if (download) {
+    headers["Content-Disposition"] = `attachment; filename*=UTF-8''${encodeURIComponent(row.filename)}`;
+  }
   return new Response(object.body, {
-    headers: {
-      "Content-Type": row.mimeType,
-      "Content-Length": String(row.size),
-      "Cache-Control": "public, max-age=31536000, immutable",
-      "X-Content-Type-Options": "nosniff",
-      "Content-Security-Policy": "default-src 'none'; sandbox",
-    },
+    headers,
   });
 }
 

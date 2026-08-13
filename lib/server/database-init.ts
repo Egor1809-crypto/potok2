@@ -116,6 +116,40 @@ const schemaStatements = [
     kind TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
+  `CREATE TABLE IF NOT EXISTS ai_request_limits (
+    key TEXT PRIMARY KEY NOT NULL,
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    scope TEXT NOT NULL,
+    window_started_at TEXT NOT NULL,
+    request_count INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS ai_idempotency (
+    key TEXT PRIMARY KEY NOT NULL,
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    operation TEXT NOT NULL,
+    request_hash TEXT NOT NULL,
+    status TEXT NOT NULL,
+    asset_id TEXT REFERENCES email_assets(id) ON DELETE SET NULL,
+    result_json TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS presentation_projects (
+    id TEXT PRIMARY KEY NOT NULL,
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    theme_id TEXT NOT NULL,
+    accent_color TEXT NOT NULL,
+    background_color TEXT NOT NULL,
+    text_color TEXT NOT NULL,
+    slides TEXT NOT NULL DEFAULT '[]',
+    source_type TEXT NOT NULL DEFAULT 'blank',
+    source_email_template_id TEXT REFERENCES email_templates(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
   `CREATE TABLE IF NOT EXISTS campaigns (
     id TEXT PRIMARY KEY NOT NULL,
     workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
@@ -215,6 +249,7 @@ const schemaStatements = [
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_participants_workspace_singleton ON participants(workspace_id)`,
   `DROP INDEX IF EXISTS idx_contacts_workspace_email`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_contacts_workspace_email ON contacts(workspace_id, email) WHERE email <> ''`,
+  `CREATE INDEX IF NOT EXISTS idx_contacts_workspace_phone ON contacts(workspace_id, phone)`,
   `DROP INDEX IF EXISTS idx_contacts_workspace_telegram`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_contacts_workspace_telegram ON contacts(workspace_id, telegram_chat_id) WHERE telegram_chat_id IS NOT NULL`,
   `DROP INDEX IF EXISTS idx_contacts_workspace_vk`,
@@ -227,6 +262,9 @@ const schemaStatements = [
   `CREATE INDEX IF NOT EXISTS idx_email_templates_workspace_updated ON email_templates(workspace_id, updated_at)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_email_assets_object_key ON email_assets(object_key)`,
   `CREATE INDEX IF NOT EXISTS idx_email_assets_workspace_created ON email_assets(workspace_id, created_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_ai_request_limits_workspace_scope ON ai_request_limits(workspace_id, scope)`,
+  `CREATE INDEX IF NOT EXISTS idx_ai_idempotency_workspace_operation_created ON ai_idempotency(workspace_id, operation, created_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_presentation_projects_workspace_updated ON presentation_projects(workspace_id, updated_at)`,
   `CREATE INDEX IF NOT EXISTS idx_campaigns_workspace_status_updated ON campaigns(workspace_id, status, updated_at)`,
   `CREATE INDEX IF NOT EXISTS idx_campaigns_segment ON campaigns(segment_id)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_campaign_versions_number ON campaign_versions(campaign_id, version)`,
@@ -336,6 +374,14 @@ export async function requireWorkspaceParticipant(request: Request) {
 async function createSchema() {
   const d1 = getD1();
   await d1.batch(schemaStatements.map((statement) => d1.prepare(statement)));
+  const aiIdempotencyColumns = await d1
+    .prepare("PRAGMA table_info(ai_idempotency)")
+    .all<{ name: string }>();
+  if (!aiIdempotencyColumns.results.some((column) => column.name === "result_json")) {
+    await d1
+      .prepare("ALTER TABLE ai_idempotency ADD COLUMN result_json TEXT")
+      .run();
+  }
   const campaignColumns = await d1
     .prepare("PRAGMA table_info(campaigns)")
     .all<{ name: string }>();

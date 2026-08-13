@@ -14,6 +14,9 @@ import type {
   DeliveryOutboxStatus,
   EmailBuilderDocumentInput,
   IntegrationConnectionStatus,
+  PresentationSlide,
+  PresentationSourceType,
+  PresentationThemeId,
   SegmentRule,
 } from "@/types/api";
 import type { TemplateCategory } from "@/types/template";
@@ -112,6 +115,10 @@ export const contacts = sqliteTable(
     uniqueIndex("idx_contacts_workspace_email")
       .on(table.workspaceId, table.email)
       .where(sql`${table.email} <> ''`),
+    // A company phone can legitimately belong to several people. The API still
+    // detects likely duplicates before import, while this non-unique index keeps
+    // lookups fast without making a schema migration fail on historical data.
+    index("idx_contacts_workspace_phone").on(table.workspaceId, table.phone),
     index("idx_contacts_workspace_status").on(
       table.workspaceId,
       table.status,
@@ -248,6 +255,85 @@ export const emailAssets = sqliteTable(
     index("idx_email_assets_workspace_created").on(
       table.workspaceId,
       table.createdAt,
+    ),
+  ],
+);
+
+export const aiRequestLimits = sqliteTable(
+  "ai_request_limits",
+  {
+    key: text("key").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    scope: text("scope").notNull(),
+    windowStartedAt: text("window_started_at").notNull(),
+    requestCount: integer("request_count").notNull().default(0),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("idx_ai_request_limits_workspace_scope").on(
+      table.workspaceId,
+      table.scope,
+    ),
+  ],
+);
+
+export const aiIdempotency = sqliteTable(
+  "ai_idempotency",
+  {
+    key: text("key").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    operation: text("operation").notNull(),
+    requestHash: text("request_hash").notNull(),
+    status: text("status").$type<"pending" | "completed" | "failed">().notNull(),
+    assetId: text("asset_id").references(() => emailAssets.id, { onDelete: "set null" }),
+    resultJson: text("result_json"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("idx_ai_idempotency_workspace_operation_created").on(
+      table.workspaceId,
+      table.operation,
+      table.createdAt,
+    ),
+  ],
+);
+
+export const presentationProjects = sqliteTable(
+  "presentation_projects",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description").notNull().default(""),
+    themeId: text("theme_id").$type<PresentationThemeId>().notNull(),
+    accentColor: text("accent_color").notNull(),
+    backgroundColor: text("background_color").notNull(),
+    textColor: text("text_color").notNull(),
+    slides: text("slides", { mode: "json" })
+      .$type<PresentationSlide[]>()
+      .notNull()
+      .default(sql`'[]'`),
+    sourceType: text("source_type")
+      .$type<PresentationSourceType>()
+      .notNull()
+      .default("blank"),
+    sourceEmailTemplateId: text("source_email_template_id").references(
+      () => emailTemplates.id,
+      { onDelete: "set null" },
+    ),
+    ...timestamps,
+  },
+  (table) => [
+    index("idx_presentation_projects_workspace_updated").on(
+      table.workspaceId,
+      table.updatedAt,
     ),
   ],
 );

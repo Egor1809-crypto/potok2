@@ -237,6 +237,25 @@ function storageSnapshotFingerprint(snapshot: string) {
   return `${snapshot.length}-${hash >>> 0}`;
 }
 
+function createDocumentWithStudioAsset(assetId: string, assetName: string) {
+  const document = createBlankDocument();
+  const image = createBlock("image");
+  const assetUrl = new URL(
+    `/api/assets/${encodeURIComponent(assetId)}`,
+    window.location.origin,
+  ).toString();
+  return {
+    ...document,
+    blocks: [{
+      ...image,
+      content: assetName || "Изображение из студии MAILFLOW",
+      href: assetUrl,
+      widthPercent: 100,
+      borderRadius: 16,
+    }],
+  };
+}
+
 export function EmailBuilderView(props: EmailBuilderViewProps) {
   const browserSearch = useSyncExternalStore(
     subscribeToLocation,
@@ -245,6 +264,10 @@ export function EmailBuilderView(props: EmailBuilderViewProps) {
   );
   const query = useMemo(() => new URLSearchParams(browserSearch), [browserSearch]);
   const createNew = query.get("new") === "1";
+  const importedAssetId = /^asset-[a-f\d-]{20,}$/i.test(query.get("asset") ?? "")
+    ? query.get("asset") ?? ""
+    : "";
+  const importedAssetName = (query.get("assetName") ?? "").trim().slice(0, 180);
   const requestedTemplateId = createNew
     ? undefined
     : props.templateId ?? query.get("template") ?? undefined;
@@ -361,7 +384,9 @@ export function EmailBuilderView(props: EmailBuilderViewProps) {
   }
 
   const baseDocument = createNew
-    ? createBlankDocument()
+    ? importedAssetId
+      ? createDocumentWithStudioAsset(importedAssetId, importedAssetName)
+      : createBlankDocument()
     : restoredDocument ??
     (campaignMode && restoredState.emailBodyText
       ? createPlainTextDocument({
@@ -392,7 +417,7 @@ export function EmailBuilderView(props: EmailBuilderViewProps) {
   return (
     <ToastProvider>
       <EmailBuilderWorkspace
-        key={`${createNew ? "blank" : resolvedTemplateId ?? "new"}:${resolvedCampaignName}:${resolvedContinueHref}:${campaignMode ? storageSnapshotFingerprint(browserDraftSnapshot) : "server"}`}
+        key={`${createNew ? importedAssetId || "blank" : resolvedTemplateId ?? "new"}:${resolvedCampaignName}:${resolvedContinueHref}:${campaignMode ? storageSnapshotFingerprint(browserDraftSnapshot) : "server"}`}
         templateId={resolvedTemplateId}
         campaignName={resolvedCampaignName}
         continueHref={resolvedContinueHref}

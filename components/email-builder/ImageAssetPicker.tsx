@@ -5,10 +5,11 @@ import { ImagePlus, LoaderCircle, Upload } from "lucide-react";
 
 import type { ApiError, EmailAssetMutationResponse, EmailAssetRecord, EmailAssetsListResponse } from "@/types/api";
 
-export function ImageAssetPicker({ kind, value, onSelect }: {
+export function ImageAssetPicker({ kind, value, onSelect, destinationLabel = "письме" }: {
   kind: "photo" | "logo";
   value?: string;
   onSelect: (url: string, filename: string) => void;
+  destinationLabel?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [assets, setAssets] = useState<EmailAssetRecord[]>([]);
@@ -108,7 +109,7 @@ export function ImageAssetPicker({ kind, value, onSelect }: {
           </span>
         </span>
       </div>
-      <p className="m-0 text-[9px] leading-4 text-text-subtle">PNG, JPEG или GIF, до 4 МБ. После загрузки файл сразу появится в письме и сохранится в медиатеке.</p>
+      <p className="m-0 text-[9px] leading-4 text-text-subtle">PNG, JPEG или GIF, до 4 МБ. После загрузки файл сразу появится в {destinationLabel} и сохранится в медиатеке.</p>
       {error ? <p role="alert" className="m-0 rounded-lg bg-danger-subtle px-2.5 py-2 text-[10px] leading-4 text-danger">{error}</p> : null}
       {loading ? <p className="m-0 text-[10px] text-text-subtle">Загружаем медиатеку…</p> : relevantAssets.length ? (
         <div>

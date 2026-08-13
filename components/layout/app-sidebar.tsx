@@ -186,7 +186,7 @@ export function AppSidebar({
 
       <div className="shrink-0 border-t border-border/70 p-3">
         <Link
-          href="/email-builder?new=1"
+          href="/dashboard#creative-studio"
           onClick={onNavigate}
           className={buttonVariants({
             variant: "primary",
@@ -195,7 +195,7 @@ export function AppSidebar({
           })}
         >
           <Plus aria-hidden="true" className="size-4" />
-          Создать письмо
+          Создать проект
         </Link>
 
         <Link

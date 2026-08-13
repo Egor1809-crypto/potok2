@@ -235,6 +235,38 @@ export type EmailAssetRecord = {
 export type EmailAssetsListResponse = { assets: EmailAssetRecord[] };
 export type EmailAssetMutationResponse = { asset: EmailAssetRecord };
 
+export type ImageStudioStyle =
+  | "editorial"
+  | "minimal"
+  | "photo"
+  | "abstract"
+  | "collage"
+  | "three-dimensional";
+
+export type ImageStudioAspect = "square" | "landscape" | "portrait" | "banner";
+
+export type ImageStudioStatusResponse = {
+  configured: boolean;
+  provider: "navyai" | null;
+  model: string | null;
+  referenceImageSupported: boolean;
+  assets: EmailAssetRecord[];
+};
+
+export type ImageStudioGenerateRequest = {
+  prompt: string;
+  title?: string;
+  style: ImageStudioStyle;
+  aspect: ImageStudioAspect;
+  quality: "standard" | "high";
+  referenceAssetId?: string;
+};
+
+export type ImageStudioGenerateResponse = {
+  asset: EmailAssetRecord;
+  revisedPrompt: string;
+};
+
 export type EmailAiAction =
   | "brief"
   | "design"
@@ -284,6 +316,99 @@ export type EmailAiResponse = {
   configured: boolean;
   provider?: "navyai" | "openai";
   suggestion?: EmailAiSuggestion;
+};
+
+export type PresentationThemeId =
+  | "atelier"
+  | "violet"
+  | "noir"
+  | "ocean"
+  | "sunrise";
+
+export type PresentationSlideLayout =
+  | "title"
+  | "statement"
+  | "split"
+  | "bullets"
+  | "quote"
+  | "stats"
+  | "closing";
+
+export type PresentationSlide = {
+  id: string;
+  layout: PresentationSlideLayout;
+  eyebrow: string;
+  title: string;
+  body: string;
+  bullets: string[];
+  speakerNotes: string;
+  assetId?: string;
+  imageUrl?: string;
+};
+
+export type PresentationSourceType = "blank" | "template" | "ai" | "email";
+
+export type PresentationProjectRecord = {
+  id: string;
+  workspaceId: string;
+  name: string;
+  description: string;
+  themeId: PresentationThemeId;
+  accentColor: string;
+  backgroundColor: string;
+  textColor: string;
+  slides: PresentationSlide[];
+  sourceType: PresentationSourceType;
+  sourceEmailTemplateId: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PresentationCreateInput = {
+  name: string;
+  description?: string;
+  themeId?: PresentationThemeId;
+  accentColor?: string;
+  backgroundColor?: string;
+  textColor?: string;
+  slides?: PresentationSlide[];
+  sourceType?: PresentationSourceType;
+  sourceEmailTemplateId?: string | null;
+};
+
+export type PresentationPatchInput = Partial<PresentationCreateInput> & {
+  id: string;
+  expectedUpdatedAt?: string;
+};
+
+export type PresentationsListResponse = {
+  presentations: PresentationProjectRecord[];
+};
+
+export type PresentationMutationResponse = {
+  presentation: PresentationProjectRecord;
+};
+
+export type PresentationAiRequest = {
+  goal: string;
+  audience?: string;
+  slideCount?: number;
+  themeId?: PresentationThemeId;
+};
+
+export type PresentationAiResponse = {
+  configured: boolean;
+  provider?: "navyai" | "openai";
+  outline?: Pick<
+    PresentationProjectRecord,
+    | "name"
+    | "description"
+    | "themeId"
+    | "accentColor"
+    | "backgroundColor"
+    | "textColor"
+    | "slides"
+  >;
 };
 
 export type CampaignRecord = {

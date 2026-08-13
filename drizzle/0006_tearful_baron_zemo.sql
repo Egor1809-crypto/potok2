@@ -1,0 +1,1 @@
+ALTER TABLE `ai_idempotency` ADD `result_json` text;

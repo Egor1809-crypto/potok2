@@ -9,18 +9,27 @@ import {
   Clock3,
   ContactRound,
   FileText,
+  Images,
   LayoutTemplate,
   LoaderCircle,
   Megaphone,
   Plus,
+  Presentation,
   RefreshCw,
   Send,
+  ScanSearch,
   Sparkles,
   Upload,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import type { CampaignRecord, CampaignStatus, WorkspaceSnapshot } from "@/types/api";
+import type {
+  CampaignRecord,
+  CampaignStatus,
+  ImageStudioStatusResponse,
+  PresentationsListResponse,
+  WorkspaceSnapshot,
+} from "@/types/api";
 
 const number = new Intl.NumberFormat("ru-RU");
 function formatDate(value: string, timeZone: string) {
@@ -73,6 +82,7 @@ function errorMessage(payload: unknown) {
 
 export function DashboardView() {
   const [snapshot, setSnapshot] = useState<WorkspaceSnapshot | null>(null);
+  const [creativeCounts, setCreativeCounts] = useState({ presentations: 0, images: 0 });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -84,6 +94,20 @@ export function DashboardView() {
       const payload: unknown = await response.json().catch(() => null);
       if (!response.ok) throw new Error(errorMessage(payload));
       setSnapshot(unwrap(payload));
+      const [presentationsResult, imagesResult] = await Promise.allSettled([
+        fetch("/api/presentations", { cache: "no-store" }).then(async (result) => {
+          if (!result.ok) throw new Error("Презентации недоступны");
+          return result.json() as Promise<PresentationsListResponse>;
+        }),
+        fetch("/api/image-studio", { cache: "no-store" }).then(async (result) => {
+          if (!result.ok) throw new Error("Медиатека недоступна");
+          return result.json() as Promise<ImageStudioStatusResponse>;
+        }),
+      ]);
+      setCreativeCounts({
+        presentations: presentationsResult.status === "fulfilled" ? presentationsResult.value.presentations.length : 0,
+        images: imagesResult.status === "fulfilled" ? imagesResult.value.assets.length : 0,
+      });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Не удалось загрузить данные");
     } finally {
@@ -121,6 +145,8 @@ export function DashboardView() {
   const firstName = participantName.split(" ")[0];
   const metrics = [
     { label: "Шаблоны", value: number.format(snapshot.templates.length), note: "Макеты можно редактировать и клонировать", Icon: LayoutTemplate, href: "/templates" },
+    { label: "Презентации", value: number.format(creativeCounts.presentations), note: "Сохранённые редактируемые проекты", Icon: Presentation, href: "/presentations" },
+    { label: "Изображения", value: number.format(creativeCounts.images), note: "Визуалы в общей медиатеке", Icon: Images, href: "/image-studio" },
     { label: "Контакты", value: number.format(snapshot.stats.totalContacts), note: `${number.format(snapshot.stats.activeContacts)} доступны для работы`, Icon: ContactRound, href: "/contacts" },
     { label: "Кампании", value: number.format(snapshot.stats.totalCampaigns), note: `${number.format(snapshot.stats.activeCampaigns)} требуют внимания`, Icon: Megaphone, href: "/campaigns" },
     { label: "Подключённые каналы", value: number.format(snapshot.stats.connectedIntegrations), note: "Email, Telegram или ВКонтакте", Icon: Cable, href: "/integrations" },
@@ -131,16 +157,31 @@ export function DashboardView() {
       <section className="grid gap-5 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm md:grid-cols-[minmax(0,1fr)_auto] md:items-center sm:p-7">
         <div>
           <p className="section-eyebrow">{snapshot.workspace.name}</p>
-          <h1 className="text-[28px] font-semibold tracking-[-.04em] sm:text-[32px]">{firstName ? `${firstName}, создадим красивое письмо` : "Создадим красивое письмо"}</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-muted)]">Начните с шаблона или соберите макет с ИИ. Контакты и доставка через VK WorkSpace подключаются, когда письмо уже готово.</p>
+          <h1 className="text-[28px] font-semibold tracking-[-.04em] sm:text-[32px]">{firstName ? `${firstName}, что создаём сегодня?` : "Что создаём сегодня?"}</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-muted)]">Письмо, презентация и изображения живут в одной студии. Найденные контакты проходят вашу проверку, а готовые материалы можно повторно использовать в проектах.</p>
         </div>
         <div className="flex flex-wrap gap-2"><Link href="/templates" className="btn btn-secondary w-fit gap-2"><LayoutTemplate aria-hidden="true" className="size-4" />Выбрать шаблон</Link><Link href="/email-builder?new=1" className="btn btn-primary w-fit gap-2"><Plus aria-hidden="true" className="size-4" />Создать письмо</Link></div>
       </section>
 
-      <section className="grid gap-3 md:grid-cols-3" aria-label="Начать работу над письмом">
-        <Link href="/templates" className="group rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 transition hover:border-[var(--primary)]/35 hover:shadow-sm"><span className="grid size-10 place-items-center rounded-xl bg-[var(--primary-subtle)] text-[var(--primary)]"><LayoutTemplate aria-hidden="true" className="size-5" /></span><h2 className="mt-4 text-[15px] font-semibold">Выбрать из {number.format(snapshot.templates.length)} шаблонов</h2><p className="mt-1.5 text-[11px] leading-5 text-[var(--text-muted)]">Фильтры по задаче, стилю и насыщенности. Любой макет можно сохранить как свой.</p><span className="mt-4 inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--primary)]">Открыть библиотеку <ArrowRight aria-hidden="true" className="size-3.5" /></span></Link>
-        <Link href="/email-builder?new=1" className="group rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 transition hover:border-[var(--primary)]/35 hover:shadow-sm"><span className="grid size-10 place-items-center rounded-xl bg-[var(--primary-subtle)] text-[var(--primary)]"><Sparkles aria-hidden="true" className="size-5" /></span><h2 className="mt-4 text-[15px] font-semibold">Создать письмо в студии</h2><p className="mt-1.5 text-[11px] leading-5 text-[var(--text-muted)]">Выберите шаблон, пустой холст или ИИ. Затем отредактируйте каждый блок и экспортируйте результат.</p><span className="mt-4 inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--primary)]">Открыть студию <ArrowRight aria-hidden="true" className="size-3.5" /></span></Link>
-        <Link href="/templates?import=1" className="group rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 transition hover:border-[var(--primary)]/35 hover:shadow-sm"><span className="grid size-10 place-items-center rounded-xl bg-[var(--primary-subtle)] text-[var(--primary)]"><Upload aria-hidden="true" className="size-5" /></span><h2 className="mt-4 text-[15px] font-semibold">Импортировать свой макет</h2><p className="mt-1.5 text-[11px] leading-5 text-[var(--text-muted)]">Загрузите резервный файл MAILFLOW и продолжите редактирование в конструкторе.</p><span className="mt-4 inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--primary)]">Импортировать <ArrowRight aria-hidden="true" className="size-3.5" /></span></Link>
+      <section id="creative-studio" className="grid scroll-mt-24 gap-3 md:grid-cols-2 xl:grid-cols-4" aria-label="Творческие модули">
+        <StudioCard href="/email-builder?new=1" Icon={Sparkles} title="Письмо" description="Собрать из блоков, шаблона или вместе с ИИ." action="Создать письмо" />
+        <StudioCard href="/presentations?new=1" Icon={Presentation} title="Презентация" description="Создать слайды с нуля, из письма или по задаче." action="Открыть презентации" />
+        <StudioCard href="/image-studio?new=1" Icon={Images} title="Изображение" description="Создать визуал и использовать его в письме или слайдах." action="Открыть студию" />
+        <StudioCard href="/contact-finder" Icon={ScanSearch} title="Контакты" description="Найти публичные email и телефоны, проверить и импортировать." action="Начать поиск" />
+      </section>
+
+      <section className="card p-5 sm:p-6" aria-labelledby="workflow-title">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><p className="section-eyebrow">Единый рабочий процесс</p><h2 id="workflow-title" className="mt-1 text-[17px] font-semibold">От источника до готового материала</h2></div><p className="max-w-xl text-[11px] leading-5 text-[var(--text-muted)]">Каждый переход сохраняет результат в рабочем пространстве: ничего не нужно переносить вручную между модулями.</p></div>
+        <ol className="mt-5 grid gap-3 md:grid-cols-4">
+          <WorkflowStep index="01" title="Найти" text="Укажите сайт или вставьте текст, затем проверьте найденные данные." />
+          <WorkflowStep index="02" title="Создать визуал" text="Сохраните изображение в общей библиотеке материалов." />
+          <WorkflowStep index="03" title="Собрать" text="Добавьте визуал в письмо или презентацию и отредактируйте." />
+          <WorkflowStep index="04" title="Использовать" text="Скачайте результат или передайте готовое письмо в рассылку." />
+        </ol>
+        <div className="mt-4 flex flex-wrap gap-2 border-t border-[var(--border)] pt-4">
+          <Link href="/templates?import=1" className="btn btn-secondary gap-2"><Upload aria-hidden="true" className="size-4" />Импортировать свой макет</Link>
+          <Link href="/templates" className="btn btn-ghost gap-2">Открыть шаблоны<ArrowRight aria-hidden="true" className="size-4" /></Link>
+        </div>
       </section>
 
       <section className={`rounded-2xl border p-5 sm:p-6 ${nextAction.tone}`} aria-labelledby="next-action-title">
@@ -155,7 +196,7 @@ export function DashboardView() {
         </div>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Состояние рабочего пространства">
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-label="Состояние рабочего пространства">
         {metrics.map(({ label, value, note, Icon, href }) => (
           <Link key={label} href={href} className="card group p-4 transition hover:border-[var(--primary)]/30 hover:shadow-sm sm:p-5">
             <div className="flex items-start justify-between gap-3"><p className="text-[12px] font-semibold text-[var(--text-muted)]">{label}</p><Icon aria-hidden="true" className="size-4 text-[var(--primary)]" /></div>
@@ -223,6 +264,33 @@ function ReadinessStep({ ready, label, action, href }: { ready: boolean; label: 
       <span className={`grid size-6 shrink-0 place-items-center rounded-full ${ready ? "bg-[var(--success-subtle)] text-[var(--success)]" : "bg-[var(--warning-subtle)] text-[var(--warning)]"}`}>{ready ? <Check aria-hidden="true" className="size-3.5" /> : <Clock3 aria-hidden="true" className="size-3.5" />}</span>
       <span className="flex-1 text-[12px] font-medium">{label}</span>
       {!ready && <Link href={href} className="text-[11px] font-semibold text-[var(--primary)]">{action}</Link>}
+    </li>
+  );
+}
+
+function StudioCard({ href, Icon, title, description, action }: {
+  href: string;
+  Icon: typeof Sparkles;
+  title: string;
+  description: string;
+  action: string;
+}) {
+  return (
+    <Link href={href} className="group rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 transition hover:-translate-y-0.5 hover:border-[var(--primary)]/35 hover:shadow-sm">
+      <span className="grid size-10 place-items-center rounded-xl bg-[var(--primary-subtle)] text-[var(--primary)]"><Icon aria-hidden="true" className="size-5" /></span>
+      <h2 className="mt-4 text-[15px] font-semibold">{title}</h2>
+      <p className="mt-1.5 text-[11px] leading-5 text-[var(--text-muted)]">{description}</p>
+      <span className="mt-4 inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--primary)]">{action}<ArrowRight aria-hidden="true" className="size-3.5 transition group-hover:translate-x-0.5" /></span>
+    </Link>
+  );
+}
+
+function WorkflowStep({ index, title, text }: { index: string; title: string; text: string }) {
+  return (
+    <li className="rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)] p-4">
+      <span className="text-[10px] font-semibold tracking-[.14em] text-[var(--primary)]">{index}</span>
+      <h3 className="mt-2 text-[13px] font-semibold">{title}</h3>
+      <p className="mt-1 text-[10px] leading-4 text-[var(--text-muted)]">{text}</p>
     </li>
   );
 }

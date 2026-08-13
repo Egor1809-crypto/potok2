@@ -556,6 +556,21 @@ function contactEmail(value: unknown, existing?: ContactRecord): string {
   return normalizeEmail(value, "Email");
 }
 
+function contactPhone(value: unknown, existing?: ContactRecord): string {
+  if (value === undefined) return existing?.phone ?? "";
+  if (typeof value !== "string") {
+    throw new ApiRequestError("Поле «Телефон» должно быть текстом.");
+  }
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  const digits = trimmed.replace(/\D/g, "");
+  if (digits.length < 7 || digits.length > 15) {
+    throw new ApiRequestError("В поле «Телефон» указан некорректный номер.");
+  }
+  if (digits.length === 11 && digits.startsWith("8")) return `+7${digits.slice(1)}`;
+  return `+${digits}`;
+}
+
 function parseContact(
   payload: unknown,
   existing?: ContactRecord,
@@ -566,6 +581,7 @@ function parseContact(
   const lastName =
     optionalText(object.lastName, "Фамилия", 100) ?? existing?.lastName ?? "";
   const email = contactEmail(object.email, existing);
+  const phone = contactPhone(object.phone, existing);
   if (!firstName) throw new ApiRequestError("Укажите имя контакта.");
   if (!lastName) throw new ApiRequestError("Укажите фамилию контакта.");
 
@@ -619,9 +635,9 @@ function parseContact(
       "Идентификатор пользователя ВКонтакте должен состоять из цифр.",
     );
   }
-  if (!email && !telegramChatId && !vkUserId) {
+  if (!email && !phone && !telegramChatId && !vkUserId) {
     throw new ApiRequestError(
-      "Укажите хотя бы один канал контакта: email, идентификатор чата Telegram или идентификатор пользователя ВКонтакте.",
+      "Укажите хотя бы один канал контакта: email, телефон или идентификатор мессенджера.",
     );
   }
   const emailConsentInput = optionalBoolean(
@@ -641,7 +657,7 @@ function parseContact(
     firstName,
     lastName,
     email,
-    phone: optionalText(object.phone, "Телефон", 80) ?? existing?.phone ?? "",
+    phone,
     companyId: (() => {
       const parsed = nullableText(object.companyId, "Компания", 120);
       return parsed === undefined ? (existing?.companyId ?? null) : parsed;
@@ -729,6 +745,7 @@ function contactsShareIdentity(
 ): boolean {
   return Boolean(
     (left.email && right.email && left.email === right.email) ||
+      (left.phone && right.phone && left.phone === right.phone) ||
       (left.telegramChatId &&
         right.telegramChatId &&
         left.telegramChatId === right.telegramChatId) ||
@@ -742,6 +759,7 @@ function rowMatchesContactInput(
 ): boolean {
   return Boolean(
     (input.email && row.email === input.email) ||
+      (input.phone && row.phone === input.phone) ||
       (input.telegramChatId && row.telegramChatId === input.telegramChatId) ||
       (input.vkUserId && row.vkUserId === input.vkUserId),
   );
@@ -758,6 +776,7 @@ async function findContactsByIdentifiers(
         eq(contacts.workspaceId, WORKSPACE_ID),
         or(
           input.email ? eq(contacts.email, input.email) : undefined,
+          input.phone ? eq(contacts.phone, input.phone) : undefined,
           input.telegramChatId
             ? eq(contacts.telegramChatId, input.telegramChatId)
             : undefined,
@@ -798,7 +817,7 @@ export async function createContact(
   const duplicate = await findContactsByIdentifiers(input);
   if (duplicate.length) {
     throw new ApiRequestError(
-      "Контакт с таким email или идентификатором мессенджера уже существует. Откройте его и сохраните изменения.",
+      "Контакт с таким email, телефоном или идентификатором мессенджера уже существует. Откройте его и сохраните изменения.",
       409,
     );
   }
@@ -806,7 +825,14 @@ export async function createContact(
   const [row] = await db
     .insert(contacts)
     .values(contactValues(input, newId("contact"), now))
+    .onConflictDoNothing()
     .returning();
+  if (!row) {
+    throw new ApiRequestError(
+      "Контакт с таким email, телефоном или идентификатором мессенджера уже существует.",
+      409,
+    );
+  }
   return { contact: toContact(row) };
 }
 
@@ -863,6 +889,7 @@ export async function createContactsBatch(
 
   const db = getDb();
   const emails = uniqueInputs.flatMap((input) => (input.email ? [input.email] : []));
+  const phones = uniqueInputs.flatMap((input) => (input.phone ? [input.phone] : []));
   const telegramChatIds = uniqueInputs.flatMap((input) =>
     input.telegramChatId ? [input.telegramChatId] : [],
   );
@@ -878,6 +905,18 @@ export async function createContactsBatch(
         and(
           eq(contacts.workspaceId, WORKSPACE_ID),
           inArray(contacts.email, emailChunk),
+        ),
+      );
+    rows.forEach((row) => existingById.set(row.id, row));
+  }
+  for (const phoneChunk of chunksOf(phones)) {
+    const rows = await db
+      .select()
+      .from(contacts)
+      .where(
+        and(
+          eq(contacts.workspaceId, WORKSPACE_ID),
+          inArray(contacts.phone, phoneChunk),
         ),
       );
     rows.forEach((row) => existingById.set(row.id, row));
@@ -912,7 +951,7 @@ export async function createContactsBatch(
     const matchIds = new Set(matches.map((row) => row.id));
     if (matchIds.size > 1) {
       throw new ApiRequestError(
-        "Email и идентификаторы мессенджеров относятся к разным существующим контактам. Исправьте строку импорта.",
+        "Email, телефон и идентификаторы мессенджеров относятся к разным существующим контактам. Исправьте строку импорта.",
         409,
       );
     }
@@ -938,9 +977,17 @@ export async function createContactsBatch(
       updatedCount += 1;
     } else {
       const id = newId("contact");
-      await db.insert(contacts).values(contactValues(input, id, now));
-      affectedIds.push(id);
-      createdCount += 1;
+      const [created] = await db
+        .insert(contacts)
+        .values(contactValues(input, id, now))
+        .onConflictDoNothing()
+        .returning({ id: contacts.id });
+      if (created) {
+        affectedIds.push(id);
+        createdCount += 1;
+      } else {
+        skippedCount += 1;
+      }
     }
   }
 
@@ -971,7 +1018,7 @@ export async function updateContact(
   const duplicate = await findContactsByIdentifiers(input);
   if (duplicate.some((row) => row.id !== id)) {
     throw new ApiRequestError(
-      "Другой контакт уже использует этот email или идентификатор мессенджера.",
+      "Другой контакт уже использует этот email, телефон или идентификатор мессенджера.",
       409,
     );
   }
