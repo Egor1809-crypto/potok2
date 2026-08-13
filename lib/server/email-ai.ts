@@ -26,8 +26,9 @@ function aiProvider() {
     return {
       key: navyKey,
       provider: "navyai" as const,
-      endpoint: `${runtime().NAVYAI_BASE_URL?.trim().replace(/\/$/, "") || "https://api.navy/v1"}/responses`,
+      endpoint: `${runtime().NAVYAI_BASE_URL?.trim().replace(/\/$/, "") || "https://api.navy/v1"}/chat/completions`,
       model: runtime().NAVYAI_EMAIL_MODEL?.trim() || "gpt-5.2",
+      fallbackModel: "gemini-2.5-flash-lite",
     };
   }
   const openAiKey = runtime().OPENAI_API_KEY?.trim();
@@ -36,6 +37,7 @@ function aiProvider() {
     provider: "openai" as const,
     endpoint: "https://api.openai.com/v1/responses",
     model: runtime().OPENAI_EMAIL_MODEL?.trim() || "gpt-5.2",
+    fallbackModel: undefined,
   } : null;
 }
 
@@ -111,6 +113,15 @@ function outputText(response: unknown): string {
   const object = asObject(response);
   if (typeof object.output_text === "string" && object.output_text.trim()) {
     return object.output_text;
+  }
+  if (Array.isArray(object.choices)) {
+    for (const choiceValue of object.choices) {
+      if (!choiceValue || typeof choiceValue !== "object") continue;
+      const choice = choiceValue as { message?: unknown };
+      if (!choice.message || typeof choice.message !== "object") continue;
+      const message = choice.message as { content?: unknown };
+      if (typeof message.content === "string" && message.content.trim()) return message.content;
+    }
   }
   if (!Array.isArray(object.output)) throw new ApiRequestError("ИИ не вернул результат. Повторите запрос.", 502);
   for (const itemValue of object.output) {
@@ -193,6 +204,16 @@ function visibleBlockContent(type: EmailBuilderBlockInput["type"], value: string
   return "";
 }
 
+function modelText(value: unknown): string | undefined {
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const object = value as Record<string, unknown>;
+  for (const key of ["text", "label", "value", "content", "title"]) {
+    if (typeof object[key] === "string" && object[key].trim()) return object[key].trim();
+  }
+  return undefined;
+}
+
 function normalizeCompoundContent(type: EmailBuilderBlockInput["type"], value: string): string {
   const trimmed = value.trim();
   if (!trimmed || trimmed.includes("|")) return trimmed;
@@ -248,7 +269,9 @@ function creativeBlockStyle(
 }
 
 function parseSuggestion(value: string, input: EmailAiRequest): EmailAiSuggestion {
-  const object = parseAiJson(value);
+  const parsed = parseAiJson(value);
+  const nested = [parsed.suggestion, parsed.email, parsed.result].find((candidate) => candidate && typeof candidate === "object" && !Array.isArray(candidate));
+  const object = nested ? asObject(nested) : parsed;
   if (input.action === "brief") {
     const questions = Array.isArray(object.questions) ? object.questions.slice(0, 6).flatMap((value, index) => {
       const row = asObject(value);
@@ -260,27 +283,43 @@ function parseSuggestion(value: string, input: EmailAiRequest): EmailAiSuggestio
     }) : [];
     return { subject: "", previewText: "", body: "", cta: "", questions };
   }
+  const subject = modelText(object.subject) ?? modelText(object.title) ?? input.goal.split(/[.!?\n]/)[0]?.slice(0, 140) ?? "Новое письмо";
+  const body = modelText(object.body) ?? modelText(object.text) ?? [input.goal, ...(input.briefAnswers ?? []).map((item) => item.answer)].filter(Boolean).join("\n\n");
   const suggestion: EmailAiSuggestion = {
-    subject: cleanText(object.subject, "Тема", 300),
-    previewText: cleanText(object.previewText, "Прехедер", 500),
-    body: cleanText(object.body, "Текст", 8_000),
-    cta: cleanText(object.cta, "Призыв к действию", 160),
+    subject: cleanText(subject, "Тема", 300),
+    previewText: cleanText(modelText(object.previewText) ?? modelText(object.preheader) ?? subject, "Прехедер", 500),
+    body: cleanText(body, "Текст", 8_000),
+    cta: cleanText(modelText(object.cta) ?? modelText(object.callToAction) ?? "Узнать подробнее", "Призыв к действию", 160),
     artDirection: optionalText(object.artDirection, "Арт-направление", 600),
     contentStrategy: optionalText(object.contentStrategy, "Стратегия текста", 600),
   };
   if (input.action !== "design") return suggestion;
-  const design = asObject(object.design);
-  if (!Array.isArray(design.blocks)) throw new ApiRequestError("ИИ не вернул структуру письма. Повторите запрос.", 502);
+  const design = object.design && typeof object.design === "object" && !Array.isArray(object.design)
+    ? asObject(object.design)
+    : {};
+  const fallbackDetails = (input.briefAnswers ?? []).map((item) => item.answer).filter(Boolean);
+  const fallbackBlocks: Record<string, unknown>[] = [
+    { type: "pattern", content: "✦  ·  ✦  ·  ✦", label: null, assetId: null, imagePrompt: null },
+    { type: "hero", content: `${suggestion.subject}|${suggestion.previewText}`, label: null, assetId: null, imagePrompt: null },
+    { type: "text", content: suggestion.body, label: null, assetId: null, imagePrompt: null },
+    ...(fallbackDetails.length ? [{ type: "notice", content: `Главное|${fallbackDetails.slice(0, 2).join(" · ")}|${fallbackDetails.slice(2).join(" · ") || "Все детали указаны в письме"}`, label: null, assetId: null, imagePrompt: null }] : []),
+    { type: "checklist", content: fallbackDetails.slice(0, 3).join("|") || "Понятная ценность|Конкретные детали|Одно главное действие", label: null, assetId: null, imagePrompt: null },
+    ...(input.websiteUrl ? [{ type: "button", content: suggestion.cta, label: suggestion.cta, assetId: null, imagePrompt: null }] : []),
+    { type: "footer", content: `${input.brandName || "MAILFLOW"} · Настроить подписку · Отписаться`, label: null, assetId: null, imagePrompt: null },
+  ];
+  const designBlocks = Array.isArray(design.blocks) && design.blocks.length ? design.blocks : fallbackBlocks;
   const assetById = new Map((input.availableAssets ?? []).map((asset) => [asset.id, asset]));
-  const accentColor = hexColor(design.accentColor, "#6D28D9");
+  const accentColor = hexColor(design.accentColor ?? input.primaryColor, "#6D28D9");
   const bodyBackground = hexColor(design.bodyBackground, "#FFFDF8");
-  const workspaceBackground = hexColor(design.workspaceBackground, "#F2ECF7");
+  const workspaceBackground = hexColor(design.workspaceBackground ?? input.secondaryColor, "#F2ECF7");
   const allowedTypes = new Set<EmailBuilderBlockInput["type"]>([
     "logo", "heading", "text", "image", "button", "columns", "divider", "spacer", "social", "footer", "hero", "quote", "checklist", "stats", "product", "signature", "pattern", "banner", "timeline", "faq", "coupon", "video", "notice", "comparison", "document", "compliance",
   ]);
-  const blocks = design.blocks.slice(0, 20).flatMap((value, index) => {
+  const blocks = designBlocks.slice(0, 20).flatMap((value, index) => {
     const raw = asObject(value);
-    const type = optionalText(raw.type, `Тип блока ${index + 1}`, 30) as EmailBuilderBlockInput["type"] | undefined;
+    const rawType = optionalText(raw.type, `Тип блока ${index + 1}`, 30);
+    const typeAliases: Record<string, EmailBuilderBlockInput["type"]> = { paragraph: "text", list: "checklist", cta: "button", call_to_action: "button", title: "heading" };
+    const type = (rawType ? typeAliases[rawType] ?? rawType : undefined) as EmailBuilderBlockInput["type"] | undefined;
     if (!type || !allowedTypes.has(type)) return [];
     const assetId = raw.assetId === null ? undefined : optionalText(raw.assetId, `Изображение блока ${index + 1}`, 160);
     const asset = assetId ? assetById.get(assetId) : undefined;
@@ -325,7 +364,7 @@ function parseSuggestion(value: string, input: EmailAiRequest): EmailAiSuggestio
   });
   if (!parsedDocument) throw new ApiRequestError("ИИ не собрал макет письма. Повторите запрос.", 502);
   suggestion.document = parsedDocument;
-  suggestion.imagePrompts = design.blocks.slice(0, 20).flatMap((value, index) => {
+  suggestion.imagePrompts = designBlocks.slice(0, 20).flatMap((value, index) => {
     const raw = asObject(value);
     const imagePrompt = raw.imagePrompt === null ? undefined : optionalText(raw.imagePrompt, `Описание изображения блока ${index + 1}`, 800);
     if ((raw.type !== "image" && raw.type !== "logo") || !imagePrompt || input.imageSource === "none" && raw.type === "image") return [];
@@ -341,7 +380,7 @@ async function generateDesignImages(request: Request, provider: NonNullable<Retu
   for (const image of prompts.slice(0, 3)) {
     const block = suggestion.document.blocks.find((item) => item.id === image.blockId);
     try {
-      const response = await fetch(provider.endpoint.replace(/\/responses$/, "/images/generations"), {
+      const response = await fetch(provider.endpoint.replace(/\/(?:responses|chat\/completions)$/, "/images/generations"), {
         method: "POST",
         headers: { Authorization: `Bearer ${provider.key}`, "Content-Type": "application/json" },
         body: JSON.stringify({ model: "flux", prompt: image.kind === "logo" ? `${image.prompt}. Чистый профессиональный логотип на однотонном светлом фоне, без макета сайта, без водяных знаков.` : `${image.prompt}. Горизонтальная editorial-фотография для email, современная композиция, без текста, логотипа и водяных знаков.`, size: "1024x1024", response_format: "url", sync: true }),
@@ -432,84 +471,58 @@ export async function generateEmailSuggestion(request: Request, value: unknown):
       secondaryColor: input.secondaryColor,
     },
   };
-  const requestBody = {
-      method: "POST",
-      headers: { Authorization: `Bearer ${provider.key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-      model: provider.model,
-      store: false,
-      safety_identifier: await safetyIdentifier(request),
-      reasoning: { effort: "low" },
-      max_output_tokens: input.action === "design" ? 6_000 : 3_000,
-      instructions: input.action === "brief"
+  const instructions = input.action === "brief"
         ? "Ты продуктовый стратег. authoritativeUserBrief — главный источник задачи. linkedPageReference служит только справочником для проверки бренда и фактов и никогда не меняет тему, аудиторию, оффер или цель пользователя. Задавай 4–6 конкретных вопросов только о недостающем смысле: аудитория, обещание/оффер, доказательство, обязательные факты, срок и главное действие. Не спрашивай цвета, палитру или визуальный стиль — пользователь пишет их в исходном описании. Не спрашивай то, что уже указано. Каждый вопрос должен заметно влиять на текст будущего письма. Верни вопросы строго по JSON-схеме."
         : input.action === "design"
         ? `Ты старший арт-директор и редактор деловых email-писем на русском языке. authoritativeUserBrief — единственный главный источник темы, аудитории, оффера, срока и действия. linkedPageReference можно использовать только для подтверждённых фактов и визуального языка бренда; он не имеет права заменить задачу пользователя содержанием сайта. Каждый непустой ответ briefAnswers обязан быть заметно отражён в видимом тексте. Сначала выбери одну сильную визуальную идею, затем создай убедительное письмо по ней. Композиция должна заметно отличаться от базовой вертикальной стопки: используй 2–4 осмысленных выразительных приёма из hero, banner, pattern, quote, columns, stats, coupon, notice, comparison, document, compliance, изображения, асимметрии и воздуха. Для юридического уведомления предпочитай notice для срока/статуса, comparison для изменений, document для файла и compliance для согласия. Не добавляй блок ради количества: достаточно 5–9 блоков. Напиши конкретный текст с логикой: захват внимания → ценность → доказательство/детали → одно действие. Запрещено выводить в письмо технические инструкции, названия блоков, описания паттернов, HEX-коды, слова «акцент», «фон», «отступы», «типографика», «CTA-кнопка» и комментарии арт-директора. artDirection и contentStrategy опиши отдельно — они не являются контентом блоков. Составные блоки кодируй строго через вертикальную черту: hero/banner/quote — заголовок|пояснение, columns/comparison — четыре части, stats — число|подпись|число|подпись, product/document/compliance/notice — три части, timeline/faq — пары через |. Не создавай HTML. ${input.includeLogo ? `Если в authoritativeUserBrief.availableAssets есть kind=logo, обязательно выбери его assetId.` : "Не добавляй logo."} ${(input.availableAssets ?? []).some((asset) => asset.kind === "photo") ? "Используй подходящие фотографии из authoritativeUserBrief.availableAssets." : input.imageSource === "generate" ? "Добавь один блок image и напиши предметный imagePrompt, непосредственно связанный с целью, аудиторией и фактом из authoritativeUserBrief; никаких случайных стоковых сюжетов и текста на изображении." : "Не добавляй image: работай композицией, цветом, рамками, узорами и типографикой."} Не выдумывай факты, даты и цифры. Сохраняй только переменные {{first_name}}, {{last_name}}, {{company}}, {{position}}, {{city}}. Если websiteUrl отсутствует, не добавляй button, video, document или compliance. Цвета выводи только в полях design и строго #RRGGBB. Ответ строго по JSON-схеме.`
-        : "Ты редактор деловых email-писем на русском языке. Верни только четыре коротких поля JSON: subject, previewText, body, cta. Никакого HTML, Markdown, таблиц, дизайна или пояснений. body — обычный текст до 1800 символов. subject — до 140 символов, previewText — до 240, cta — до 80. Не выдумывай даты, цифры, ссылки и факты. Сохраняй только переменные {{first_name}}, {{last_name}}, {{company}}, {{position}}, {{city}}. Ответ строго по JSON-схеме.",
-      input: JSON.stringify(modelInput),
-      text: {
-        format: {
-          type: "json_schema",
-          name: "email_suggestion",
-          strict: true,
-          schema: input.action === "brief" ? {
+        : "Ты редактор деловых email-писем на русском языке. Верни только четыре коротких поля JSON: subject, previewText, body, cta. Никакого HTML, Markdown, таблиц, дизайна или пояснений. body — обычный текст до 1800 символов. subject — до 140 символов, previewText — до 240, cta — до 80. Не выдумывай даты, цифры, ссылки и факты. Сохраняй только переменные {{first_name}}, {{last_name}}, {{company}}, {{position}}, {{city}}. Ответ строго по JSON-схеме.";
+  const schema = input.action === "brief" ? {
             type: "object", additionalProperties: false, required: ["questions"], properties: { questions: { type: "array", minItems: 3, maxItems: 6, items: { type: "object", additionalProperties: false, required: ["id", "question", "placeholder", "required"], properties: { id: { type: "string" }, question: { type: "string" }, placeholder: { type: "string" }, required: { type: "boolean" } } } } }
           } : input.action === "design" ? {
             type: "object",
             additionalProperties: false,
             required: ["subject", "previewText", "body", "cta", "artDirection", "contentStrategy", "design"],
             properties: {
-              subject: { type: "string", maxLength: 140 },
-              previewText: { type: "string", maxLength: 240 },
-              body: { type: "string", maxLength: 1800 },
-              cta: { type: "string", maxLength: 80 },
-              artDirection: { type: "string", maxLength: 600 },
-              contentStrategy: { type: "string", maxLength: 600 },
-              design: {
-                type: "object",
-                additionalProperties: false,
-                required: ["accentColor", "bodyBackground", "workspaceBackground", "blocks"],
-                properties: {
-                  accentColor: { type: "string" },
-                  bodyBackground: { type: "string" },
-                  workspaceBackground: { type: "string" },
-                  blocks: {
-                    type: "array",
-                    minItems: 1,
-                    maxItems: 20,
-                    items: {
-                      type: "object",
-                      additionalProperties: false,
-                      required: ["type", "content", "label", "assetId", "imagePrompt"],
-                      properties: {
-                        type: { type: "string", enum: ["logo", "heading", "text", "image", "button", "columns", "divider", "spacer", "social", "footer", "hero", "quote", "checklist", "stats", "product", "signature", "pattern", "banner", "timeline", "faq", "coupon", "video", "notice", "comparison", "document", "compliance"] },
-                        content: { type: "string" },
-                        label: { type: ["string", "null"] },
-                        assetId: { type: ["string", "null"] },
-                        imagePrompt: { type: ["string", "null"] },
-                      },
-                    },
-                  },
-                },
-              },
+              subject: { type: "string", maxLength: 140 }, previewText: { type: "string", maxLength: 240 }, body: { type: "string", maxLength: 1800 }, cta: { type: "string", maxLength: 80 }, artDirection: { type: "string", maxLength: 600 }, contentStrategy: { type: "string", maxLength: 600 },
+              design: { type: "object", additionalProperties: false, required: ["accentColor", "bodyBackground", "workspaceBackground", "blocks"], properties: { accentColor: { type: "string" }, bodyBackground: { type: "string" }, workspaceBackground: { type: "string" }, blocks: { type: "array", minItems: 1, maxItems: 20, items: { type: "object", additionalProperties: false, required: ["type", "content", "label", "assetId", "imagePrompt"], properties: { type: { type: "string", enum: ["logo", "heading", "text", "image", "button", "columns", "divider", "spacer", "social", "footer", "hero", "quote", "checklist", "stats", "product", "signature", "pattern", "banner", "timeline", "faq", "coupon", "video", "notice", "comparison", "document", "compliance"] }, content: { type: "string" }, label: { type: ["string", "null"] }, assetId: { type: ["string", "null"] }, imagePrompt: { type: ["string", "null"] } } } } } },
             },
-          } : {
-            type: "object",
-            additionalProperties: false,
-            required: ["subject", "previewText", "body", "cta"],
-            properties: {
-              subject: { type: "string" },
-              previewText: { type: "string" },
-              body: { type: "string" },
-              cta: { type: "string" },
-            },
-          },
+          } : { type: "object", additionalProperties: false, required: ["subject", "previewText", "body", "cta"], properties: { subject: { type: "string" }, previewText: { type: "string" }, body: { type: "string" }, cta: { type: "string" } } };
+  const requestBody = {
+      method: "POST",
+      headers: { Authorization: `Bearer ${provider.key}`, "Content-Type": "application/json" },
+      body: JSON.stringify(provider.provider === "navyai" ? {
+      model: provider.model,
+      messages: [{ role: "system", content: instructions }, { role: "user", content: JSON.stringify(modelInput) }],
+      max_tokens: input.action === "design" ? 6_000 : 3_000,
+      // NavyAI's OpenAI-compatible gateway accepts JSON mode consistently, while
+      // complex nested json_schema requests can fail at the provider before the
+      // model runs. We still validate the full result with our own strict parser.
+      response_format: { type: "json_object" },
+    } : {
+      model: provider.model,
+      store: false,
+      safety_identifier: await safetyIdentifier(request),
+      reasoning: { effort: "low" },
+      max_output_tokens: input.action === "design" ? 6_000 : 3_000,
+      instructions,
+      input: JSON.stringify(modelInput),
+      text: {
+        format: {
+          type: "json_schema",
+          name: "email_suggestion",
+          strict: true,
+          schema,
         },
       },
     }),
   } satisfies RequestInit;
   let response = await fetch(provider.endpoint, requestBody);
-  const responseBody: unknown = await response.json().catch(() => null);
+  let responseBody: unknown = await response.json().catch(() => null);
+  if (!response.ok && provider.provider === "navyai" && provider.fallbackModel && provider.model !== provider.fallbackModel) {
+    const fallbackBody = { ...JSON.parse(String(requestBody.body)) as Record<string, unknown>, model: provider.fallbackModel };
+    response = await fetch(provider.endpoint, { ...requestBody, body: JSON.stringify(fallbackBody) });
+    responseBody = await response.json().catch(() => null);
+  }
   if (!response.ok) {
     console.error("OpenAI email assistant error", response.status, responseBody);
     throw new ApiRequestError(response.status === 429 ? "ИИ-помощник занят. Повторите через минуту." : "ИИ-помощник не смог подготовить текст. Повторите попытку.", 502);
@@ -521,14 +534,12 @@ export async function generateEmailSuggestion(request: Request, value: unknown):
     if (input.action === "brief") {
       suggestion = fallbackBriefQuestions(input.goal);
     } else if (input.action === "design") {
-      response = await fetch(provider.endpoint, {
-        ...requestBody,
-        body: JSON.stringify({
-          ...JSON.parse(String(requestBody.body)) as Record<string, unknown>,
-          reasoning: { effort: "medium" },
-          instructions: `${String((JSON.parse(String(requestBody.body)) as Record<string, unknown>).instructions)}\nПРЕДЫДУЩАЯ ПОПЫТКА НАРУШИЛА JSON-СХЕМУ. Верни только один валидный JSON-объект без Markdown, вводного текста и комментариев.`,
-        }),
-      });
+      const rawRetry = JSON.parse(String(requestBody.body)) as Record<string, unknown>;
+      response = await fetch(provider.endpoint, { ...requestBody, body: JSON.stringify(provider.provider === "navyai" ? {
+        ...rawRetry,
+        model: "gemini-2.5-flash-lite",
+        messages: [{ role: "system", content: `${instructions}\nПРЕДЫДУЩАЯ ПОПЫТКА НАРУШИЛА JSON-СХЕМУ. Верни только один валидный JSON-объект без Markdown, вводного текста и комментариев.` }, { role: "user", content: JSON.stringify(modelInput) }],
+      } : { ...rawRetry, reasoning: { effort: "medium" }, instructions: `${instructions}\nПРЕДЫДУЩАЯ ПОПЫТКА НАРУШИЛА JSON-СХЕМУ. Верни только один валидный JSON-объект без Markdown, вводного текста и комментариев.` }) });
       const retryBody: unknown = await response.json().catch(() => null);
       if (!response.ok) throw error;
       suggestion = parseSuggestion(outputText(retryBody), input);

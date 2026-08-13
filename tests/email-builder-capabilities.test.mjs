@@ -253,3 +253,49 @@ test("studio picks use distinct art directions instead of palette duplicates", a
   assert.match(preview, /Выбор студии/);
   assert.match(database, /email-template-library-v7-studio/);
 });
+
+test("creative collection adds fifty art-directed templates, not palette clones", async () => {
+  const [creative, templates, templatesView, preview, database] = await Promise.all([
+    readFile(new URL("../data/creative-template-library.ts", import.meta.url), "utf8"),
+    readFile(new URL("../data/templates.ts", import.meta.url), "utf8"),
+    readFile(new URL("../components/templates/TemplatesView.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/templates/TemplatePreview.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/server/database-init.ts", import.meta.url), "utf8"),
+  ]);
+  for (const system of ["memphis", "bauhaus", "cinema", "botanical", "neo-tokyo", "paper-cut", "nordic", "ledger", "holo", "mono"]) {
+    assert.match(creative, new RegExp(`id: "${system}"`));
+  }
+  for (const story of ["private-invite", "product-drop", "weekly-signal", "personal-pitch", "status-update"]) {
+    assert.match(creative, new RegExp(`id: "${story}"`));
+  }
+  assert.match(creative, /systems\.flatMap/);
+  assert.match(creative, /stories\.map/);
+  assert.match(templates, /\.\.\.creativeTemplates/);
+  assert.match(templatesView, /template-v8-creative-/);
+  assert.match(preview, /template-v8-creative-/);
+  assert.match(database, /email-template-library-v8-creative/);
+});
+
+test("email action blocks are real links in the canvas and compiled email", async () => {
+  const [canvas, properties, compiler] = await Promise.all([
+    readFile(new URL("../components/email-builder/EmailCanvas.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/email-builder/PropertiesPanel.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/server/email-document.ts", import.meta.url), "utf8"),
+  ]);
+  assert.match(properties, /Куда ведёт нажатие/);
+  assert.match(properties, /normalizedActionUrl/);
+  assert.match(properties, /Проверить ссылку в новой вкладке/);
+  assert.ok((canvas.match(/target="_blank"/g) ?? []).length >= 5);
+  assert.ok((canvas.match(/href=\{block\.href \|\| undefined\}/g) ?? []).length >= 5);
+  assert.match(compiler, /<a href="\$\{escapeHtml\(block\.href \?\? ""\)\}"/);
+  assert.match(compiler, /safeHttpsUrl\(block\.href, `Ссылка кнопки/);
+});
+
+test("NavyAI uses its supported chat endpoint and a working structured-output fallback", async () => {
+  const server = await readFile(new URL("../lib/server/email-ai.ts", import.meta.url), "utf8");
+  assert.match(server, /\/chat\/completions/);
+  assert.match(server, /gemini-2\.5-flash-lite/);
+  assert.match(server, /choices/);
+  assert.match(server, /response_format/);
+  assert.match(server, /\(\?:responses\|chat\\\/completions\)/);
+});

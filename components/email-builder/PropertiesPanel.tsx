@@ -65,6 +65,13 @@ const compoundContentLabels: Partial<Record<BuilderBlock["type"], string[]>> = {
   compliance: ["Статус", "Описание согласия", "Подсказка к действию"],
 };
 
+function normalizedActionUrl(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed || /^https:\/\//i.test(trimmed) || /^http:\/\/(?:localhost|127\.0\.0\.1|\[::1\])/i.test(trimmed)) return trimmed;
+  if (/^(?:www\.)?[\p{L}\d-]+(?:\.[\p{L}\d-]+)+(?:[/?#].*)?$/u.test(trimmed)) return `https://${trimmed}`;
+  return trimmed;
+}
+
 type PropertiesPanelProps = {
   block: BuilderBlock;
   document: BuilderDocument;
@@ -190,7 +197,7 @@ export function PropertiesPanel({
             )}
 
             {block.type === "button" || block.type === "product" || block.type === "video" || block.type === "document" || block.type === "compliance" ? (
-              <FormField label="Целевая ссылка" htmlFor="builder-button-link">
+              <FormField label="Куда ведёт нажатие" htmlFor="builder-button-link" hint={block.href?.startsWith("https://") ? "Ссылка готова. Нажмите кнопку на холсте, чтобы проверить переход." : "Вставьте полный адрес. Если протокол не указан, добавим https:// автоматически."}>
                 <div className="relative">
                   <Link2 aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-text-subtle" />
                   <Input
@@ -198,9 +205,12 @@ export function PropertiesPanel({
                     type="url"
                     value={block.href ?? ""}
                     onChange={(event) => onUpdateBlock({ href: event.target.value })}
+                    onBlur={(event) => onUpdateBlock({ href: normalizedActionUrl(event.target.value) })}
+                    placeholder="https://example.ru/страница"
                     className="pl-8 text-[11px]"
                   />
                 </div>
+                {block.href ? <a href={normalizedActionUrl(block.href)} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold text-primary hover:underline"><Link2 aria-hidden="true" className="size-3" />Проверить ссылку в новой вкладке</a> : null}
               </FormField>
             ) : null}
             {block.type === "image" || block.type === "logo" ? (

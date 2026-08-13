@@ -337,7 +337,15 @@ function BlockContent({
     const buttonBackground = block.buttonStyle === "outline" ? "transparent" : block.buttonStyle === "soft" ? `${accentColor}18` : accentColor;
     const buttonColor = block.buttonStyle === "solid" ? block.textColor : accentColor;
     return (
-      <span
+      <a
+        href={block.href || undefined}
+        target="_blank"
+        rel="noreferrer"
+        aria-disabled={!block.href}
+        onClick={(event) => {
+          event.stopPropagation();
+          if (!block.href) event.preventDefault();
+        }}
         className="inline-flex min-h-10 items-center justify-center px-5 text-white shadow-[0_4px_12px_rgba(30,32,60,0.14)]"
         style={{
           borderRadius: block.borderRadius,
@@ -351,7 +359,7 @@ function BlockContent({
         }}
       >
         {renderTokens(block.label || block.content)}
-      </span>
+      </a>
     );
   }
 
@@ -512,7 +520,7 @@ function BlockContent({
         <strong className="block text-[19px]">{renderTokens(name || "Название предложения")}</strong>
         <p className="mb-0 mt-2 opacity-75" style={{ fontSize: block.fontSize }}>{renderTokens(description || "Короткое описание пользы")}</p>
         <strong className="mt-3 block text-[17px]">{renderTokens(price || "Цена")}</strong>
-        <span className="mt-4 inline-flex rounded-lg px-4 py-2 text-[12px] font-semibold text-white" style={{ backgroundColor: accentColor }}>{renderTokens(block.label || "Узнать подробнее")}</span>
+        <a href={block.href || undefined} target="_blank" rel="noreferrer" aria-disabled={!block.href} onClick={(event) => { event.stopPropagation(); if (!block.href) event.preventDefault(); }} className="mt-4 inline-flex rounded-lg px-4 py-2 text-[12px] font-semibold text-white" style={{ backgroundColor: accentColor }}>{renderTokens(block.label || "Узнать подробнее")}</a>
       </div>
     );
   }
@@ -549,7 +557,7 @@ function BlockContent({
   }
   if (block.type === "video") {
     const [title, duration] = block.content.split("|");
-    return <div className="grid min-h-44 place-items-center p-6" style={{backgroundColor:block.backgroundColor,borderRadius:block.borderRadius,fontSize:block.fontSize,lineHeight:block.lineHeight/100,letterSpacing:block.letterSpacing}}><div><span className="mx-auto grid size-12 place-items-center rounded-full bg-white/15 text-xl">▶</span><strong className="mt-3 block">{renderTokens(title||"Видео")}</strong><span className="mt-1 block text-xs opacity-60">{duration}</span></div></div>;
+    return <a href={block.href || undefined} target="_blank" rel="noreferrer" aria-disabled={!block.href} onClick={(event) => { event.stopPropagation(); if (!block.href) event.preventDefault(); }} className="grid min-h-44 place-items-center p-6 no-underline" style={{backgroundColor:block.backgroundColor,borderRadius:block.borderRadius,fontSize:block.fontSize,lineHeight:block.lineHeight/100,letterSpacing:block.letterSpacing,color:block.textColor}}><span><span className="mx-auto grid size-12 place-items-center rounded-full bg-white/15 text-xl">▶</span><strong className="mt-3 block">{renderTokens(title||"Видео")}</strong><span className="mt-1 block text-xs opacity-60">{duration}</span></span></a>;
   }
   if (block.type === "notice") {
     const [eyebrow, message, status] = block.content.split("|");
@@ -561,11 +569,11 @@ function BlockContent({
   }
   if (block.type === "document") {
     const [name, meta, status] = block.content.split("|");
-    return <div className="flex items-center gap-4 border p-5 text-left" style={{borderColor:block.borderColor,borderRadius:block.borderRadius,backgroundColor:block.backgroundColor,fontSize:block.fontSize,lineHeight:block.lineHeight/100}}><span className="grid size-11 shrink-0 place-items-center rounded-lg text-lg font-bold text-white" style={{backgroundColor:accentColor}}>▤</span><span className="min-w-0 flex-1"><strong className="block truncate">{renderTokens(name||"Название документа")}</strong><span className="mt-1 block text-[11px] opacity-60">{renderTokens(meta||"PDF")} · {renderTokens(status||"Готов")}</span></span><span className="rounded-lg px-3 py-2 text-[11px] font-bold text-white" style={{backgroundColor:accentColor}}>{renderTokens(block.label||"Открыть")}</span></div>;
+    return <a href={block.href || undefined} target="_blank" rel="noreferrer" aria-disabled={!block.href} onClick={(event) => { event.stopPropagation(); if (!block.href) event.preventDefault(); }} className="flex items-center gap-4 border p-5 text-left no-underline" style={{borderColor:block.borderColor,borderRadius:block.borderRadius,backgroundColor:block.backgroundColor,fontSize:block.fontSize,lineHeight:block.lineHeight/100,color:block.textColor}}><span className="grid size-11 shrink-0 place-items-center rounded-lg text-lg font-bold text-white" style={{backgroundColor:accentColor}}>▤</span><span className="min-w-0 flex-1"><strong className="block truncate">{renderTokens(name||"Название документа")}</strong><span className="mt-1 block text-[11px] opacity-60">{renderTokens(meta||"PDF")} · {renderTokens(status||"Готов")}</span></span><span className="rounded-lg px-3 py-2 text-[11px] font-bold text-white" style={{backgroundColor:accentColor}}>{renderTokens(block.label||"Открыть")}</span></a>;
   }
   if (block.type === "compliance") {
     const [status, description, hint] = block.content.split("|");
-    return <div className="border p-5 text-left" style={{borderColor:block.borderColor,borderRadius:block.borderRadius,backgroundColor:block.backgroundColor,fontSize:block.fontSize,lineHeight:block.lineHeight/100}}><span className="block text-[11px] font-bold uppercase tracking-[.08em]" style={{color:accentColor}}>✓ {renderTokens(status||"Статус")}</span><span className="mt-2 block">{renderTokens(description||"Описание согласия")}</span><span className="mt-2 block text-[11px] opacity-60">{renderTokens(hint||"Подсказка")}</span><span className="mt-3 inline-block text-[11px] font-bold underline" style={{color:accentColor}}>{renderTokens(block.label||"Настроить")}</span></div>;
+    return <div className="border p-5 text-left" style={{borderColor:block.borderColor,borderRadius:block.borderRadius,backgroundColor:block.backgroundColor,fontSize:block.fontSize,lineHeight:block.lineHeight/100}}><span className="block text-[11px] font-bold uppercase tracking-[.08em]" style={{color:accentColor}}>✓ {renderTokens(status||"Статус")}</span><span className="mt-2 block">{renderTokens(description||"Описание согласия")}</span><span className="mt-2 block text-[11px] opacity-60">{renderTokens(hint||"Подсказка")}</span><a href={block.href || undefined} target="_blank" rel="noreferrer" aria-disabled={!block.href} onClick={(event) => { event.stopPropagation(); if (!block.href) event.preventDefault(); }} className="mt-3 inline-block text-[11px] font-bold underline" style={{color:accentColor}}>{renderTokens(block.label||"Настроить")}</a></div>;
   }
 
   return (

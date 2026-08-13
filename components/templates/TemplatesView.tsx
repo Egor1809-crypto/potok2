@@ -47,6 +47,10 @@ type DensityFilter = "all" | "compact" | "balanced" | "rich";
 type PaletteFilter = "all" | "light" | "dark" | "warm" | "cool" | "neutral";
 type LoadState = "loading" | "ready" | "error";
 
+function isStudioTemplate(template: EmailTemplateRecord) {
+  return template.id.startsWith("template-v7-studio-") || template.id.startsWith("template-v8-creative-");
+}
+
 function paletteOf(template: EmailTemplateRecord): Exclude<PaletteFilter, "all"> {
   const dark = [template.builderDocument.bodyBackground, template.builderDocument.workspaceBackground]
     .some((value) => /^#(?:0|1|2|3)/i.test(value));
@@ -194,7 +198,7 @@ export function TemplatesView() {
     const normalized = query.trim().toLocaleLowerCase("ru-RU");
     return templates
       .filter((template) => scope === "all" || !template.isStarter)
-      .filter((template) => scope === "mine" || collection === "all" || template.id.startsWith("template-v7-studio-"))
+      .filter((template) => scope === "mine" || collection === "all" || isStudioTemplate(template))
       .filter((template) => category === "All" || template.category === category)
       .filter((template) => {
         if (style === "all") return true;
@@ -230,7 +234,7 @@ export function TemplatesView() {
   const scopedTemplates = useMemo(
     () => templates
       .filter((template) => scope === "all" || !template.isStarter)
-      .filter((template) => scope === "mine" || collection === "all" || template.id.startsWith("template-v7-studio-")),
+      .filter((template) => scope === "mine" || collection === "all" || isStudioTemplate(template)),
     [collection, scope, templates],
   );
 
@@ -380,7 +384,7 @@ export function TemplatesView() {
         <div className="space-y-4">
           <div className="inline-flex flex-wrap rounded-xl border border-border bg-surface p-1" role="group" aria-label="Раздел шаблонов">
             <button type="button" aria-pressed={scope === "all" && collection === "studio"} onClick={() => { setScope("all"); setCollection("studio"); }} className="rounded-lg px-4 py-2 text-[12px] font-semibold text-text-muted outline-none transition hover:text-text-strong aria-pressed:bg-primary aria-pressed:text-white focus-visible:ring-2 focus-visible:ring-primary/30">
-              <Sparkles aria-hidden="true" className="mr-1.5 inline size-3.5" />Подборка студии <span className="ml-1 opacity-70">{templates.filter((template) => template.id.startsWith("template-v7-studio-")).length}</span>
+              <Sparkles aria-hidden="true" className="mr-1.5 inline size-3.5" />Подборка студии <span className="ml-1 opacity-70">{templates.filter(isStudioTemplate).length}</span>
             </button>
             <button type="button" aria-pressed={scope === "all" && collection === "all"} onClick={() => { setScope("all"); setCollection("all"); }} className="rounded-lg px-4 py-2 text-[12px] font-semibold text-text-muted outline-none transition hover:text-text-strong aria-pressed:bg-primary aria-pressed:text-white focus-visible:ring-2 focus-visible:ring-primary/30">
               Вся библиотека <span className="ml-1 opacity-70">{templates.length}</span>
@@ -396,7 +400,7 @@ export function TemplatesView() {
                   <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#C7FF65]">MAILFLOW DESIGN STUDIO / 01</span>
                   <h2 className="mb-0 mt-3 max-w-3xl text-balance text-[28px] font-semibold leading-[1.04] tracking-[-0.04em] sm:text-[38px]">Не шаблоны по палитрам, а разные арт-направления</h2>
                 </div>
-                <p className="m-0 max-w-xl text-[12px] leading-6 text-[#C9C0B7]">Швейцарская сетка, газетная редакция, neon terminal, музейное приглашение, bento-отчёт, документальное досье, брутализм и сервисные продукты. Каждый макет собран с собственной логикой композиции.</p>
+                <p className="m-0 max-w-xl text-[12px] leading-6 text-[#C9C0B7]">63 арт-направления и сценария: Swiss Grid, Memphis, Bauhaus, cinema noir, botanical, neo‑Tokyo, paper-cut, Nordic, ledger, holographic и другие. Макеты различаются композицией, ритмом и задачей, а не только цветом.</p>
               </div>
             </div>
           ) : null}

@@ -35,7 +35,7 @@ export function TemplateCard({
   onDelete: () => void;
   busyAction?: "clone" | "delete";
 }) {
-  const isStudioPick = template.id.startsWith("template-v7-studio-");
+  const isStudioPick = template.id.startsWith("template-v7-studio-") || template.id.startsWith("template-v8-creative-");
   const isDesignerCollection = isStudioPick || template.id.startsWith("template-v3-");
   return (
     <article className="group min-w-0 overflow-hidden rounded-[14px] border border-border bg-surface shadow-[var(--shadow-xs)] transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-1 hover:border-border-strong hover:shadow-[var(--shadow-md)]">
@@ -131,7 +131,7 @@ export function TemplateThumbnail({ template }: { template: EmailTemplateRecord 
   const frameStyle = template.builderDocument.frameStyle ?? "none";
   const frameColor = template.builderDocument.frameColor ?? accentColor;
   const frameRadius = template.builderDocument.frameRadius ?? 0;
-  const isStudioPick = template.id.startsWith("template-v7-studio-");
+  const isStudioPick = template.id.startsWith("template-v7-studio-") || template.id.startsWith("template-v8-creative-");
 
   return (
     <div
