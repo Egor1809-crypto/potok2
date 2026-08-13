@@ -292,6 +292,12 @@ export function PresentationStudio() {
     return () => window.cancelAnimationFrame(frame);
   }, [projectId, requestedView]);
 
+  useEffect(() => {
+    if (projectId || searchParams.get("create") !== "ai") return;
+    const frame = window.requestAnimationFrame(() => setAiOpen(true));
+    return () => window.cancelAnimationFrame(frame);
+  }, [projectId, searchParams]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -641,6 +647,11 @@ export function PresentationStudio() {
     router.push(`/campaigns/new?step=message&presentation=${encodeURIComponent(project.id)}`);
   };
 
+  const openAiCreator = async () => {
+    if (dirty && !(await saveProject())) return;
+    router.push("/presentations?create=ai");
+  };
+
   const filteredProjects = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase("ru-RU");
     return presentations.filter((item) => !normalized || `${item.name} ${item.description}`.toLocaleLowerCase("ru-RU").includes(normalized));
@@ -670,6 +681,7 @@ export function PresentationStudio() {
           <span className="rounded-full bg-primary-subtle px-2.5 py-1 text-[10px] font-semibold text-primary">{sourceLabels[project.sourceType]}</span>
           <Input aria-label="Название презентации" value={project.name} onChange={(event) => updateProject({ name: event.target.value })} className="min-w-[220px] flex-1 border-0 bg-transparent font-semibold shadow-none focus:shadow-none" />
           <span className={cn("text-[11px]", dirty ? "text-warning" : "text-text-subtle")}>{dirty ? "Есть несохранённые изменения" : notice || "Сохранено"}</span>
+          <Button variant="outline" size="sm" leadingIcon={<Sparkles className="size-3.5" />} onClick={() => void openAiCreator()}>Новая с ИИ</Button>
           <Button variant="outline" size="sm" leadingIcon={<Copy className="size-3.5" />} onClick={() => void copyProjectLink()}>Ссылка</Button>
           <Button variant="outline" size="sm" leadingIcon={<Download className="size-3.5" />} onClick={() => void downloadPptx()} loading={busy === "save"}>PPTX</Button>
           <Button size="sm" leadingIcon={<Save className="size-3.5" />} onClick={() => void saveProject()} loading={busy === "save"} loadingText="Сохраняем">Сохранить</Button>

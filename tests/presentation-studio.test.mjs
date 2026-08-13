@@ -39,6 +39,8 @@ test("presentation studio exposes real creation, editing and save flows", async 
   assert.match(view, /sourceLabels\[project\.sourceType\]/);
   assert.match(view, /ImageAssetPicker/);
   assert.match(view, /destinationLabel="презентации"/);
+  assert.match(view, /Новая с ИИ/);
+  assert.match(view, /\/presentations\?create=ai/);
 });
 
 test("presentation library offers varied scenarios and practical filters", async () => {
