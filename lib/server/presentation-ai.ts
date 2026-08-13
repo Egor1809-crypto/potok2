@@ -25,7 +25,7 @@ const LAYOUTS = new Set<PresentationSlideLayout>(["title", "statement", "split",
 const GENERATION_WINDOW_MS = 10 * 60 * 1_000;
 const GENERATION_LIMIT = 8;
 const IDEMPOTENCY_STALE_MS = 15 * 60 * 1_000;
-const PROVIDER_TIMEOUT_MS = 38_000;
+const PROVIDER_TIMEOUT_MS = 24_000;
 const MAX_PROVIDER_RESPONSE_BYTES = 1_000_000;
 
 function runtime() {
@@ -332,7 +332,7 @@ async function callPresentationProvider(endpoint: string, init: RequestInit) {
     const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
     throw new ApiRequestError(
       timedOut
-        ? "ИИ не ответил за 38 секунд. Повторите запрос позже."
+        ? "ИИ не ответил за 24 секунды. Поток подготовит редактируемую резервную структуру."
         : "Не удалось связаться с ИИ-провайдером. Повторите запрос позже.",
       timedOut ? 504 : 502,
     );
@@ -518,6 +518,23 @@ export async function generatePresentationOutline(request: Request, value: unkno
     await finishPresentationGeneration(reservation.key, "completed", result);
     return result;
   } catch (error) {
+    if (error instanceof ApiRequestError && (error.status === 504 || error.status === 502 || error.status === 422)) {
+      const theme = presentationTheme(input.themeId);
+      const fallback = safeFallbackOutline(input);
+      const result: PresentationAiResponse = {
+        configured: true,
+        provider: selected.provider,
+        outline: {
+          ...fallback,
+          themeId: input.themeId,
+          accentColor: theme.accentColor,
+          backgroundColor: theme.backgroundColor,
+          textColor: theme.textColor,
+        },
+      };
+      await finishPresentationGeneration(reservation.key, "completed", result);
+      return result;
+    }
     await finishPresentationGeneration(reservation.key, "failed");
     throw error;
   }

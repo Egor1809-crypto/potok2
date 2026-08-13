@@ -25,6 +25,11 @@ function useOverlayBehavior({
   onClose: () => void;
   closeOnEscape: boolean;
 }) {
+  const onCloseRef = React.useRef(onClose);
+  React.useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   React.useEffect(() => {
     if (!open) return;
 
@@ -42,7 +47,7 @@ function useOverlayBehavior({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape" && closeOnEscape) {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
 
@@ -73,7 +78,7 @@ function useOverlayBehavior({
       document.body.style.overflow = previousOverflow;
       previouslyFocused?.focus();
     };
-  }, [closeOnEscape, onClose, open, panelRef]);
+  }, [closeOnEscape, open, panelRef]);
 }
 
 export interface ModalProps {

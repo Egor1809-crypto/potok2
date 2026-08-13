@@ -128,10 +128,16 @@ function SlidePreview({
   project,
   slide,
   compact = false,
+  editable = false,
+  onChange,
+  onPickImage,
 }: {
   project: Pick<PresentationProjectRecord, "accentColor" | "backgroundColor" | "textColor">;
   slide: PresentationSlide;
   compact?: boolean;
+  editable?: boolean;
+  onChange?: (patch: Partial<PresentationSlide>) => void;
+  onPickImage?: () => void;
 }) {
   const inverse = project.backgroundColor.toLowerCase() === "#101113" ? "#F5F1E8" : project.textColor;
   const metrics = slide.bullets.slice(0, 3).map((item) => {
@@ -143,6 +149,17 @@ function SlidePreview({
   const image = slide.imageUrl ? (
     // eslint-disable-next-line @next/next/no-img-element
     <img src={slide.imageUrl} alt="" className="h-full min-h-0 w-full rounded-[inherit] object-cover" />
+  ) : null;
+  const editableTitle = (className: string) => editable ? (
+    <textarea aria-label="Заголовок слайда" value={slide.title} onChange={(event) => onChange?.({ title: event.target.value })} className={cn("m-0 w-full resize-none overflow-hidden border-0 bg-transparent p-0 font-semibold tracking-[-0.045em] text-inherit outline-none ring-0 focus:ring-2 focus:ring-primary/30", className)} rows={3} />
+  ) : <h2 className={cn("m-0 font-semibold tracking-[-0.045em]", className)}>{slide.title}</h2>;
+  const editableBody = (className: string) => editable ? (
+    <textarea aria-label="Текст слайда" value={slide.body} onChange={(event) => onChange?.({ body: event.target.value })} className={cn("m-0 w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-inherit outline-none ring-0 focus:ring-2 focus:ring-primary/30", className)} rows={4} placeholder="Добавьте пояснение" />
+  ) : slide.body ? <p className={cn("mb-0", className)}>{slide.body}</p> : null;
+  const imageArea = image ? (
+    <button type="button" onClick={editable ? onPickImage : undefined} className="h-full w-full overflow-hidden rounded-[inherit] text-left" aria-label={editable ? "Заменить изображение" : undefined}>{image}</button>
+  ) : editable ? (
+    <button type="button" onClick={onPickImage} className="grid h-full w-full place-items-center rounded-[inherit] border border-dashed border-current/25 bg-black/5 text-[12px] font-semibold opacity-65 hover:opacity-100">+ Добавить фотографию</button>
   ) : null;
 
   return (
@@ -163,42 +180,42 @@ function SlidePreview({
         <div className="absolute inset-x-[6.2%] inset-y-[13%] flex items-center gap-[5%]">
           <div className={cn("min-w-0", image ? "w-[56%]" : "w-full")}>
             {slide.eyebrow ? <p className={cn("m-0 font-bold uppercase tracking-[0.15em]", compact ? "text-[3px]" : "text-[10px]")} style={{ color: project.accentColor }}>{slide.eyebrow}</p> : null}
-            <h2 className={cn("m-0 mt-[6%] max-w-[95%] font-semibold tracking-[-0.05em]", titleClass)}>{slide.title}</h2>
-            {slide.body ? <p className={cn("mb-0 mt-[7%] max-w-[86%] opacity-70", bodyClass)}>{slide.body}</p> : null}
+            {editableTitle(cn("mt-[6%] max-w-[95%] tracking-[-0.05em]", titleClass))}
+            {editableBody(cn("mt-[7%] max-w-[86%] opacity-70", bodyClass))}
           </div>
-          {image ? <div className="h-[80%] w-[39%] overflow-hidden rounded-[9%]">{image}</div> : null}
+          {(imageArea || editable) ? <div className="h-[80%] w-[39%] overflow-hidden rounded-[9%]">{imageArea}</div> : null}
         </div>
       ) : slide.layout === "statement" ? (
         <div className="absolute inset-x-[6.2%] inset-y-[13%] flex gap-[5%]">
           <div className={cn("flex min-w-0 flex-col justify-center", image ? "w-[57%]" : "w-full")}>
             {slide.eyebrow ? <p className={cn("m-0 font-bold uppercase tracking-[0.15em]", compact ? "text-[3px]" : "text-[10px]")} style={{ color: project.accentColor }}>{slide.eyebrow}</p> : null}
-            <h2 className={cn("m-0 mt-[4%] max-w-[96%] font-semibold tracking-[-0.045em]", compact ? titleClass : "text-[clamp(23px,2.8vw,46px)] leading-[1.08]")}>{slide.title}</h2>
-            {slide.body ? <p className={cn("mb-0 mt-[7%] max-w-[88%] opacity-70", bodyClass)}>{slide.body}</p> : null}
+            {editableTitle(cn("mt-[4%] max-w-[96%]", compact ? titleClass : "text-[clamp(23px,2.8vw,46px)] leading-[1.08]"))}
+            {editableBody(cn("mt-[7%] max-w-[88%] opacity-70", bodyClass))}
           </div>
-          {image ? <div className="h-full w-[38%] overflow-hidden rounded-[8%]">{image}</div> : null}
+          {(imageArea || editable) ? <div className="h-full w-[38%] overflow-hidden rounded-[8%]">{imageArea}</div> : null}
         </div>
       ) : slide.layout === "split" ? (
         <div className="absolute inset-x-[6.2%] inset-y-[14%] grid grid-cols-2 gap-[6%]">
           <div className="flex min-w-0 flex-col justify-center">
             {slide.eyebrow ? <p className={cn("m-0 font-bold uppercase tracking-[0.15em]", compact ? "text-[3px]" : "text-[10px]")} style={{ color: project.accentColor }}>{slide.eyebrow}</p> : null}
-            <h2 className={cn("m-0 mt-[5%] font-semibold tracking-[-0.04em]", compact ? titleClass : "text-[clamp(20px,2.2vw,36px)] leading-[1.08]")}>{slide.title}</h2>
-            {slide.body ? <p className={cn("mb-0 mt-[7%] opacity-70", bodyClass)}>{slide.body}</p> : null}
+            {editableTitle(cn("mt-[5%]", compact ? titleClass : "text-[clamp(20px,2.2vw,36px)] leading-[1.08]"))}
+            {editableBody(cn("mt-[7%] opacity-70", bodyClass))}
           </div>
           <div className="min-h-0 overflow-hidden rounded-[8%] p-[9%]" style={{ backgroundColor: `${project.accentColor}18` }}>
-            {image ?? <ul className={cn("m-0 grid list-none gap-[8%] p-0", bodyClass)}>{(slide.bullets.length ? slide.bullets : ["Первый аргумент", "Второй аргумент", "Вывод"]).slice(0, 5).map((item, index) => <li key={`${item}-${index}`} className="flex gap-[5%]"><span className="font-bold" style={{ color: project.accentColor }}>0{index + 1}</span><span>{item}</span></li>)}</ul>}
+            {imageArea ?? <ul className={cn("m-0 grid list-none gap-[8%] p-0", bodyClass)}>{(slide.bullets.length ? slide.bullets : ["Первый аргумент", "Второй аргумент", "Вывод"]).slice(0, 5).map((item, index) => <li key={`${item}-${index}`} className="flex gap-[5%]"><span className="font-bold" style={{ color: project.accentColor }}>0{index + 1}</span><span>{item}</span></li>)}</ul>}
           </div>
         </div>
       ) : slide.layout === "quote" ? (
         <div className="absolute inset-x-[8%] inset-y-[14%] flex items-center">
           <div>
             <span className={cn("font-serif leading-none", compact ? "text-[13px]" : "text-[72px]")} style={{ color: project.accentColor }}>“</span>
-            <h2 className={cn("m-0 -mt-[4%] font-serif font-semibold tracking-[-0.035em]", compact ? "text-[8px] leading-[1.1]" : "text-[clamp(22px,2.6vw,43px)] leading-[1.14]")}>{slide.title}</h2>
-            {slide.body ? <p className={cn("mb-0 mt-[6%] opacity-65", bodyClass)}>{slide.body}</p> : null}
+            {editableTitle(cn("-mt-[4%] font-serif", compact ? "text-[8px] leading-[1.1]" : "text-[clamp(22px,2.6vw,43px)] leading-[1.14]"))}
+            {editableBody(cn("mt-[6%] opacity-65", bodyClass))}
           </div>
         </div>
       ) : slide.layout === "stats" ? (
         <div className="absolute inset-x-[6.2%] inset-y-[13%]">
-          <h2 className={cn("m-0 max-w-[75%] font-semibold tracking-[-0.04em]", compact ? titleClass : "text-[clamp(20px,2.2vw,36px)] leading-[1.08]")}>{slide.title}</h2>
+          {editableTitle(cn("max-w-[75%]", compact ? titleClass : "text-[clamp(20px,2.2vw,36px)] leading-[1.08]"))}
           <div className="mt-[8%] grid grid-cols-3 gap-[3%]">
             {(metrics.length ? metrics : [{ value: "—", label: "показатель" }, { value: "—", label: "показатель" }, { value: "—", label: "показатель" }]).map((metric, index) => <div key={`${metric.value}-${index}`} className="rounded-[10%] p-[9%]" style={{ backgroundColor: `${project.accentColor}18` }}><strong className={cn("block tracking-[-0.05em]", compact ? "text-[8px]" : "text-[clamp(22px,2.5vw,42px)]")} style={{ color: project.accentColor }}>{metric.value}</strong><span className={cn("mt-[5%] block opacity-70", bodyClass)}>{metric.label}</span></div>)}
           </div>
@@ -207,11 +224,11 @@ function SlidePreview({
         <div className="absolute inset-x-[6.2%] inset-y-[13%] flex gap-[5%]">
           <div className={cn("min-w-0", image ? "w-[58%]" : "w-full")}>
             {slide.eyebrow ? <p className={cn("m-0 font-bold uppercase tracking-[0.15em]", compact ? "text-[3px]" : "text-[10px]")} style={{ color: project.accentColor }}>{slide.eyebrow}</p> : null}
-            <h2 className={cn("m-0 mt-[4%] font-semibold tracking-[-0.04em]", compact ? titleClass : "text-[clamp(20px,2.2vw,36px)] leading-[1.08]")}>{slide.title}</h2>
-            {slide.body ? <p className={cn("mb-0 mt-[5%] opacity-70", bodyClass)}>{slide.body}</p> : null}
+            {editableTitle(cn("mt-[4%]", compact ? titleClass : "text-[clamp(20px,2.2vw,36px)] leading-[1.08]"))}
+            {editableBody(cn("mt-[5%] opacity-70", bodyClass))}
             <ul className={cn("m-0 mt-[6%] grid gap-[3%] p-0", compact ? "text-[4px]" : "text-[clamp(11px,1.2vw,18px)]")}>{(slide.bullets.length ? slide.bullets : ["Добавьте аргумент", "Добавьте доказательство", "Сформулируйте вывод"]).slice(0, 6).map((item, index) => <li key={`${item}-${index}`} className="ml-[4%] pl-[2%] marker:text-[color:var(--primary)]">{item}</li>)}</ul>
           </div>
-          {image ? <div className="h-full w-[37%] overflow-hidden rounded-[8%]">{image}</div> : null}
+          {(imageArea || editable) ? <div className="h-full w-[37%] overflow-hidden rounded-[8%]">{imageArea}</div> : null}
         </div>
       )}
     </div>
@@ -252,6 +269,7 @@ export function PresentationStudio() {
   const [templateUseCase, setTemplateUseCase] = useState("Все задачи");
   const [aiOpen, setAiOpen] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
+  const [slideImageOpen, setSlideImageOpen] = useState(false);
   const [aiGoal, setAiGoal] = useState("");
   const [aiAudience, setAiAudience] = useState("");
   const [aiSlideCount, setAiSlideCount] = useState(7);
@@ -665,7 +683,7 @@ export function PresentationStudio() {
               <div className="hidden items-center gap-1 sm:flex"><Button variant="ghost" size="sm" onClick={() => moveSlide(-1)} leadingIcon={<ArrowUp className="size-3.5" />}>Выше</Button><Button variant="ghost" size="sm" onClick={() => moveSlide(1)} leadingIcon={<ArrowDown className="size-3.5" />}>Ниже</Button><Button variant="ghost" size="sm" onClick={duplicateSlide} leadingIcon={<Copy className="size-3.5" />}>Дублировать</Button><Button variant="ghost" size="sm" disabled={project.slides.length <= 1} onClick={removeSlide} leadingIcon={<Trash2 className="size-3.5" />}>Удалить</Button></div>
             </div>
             <div className="grid flex-1 place-items-center p-4 sm:p-6 xl:p-8">
-              <div className="w-full max-w-[1180px] overflow-hidden rounded-[14px] border border-border bg-surface shadow-[0_30px_90px_rgb(48_25_43/0.18)]"><SlidePreview project={project} slide={selectedSlide} /></div>
+              <div className="w-full max-w-[1180px] overflow-hidden rounded-[14px] border border-border bg-surface shadow-[0_30px_90px_rgb(48_25_43/0.18)]"><SlidePreview project={project} slide={selectedSlide} editable onChange={updateSlide} onPickImage={() => setSlideImageOpen(true)} /></div>
             </div>
             <div className="sticky bottom-0 z-10 border-t border-border bg-surface/95 px-4 py-3 backdrop-blur sm:px-6">
               <div className="mx-auto flex max-w-[1180px] items-center justify-between gap-4"><div className="min-w-0 flex-1"><div className="h-1.5 overflow-hidden rounded-full bg-surface-inset"><div className="h-full rounded-full bg-success transition-all" style={{ width: `${Math.round(reviewedSlideIds.length / project.slides.length * 100)}%` }} /></div><p className="mb-0 mt-1 text-[10px] text-text-subtle">Следующий слайд откроется после подтверждения текущего.</p></div><Button onClick={() => void confirmCurrentSlide()} loading={busy === "save"} trailingIcon={selectedSlideIndex < project.slides.length - 1 ? <ChevronRight className="size-4" /> : <Check className="size-4" />}>{selectedSlideIndex < project.slides.length - 1 ? "Готово — следующий слайд" : "Подтвердить презентацию"}</Button></div>
@@ -676,13 +694,14 @@ export function PresentationStudio() {
               <section><h3 className="mb-2 mt-0 text-[12px] font-semibold">Композиция</h3><Select value={selectedSlide.layout} onChange={(event) => updateSlide({ layout: event.target.value as PresentationSlideLayout })} options={Object.entries(layoutLabels).map(([value, label]) => ({ value, label }))} /></section>
               <section className="grid gap-3"><h3 className="m-0 text-[12px] font-semibold">Содержание</h3><FormField label="Надзаголовок" htmlFor="slide-eyebrow"><Input id="slide-eyebrow" value={selectedSlide.eyebrow} onChange={(event) => updateSlide({ eyebrow: event.target.value })} placeholder="Например: ИССЛЕДОВАНИЕ" /></FormField><FormField label="Заголовок-вывод" htmlFor="slide-title"><Textarea id="slide-title" value={selectedSlide.title} onChange={(event) => updateSlide({ title: event.target.value })} rows={3} /></FormField><FormField label="Пояснение" htmlFor="slide-body"><Textarea id="slide-body" value={selectedSlide.body} onChange={(event) => updateSlide({ body: event.target.value })} rows={4} /></FormField><FormField label={selectedSlide.layout === "stats" ? "Показатели: число | подпись" : "Пункты — один на строку"} htmlFor="slide-bullets"><Textarea id="slide-bullets" value={selectedSlide.bullets.join("\n")} onChange={(event) => updateSlide({ bullets: event.target.value.split("\n").slice(0, 8) })} rows={5} /></FormField></section>
               <section><div className="mb-2 flex items-center justify-between"><h3 className="m-0 text-[12px] font-semibold">Изображение</h3>{selectedSlide.imageUrl ? <Button variant="ghost" size="sm" onClick={() => updateSlide({ imageUrl: undefined, assetId: undefined })}>Убрать</Button> : null}</div><ImageAssetPicker kind="photo" value={selectedSlide.imageUrl} destinationLabel="презентации" onSelect={(url) => updateSlide({ imageUrl: url, assetId: imageAssetId(url) })} /></section>
-              <section><h3 className="mb-2 mt-0 text-[12px] font-semibold">Тема презентации</h3><ThemeStrip value={project.themeId} onChange={changeTheme} /><div className="mt-3 grid grid-cols-3 gap-2"><FormField label="Акцент"><Input type="color" value={project.accentColor} onChange={(event) => updateProject({ accentColor: event.target.value.toUpperCase() })} className="h-10 p-1" /></FormField><FormField label="Фон"><Input type="color" value={project.backgroundColor} onChange={(event) => updateProject({ backgroundColor: event.target.value.toUpperCase() })} className="h-10 p-1" /></FormField><FormField label="Текст"><Input type="color" value={project.textColor} onChange={(event) => updateProject({ textColor: event.target.value.toUpperCase() })} className="h-10 p-1" /></FormField></div></section>
+              <section><h3 className="mb-2 mt-0 text-[12px] font-semibold">Фон и цвета текущей презентации</h3><p className="mb-3 mt-0 text-[10px] leading-4 text-text-muted">Изменения сразу видны на большом слайде. Тема применяет согласованную палитру ко всей презентации.</p><ThemeStrip value={project.themeId} onChange={changeTheme} /><div className="mt-3 grid grid-cols-3 gap-2"><FormField label="Акцент"><Input type="color" value={project.accentColor} onChange={(event) => updateProject({ accentColor: event.target.value.toUpperCase() })} className="h-10 p-1" /></FormField><FormField label="Фон слайда"><Input type="color" value={project.backgroundColor} onChange={(event) => updateProject({ backgroundColor: event.target.value.toUpperCase() })} className="h-10 p-1" /></FormField><FormField label="Текст"><Input type="color" value={project.textColor} onChange={(event) => updateProject({ textColor: event.target.value.toUpperCase() })} className="h-10 p-1" /></FormField></div></section>
               <section><FormField label="Заметки выступающего" hint="Факты и внешние источники указывайте здесь. Они сохраняются в проекте." htmlFor="slide-notes"><Textarea id="slide-notes" value={selectedSlide.speakerNotes} onChange={(event) => updateSlide({ speakerNotes: event.target.value })} rows={5} /></FormField></section>
             </div>
           </aside>
           </div>
           <div className="flex flex-col gap-3 border-t border-border bg-[#1C171B] px-4 py-4 text-white sm:flex-row sm:items-center sm:justify-between sm:px-6"><div><p className="m-0 text-[12px] font-semibold">Презентация готова для письма</p><p className="mb-0 mt-1 text-[10px] text-white/60">В кампании выберите UniSender: Поток приложит сохранённый PPTX к email.</p></div><Button onClick={() => void openEmailCampaign()} leadingIcon={<Send className="size-4" />}>Отправить вместе с письмом</Button></div>
         </div>
+        <Modal open={slideImageOpen} onOpenChange={setSlideImageOpen} title="Изображение слайда" description="Выберите файл из медиатеки или загрузите новый. Изображение сразу появится на активном слайде." size="lg" footer={<Button variant="ghost" onClick={() => setSlideImageOpen(false)}>Закрыть</Button>}><ImageAssetPicker kind="photo" value={selectedSlide.imageUrl} destinationLabel="активного слайда" onSelect={(url) => { updateSlide({ imageUrl: url, assetId: imageAssetId(url) }); setSlideImageOpen(false); }} /></Modal>
       </div>
     );
   }
