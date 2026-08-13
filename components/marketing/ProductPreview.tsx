@@ -10,7 +10,8 @@ import {
   SendHorizontal,
   UsersRound,
 } from "lucide-react";
-import { BRAND_NAME } from "@/config/brand";
+import Image from "next/image";
+import { BRAND_NAME, brandConfig } from "@/config/brand";
 
 const rows = [
   { name: "София Рейнольдс", initials: "СР", email: "sofia@northstar.legal", company: "Нортстар Лигал", role: "Управляющий партнёр", tag: "Ключевой", tone: "bg-[#eeeaff] text-[#5c55d8]" },
@@ -36,7 +37,7 @@ export function ProductPreview() {
           <div className="flex h-[548px] sm:h-[580px]">
             <aside className="hidden w-[188px] shrink-0 border-r border-[#ececf1] bg-[#fbfbfc] p-3.5 md:block">
               <div className="mb-5 flex items-center gap-2 px-1">
-                <span className="grid size-6 place-items-center rounded-[7px] bg-[#625cf6] text-[10px] font-bold text-white">M</span>
+                <Image src={brandConfig.logoPath} alt="" width={24} height={24} className="size-6 rounded-[7px] object-cover" />
                 <span className="text-[11px] font-semibold tracking-[.12em]">{BRAND_NAME}</span>
               </div>
               <div className="mb-3 flex w-full items-center justify-between rounded-lg border border-[#e5e5eb] bg-white px-2.5 py-2 text-left text-[10px] font-medium text-[#353744] shadow-sm">

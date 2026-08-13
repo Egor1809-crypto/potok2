@@ -1,9 +1,10 @@
 "use client";
 
 import { ArrowRight, Menu, X } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import { BRAND_NAME } from "@/config/brand";
+import { BRAND_NAME, brandConfig } from "@/config/brand";
 
 export function MarketingHeader() {
   const [open, setOpen] = useState(false);
@@ -12,9 +13,14 @@ export function MarketingHeader() {
     <header className="fixed inset-x-0 top-0 z-50 border-b border-border bg-surface/85 backdrop-blur-xl">
       <div className="container-shell flex h-[72px] items-center justify-between">
         <Link href="/" className="group flex items-center gap-2.5" aria-label={`${BRAND_NAME}: главная`}>
-          <span className="grid size-8 place-items-center rounded-[9px] bg-primary text-[13px] font-semibold text-white shadow-[0_6px_18px_rgba(124,53,242,.25)] transition-transform group-hover:-rotate-3">
-            П
-          </span>
+          <Image
+            src={brandConfig.logoPath}
+            alt=""
+            width={32}
+            height={32}
+            priority
+            className="size-8 rounded-[9px] object-cover shadow-[0_6px_18px_rgba(124,53,242,.25)] transition-transform group-hover:-rotate-3"
+          />
           <span className="text-[15px] font-semibold tracking-[.12em] text-text-strong">{BRAND_NAME}</span>
         </Link>
 

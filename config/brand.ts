@@ -9,6 +9,7 @@ export const brandConfig = {
   accentColor: "#635BFF",
   secondaryAccentColor: "#34B6E4",
   logoMark: "П",
+  logoPath: "/potok-logo.png",
   website: "https://tech-pravo.ru/",
   supportEmail: "info@tech-pravo.ru",
   social: {

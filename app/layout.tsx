@@ -28,7 +28,14 @@ export async function generateMetadata(): Promise<Metadata> {
     metadataBase: new URL(origin),
     title: { default: title, template: `%s · ${brandConfig.name}` },
     description,
-    icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
+    icons: {
+      icon: [
+        { url: "/favicon.png", type: "image/png", sizes: "32x32" },
+        { url: brandConfig.logoPath, type: "image/png", sizes: "512x512" },
+      ],
+      shortcut: "/favicon.png",
+      apple: [{ url: "/apple-touch-icon.png", type: "image/png", sizes: "180x180" }],
+    },
     openGraph: {
       type: "website",
       locale: "ru_RU",

@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { Mail } from "lucide-react";
+import Image from "next/image";
 
-import { BRAND_NAME } from "@/config/brand";
+import { BRAND_NAME, brandConfig } from "@/config/brand";
 
 type BrandMarkProps = {
   compact?: boolean;
@@ -27,9 +27,13 @@ export function BrandMark({
         className,
       )}
     >
-      <span className="grid size-8 shrink-0 place-items-center rounded-[10px] bg-primary text-primary-foreground shadow-[0_1px_2px_rgba(25,22,55,0.2),0_6px_18px_rgba(99,91,255,0.18)]">
-        <Mail aria-hidden="true" className="size-[17px]" strokeWidth={2} />
-      </span>
+      <Image
+        src={brandConfig.logoPath}
+        alt=""
+        width={32}
+        height={32}
+        className="size-8 shrink-0 rounded-[10px] object-cover shadow-[0_1px_2px_rgba(25,22,55,0.2),0_6px_18px_rgba(99,91,255,0.18)]"
+      />
       {!compact ? (
         <span className="truncate text-[15px] font-semibold tracking-[0.08em] text-text-strong">
           {BRAND_NAME}
