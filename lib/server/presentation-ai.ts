@@ -123,7 +123,9 @@ function parseSlides(value: unknown, expectedCount: number): PresentationSlide[]
     const object = candidate as Record<string, unknown>;
     const title = optionalText(object.title, `Заголовок слайда ${index + 1}`, 300);
     if (!title) return [];
-    const rawLayout = optionalText(object.layout, `Макет слайда ${index + 1}`, 30) ?? "statement";
+    const suggestedLayouts: PresentationSlideLayout[] = ["statement", "split", "bullets", "statement", "split", "bullets"];
+    const rawLayout = optionalText(object.layout, `Макет слайда ${index + 1}`, 30)
+      ?? (index === 0 ? "title" : index === expectedCount - 1 ? "closing" : suggestedLayouts[(index - 1) % suggestedLayouts.length]);
     const layout = LAYOUTS.has(rawLayout as PresentationSlideLayout) ? rawLayout as PresentationSlideLayout : "statement";
     const bullets = Array.isArray(object.bullets)
       ? object.bullets.slice(0, 8).flatMap((item) => typeof item === "string" && item.trim() ? [item.trim().slice(0, 240)] : [])
@@ -131,7 +133,8 @@ function parseSlides(value: unknown, expectedCount: number): PresentationSlide[]
     return [{
       id: newId("slide"),
       layout,
-      eyebrow: optionalText(object.eyebrow, `Надзаголовок слайда ${index + 1}`, 120) ?? "",
+      eyebrow: optionalText(object.eyebrow, `Надзаголовок слайда ${index + 1}`, 120)
+        ?? (index === 0 ? "ПРЕЗЕНТАЦИЯ" : index === expectedCount - 1 ? "ВЫВОД" : `РАЗДЕЛ ${String(index).padStart(2, "0")}`),
       title,
       body: optionalText(object.body, `Текст слайда ${index + 1}`, 1_500) ?? "",
       bullets,
@@ -363,14 +366,11 @@ function responseSchema(slideCount: number) {
         items: {
           type: "object",
           additionalProperties: false,
-          required: ["layout", "eyebrow", "title", "body", "bullets", "speakerNotes"],
+          required: ["title", "body", "bullets"],
           properties: {
-            layout: { type: "string", enum: [...LAYOUTS] },
-            eyebrow: { type: "string", maxLength: 120 },
             title: { type: "string", maxLength: 300 },
             body: { type: "string", maxLength: 1_500 },
             bullets: { type: "array", maxItems: 8, items: { type: "string", maxLength: 240 } },
-            speakerNotes: { type: "string", maxLength: 3_000 },
           },
         },
       },
@@ -485,7 +485,7 @@ export async function generatePresentationOutline(request: Request, value: unkno
   if (reservation.replayed) return reservation.replayed;
   try {
     const theme = presentationTheme(input.themeId);
-    const instructions = `Ты — старший редактор и арт-директор деловых презентаций на русском языке. Создай связную презентацию строго по задаче пользователя. Работа презентации: к последнему слайду указанная аудитория должна понять вывод и совершить понятное действие. Построй накопительный сюжет, а не список разделов: сильный вход → контекст → напряжение или вопрос → аргументы и доказательства → вывод → действие. Каждый слайд выполняет одну смысловую работу и имеет заголовок-вывод, который можно произнести вслух. Первый слайд минимальный, последний закрывает исходный вопрос конкретным следующим шагом. Учитывай presentationTone: executive — предельно ясно и по делу; persuasive — через проблему, ценность и доказательство; educational — через понятия, пример и применение; visual — минимум текста и больше выразительных statement/split-композиций. Не выдумывай факты, цифры, отзывы, клиентов, даты, источники или результаты. Не превращай предположение пользователя в установленный факт. Используй только factualContext и userGoal; если доказательства не даны, называй это гипотезой или тем, что нужно проверить. Не вставляй производственные заметки в видимый текст. Не делай agenda-слайд. Не повторяй одинаковую композицию подряд. Используй quote только для реальной цитаты из запроса; stats — только для данных из запроса. Тексты должны помещаться: title до 90 знаков, body до 360 знаков, не более 5 коротких bullets. speakerNotes может содержать подсказку выступающему или пометку, какие данные нужно добавить. Верни ровно ${input.slideCount} слайдов и только валидный JSON.`;
+    const instructions = `Ты — старший редактор деловых презентаций на русском языке. Создай содержательную презентацию строго по теме и задаче пользователя. К последнему слайду аудитория должна понять вывод и увидеть понятное действие. Построй накопительный сюжет: сильный вход → объяснение темы → механизм или контекст → возможности → ограничения и риски → практические критерии → вывод. Каждый слайд раскрывает один аспект темы и имеет заголовок-вывод. Не делай agenda-слайд и не пиши общие производственные фразы вроде «нужно показать ценность», «добавьте факты», «согласуйте пилот», если пользователь не просил именно об этом. Не выдумывай конкретные цифры, даты, отзывы, клиентов или результаты. Разрешено объяснять общеизвестные определения, принципы работы, категории возможностей и рисков, прямо относящиеся к теме. presentationTone: executive — кратко и по делу; persuasive — через проблему, пользу и доказательство; educational — от определения к применению; visual — минимум текста. Тексты должны помещаться: title до 90 знаков, body до 360 знаков, не более 5 коротких bullets. Верни ровно ${input.slideCount} слайдов. Формат намеренно простой: один JSON-объект с name, description и slides; у каждого слайда только title, body и bullets. Никаких layout, eyebrow, speakerNotes, Markdown или комментариев.`;
     const modelInput = {
       userGoal: input.goal,
       audience: input.audience || "Аудитория указана в задаче пользователя",
@@ -502,14 +502,14 @@ export async function generatePresentationOutline(request: Request, value: unkno
       body: JSON.stringify(selected.provider === "navyai" ? {
         model: selected.model,
         messages: [{ role: "system", content: instructions }, { role: "user", content: JSON.stringify(modelInput) }],
-        max_tokens: input.slideCount > 12 ? 3_800 : 2_900,
+        max_tokens: input.slideCount > 12 ? 4_200 : 3_400,
         response_format: { type: "json_object" },
       } : {
         model: selected.model,
         store: false,
         safety_identifier: await safetyIdentifier(request),
         reasoning: { effort: "low" },
-        max_output_tokens: input.slideCount > 12 ? 3_800 : 2_900,
+        max_output_tokens: input.slideCount > 12 ? 4_200 : 3_400,
         instructions,
         input: JSON.stringify(modelInput),
         text: { format: { type: "json_schema", name: "presentation_outline", strict: true, schema } },

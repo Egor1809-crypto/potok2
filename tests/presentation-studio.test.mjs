@@ -79,8 +79,9 @@ test("AI presentation outline follows a narrative and does not invent evidence",
   ]);
   assert.match(server, /chat\/completions/);
   assert.match(server, /gemini-2\.5-flash-lite/);
-  assert.match(server, /Не превращай предположение пользователя в установленный факт/);
-  assert.match(server, /Не повторяй одинаковую композицию подряд/);
+  assert.match(server, /Не выдумывай конкретные цифры, даты, отзывы, клиентов или результаты/);
+  assert.match(server, /suggestedLayouts/);
+  assert.match(server, /у каждого слайда только title, body и bullets/);
   assert.match(server, /slides\[index\]\.layout !== slides\[index - 1\]\.layout/);
   assert.match(server, /safeFallbackOutline/);
   assert.match(server, /Криптовалюты: возможности, риски и осознанные решения/);
