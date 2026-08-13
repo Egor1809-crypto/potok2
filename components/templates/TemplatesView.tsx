@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { ArrowLeft, FileText, Plus, RefreshCw, Scale, SearchX } from "lucide-react";
+import { ArrowLeft, FileText, PenTool, RefreshCw, SearchX, Upload } from "lucide-react";
 
 import type { TemplateCategory } from "@/types";
 import type {
@@ -41,7 +41,30 @@ const categories = [
 type CategoryFilter = (typeof categories)[number];
 type ScopeFilter = "all" | "mine";
 type SortMode = "recent" | "name" | "blocks";
+type StyleFilter = "all" | "minimal" | "editorial" | "bold";
+type DensityFilter = "all" | "compact" | "balanced" | "rich";
+type PaletteFilter = "all" | "light" | "dark" | "warm" | "cool" | "neutral";
 type LoadState = "loading" | "ready" | "error";
+
+function paletteOf(template: EmailTemplateRecord): Exclude<PaletteFilter, "all"> {
+  const dark = [template.builderDocument.bodyBackground, template.builderDocument.workspaceBackground]
+    .some((value) => /^#(?:0|1|2|3)/i.test(value));
+  if (dark) return "dark";
+  const value = template.builderDocument.accentColor.replace("#", "");
+  if (!/^[\da-f]{6}$/i.test(value)) return "neutral";
+  const red = Number.parseInt(value.slice(0, 2), 16) / 255;
+  const green = Number.parseInt(value.slice(2, 4), 16) / 255;
+  const blue = Number.parseInt(value.slice(4, 6), 16) / 255;
+  const max = Math.max(red, green, blue);
+  const min = Math.min(red, green, blue);
+  const delta = max - min;
+  if (delta < 0.12) return "neutral";
+  let hue = max === red ? ((green - blue) / delta) % 6 : max === green ? (blue - red) / delta + 2 : (red - green) / delta + 4;
+  hue = (hue * 60 + 360) % 360;
+  if (hue <= 70 || hue >= 325) return "warm";
+  if (hue >= 155 && hue <= 300) return "cool";
+  return "light";
+}
 
 function subscribeToLocation(onStoreChange: () => void) {
   window.addEventListener("popstate", onStoreChange);
@@ -125,11 +148,16 @@ export function TemplatesView() {
   const [category, setCategory] = useState<CategoryFilter>("All");
   const [scope, setScope] = useState<ScopeFilter>(() => new URLSearchParams(browserSearch).get("scope") === "mine" ? "mine" : "all");
   const [query, setQuery] = useState("");
-  const [legalOnly, setLegalOnly] = useState(false);
   const [sort, setSort] = useState<SortMode>("recent");
+  const [style, setStyle] = useState<StyleFilter>("all");
+  const [density, setDensity] = useState<DensityFilter>("all");
+  const [palette, setPalette] = useState<PaletteFilter>("all");
   const [busy, setBusy] = useState<{ id: string; action: "clone" | "delete" } | null>(null);
+  const [importing, setImporting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const importRef = useRef<HTMLInputElement>(null);
+  const importPromptedRef = useRef(false);
 
   const loadTemplates = useCallback(async () => {
     setLoadState("loading");
@@ -154,12 +182,32 @@ export function TemplatesView() {
     return () => window.cancelAnimationFrame(frame);
   }, [loadTemplates]);
 
+  useEffect(() => {
+    if (loadState !== "ready" || importPromptedRef.current || new URLSearchParams(browserSearch).get("import") !== "1") return;
+    importPromptedRef.current = true;
+    importRef.current?.click();
+  }, [browserSearch, loadState]);
+
   const filteredTemplates = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase("ru-RU");
     return templates
       .filter((template) => scope === "all" || !template.isStarter)
       .filter((template) => category === "All" || template.category === category)
-      .filter((template) => !legalOnly || template.id.startsWith("template-v4-legal-"))
+      .filter((template) => {
+        if (style === "all") return true;
+        const blocks = template.builderDocument.blocks;
+        if (style === "editorial") return blocks.some((block) => block.fontFamily === "Georgia");
+        if (style === "bold") return blocks.some((block) => block.type === "hero" || block.type === "banner");
+        return blocks.length <= 7 && !blocks.some((block) => block.type === "hero" || block.type === "banner");
+      })
+      .filter((template) => palette === "all" || paletteOf(template) === palette)
+      .filter((template) => {
+        const count = template.builderDocument.blocks.length;
+        if (density === "compact") return count <= 6;
+        if (density === "balanced") return count >= 7 && count <= 8;
+        if (density === "rich") return count >= 9;
+        return true;
+      })
       .filter((template) => !normalized || [
         template.name,
         template.category,
@@ -174,7 +222,7 @@ export function TemplatesView() {
         }
         return Date.parse(second.updatedAt) - Date.parse(first.updatedAt);
       });
-  }, [category, legalOnly, query, scope, sort, templates]);
+  }, [category, density, palette, query, scope, sort, style, templates]);
 
   const scopedTemplates = useMemo(
     () => templates.filter((template) => scope === "all" || !template.isStarter),
@@ -230,6 +278,47 @@ export function TemplatesView() {
     }
   };
 
+  const importTemplate = async (file: File) => {
+    setImporting(true);
+    setError(null);
+    setNotice(null);
+    try {
+      if (file.size > 2 * 1024 * 1024) throw new Error("Файл шаблона больше 2 МБ.");
+      const parsed: unknown = JSON.parse(await file.text());
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("В файле нет макета MAILFLOW.");
+      const source = parsed as Record<string, unknown>;
+      const nestedTemplate = source.template && typeof source.template === "object" && !Array.isArray(source.template) ? source.template as Record<string, unknown> : undefined;
+      const document = nestedTemplate?.builderDocument ?? source.builderDocument ?? parsed;
+      if (!document || typeof document !== "object" || Array.isArray(document) || !Array.isArray((document as { blocks?: unknown }).blocks)) throw new Error("Не найдены блоки письма. Выберите файл .mailflow.json, скачанный из конструктора.");
+      const documentRecord = document as Record<string, unknown>;
+      const rawName = typeof nestedTemplate?.name === "string" ? nestedTemplate.name : file.name.replace(/\.mailflow\.json$|\.json$/i, "");
+      const name = `${rawName || "Импортированный шаблон"} · импорт ${new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}`;
+      const response = await fetch("/api/templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          name,
+          description: "Импортирован из резервного файла MAILFLOW.",
+          category: "Business",
+          subject: typeof documentRecord.subject === "string" ? documentRecord.subject : "Новое письмо",
+          previewText: typeof documentRecord.previewText === "string" ? documentRecord.previewText : "",
+          builderDocument: { ...documentRecord, templateId: "" },
+        }),
+      });
+      const body = await responseBody(response);
+      if (!response.ok || !("template" in body)) throw new Error(mutationError(body, "Шаблон не импортирован."));
+      setTemplates((current) => [body.template, ...current]);
+      setScope("mine");
+      setCategory("All");
+      setNotice(`Шаблон «${body.template.name}» импортирован и открыт в разделе «Мои шаблоны».`);
+    } catch (importError) {
+      setError(importError instanceof Error ? importError.message : "Шаблон не импортирован.");
+    } finally {
+      setImporting(false);
+      if (importRef.current) importRef.current.value = "";
+    }
+  };
+
   const returnPath = routeContext.returnTo ?? "/campaigns/new?step=message";
   const newTemplateHref = routeContext.returnTo
     ? campaignBuilderHref({ campaignName: routeContext.campaignName, returnTo: returnPath })
@@ -252,9 +341,15 @@ export function TemplatesView() {
                 Вернуться к кампании
               </Link>
             ) : null}
+            {!routeContext.returnTo ? <>
+              <input ref={importRef} type="file" accept=".json,.mailflow.json,application/json" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importTemplate(file); }} />
+              <button type="button" disabled={importing} onClick={() => importRef.current?.click()} className={buttonVariants({ variant: "secondary", size: "md" })}>
+                <Upload aria-hidden="true" className="size-4" />{importing ? "Импортируем…" : "Импортировать шаблон"}
+              </button>
+            </> : null}
             <Link href={newTemplateHref} className={buttonVariants({ variant: "primary", size: "md" })}>
-              <Plus aria-hidden="true" className="size-4" />
-              {routeContext.returnTo ? "Начать с нуля" : "Создать шаблон"}
+              <PenTool aria-hidden="true" className="size-4" />
+              {routeContext.returnTo ? "Начать с нуля" : "Открыть конструктор"}
             </Link>
           </div>
         }
@@ -278,13 +373,6 @@ export function TemplatesView() {
         </div>
       ) : (
         <div className="space-y-4">
-          {scope === "all" ? (
-            <button type="button" aria-pressed={legalOnly} onClick={() => { setLegalOnly((value) => !value); setCategory("All"); }} className="group flex w-full items-center gap-4 rounded-2xl border border-[#c9b8a0] bg-[#f5efe5] p-4 text-left outline-none transition hover:border-[#8d6d43] hover:shadow-[var(--shadow-sm)] focus-visible:ring-2 focus-visible:ring-primary/30 aria-pressed:border-[#1f1914] aria-pressed:bg-[#ede2d2] sm:p-5">
-              <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-[#1f1914] text-[#f4e7cf]"><Scale aria-hidden="true" className="size-5" /></span>
-              <span className="min-w-0 flex-1"><strong className="block text-[14px] text-[#1f1914]">Юридическая коллекция</strong><span className="mt-1 block text-[11px] leading-5 text-[#746555]">Условия, приватность, согласия, документы на подпись, статусы дел и политики ИИ.</span></span>
-              <span className="shrink-0 rounded-full border border-[#b9a182] bg-white/70 px-3 py-1 text-[10px] font-semibold text-[#5a442b]">{templates.filter((template) => template.id.startsWith("template-v4-legal-")).length} макетов</span>
-            </button>
-          ) : null}
           <div className="inline-flex rounded-xl border border-border bg-surface p-1" role="group" aria-label="Раздел шаблонов">
             <button type="button" aria-pressed={scope === "all"} onClick={() => setScope("all")} className="rounded-lg px-4 py-2 text-[12px] font-semibold text-text-muted outline-none transition hover:text-text-strong aria-pressed:bg-primary aria-pressed:text-white focus-visible:ring-2 focus-visible:ring-primary/30">
               Библиотека <span className="ml-1 opacity-70">{templates.length}</span>
@@ -306,8 +394,11 @@ export function TemplatesView() {
           </TabsList>
 
           <TabsContent value={category} className="pt-5">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <SearchInput value={query} onChange={(event) => setQuery(event.target.value)} onClear={() => setQuery("")} placeholder="Поиск шаблонов…" aria-label="Поиск шаблонов" wrapperClassName="w-full sm:max-w-sm" />
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(260px,1fr)_170px_170px_190px_200px]">
+              <SearchInput value={query} onChange={(event) => setQuery(event.target.value)} onClear={() => setQuery("")} placeholder="Поиск по задаче, теме или названию…" aria-label="Поиск шаблонов" wrapperClassName="w-full" />
+              <Select value={style} onChange={(event) => setStyle(event.target.value as StyleFilter)} aria-label="Стиль шаблона" options={[{value:"all",label:"Любой стиль"},{value:"minimal",label:"Минималистичный"},{value:"editorial",label:"Редакционный"},{value:"bold",label:"Контрастный"}]} className="h-8 min-h-8 text-[11px]" />
+              <Select value={palette} onChange={(event) => setPalette(event.target.value as PaletteFilter)} aria-label="Цветовая система" options={[{value:"all",label:"Любая палитра"},{value:"light",label:"Светлая"},{value:"dark",label:"Тёмная"},{value:"warm",label:"Тёплая"},{value:"cool",label:"Холодная"},{value:"neutral",label:"Нейтральная"}]} className="h-8 min-h-8 text-[11px]" />
+              <Select value={density} onChange={(event) => setDensity(event.target.value as DensityFilter)} aria-label="Насыщенность шаблона" options={[{value:"all",label:"Любая насыщенность"},{value:"compact",label:"Короткий · до 6 блоков"},{value:"balanced",label:"Средний · 7–8 блоков"},{value:"rich",label:"Подробный · 9+ блоков"}]} className="h-8 min-h-8 text-[11px]" />
               <Select
                 value={sort}
                 onChange={(event) => setSort(event.target.value as SortMode)}
@@ -317,7 +408,6 @@ export function TemplatesView() {
                   { value: "name", label: "По названию" },
                   { value: "blocks", label: "По числу блоков" },
                 ]}
-                wrapperClassName="w-52"
                 className="h-8 min-h-8 text-[11px]"
               />
             </div>
@@ -354,7 +444,7 @@ export function TemplatesView() {
                   icon={<SearchX aria-hidden="true" className="size-5" />}
                   title={scope === "mine" && !scopedTemplates.length ? "У вас пока нет своих шаблонов" : templates.length ? "Подходящих шаблонов нет" : "Библиотека пуста"}
                   description={scope === "mine" && !scopedTemplates.length ? "Создайте макет с нуля или откройте стартовый шаблон и сохраните свой вариант." : templates.length ? "Измените запрос или категорию." : "Создайте первый шаблон в визуальном редакторе."}
-                  action={templates.length ? { label: scope === "mine" && !scopedTemplates.length ? "Показать библиотеку" : "Сбросить фильтры", onClick: () => { setQuery(""); setCategory("All"); setLegalOnly(false); if (scope === "mine" && !scopedTemplates.length) setScope("all"); } } : undefined}
+                  action={templates.length ? { label: scope === "mine" && !scopedTemplates.length ? "Показать библиотеку" : "Сбросить фильтры", onClick: () => { setQuery(""); setCategory("All"); setStyle("all"); setPalette("all"); setDensity("all"); if (scope === "mine" && !scopedTemplates.length) setScope("all"); } } : undefined}
                 />
               </div>
             )}

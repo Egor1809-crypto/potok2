@@ -15,6 +15,8 @@ import {
   Plus,
   RefreshCw,
   Send,
+  Sparkles,
+  Upload,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -132,7 +134,13 @@ export function DashboardView() {
           <h1 className="text-[28px] font-semibold tracking-[-.04em] sm:text-[32px]">{firstName ? `${firstName}, создадим красивое письмо` : "Создадим красивое письмо"}</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-muted)]">Начните с шаблона или соберите макет с ИИ. Контакты и доставка через VK WorkSpace подключаются, когда письмо уже готово.</p>
         </div>
-        <Link href="/email-builder?new=1" className="btn btn-primary w-fit gap-2"><Plus aria-hidden="true" className="size-4" />Создать письмо</Link>
+        <div className="flex flex-wrap gap-2"><Link href="/templates" className="btn btn-secondary w-fit gap-2"><LayoutTemplate aria-hidden="true" className="size-4" />Выбрать шаблон</Link><Link href="/email-builder?new=1" className="btn btn-primary w-fit gap-2"><Plus aria-hidden="true" className="size-4" />Создать письмо</Link></div>
+      </section>
+
+      <section className="grid gap-3 md:grid-cols-3" aria-label="Начать работу над письмом">
+        <Link href="/templates" className="group rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 transition hover:border-[var(--primary)]/35 hover:shadow-sm"><span className="grid size-10 place-items-center rounded-xl bg-[var(--primary-subtle)] text-[var(--primary)]"><LayoutTemplate aria-hidden="true" className="size-5" /></span><h2 className="mt-4 text-[15px] font-semibold">Выбрать из {number.format(snapshot.templates.length)} шаблонов</h2><p className="mt-1.5 text-[11px] leading-5 text-[var(--text-muted)]">Фильтры по задаче, стилю и насыщенности. Любой макет можно сохранить как свой.</p><span className="mt-4 inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--primary)]">Открыть библиотеку <ArrowRight aria-hidden="true" className="size-3.5" /></span></Link>
+        <Link href="/email-builder?new=1" className="group rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 transition hover:border-[var(--primary)]/35 hover:shadow-sm"><span className="grid size-10 place-items-center rounded-xl bg-[var(--primary-subtle)] text-[var(--primary)]"><Sparkles aria-hidden="true" className="size-5" /></span><h2 className="mt-4 text-[15px] font-semibold">Создать письмо в студии</h2><p className="mt-1.5 text-[11px] leading-5 text-[var(--text-muted)]">Выберите шаблон, пустой холст или ИИ. Затем отредактируйте каждый блок и экспортируйте результат.</p><span className="mt-4 inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--primary)]">Открыть студию <ArrowRight aria-hidden="true" className="size-3.5" /></span></Link>
+        <Link href="/templates?import=1" className="group rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 transition hover:border-[var(--primary)]/35 hover:shadow-sm"><span className="grid size-10 place-items-center rounded-xl bg-[var(--primary-subtle)] text-[var(--primary)]"><Upload aria-hidden="true" className="size-5" /></span><h2 className="mt-4 text-[15px] font-semibold">Импортировать свой макет</h2><p className="mt-1.5 text-[11px] leading-5 text-[var(--text-muted)]">Загрузите резервный файл MAILFLOW и продолжите редактирование в конструкторе.</p><span className="mt-4 inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--primary)]">Импортировать <ArrowRight aria-hidden="true" className="size-3.5" /></span></Link>
       </section>
 
       <section className={`rounded-2xl border p-5 sm:p-6 ${nextAction.tone}`} aria-labelledby="next-action-title">

@@ -118,7 +118,7 @@ export function BlockLibrary({
           <span className="sr-only">Найти блок</span>
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Найти блок" className="min-w-0 flex-1 border-0 bg-transparent text-[11px] text-text-strong outline-none placeholder:text-text-subtle" />
         </label>
-        <div className="mt-3 grid grid-cols-4 rounded-lg bg-surface-subtle p-1" role="tablist" aria-label="Тип элементов">
+        <div className="mt-3 grid grid-cols-2 gap-1 rounded-lg bg-surface-subtle p-1" role="tablist" aria-label="Тип элементов">
           <LibraryTab active={tab === "content"} onClick={() => setTab("content")} icon={AlignJustify}>Контент</LibraryTab>
           <LibraryTab active={tab === "layout"} onClick={() => setTab("layout")} icon={LayoutTemplate}>Структуры</LibraryTab>
           <LibraryTab active={tab === "decor"} onClick={() => setTab("decor")} icon={Sparkles}>Декор</LibraryTab>

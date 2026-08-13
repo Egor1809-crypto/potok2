@@ -10,7 +10,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import Link from "next/link";
-import { Blocks, Library, PenTool, Save, SlidersHorizontal, Sparkles, SquareDashedMousePointer } from "lucide-react";
+import { Blocks, Library, PenTool, Save, SlidersHorizontal, Sparkles, SquareDashedMousePointer, WandSparkles } from "lucide-react";
 
 import type { EmailBlockType, TemplateCategory } from "@/types";
 import type {
@@ -95,6 +95,10 @@ const emailBlockTypes = new Set<EmailBlockType>([
   "faq",
   "coupon",
   "video",
+  "notice",
+  "comparison",
+  "document",
+  "compliance",
 ]);
 
 function subscribeToLocation(onStoreChange: () => void) {
@@ -433,7 +437,9 @@ function EmailBuilderWorkspace({
   const [previewMode, setPreviewMode] = useState<PreviewMode>("desktop");
   const [mobilePanel, setMobilePanel] = useState<BuilderPanel>("canvas");
   const [dirty, setDirty] = useState(mode === "template" ? !templateRecord || editingStarter : true);
-  const [creationMode, setCreationMode] = useState<"manual" | "ai">("manual");
+  const [creationMode, setCreationMode] = useState<"start" | "manual" | "ai">(
+    mode === "template" && !templateRecord && initialDocument.blocks.length === 0 ? "start" : "manual",
+  );
   const editRevisionRef = useRef(0);
   const savingTemplateRef = useRef(false);
 
@@ -752,12 +758,26 @@ function EmailBuilderWorkspace({
         tools={<EmailExportMenu document={document} name={campaignName} />}
       />
 
-      <div className="flex items-center justify-center gap-1 border-b border-border bg-surface px-4 py-2.5" role="tablist" aria-label="Способ создания письма">
+      <div className="flex flex-wrap items-center justify-center gap-1 border-b border-border bg-surface px-4 py-2.5" role="tablist" aria-label="Способ создания письма">
+        <Link href="/templates" className="inline-flex h-9 items-center gap-2 rounded-lg px-4 text-[12px] font-semibold text-text-muted outline-none transition hover:bg-surface-subtle hover:text-text-strong focus-visible:ring-2 focus-visible:ring-primary/30"><Library aria-hidden="true" className="size-4" />Выбрать шаблон</Link>
         <button type="button" role="tab" aria-selected={creationMode === "manual"} onClick={() => setCreationMode("manual")} className="inline-flex h-9 items-center gap-2 rounded-lg px-4 text-[12px] font-semibold text-text-muted outline-none transition hover:bg-surface-subtle aria-selected:bg-primary aria-selected:text-white focus-visible:ring-2 focus-visible:ring-primary/30"><PenTool aria-hidden="true" className="size-4" />Собрать вручную</button>
         <button type="button" role="tab" aria-selected={creationMode === "ai"} onClick={() => setCreationMode("ai")} className="inline-flex h-9 items-center gap-2 rounded-lg px-4 text-[12px] font-semibold text-text-muted outline-none transition hover:bg-surface-subtle aria-selected:bg-primary aria-selected:text-white focus-visible:ring-2 focus-visible:ring-primary/30"><Sparkles aria-hidden="true" className="size-4" />Создать с ИИ</button>
       </div>
 
-      {creationMode === "ai" ? (
+      {creationMode === "start" ? (
+        <section className="bg-surface-subtle/55 px-5 py-10 sm:px-8 sm:py-14" aria-labelledby="builder-start-title">
+          <div className="mx-auto max-w-5xl text-center">
+            <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-primary text-white shadow-[var(--shadow-md)]"><WandSparkles aria-hidden="true" className="size-5" /></span>
+            <h2 id="builder-start-title" className="mt-5 text-[24px] font-semibold tracking-[-.03em] text-text-strong">С чего начнём письмо?</h2>
+            <p className="mx-auto mt-2 max-w-xl text-[12px] leading-5 text-text-muted">Выберите готовую визуальную систему, начните с чистого холста или опишите задачу ИИ.</p>
+            <div className="mt-7 grid gap-3 text-left md:grid-cols-3">
+              <Link href="/templates" className="rounded-2xl border border-border bg-surface p-5 transition hover:border-primary/40 hover:shadow-[var(--shadow-sm)]"><span className="grid size-10 place-items-center rounded-xl bg-primary-subtle text-primary"><Library aria-hidden="true" className="size-5" /></span><strong className="mt-4 block text-[14px] text-text-strong">Выбрать шаблон</strong><span className="mt-1.5 block text-[11px] leading-5 text-text-muted">150+ готовых макетов с фильтрами по задаче и стилю.</span></Link>
+              <button type="button" onClick={() => setCreationMode("manual")} className="rounded-2xl border border-border bg-surface p-5 text-left transition hover:border-primary/40 hover:shadow-[var(--shadow-sm)]"><span className="grid size-10 place-items-center rounded-xl bg-primary-subtle text-primary"><PenTool aria-hidden="true" className="size-5" /></span><strong className="mt-4 block text-[14px] text-text-strong">Пустой холст</strong><span className="mt-1.5 block text-[11px] leading-5 text-text-muted">Соберите письмо вручную из блоков, структур и декора.</span></button>
+              <button type="button" onClick={() => setCreationMode("ai")} className="rounded-2xl border border-primary/25 bg-primary-subtle/55 p-5 text-left transition hover:border-primary/50 hover:shadow-[var(--shadow-sm)]"><span className="grid size-10 place-items-center rounded-xl bg-primary text-white"><Sparkles aria-hidden="true" className="size-5" /></span><strong className="mt-4 block text-[14px] text-text-strong">Создать с ИИ</strong><span className="mt-1.5 block text-[11px] leading-5 text-text-muted">Опишите аудиторию, цель и настроение — ИИ уточнит детали и соберёт вариант.</span></button>
+            </div>
+          </div>
+        </section>
+      ) : creationMode === "ai" ? (
         <AiEmailAssistant document={document} onApply={(next) => { mutateDocument(() => next); setSelectedBlockId(next.blocks[0]?.id ?? ""); setCreationMode("manual"); }} />
       ) : (
         <>

@@ -214,3 +214,25 @@ test("visual systems library contains reference-inspired but original editable l
   assert.match(library, /emailPatternCategoryLabels/);
   assert.match(database, /email-template-library-v5-visual/);
 });
+
+test("scaled library offers 150+ original templates and useful discovery filters", async () => {
+  const [generated, templatesView, database, dashboard, builder] = await Promise.all([
+    readFile(new URL("../data/generated-template-library.ts", import.meta.url), "utf8"),
+    readFile(new URL("../components/templates/TemplatesView.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/server/database-init.ts", import.meta.url), "utf8"),
+    readFile(new URL("../components/dashboard/DashboardView.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/email-builder/EmailBuilderView.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(generated, /themes\.flatMap/);
+  assert.ok((generated.match(/id: "(?:violet|cobalt|emerald|coral|amber|rose|sky|plum|ink|noir|sand|lime)"/g) ?? []).length >= 12);
+  assert.ok((generated.match(/id: "(?:service-status|event-invite|editorial-digest|product-launch|feedback|personal-outreach|security|case-update|webinar)"/g) ?? []).length >= 9);
+  for (const filter of ["StyleFilter", "DensityFilter", "PaletteFilter", "Поиск по задаче", "Минималистичный", "Редакционный", "Тёмная", "Тёплая", "Холодная", "Подробный · 9+ блоков"]) assert.match(templatesView, new RegExp(filter.replace(/[+]/g, "\\+")));
+  assert.match(templatesView, /Импортировать шаблон/);
+  assert.match(templatesView, /\.mailflow\.json/);
+  assert.doesNotMatch(templatesView, /Юридическая коллекция/);
+  assert.match(database, /email-template-library-v6-scale/);
+  assert.match(dashboard, /Выбрать шаблон/);
+  assert.match(dashboard, /Импортировать свой макет/);
+  assert.match(builder, /С чего начнём письмо/);
+  assert.match(builder, /150\+ готовых макетов/);
+});
