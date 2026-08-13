@@ -7,6 +7,7 @@ import {
   Copy,
   Image as ImageIcon,
   PencilLine,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 
@@ -14,6 +15,7 @@ import type { EmailTemplateRecord } from "@/types/api";
 import { BRAND_NAME } from "@/config/brand";
 import { Badge, Button, buttonVariants } from "@/components/ui";
 import { cn } from "@/components/ui/utils";
+import { emailFrameCss } from "@/components/email-builder/frame-presets";
 import { templateCategoryLabels } from "./templateLabels";
 
 export function TemplateCard({
@@ -33,6 +35,7 @@ export function TemplateCard({
   onDelete: () => void;
   busyAction?: "clone" | "delete";
 }) {
+  const isDesignerCollection = template.id.startsWith("template-v3-");
   return (
     <article className="group min-w-0 overflow-hidden rounded-[14px] border border-border bg-surface shadow-[var(--shadow-xs)] transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-1 hover:border-border-strong hover:shadow-[var(--shadow-md)]">
       <Link
@@ -54,8 +57,8 @@ export function TemplateCard({
             </p>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1">
-            <Badge variant={template.isStarter ? "neutral" : "accent"}>
-              {template.isStarter ? "Из библиотеки" : "Мой шаблон"}
+            <Badge variant={isDesignerCollection || !template.isStarter ? "accent" : "neutral"}>
+              {isDesignerCollection ? "Новая коллекция" : template.isStarter ? "Из библиотеки" : "Мой шаблон"}
             </Badge>
             <span className="text-[9px] text-text-subtle">{templateCategoryLabels[template.category]}</span>
           </div>
@@ -123,59 +126,107 @@ export function TemplateCard({
 
 export function TemplateThumbnail({ template }: { template: EmailTemplateRecord }) {
   const blocks = template.builderDocument.blocks;
-  const logo = blocks.find((block) => block.type === "logo")?.content ?? BRAND_NAME;
-  const heading = blocks.find((block) => block.type === "heading")?.content ?? template.name;
-  const text = blocks.find((block) => block.type === "text")?.content ?? template.previewText;
-  const button = blocks.find((block) => block.type === "button")?.label;
-  const hasImage = blocks.some((block) => block.type === "image");
-  const centered = blocks.find((block) => block.type === "heading")?.alignment === "center";
   const accentColor = template.builderDocument.accentColor;
+  const frameStyle = template.builderDocument.frameStyle ?? "none";
+  const frameColor = template.builderDocument.frameColor ?? accentColor;
+  const frameRadius = template.builderDocument.frameRadius ?? 0;
 
   return (
     <div
-      className="relative grid h-[255px] place-items-center overflow-hidden p-5 sm:h-[270px]"
+      className="relative grid h-[280px] place-items-center overflow-hidden p-5 sm:h-[300px]"
       style={{ backgroundColor: template.builderDocument.workspaceBackground }}
     >
-      <span aria-hidden="true" className="absolute -right-10 -top-12 size-36 rounded-full opacity-[0.08]" style={{ backgroundColor: accentColor }} />
-      <span aria-hidden="true" className="absolute -bottom-10 -left-12 size-28 rounded-full bg-white/55" />
+      <span aria-hidden="true" className="absolute -right-12 -top-14 size-40 rounded-full opacity-[0.09]" style={{ backgroundColor: accentColor }} />
+      <span aria-hidden="true" className="absolute -bottom-14 -left-12 size-32 rounded-full bg-white/30" />
+      {template.id.startsWith("template-v3-") ? (
+        <span className="absolute left-3 top-3 z-20 inline-flex items-center gap-1 rounded-full border border-white/60 bg-white/85 px-2 py-1 text-[8px] font-semibold uppercase tracking-[0.08em] text-[#312a3b] shadow-sm backdrop-blur">
+          <Sparkles aria-hidden="true" className="size-2.5" />
+          Дизайнерский
+        </span>
+      ) : null}
 
       <div
-        className={cn(
-          "relative h-[218px] w-[174px] overflow-hidden rounded-[3px] border border-black/[0.055] bg-white px-5 py-4 shadow-[0_15px_35px_rgba(30,35,50,0.13)] transition-transform duration-300 group-hover:scale-[1.025] sm:h-[230px] sm:w-[184px]",
-          centered ? "text-center" : "text-left",
-        )}
+        className="relative h-[244px] w-[190px] overflow-hidden bg-white shadow-[0_18px_45px_rgba(30,25,38,0.18)] transition-transform duration-300 group-hover:scale-[1.025] sm:h-[258px] sm:w-[202px]"
+        style={{
+          backgroundColor: template.builderDocument.bodyBackground,
+          ...emailFrameCss(frameStyle, frameColor, Math.min(frameRadius, 14)),
+        }}
       >
-        <span aria-hidden="true" className="absolute inset-x-0 top-0 h-1" style={{ backgroundColor: accentColor }} />
-        <div className={cn("flex items-center gap-1.5 text-[5px] font-bold tracking-[0.13em] text-[#323745]", centered && "justify-center")}>
-          <span className="grid size-3 place-items-center rounded-[3px] text-[5px] text-white" style={{ backgroundColor: accentColor }}>M</span>
-          <span className="max-w-[110px] truncate">{logo}</span>
-        </div>
-
-        <div className="mt-5">
-          <span className="mb-2 block text-[5px] font-semibold uppercase tracking-[0.16em]" style={{ color: accentColor }}>
-            {templateCategoryLabels[template.category]}
-          </span>
-          <p className="m-0 line-clamp-2 text-[13px] leading-[1.08] font-semibold tracking-[-0.04em] text-[#171923]">{heading}</p>
-          <p className="mt-3 line-clamp-3 text-[6px] leading-[1.6] text-[#747987]">{text.replace(/{{([^}]+)}}/g, "$1")}</p>
-        </div>
-
-        {hasImage ? (
-          <div className="mt-3 grid h-11 place-items-center rounded-[5px] border border-[#e8eaf0] bg-[#f4f5f8]">
-            <ImageIcon aria-hidden="true" className="size-3 text-[#9ba0ad]" />
-          </div>
-        ) : button ? (
-          <span className={cn("mt-4 inline-flex rounded-[4px] px-2.5 py-1.5 text-[5px] font-semibold text-white", centered && "mx-auto")} style={{ backgroundColor: accentColor }}>{button}</span>
-        ) : (
-          <div className="mt-4">
-            <span className="block h-1 w-full rounded-full bg-[#e8eaf0]" />
-            <span className="mt-1.5 block h-1 w-3/4 rounded-full bg-[#eef0f3]" />
-          </div>
-        )}
-
-        <div className="absolute inset-x-5 bottom-4 border-t border-[#eceef2] pt-2">
-          <span className={cn("block h-1 w-2/3 rounded-full bg-[#eceef2]", centered && "mx-auto")} />
+        <div className="absolute left-1/2 top-0 w-[340px] origin-top -translate-x-1/2 scale-[0.58] sm:scale-[0.62]">
+          {blocks.slice(0, 8).map((block) => (
+            <TemplateMiniBlock key={block.id} block={block} accentColor={accentColor} />
+          ))}
         </div>
       </div>
     </div>
   );
+}
+
+type TemplateMiniBlockValue = EmailTemplateRecord["builderDocument"]["blocks"][number];
+
+function cleanMiniText(value: string) {
+  return value.replace(/{{([^}]+)}}/g, "$1").trim();
+}
+
+function TemplateMiniBlock({ block, accentColor }: { block: TemplateMiniBlockValue; accentColor: string }) {
+  const alignment = block.alignment ?? "left";
+  const background = block.backgroundColor === "transparent" ? "transparent" : block.backgroundColor;
+  const commonStyle = {
+    backgroundColor: background,
+    color: block.textColor,
+    textAlign: alignment,
+    padding: `${Math.max(7, (block.paddingTop ?? 16) * 0.62)}px ${Math.max(18, (block.paddingRight ?? 24) * 0.72)}px ${Math.max(7, (block.paddingBottom ?? 16) * 0.62)}px ${Math.max(18, (block.paddingLeft ?? 24) * 0.72)}px`,
+    fontFamily: block.fontFamily,
+  } as const;
+  const parts = cleanMiniText(block.content).split("|");
+
+  if (block.type === "pattern") {
+    return <div aria-hidden="true" className="whitespace-pre-line text-center text-[12px] font-semibold leading-4" style={{ ...commonStyle, letterSpacing: Math.min(block.letterSpacing ?? 0, 4) }}>{block.content}</div>;
+  }
+  if (block.type === "logo") {
+    return <div className="truncate text-[8px] font-bold uppercase tracking-[0.16em]" style={commonStyle}>{cleanMiniText(block.content) || BRAND_NAME}</div>;
+  }
+  if (block.type === "hero" || block.type === "banner") {
+    return <div style={commonStyle}><div className="text-[22px] font-bold leading-[1.05] tracking-[-0.035em]">{parts[0]}</div>{parts[1] ? <div className="mt-3 text-[8px] leading-[1.5] opacity-75">{parts[1]}</div> : null}</div>;
+  }
+  if (block.type === "heading") {
+    return <div className="text-[22px] font-bold leading-[1.05] tracking-[-0.04em]" style={commonStyle}>{cleanMiniText(block.content)}</div>;
+  }
+  if (block.type === "text") {
+    return <div className="line-clamp-3 text-[8px] leading-[1.55]" style={commonStyle}>{cleanMiniText(block.content)}</div>;
+  }
+  if (block.type === "image") {
+    return <div style={commonStyle}><div className="grid h-24 place-items-center rounded-lg bg-gradient-to-br from-black/[0.04] to-black/[0.12]"><ImageIcon aria-hidden="true" className="size-5 opacity-35" /></div></div>;
+  }
+  if (block.type === "stats") {
+    return <div className="grid grid-cols-2 gap-2" style={commonStyle}>{[0, 2].map((index) => <div key={index} className="rounded-md border border-black/[0.06] p-3 text-center"><strong className="block text-[16px]" style={{ color: accentColor }}>{parts[index]}</strong><span className="text-[7px] opacity-65">{parts[index + 1]}</span></div>)}</div>;
+  }
+  if (block.type === "columns") {
+    return <div className="grid grid-cols-2 gap-2" style={commonStyle}>{parts.slice(0, 2).map((part, index) => <div key={index} className="whitespace-pre-line rounded-md border border-black/10 p-3 text-[8px] leading-[1.45]">{part}</div>)}</div>;
+  }
+  if (block.type === "quote") {
+    return <div style={commonStyle}><div className="border-l-[3px] pl-3 text-[9px] italic leading-[1.45]" style={{ borderColor: accentColor }}>{parts[0]}<span className="mt-2 block text-[7px] not-italic opacity-65">{parts[1]}</span></div></div>;
+  }
+  if (block.type === "checklist" || block.type === "timeline" || block.type === "faq") {
+    return <div className="space-y-1.5 text-[8px] leading-[1.35]" style={commonStyle}>{parts.slice(0, block.type === "checklist" ? 3 : 4).map((part, index) => <div key={index} className="flex gap-2"><span className="font-bold" style={{ color: accentColor }}>{block.type === "checklist" ? "✓" : `${Math.floor(index / 2) + 1}`}</span><span className={cn(index % 2 === 0 && block.type !== "checklist" && "font-semibold")}>{part}</span></div>)}</div>;
+  }
+  if (block.type === "coupon") {
+    return <div style={commonStyle}><div className="rounded-lg border-2 border-dashed p-3 text-center" style={{ borderColor: accentColor }}><span className="text-[7px] uppercase tracking-wider">{parts[0]}</span><strong className="my-1 block text-[18px] tracking-widest" style={{ color: accentColor }}>{parts[1]}</strong><span className="text-[7px] opacity-65">{parts[2]}</span></div></div>;
+  }
+  if (block.type === "video") {
+    return <div style={commonStyle}><div className="grid h-24 place-items-center rounded-lg bg-black/80 text-white"><span className="grid size-8 place-items-center rounded-full bg-white/20 text-[12px]">▶</span><span className="text-[8px] font-semibold">{parts[0]}</span></div></div>;
+  }
+  if (block.type === "product") {
+    return <div style={commonStyle}><div className="rounded-lg border border-black/10 p-3"><strong className="text-[10px]">{parts[0]}</strong><p className="my-1 text-[7px] opacity-65">{parts[1]}</p><strong className="text-[9px]">{parts[2]}</strong></div></div>;
+  }
+  if (block.type === "button") {
+    return <div style={commonStyle}><span className="inline-flex rounded-md px-4 py-2 text-[8px] font-bold" style={{ backgroundColor: block.buttonStyle === "outline" ? "transparent" : accentColor, border: block.buttonStyle === "outline" ? `2px solid ${accentColor}` : undefined, color: block.buttonStyle === "solid" ? block.textColor : accentColor }}>{block.label || block.content}</span></div>;
+  }
+  if (block.type === "divider") {
+    return <div style={commonStyle}><div className="border-t" style={{ borderColor: block.textColor }} /></div>;
+  }
+  if (block.type === "footer" || block.type === "signature") {
+    return <div className="line-clamp-2 text-[7px] leading-[1.45] opacity-65" style={commonStyle}>{cleanMiniText(block.content).replaceAll("|", " · ")}</div>;
+  }
+  return null;
 }

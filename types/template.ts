@@ -37,6 +37,22 @@ export interface EmailBlock {
   alignment?: "left" | "center" | "right";
   href?: string;
   label?: string;
+  paddingTop?: number;
+  paddingBottom?: number;
+  paddingLeft?: number;
+  paddingRight?: number;
+  backgroundColor?: string;
+  textColor?: string;
+  fontSize?: number;
+  borderRadius?: number;
+  fontFamily?: "Arial" | "Georgia" | "Verdana" | "Trebuchet MS";
+  fontWeight?: 400 | 500 | 600 | 700;
+  lineHeight?: number;
+  letterSpacing?: number;
+  borderWidth?: number;
+  borderColor?: string;
+  widthPercent?: number;
+  buttonStyle?: "solid" | "outline" | "soft";
 }
 
 export interface EmailTemplate {
@@ -48,6 +64,11 @@ export interface EmailTemplate {
   previewText: string;
   accentColor: string;
   backgroundColor: string;
+  bodyBackground?: string;
+  contentWidth?: number;
+  frameStyle?: "none" | "hairline" | "accent" | "double" | "dashed" | "top-bottom" | "left-band" | "soft";
+  frameColor?: string;
+  frameRadius?: number;
   thumbnailVariant: "editorial" | "minimal" | "bold" | "classic";
   blocks: EmailBlock[];
   isFavorite: boolean;
