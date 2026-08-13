@@ -1,6 +1,6 @@
-# MAILFLOW
+# Поток
 
-MAILFLOW is a demo-ready SaaS MVP for managing B2B contacts, building personalized email campaigns, and measuring outreach in one workspace.
+Поток is a demo-ready SaaS MVP for managing B2B contacts, building personalized email campaigns, and measuring outreach in one workspace.
 
 ## Product areas
 

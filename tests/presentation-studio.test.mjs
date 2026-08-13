@@ -86,6 +86,6 @@ test("PowerPoint export builds OOXML and only fetches same-origin library assets
   assert.match(exporter, /new URL\(`\/api\/assets\/\$\{encodeURIComponent\(slide\.assetId\)\}`/);
   assert.match(exporter, /redirect: "error"/);
   assert.doesNotMatch(exporter, /new URL\(slide\.imageUrl/);
-  assert.match(store, /Для слайда можно выбрать только изображение из общей медиатеки MAILFLOW/);
+  assert.match(store, /Для слайда можно выбрать только изображение из общей медиатеки Поток/);
   assert.match(route, /application\/vnd\.openxmlformats-officedocument\.presentationml\.presentation/);
 });

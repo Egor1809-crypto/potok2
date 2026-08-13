@@ -10,7 +10,7 @@ import { BrandMark } from "@/components/layout/brand-mark";
 import { demoUser, workspaceConfig } from "@/config/brand";
 
 /**
- * MAILFLOW currently has one ready-to-use account. Login and registration
+ * Поток currently has one ready-to-use account. Login and registration
  * routes share this hand-off instead of pretending to manage credentials or
  * permissions that do not exist in the MVP.
  */
@@ -59,7 +59,7 @@ export function AuthScreen() {
           href="/dashboard"
           className="mt-6 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 text-[13px] font-semibold text-primary-foreground outline-none transition hover:opacity-90 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2"
         >
-          Перейти в MAILFLOW
+          Перейти в Поток
           <ArrowRight aria-hidden="true" className="size-4" />
         </Link>
       </section>

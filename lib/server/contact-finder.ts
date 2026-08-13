@@ -12,7 +12,7 @@ const SAME_SITE_PAGE_LIMIT = 5;
 const MAX_SOURCE_BYTES = 1_000_000;
 const MAX_TEXT_LENGTH = 100_000;
 const FETCH_TIMEOUT_MS = 8_000;
-const USER_AGENT = "MAILFLOW-ContactFinder/1.0";
+const USER_AGENT = "Potok-ContactFinder/1.0";
 const REQUEST_WINDOW_MS = 10 * 60 * 1_000;
 const REQUEST_LIMIT = 20;
 

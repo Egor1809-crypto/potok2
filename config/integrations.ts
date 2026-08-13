@@ -69,7 +69,7 @@ export const integrationProviders: IntegrationProviderDefinition[] = [
     name: "VK WorkSpace",
     category: "Ручной импорт в «Рассылки»",
     summary:
-      "MAILFLOW готовит CSV получателей для ручного импорта в модуль «Рассылки» VK WorkSpace.",
+      "Поток готовит CSV получателей для ручного импорта в модуль «Рассылки» VK WorkSpace.",
     channelIds: ["email"],
     accent: "#1777ff",
     initials: "VK",
@@ -80,16 +80,16 @@ export const integrationProviders: IntegrationProviderDefinition[] = [
       "Проверенный отправитель в кабинете VK WorkSpace",
     ],
     setupSteps: [
-      "Проверить согласия и email выбранной аудитории в MAILFLOW.",
+      "Проверить согласия и email выбранной аудитории в Поток.",
       "Скачать CSV из готовой кампании.",
       "Импортировать файл и завершить настройку письма в VK WorkSpace.",
       "Запустить рассылку и сверять результаты в кабинете VK WorkSpace.",
     ],
     limitations: [
-      "У модуля «Рассылки» VK WorkSpace нет используемого здесь публичного API: MAILFLOW не выдаёт ручной экспорт за автоматическую отправку.",
+      "У модуля «Рассылки» VK WorkSpace нет используемого здесь публичного API: Поток не выдаёт ручной экспорт за автоматическую отправку.",
       "Контент, отправитель, запуск и статистика остаются в интерфейсе VK WorkSpace.",
     ],
-    route: "MAILFLOW → CSV → ручной импорт в VK WorkSpace",
+    route: "Поток → CSV → ручной импорт в VK WorkSpace",
     deliveryMode: "manual_export",
   },
   {
@@ -115,7 +115,7 @@ export const integrationProviders: IntegrationProviderDefinition[] = [
       "Бот не может первым написать пользователю, который не начал диалог.",
       "Общий лимит Telegram Bot API по умолчанию — около 30 сообщений в секунду.",
     ],
-    route: "MAILFLOW → серверный адаптер → Telegram Bot API",
+    route: "Поток → серверный адаптер → Telegram Bot API",
     deliveryMode: "automatic",
   },
   {
@@ -141,7 +141,7 @@ export const integrationProviders: IntegrationProviderDefinition[] = [
       "Получатель должен разрешить сообщения от сообщества.",
       "Массовая отправка должна соблюдать правила платформы и её лимиты.",
     ],
-    route: "MAILFLOW → серверный адаптер → VK API",
+    route: "Поток → серверный адаптер → VK API",
     deliveryMode: "automatic",
   },
   {
@@ -168,7 +168,7 @@ export const integrationProviders: IntegrationProviderDefinition[] = [
       "Отправка разрешена только контактам с законным основанием и согласием.",
       "Тариф и модерация сервиса определяют доступный объём.",
     ],
-    route: "MAILFLOW → серверный адаптер → UniSender",
+    route: "Поток → серверный адаптер → UniSender",
     deliveryMode: "automatic",
   },
 ];

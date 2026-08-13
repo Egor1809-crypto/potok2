@@ -4,7 +4,7 @@ import { ImageStudioView } from "@/components/image-studio";
 
 export const metadata: Metadata = {
   title: "Студия изображений",
-  description: "Создание и хранение изображений для писем MAILFLOW.",
+  description: "Создание и хранение изображений для писем Поток.",
 };
 
 export default function ImageStudioPage() {

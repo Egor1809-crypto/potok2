@@ -145,7 +145,7 @@ export function EmailExportMenu({ document, name }: { document: BuilderDocument;
     ["doc", FileText, "Word (.doc)", "Для согласования и правок"],
     ["pdf", Printer, "PDF", "Без всплывающего окна"],
     ["txt", FileText, "Текст", "Без оформления"],
-    ["json", FileJson2, "Исходник MAILFLOW", "Резервная копия макета"],
+    ["json", FileJson2, "Исходник «Поток»", "Резервная копия макета"],
   ] as const;
 
   return <>

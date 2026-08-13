@@ -13,7 +13,7 @@ export function MarketingHeader() {
       <div className="container-shell flex h-[72px] items-center justify-between">
         <Link href="/" className="group flex items-center gap-2.5" aria-label={`${BRAND_NAME}: главная`}>
           <span className="grid size-8 place-items-center rounded-[9px] bg-primary text-[13px] font-semibold text-white shadow-[0_6px_18px_rgba(124,53,242,.25)] transition-transform group-hover:-rotate-3">
-            M
+            П
           </span>
           <span className="text-[15px] font-semibold tracking-[.12em] text-text-strong">{BRAND_NAME}</span>
         </Link>

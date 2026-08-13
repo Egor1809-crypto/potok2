@@ -267,7 +267,7 @@ export function ContactFinderView() {
       <PageHeader
         eyebrow="Контакты → проверка → база"
         title="Поиск публичных контактов"
-        description="Найдите деловые email и телефоны на указанном сайте или в тексте. MAILFLOW показывает источник каждого результата и ничего не сохраняет без вашего выбора."
+        description="Найдите деловые email и телефоны на указанном сайте или в тексте. Поток показывает источник каждого результата и ничего не сохраняет без вашего выбора."
         action={
           <Link href="/contacts" className={buttonVariants({ variant: "outline" })}>
             <UsersRound aria-hidden="true" className="size-4" />
@@ -502,7 +502,7 @@ export function ContactFinderView() {
                 </span>
                 <h3 className="mt-4 mb-0 text-[16px] font-semibold text-text-strong">Публичные контакты не найдены</h3>
                 <p className="mt-2 mb-0 text-[13px] leading-5 text-text-muted">
-                  Попробуйте страницу «Контакты» или вставьте текст вручную. MAILFLOW не подбирает и не угадывает адреса.
+                  Попробуйте страницу «Контакты» или вставьте текст вручную. Поток не подбирает и не угадывает адреса.
                 </p>
               </div>
             </Card>

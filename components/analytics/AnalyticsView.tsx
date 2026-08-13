@@ -169,7 +169,7 @@ export function AnalyticsView() {
           <p className="section-eyebrow">Факты выполнения</p>
           <h1 className="text-[28px] font-semibold tracking-[-.04em]">Журнал отправки</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-muted)]">
-            Здесь показано только то, что MAILFLOW действительно выполнил: последние {number.format(historyLimit)} заданий провайдерам и ручных выгрузок. Подтверждения доставки, открытия и ответы смотрите у подключённого провайдера.
+            Здесь показано только то, что Поток действительно выполнил: последние {number.format(historyLimit)} заданий провайдерам и ручных выгрузок. Подтверждения доставки, открытия и ответы смотрите у подключённого провайдера.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -191,7 +191,7 @@ export function AnalyticsView() {
 
       {!jobs.length ? (
         <section className="rounded-2xl border border-[#eadfbd] bg-[#fff9eb] p-5">
-          <div className="flex items-start gap-3"><BarChart3 aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-[var(--warning)]" /><div><h2 className="text-[13px] font-semibold">Заданий на отправку пока нет</h2><p className="mt-1 text-[11px] leading-5 text-[var(--text-muted)]">Сохраните кампанию, проверьте готовность и запустите её явно. Если провайдер не подключён, MAILFLOW остановит запуск и покажет причину.</p><Link href="/campaigns" className="mt-2 inline-flex text-[11px] font-semibold text-[var(--primary)]">Открыть кампании →</Link></div></div>
+          <div className="flex items-start gap-3"><BarChart3 aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-[var(--warning)]" /><div><h2 className="text-[13px] font-semibold">Заданий на отправку пока нет</h2><p className="mt-1 text-[11px] leading-5 text-[var(--text-muted)]">Сохраните кампанию, проверьте готовность и запустите её явно. Если провайдер не подключён, Поток остановит запуск и покажет причину.</p><Link href="/campaigns" className="mt-2 inline-flex text-[11px] font-semibold text-[var(--primary)]">Открыть кампании →</Link></div></div>
         </section>
       ) : (
         <section className="card overflow-hidden">

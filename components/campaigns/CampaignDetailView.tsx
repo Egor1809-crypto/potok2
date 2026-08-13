@@ -496,7 +496,7 @@ function Metrics({
         })}
       </section>
       <Alert tone="info" title="Показаны только проверяемые факты">
-        MAILFLOW пока не получает от провайдеров события доставки, открытий, переходов и ответов, поэтому эти метрики не имитируются нулями.
+        Поток пока не получает от провайдеров события доставки, открытий, переходов и ответов, поэтому эти метрики не имитируются нулями.
       </Alert>
     </div>
   );
@@ -617,7 +617,7 @@ function CampaignLoadError({ onReload }: { onReload?: () => void }) {
       <section className="card p-8 text-center sm:p-12">
         <span className="mx-auto grid size-12 place-items-center rounded-xl bg-danger-subtle text-danger"><AlertTriangle aria-hidden="true" className="size-5" /></span>
         <h1 className="mt-5 text-[22px] font-semibold text-text-strong">Не удалось загрузить кампанию</h1>
-        <p className="mx-auto mt-2 max-w-md text-[13px] leading-5 text-text-muted">Сервер рабочего пространства не ответил. MAILFLOW не подменяет кампанию локальной копией.</p>
+        <p className="mx-auto mt-2 max-w-md text-[13px] leading-5 text-text-muted">Сервер рабочего пространства не ответил. Поток не подменяет кампанию локальной копией.</p>
         <div className="mt-6 flex flex-col justify-center gap-2 sm:flex-row">
           <Link href="/campaigns" className={buttonVariants({ variant: "secondary" })}>Все кампании</Link>
           {onReload ? <Button onClick={onReload} leadingIcon={<RefreshCw className="size-4" />}>Повторить загрузку</Button> : null}

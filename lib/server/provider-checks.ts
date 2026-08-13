@@ -25,7 +25,7 @@ export async function checkProviderConnection(
       ok: true,
       identity: "manual_export",
       message:
-        "Ручной CSV-маршрут готов. MAILFLOW не подключается к несуществующему публичному API «Рассылок» VK WorkSpace.",
+        "Ручной CSV-маршрут готов. Поток не подключается к несуществующему публичному API «Рассылок» VK WorkSpace.",
     };
   }
   if (!hasRuntimeCredentials(integration.providerId)) {

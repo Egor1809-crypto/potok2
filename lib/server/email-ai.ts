@@ -305,7 +305,7 @@ function parseSuggestion(value: string, input: EmailAiRequest): EmailAiSuggestio
     ...(fallbackDetails.length ? [{ type: "notice", content: `Главное|${fallbackDetails.slice(0, 2).join(" · ")}|${fallbackDetails.slice(2).join(" · ") || "Все детали указаны в письме"}`, label: null, assetId: null, imagePrompt: null }] : []),
     { type: "checklist", content: fallbackDetails.slice(0, 3).join("|") || "Понятная ценность|Конкретные детали|Одно главное действие", label: null, assetId: null, imagePrompt: null },
     ...(input.websiteUrl ? [{ type: "button", content: suggestion.cta, label: suggestion.cta, assetId: null, imagePrompt: null }] : []),
-    { type: "footer", content: `${input.brandName || "MAILFLOW"} · Настроить подписку · Отписаться`, label: null, assetId: null, imagePrompt: null },
+    { type: "footer", content: `${input.brandName || "Поток"} · Настроить подписку · Отписаться`, label: null, assetId: null, imagePrompt: null },
   ];
   const designBlocks = Array.isArray(design.blocks) && design.blocks.length ? design.blocks : fallbackBlocks;
   const assetById = new Map((input.availableAssets ?? []).map((asset) => [asset.id, asset]));
@@ -427,7 +427,7 @@ async function findInternetImages(suggestion: EmailAiSuggestion) {
 async function searchCommonsImage(search: string, used: Set<string>) {
   const url = new URL("https://api.openverse.org/v1/images/");
   url.search = new URLSearchParams({ q: search, license_type: "commercial", aspect_ratio: "wide", mature: "false", page_size: "20" }).toString();
-  const response = await fetch(url, { headers: { "User-Agent": "MAILFLOW/1.0 (info@tech-pravo.ru)" } });
+  const response = await fetch(url, { headers: { "User-Agent": "Поток/1.0 (info@tech-pravo.ru)" } });
   if (!response.ok) return undefined;
   const body = asObject(await response.json());
   const results = Array.isArray(body.results) ? body.results : [];
@@ -451,7 +451,7 @@ export async function generateEmailSuggestion(request: Request, value: unknown):
   const urls = input.goal.match(/https:\/\/[^\s]+/g) ?? [];
   const linkedContext = await Promise.all(urls.slice(0, 2).map(async (url) => {
     try {
-      const response = await fetch(url, { redirect: "follow", headers: { "User-Agent": "MAILFLOW/1.0" } });
+      const response = await fetch(url, { redirect: "follow", headers: { "User-Agent": "Поток/1.0" } });
       if (!response.ok || !response.headers.get("content-type")?.includes("text/html")) return "";
       return (await response.text()).replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 10_000);
     } catch { return ""; }

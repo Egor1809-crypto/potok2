@@ -74,11 +74,11 @@ function scenarioMiddle(prefix: string, system: CreativeSystem, story: CreativeS
   ];
   if (story.id === "product-drop") return [
     { id: `${prefix}-stats`, type: "stats", content: story.facts.join("|"), alignment: "center", backgroundColor: system.soft, textColor: system.text, borderRadius: system.radius },
-    { id: `${prefix}-product`, type: "product", content: `MAILFLOW Studio|${story.supporting.join(" · ")}|Доступно сейчас`, label: story.action, href: "https://tech-pravo.ru/", alignment: "left", backgroundColor: system.soft, textColor: system.text, borderColor: system.accent, borderWidth: 1, borderRadius: system.radius },
+    { id: `${prefix}-product`, type: "product", content: `Поток Studio|${story.supporting.join(" · ")}|Доступно сейчас`, label: story.action, href: "https://tech-pravo.ru/", alignment: "left", backgroundColor: system.soft, textColor: system.text, borderColor: system.accent, borderWidth: 1, borderRadius: system.radius },
   ];
   if (story.id === "weekly-signal") return [
     { id: `${prefix}-columns`, type: "columns", content: `${story.facts[0]} / ${story.facts[1]}\n${story.supporting[0]}|${story.facts[2]} / ${story.facts[3]}\n${story.supporting[1]}`, alignment: "left", backgroundColor: system.soft, textColor: system.text, fontFamily: system.font, borderColor: system.accent, borderWidth: 1, borderRadius: system.radius },
-    { id: `${prefix}-quote`, type: "quote", content: `${story.supporting[2]}|Редакция MAILFLOW`, alignment: "left", backgroundColor: system.soft, textColor: system.text, fontFamily: system.font, borderRadius: system.radius },
+    { id: `${prefix}-quote`, type: "quote", content: `${story.supporting[2]}|Редакция Поток`, alignment: "left", backgroundColor: system.soft, textColor: system.text, fontFamily: system.font, borderRadius: system.radius },
   ];
   if (story.id === "personal-pitch") return [
     { id: `${prefix}-text`, type: "text", content: "{{first_name}}, предлагаю не демонстрацию, а короткий разбор одного реального сценария вашей команды — с готовым макетом и измеримым результатом.", alignment: "left", backgroundColor: "transparent", textColor: system.text, fontFamily: system.font, fontSize: 17, lineHeight: 170 },

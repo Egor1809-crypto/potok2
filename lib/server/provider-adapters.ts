@@ -439,7 +439,7 @@ export async function createUniSenderCampaign(input: {
           parameters: [
             ["name", providerField],
             ["type", "string"],
-            ["public_name", `MAILFLOW ${token}`],
+            ["public_name", `Поток ${token}`],
           ],
           fetchFn,
           signal: input.signal,

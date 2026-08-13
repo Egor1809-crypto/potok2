@@ -8,6 +8,7 @@ import {
   workspaces,
 } from "@/db/schema";
 import { integrationProviders } from "@/config/integrations";
+import { BRAND_NAME } from "@/config/brand";
 import { ApiRequestError } from "./api-utils";
 import { starterEmailTemplateValues } from "./starter-template-library";
 
@@ -300,7 +301,7 @@ function identityFromRequest(request: Request): RequestIdentity {
     forwardedUserId && forwardedEmail ? forwardedUserId : null;
   const email = forwardedEmail ?? "participant@mailflow.local";
   const encodedName = request.headers.get("oai-authenticated-user-full-name");
-  let displayName = "Участник MAILFLOW";
+  let displayName = `Участник ${BRAND_NAME}`;
   if (
     encodedName &&
     request.headers.get("oai-authenticated-user-full-name-encoding") ===
@@ -437,8 +438,8 @@ async function seedDatabase(request: Request) {
     .insert(workspaces)
     .values({
       id: WORKSPACE_ID,
-      name: "Рабочее пространство MAILFLOW",
-      companyName: "MAILFLOW",
+      name: `Рабочее пространство «${BRAND_NAME}»`,
+      companyName: BRAND_NAME,
       timezone: "Europe/Moscow",
       defaultSenderName: identity.displayName,
       defaultSenderEmail: identity.email,
@@ -674,6 +675,32 @@ async function seedDatabase(request: Request) {
     }).onConflictDoUpdate({
       target: systemState.key,
       set: { value: "seeded", updatedAt: now },
+    });
+  }
+
+  const [brandRenameState] = await db
+    .select({ key: systemState.key })
+    .from(systemState)
+    .where(eq(systemState.key, "visible-brand-potoc-v1"))
+    .limit(1);
+  if (!brandRenameState) {
+    for (const template of starterEmailTemplateValues()) {
+      await db.update(emailTemplates).set({
+        subject: template.subject,
+        previewText: template.previewText,
+        builderDocument: template.builderDocument,
+        emailBodyHtml: template.emailBodyHtml,
+        emailBodyText: template.emailBodyText,
+        updatedAt: now,
+      }).where(and(eq(emailTemplates.id, template.id), eq(emailTemplates.workspaceId, WORKSPACE_ID)));
+    }
+    await db.insert(systemState).values({
+      key: "visible-brand-potoc-v1",
+      value: "renamed",
+      updatedAt: now,
+    }).onConflictDoUpdate({
+      target: systemState.key,
+      set: { value: "renamed", updatedAt: now },
     });
   }
 

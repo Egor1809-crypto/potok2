@@ -499,7 +499,7 @@ export async function generatePresentationOutline(request: Request, value: unkno
       provider: selected.provider,
       outline: {
         name: optionalText(parsed.name, "Название презентации", 120) || input.goal.split(/[.!?\n]/)[0]?.slice(0, 120) || "Новая презентация",
-        description: optionalText(parsed.description, "Описание презентации", 500) ?? "Создано ИИ-помощником MAILFLOW.",
+        description: optionalText(parsed.description, "Описание презентации", 500) ?? "Создано ИИ-помощником Поток.",
         themeId: input.themeId,
         accentColor: theme.accentColor,
         backgroundColor: theme.backgroundColor,

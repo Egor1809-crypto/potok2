@@ -248,7 +248,7 @@ function createDocumentWithStudioAsset(assetId: string, assetName: string) {
     ...document,
     blocks: [{
       ...image,
-      content: assetName || "Изображение из студии MAILFLOW",
+      content: assetName || "Изображение из студии Поток",
       href: assetUrl,
       widthPercent: 100,
       borderRadius: 16,

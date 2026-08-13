@@ -294,7 +294,7 @@ export function TemplatesView() {
     try {
       if (file.size > 2 * 1024 * 1024) throw new Error("Файл шаблона больше 2 МБ.");
       const parsed: unknown = JSON.parse(await file.text());
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("В файле нет макета MAILFLOW.");
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("В файле нет макета Поток.");
       const source = parsed as Record<string, unknown>;
       const nestedTemplate = source.template && typeof source.template === "object" && !Array.isArray(source.template) ? source.template as Record<string, unknown> : undefined;
       const document = nestedTemplate?.builderDocument ?? source.builderDocument ?? parsed;
@@ -307,7 +307,7 @@ export function TemplatesView() {
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
           name,
-          description: "Импортирован из резервного файла MAILFLOW.",
+          description: "Импортирован из резервного файла Поток.",
           category: "Business",
           subject: typeof documentRecord.subject === "string" ? documentRecord.subject : "Новое письмо",
           previewText: typeof documentRecord.previewText === "string" ? documentRecord.previewText : "",
@@ -397,7 +397,7 @@ export function TemplatesView() {
             <div className="overflow-hidden rounded-[18px] border border-[#28231F] bg-[#211D1A] p-5 text-[#F8F2E8] shadow-[0_18px_46px_rgba(35,28,23,0.12)] sm:p-6">
               <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(340px,.8fr)] lg:items-end">
                 <div>
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#C7FF65]">MAILFLOW DESIGN STUDIO / 01</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#C7FF65]">СТУДИЯ ДИЗАЙНА «ПОТОК» / 01</span>
                   <h2 className="mb-0 mt-3 max-w-3xl text-balance text-[28px] font-semibold leading-[1.04] tracking-[-0.04em] sm:text-[38px]">Не шаблоны по палитрам, а разные арт-направления</h2>
                 </div>
                 <p className="m-0 max-w-xl text-[12px] leading-6 text-[#C9C0B7]">Больше 150 студийных макетов: Swiss Grid, Memphis, Bauhaus, cinema noir, botanical, neo‑Tokyo, postal, gallery, ceramic, festival и другие. Они различаются композицией, ритмом и задачей, а не только цветом.</p>

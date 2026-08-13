@@ -88,7 +88,7 @@ export function LandingPage() {
 
       <footer className="border-t border-border bg-surface-subtle/55">
         <div className="container-shell grid gap-10 py-12 sm:grid-cols-[1.5fr_repeat(3,1fr)]">
-          <div><Link href="/" className="flex items-center gap-2.5"><span className="grid size-8 place-items-center rounded-[9px] bg-primary text-[13px] font-semibold text-white">M</span><span className="text-[14px] font-semibold tracking-[.12em]">{BRAND_NAME}</span></Link><p className="mt-4 max-w-xs text-[12px] leading-5 text-text-muted">Единое пространство для контактов, кампаний и всех диалогов между ними.</p></div>
+          <div><Link href="/" className="flex items-center gap-2.5"><span className="grid size-8 place-items-center rounded-[9px] bg-primary text-[13px] font-semibold text-white">П</span><span className="text-[14px] font-semibold tracking-[.12em]">{BRAND_NAME}</span></Link><p className="mt-4 max-w-xs text-[12px] leading-5 text-text-muted">Единое пространство для контактов, кампаний и всех диалогов между ними.</p></div>
           {footerGroups.map(group=><div key={group.title}><p className="text-[11px] font-semibold text-[#393a46]">{group.title}</p><div className="mt-4 space-y-3">{group.links.map(([label,href])=><Link key={label} href={href} className="block text-[12px] text-[#858793] hover:text-[#4d4f5c]">{label}</Link>)}</div></div>)}
         </div>
         <div className="container-shell flex flex-col gap-3 border-t border-[#e9eaf0] py-5 text-[10px] text-[#9698a5] sm:flex-row sm:items-center sm:justify-between"><span>© 2026 {BRAND_NAME}.</span><span>Контакты, согласия и кампании — в одном рабочем пространстве.</span></div>

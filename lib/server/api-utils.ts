@@ -33,11 +33,11 @@ export function jsonError(error: unknown): Response {
     message.includes("no such table") ||
     message.includes("database");
 
-  console.error("MAILFLOW API error", error);
+  console.error("Поток API error", error);
   return Response.json(
     {
       error: isDatabaseUnavailable
-        ? "Хранилище MAILFLOW временно недоступно. Повторите попытку позже."
+        ? "Хранилище Поток временно недоступно. Повторите попытку позже."
         : "Не удалось выполнить операцию. Повторите попытку позже.",
     },
     { status: 500 },

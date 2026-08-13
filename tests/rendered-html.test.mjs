@@ -20,13 +20,13 @@ async function render(pathname = "/") {
   );
 }
 
-test("server-renders the finished MAILFLOW landing page", async () => {
+test("server-renders the finished «Поток» landing page", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /MAILFLOW/);
+  assert.match(html, /Поток/);
   assert.match(html, /Красивые письма/);
   assert.match(html, /Без дизайнера и кода/);
   assert.match(html, /Создать первое письмо/);

@@ -108,7 +108,7 @@ const studioSpecs: StudioTemplateSpec[] = [
     frameRadius: 10,
     thumbnailVariant: "bold",
     blocks: [
-      logo("terminal", "MAILFLOW://STUDIO", "#B6F33D", "#10141B"),
+      logo("terminal", "ПОТОК://СТУДИЯ", "#B6F33D", "#10141B"),
       { id: "terminal-pattern", type: "pattern", content: "> INIT CREATIVE_WORKFLOW\n[████████████████] 100%", alignment: "left", backgroundColor: "#080A0E", textColor: "#66E3FF", fontFamily: "Verdana", fontSize: 14, letterSpacing: 1, borderRadius: 8 },
       { id: "terminal-hero", type: "hero", content: "DESIGN SYSTEM\nIS NOW LIVE_|Конструктор, библиотека и экспорт работают как один процесс.", alignment: "left", backgroundColor: "#10141B", textColor: "#F7F9FC", fontFamily: "Verdana", fontSize: 43, lineHeight: 105, borderColor: "#263040", borderWidth: 1, borderRadius: 12 },
       { id: "terminal-stats", type: "stats", content: "150+|готовых систем|1 клик|до чистого HTML", alignment: "center", backgroundColor: "#171D26", textColor: "#EAF0F7", borderRadius: 10 },
@@ -306,7 +306,7 @@ const studioSpecs: StudioTemplateSpec[] = [
     frameRadius: 0,
     thumbnailVariant: "bold",
     blocks: [
-      logo("kinetic", "MAILFLOW® / DIRECT", "#171717", "#EDEDED"),
+      logo("kinetic", "ПОТОК® / DIRECT", "#171717", "#EDEDED"),
       { id: "kinetic-pattern", type: "pattern", content: "IDEA → PROTOTYPE → PROOF → SCALE →", alignment: "left", backgroundColor: "#171717", textColor: "#A8FF35", fontSize: 15, letterSpacing: 3, borderRadius: 0 },
       { id: "kinetic-hero", type: "hero", content: "НЕ СЛАЙДЫ.\nРАБОЧИЙ\nПРОТОТИП.|За семь дней на одном реальном процессе вашей команды.", alignment: "left", backgroundColor: "#A8FF35", textColor: "#171717", fontSize: 55, fontWeight: 700, lineHeight: 90, borderRadius: 0, paddingTop: 32, paddingBottom: 32 },
       { id: "kinetic-text", type: "text", content: "{{first_name}}, вместо общей демонстрации предлагаем выбрать один сценарий {{company}} и собрать для него измеримый прототип.", alignment: "left", textColor: "#171717", fontSize: 18, lineHeight: 155, paddingTop: 26, paddingBottom: 20 },

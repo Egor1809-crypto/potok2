@@ -52,7 +52,7 @@ function safeImageUrl(value: unknown, assetId?: string) {
   const resolvedId = assetId ?? assetIdFromImageUrl(value);
   if (resolvedId) return `/api/assets/${encodeURIComponent(resolvedId)}`;
   if (value === undefined || value === "") return undefined;
-  throw new ApiRequestError("Для слайда можно выбрать только изображение из общей медиатеки MAILFLOW.");
+  throw new ApiRequestError("Для слайда можно выбрать только изображение из общей медиатеки Поток.");
 }
 
 function parseBullets(value: unknown, index: number): string[] {
@@ -131,7 +131,7 @@ function slidesFromEmailTemplate(row: typeof emailTemplates.$inferSelect): Prese
   const slides: PresentationSlide[] = [{
     id: newId("slide"),
     layout: "title",
-    eyebrow: "ИЗ ПИСЬМА MAILFLOW",
+    eyebrow: "ИЗ ПИСЬМА Поток",
     title: row.subject || row.name,
     body: row.previewText || row.description,
     bullets: [],

@@ -1,14 +1,14 @@
 /** Product identity and safe fallbacks shown before the workspace API loads. */
 export const brandConfig = {
-  name: "MAILFLOW",
-  legalName: "MAILFLOW",
+  name: "Поток",
+  legalName: "Поток",
   tagline: "Студия красивых писем и управляемой доставки.",
   description:
     "Создавайте красивые персональные письма, управляйте контактами и передавайте готовые кампании проверенным провайдерам.",
   shortDescription: "Дизайн писем, аудитории и доставка в одном пространстве.",
   accentColor: "#635BFF",
   secondaryAccentColor: "#34B6E4",
-  logoMark: "M",
+  logoMark: "П",
   website: "https://tech-pravo.ru/",
   supportEmail: "info@tech-pravo.ru",
   social: {

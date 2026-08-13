@@ -555,7 +555,7 @@ export function IntegrationsView() {
               <h2 className="text-[14px] font-semibold text-text-strong">Нативные «Рассылки» VK WorkSpace</h2>
               <p className="mt-1 text-[12px] leading-5 text-text-muted">
                 Создайте кампанию, выберите аудиторию и пройдите проверку. Только после этого
-                MAILFLOW сформирует CSV именно для зафиксированных получателей. Письмо и запуск завершаются в VK WorkSpace вручную.
+                Поток сформирует CSV именно для зафиксированных получателей. Письмо и запуск завершаются в VK WorkSpace вручную.
               </p>
             </div>
           </div>

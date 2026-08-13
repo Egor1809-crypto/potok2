@@ -255,7 +255,7 @@ function AccountSection({ form, participant, update }: { form: WorkspaceForm; pa
           <span className="badge badge-accent">Участник · полный доступ</span>
         </div>
         <p className="mt-4 text-[12px] leading-5 text-[var(--text-muted)]">
-          Это единственный аккаунт продукта. Вход защищает платформа, а внутри MAILFLOW нет ролей и приглашений.
+          Это единственный аккаунт продукта. Вход защищает платформа, а внутри Поток нет ролей и приглашений.
         </p>
       </div>
 
@@ -303,7 +303,7 @@ function SendingSection({ form, update }: { form: WorkspaceForm; update: UpdateF
 function DataSection({ participantEmail, onExport }: { participantEmail: string; onExport: () => void }) {
   return (
     <div className="space-y-6">
-      <SettingRow Icon={KeyRound} title="Вход в аккаунт" copy={`Доступ подтверждает защищённая учётная запись ${participantEmail}. Пароли внутри MAILFLOW не хранятся.`}>
+      <SettingRow Icon={KeyRound} title="Вход в аккаунт" copy={`Доступ подтверждает защищённая учётная запись ${participantEmail}. Пароли внутри Поток не хранятся.`}>
         <span className="badge badge-success">Защищён</span>
       </SettingRow>
       <SettingRow Icon={Download} title="Экспорт данных" copy="Скачать снимок контактов, сегментов, email-шаблонов, кампаний и настроек в формате JSON.">

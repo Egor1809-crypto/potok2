@@ -272,7 +272,7 @@ const initialContent: Record<EmailBlockType, Pick<EmailBlock, "content" | "label
     href: "https://mailflow.example",
   },
   signature: {
-    content: "Егор Сабалин|Основатель MAILFLOW|egor@example.ru",
+    content: "Егор Сабалин|Основатель Поток|egor@example.ru",
     label: undefined,
     href: undefined,
   },
