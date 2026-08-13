@@ -299,3 +299,37 @@ test("NavyAI uses its supported chat endpoint and a working structured-output fa
   assert.match(server, /response_format/);
   assert.match(server, /\(\?:responses\|chat\\\/completions\)/);
 });
+
+test("decor library now contains sixty-four motifs and twenty-eight email frames", async () => {
+  const [patterns, frames, compiler, builder, library] = await Promise.all([
+    readFile(new URL("../components/email-builder/pattern-presets.ts", import.meta.url), "utf8"),
+    readFile(new URL("../components/email-builder/frame-presets.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/server/email-document.ts", import.meta.url), "utf8"),
+    readFile(new URL("../components/email-builder/EmailBuilderView.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/email-builder/BlockLibrary.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.equal((patterns.match(/\{ id: "/g) ?? []).length, 64);
+  assert.equal((frames.match(/\{ id: "/g) ?? []).length, 28);
+  for (const category of ["Ботанические", "Ретро и печать", "Цифровые", "Праздничные"]) assert.match(patterns, new RegExp(category));
+  for (const name of ["Вьюнок", "Почтовые марки", "Микросхема", "Фейерверк", "Билет", "Окно", "Архив", "Премиальная", "Открытка"]) {
+    assert.match(`${patterns}\n${frames}`, new RegExp(name));
+  }
+  for (const id of ["ticket", "window", "railway", "archive", "corner-cut", "luxury", "blueprint", "postcard", "focus"]) {
+    assert.match(compiler, new RegExp(`"${id}"`));
+    assert.match(builder, new RegExp(`"${id}"`));
+  }
+  assert.match(library, /64 орнамента и контура/);
+});
+
+test("creative expansion adds seventy more scenario-led studio templates", async () => {
+  const [creative, database] = await Promise.all([
+    readFile(new URL("../data/creative-template-library.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/server/database-init.ts", import.meta.url), "utf8"),
+  ]);
+  for (const direction of ["Atelier Rouge", "Circuit Lab", "Air Mail", "Festival Pop", "Gallery Note", "Alpine Signal", "Receipt Club", "Lunar Orbit", "Ceramic Blue", "Newsflash"]) {
+    assert.match(creative, new RegExp(direction));
+  }
+  assert.match(creative, /id: "research-brief"/);
+  assert.match(creative, /id: "award-note"/);
+  assert.match(database, /email-template-library-v9-creative-expansion/);
+});

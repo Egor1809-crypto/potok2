@@ -400,7 +400,7 @@ export function TemplatesView() {
                   <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#C7FF65]">MAILFLOW DESIGN STUDIO / 01</span>
                   <h2 className="mb-0 mt-3 max-w-3xl text-balance text-[28px] font-semibold leading-[1.04] tracking-[-0.04em] sm:text-[38px]">Не шаблоны по палитрам, а разные арт-направления</h2>
                 </div>
-                <p className="m-0 max-w-xl text-[12px] leading-6 text-[#C9C0B7]">63 арт-направления и сценария: Swiss Grid, Memphis, Bauhaus, cinema noir, botanical, neo‑Tokyo, paper-cut, Nordic, ledger, holographic и другие. Макеты различаются композицией, ритмом и задачей, а не только цветом.</p>
+                <p className="m-0 max-w-xl text-[12px] leading-6 text-[#C9C0B7]">Больше 150 студийных макетов: Swiss Grid, Memphis, Bauhaus, cinema noir, botanical, neo‑Tokyo, postal, gallery, ceramic, festival и другие. Они различаются композицией, ритмом и задачей, а не только цветом.</p>
               </div>
             </div>
           ) : null}

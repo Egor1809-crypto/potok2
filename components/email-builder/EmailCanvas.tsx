@@ -94,7 +94,7 @@ export function EmailCanvas({
           </div>
 
           <div
-            className="overflow-visible rounded-[3px] border border-black/5 shadow-[0_18px_50px_rgba(28,32,44,0.12)]"
+            className="overflow-hidden shadow-[0_18px_50px_rgba(28,32,44,0.12)]"
             style={{ backgroundColor: document.bodyBackground, ...emailFrameCss(document.frameStyle, document.frameColor, document.frameRadius) }}
           >
             {document.blocks.length === 0 ? (
@@ -536,7 +536,7 @@ function BlockContent({
   }
 
   if (block.type === "pattern") {
-    return <div aria-hidden="true" className="whitespace-pre-line rounded-xl py-3 text-center font-semibold" style={{ backgroundColor: block.backgroundColor === "transparent" ? `${accentColor}12` : block.backgroundColor, borderRadius: block.borderRadius, color: block.textColor, fontFamily: block.fontFamily, fontSize: block.fontSize, letterSpacing: block.letterSpacing, lineHeight: block.lineHeight / 100 }}>{block.content}</div>;
+    return <div aria-hidden="true" className="whitespace-pre-line py-2.5 text-center font-normal" style={{ backgroundColor: block.backgroundColor === "transparent" ? `${accentColor}12` : block.backgroundColor, borderRadius: block.borderRadius, color: block.textColor, fontFamily: block.fontFamily, fontSize: block.fontSize, letterSpacing: block.letterSpacing, lineHeight: block.lineHeight / 100 }}>{block.content}</div>;
   }
 
   if (block.type === "banner") {

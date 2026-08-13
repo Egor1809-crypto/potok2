@@ -595,6 +595,18 @@ async function seedDatabase(request: Request) {
     await db.insert(systemState).values({ key: "email-template-library-v8-creative", value: "seeded", updatedAt: now }).onConflictDoUpdate({ target: systemState.key, set: { value: "seeded", updatedAt: now } });
   }
 
+  const [creativeExpansionState] = await db
+    .select({ key: systemState.key })
+    .from(systemState)
+    .where(eq(systemState.key, "email-template-library-v9-creative-expansion"))
+    .limit(1);
+  if (!creativeExpansionState) {
+    for (const template of starterEmailTemplateValues().filter((item) => item.id.startsWith("template-v8-creative-"))) {
+      await db.insert(emailTemplates).values({ ...template, workspaceId: WORKSPACE_ID }).onConflictDoNothing();
+    }
+    await db.insert(systemState).values({ key: "email-template-library-v9-creative-expansion", value: "seeded", updatedAt: now }).onConflictDoUpdate({ target: systemState.key, set: { value: "seeded", updatedAt: now } });
+  }
+
   const [templateHeadersState] = await db
     .select({ key: systemState.key })
     .from(systemState)

@@ -179,7 +179,7 @@ function isBuilderDocument(value: unknown): value is BuilderDocument {
     typeof value.bodyBackground === "string" &&
     typeof value.workspaceBackground === "string" &&
     isFiniteNumber(value.contentWidth) &&
-    (value.frameStyle === undefined || ["none", "hairline", "accent", "double", "dashed", "top-bottom", "left-band", "soft", "capsule", "stamp", "offset", "inset", "top-accent", "bottom-accent", "right-band", "editorial"].includes(String(value.frameStyle))) &&
+    (value.frameStyle === undefined || ["none", "hairline", "accent", "double", "dashed", "top-bottom", "left-band", "soft", "capsule", "stamp", "offset", "inset", "top-accent", "bottom-accent", "right-band", "editorial", "ticket", "window", "railway", "archive", "corner-cut", "top-ribbon", "side-lines", "luxury", "blueprint", "poster", "postcard", "focus"].includes(String(value.frameStyle))) &&
     (value.frameColor === undefined || typeof value.frameColor === "string") &&
     (value.frameRadius === undefined || isFiniteNumber(value.frameRadius)) &&
     Array.isArray(value.blocks) &&

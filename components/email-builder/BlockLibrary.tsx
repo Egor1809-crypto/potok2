@@ -66,7 +66,7 @@ export const blockLibrary: BlockLibraryItem[] = [
   { type: "stats", label: "Показатели", description: "Цифры и результаты", icon: ChartNoAxesColumnIncreasing },
   { type: "product", label: "Карточка", description: "Продукт или услуга", icon: PackageOpen },
   { type: "signature", label: "Подпись", description: "Отправитель и контакты", icon: ContactRound },
-  { type: "pattern", label: "Узор", description: "32 орнамента и контура", icon: Shapes },
+  { type: "pattern", label: "Узор", description: "64 орнамента и контура", icon: Shapes },
   { type: "banner", label: "Баннер", description: "Яркое объявление", icon: Megaphone },
   { type: "timeline", label: "Этапы", description: "Путь или программа", icon: ListTree },
   { type: "faq", label: "Вопросы", description: "Вопросы и ответы", icon: CircleHelp },
