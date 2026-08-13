@@ -75,6 +75,7 @@ export function buildImageGenerationPrompt(input: ImageStudioGenerateRequest) {
     input.prompt,
     styleDirections[input.style],
     bannerDirection,
+    input.aspect === "portrait" ? "Если изображение предназначено для фона, сохрани спокойную периферию и достаточное негативное пространство для текста поверх." : "",
     "Создай законченное оригинальное изображение без водяных знаков, UI-мокапа и нечитаемого псевдотекста. Не добавляй логотип, если он не описан в задаче.",
   ].join("\n\n");
 }

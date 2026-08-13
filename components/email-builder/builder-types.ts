@@ -36,6 +36,7 @@ export type BuilderDocument = {
   previewText: string;
   accentColor: string;
   bodyBackground: string;
+  backgroundImageUrl?: string;
   workspaceBackground: string;
   contentWidth: number;
   frameStyle: EmailFrameStyle;
@@ -319,6 +320,7 @@ export function documentFromTemplate(template: EmailTemplate): BuilderDocument {
     previewText: template.previewText,
     accentColor: template.accentColor,
     bodyBackground: "#ffffff",
+    backgroundImageUrl: undefined,
     workspaceBackground: template.backgroundColor,
     contentWidth: 640,
     frameStyle: "none",
@@ -347,6 +349,7 @@ export function createBlankDocument(): BuilderDocument {
     previewText: "",
     accentColor: "#6558e8",
     bodyBackground: "#ffffff",
+    backgroundImageUrl: undefined,
     workspaceBackground: "#f3f4f8",
     contentWidth: 640,
     frameStyle: "none",

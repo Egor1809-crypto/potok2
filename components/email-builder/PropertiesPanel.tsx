@@ -417,6 +417,16 @@ export function PropertiesPanel({
               value={document.bodyBackground}
               onChange={(bodyBackground) => onUpdateDocument({ bodyBackground })}
             />
+            <FormField label="Фоновое изображение" hint="Располагается под блоками. Для читаемости выбирайте спокойный фон без текста.">
+              <ImageAssetPicker
+                kind="photo"
+                value={document.backgroundImageUrl}
+                destinationLabel="фоне письма"
+                onSelect={(backgroundImageUrl) => onUpdateDocument({ backgroundImageUrl })}
+              />
+              <p className="text-xs leading-5 text-[var(--muted)]">Текстовые блоки с прозрачным фоном будут располагаться поверх изображения. Если почтовый клиент не загрузит картинку, останется выбранный цвет фона.</p>
+              {document.backgroundImageUrl ? <Button type="button" variant="ghost" size="sm" onClick={() => onUpdateDocument({ backgroundImageUrl: undefined })}>Убрать фоновое изображение</Button> : null}
+            </FormField>
             <ColorField label="Внешний фон" value={document.workspaceBackground} onChange={(workspaceBackground) => onUpdateDocument({ workspaceBackground })} />
             <FormField label="Ширина письма" htmlFor="builder-content-width">
               <div className="flex items-center gap-2">

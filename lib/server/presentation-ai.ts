@@ -61,7 +61,7 @@ function provider() {
   } : null;
 }
 
-function parseRequest(value: unknown): Required<Pick<PresentationAiRequest, "goal" | "slideCount" | "themeId">> & Pick<PresentationAiRequest, "audience"> {
+function parseRequest(value: unknown): Required<Pick<PresentationAiRequest, "goal" | "slideCount" | "themeId" | "tone">> & Pick<PresentationAiRequest, "audience" | "context" | "desiredAction"> {
   const object = asObject(value);
   const goal = cleanText(object.goal, "Задача презентации", 4_000);
   if (goal.length < 12) throw new ApiRequestError("Опишите задачу презентации хотя бы одним предложением.");
@@ -70,6 +70,9 @@ function parseRequest(value: unknown): Required<Pick<PresentationAiRequest, "goa
   return {
     goal,
     audience: optionalText(object.audience, "Аудитория", 800),
+    context: optionalText(object.context, "Исходные данные", 2_000),
+    desiredAction: optionalText(object.desiredAction, "Желаемое действие", 500),
+    tone: object.tone === "persuasive" || object.tone === "educational" || object.tone === "visual" ? object.tone : "executive",
     slideCount: optionalInteger(object.slideCount, "Количество слайдов", 3, 20) ?? 7,
     themeId: rawTheme as PresentationThemeId,
   };
@@ -376,11 +379,13 @@ function responseSchema(slideCount: number) {
 function safeFallbackOutline(input: ReturnType<typeof parseRequest>) {
   const summary = input.goal.split(/[.!?\n]/)[0]?.trim().slice(0, 120).trim() || "Новая презентация";
   const audience = input.audience || "целевая аудитория";
+  const facts = input.context?.trim() || "Подтверждённые данные не указаны; этот слайд нужно дополнить фактами перед показом.";
+  const action = input.desiredAction?.trim() || "Согласовать следующий шаг";
   const middle: Array<Pick<PresentationSlide, "layout" | "eyebrow" | "title" | "body" | "bullets">> = [
-    { layout: "statement", eyebrow: "КОНТЕКСТ", title: "Задача требует ясного решения, а не длинного перечня функций", body: input.goal.slice(0, 700), bullets: [] },
-    { layout: "split", eyebrow: "ВОПРОС", title: "Сначала нужно проверить исходную гипотезу", body: "Отделите предположение от подтверждённого результата.", bullets: ["Зафиксировать исходный процесс", "Определить наблюдаемый результат", "Не подменять проверку обещанием"] },
-    { layout: "bullets", eyebrow: "АУДИТОРИЯ", title: "Аудитории важна проверяемая ценность", body: `Фокус: ${audience}. Свяжите предложение с реальной рабочей ситуацией этой аудитории.`, bullets: ["Какую задачу решаем", "Что должно стать понятнее или проще", "По какому сигналу принимаем решение"] },
-    { layout: "statement", eyebrow: "ГИПОТЕЗА", title: "Единый подход имеет смысл только при подтверждённом эффекте", body: "Черновик не утверждает результат заранее — он формулирует то, что предстоит проверить.", bullets: [] },
+    { layout: "statement", eyebrow: "ЗАДАЧА", title: "Презентация должна привести аудиторию к одному понятному решению", body: input.goal.slice(0, 700), bullets: [] },
+    { layout: "split", eyebrow: "КОНТЕКСТ", title: "Исходная ситуация задаёт границы сильного предложения", body: facts, bullets: ["Что уже известно", "Что остаётся гипотезой", "Что нужно проверить"] },
+    { layout: "bullets", eyebrow: "АУДИТОРИЯ", title: `${audience} оценивает не набор функций, а полезность в своей работе`, body: "Свяжите предложение с реальным рабочим сценарием и критерием выбора.", bullets: ["Текущая задача аудитории", "Предлагаемое изменение", "Наблюдаемый результат"] },
+    { layout: "statement", eyebrow: "ЦЕННОСТЬ", title: "Сильное предложение объясняет изменение простым рабочим сценарием", body: "Покажите путь от текущей ситуации к результату — без неподтверждённых обещаний.", bullets: [] },
     { layout: "split", eyebrow: "ПИЛОТ", title: "Ограниченный пилот снижает стоимость ошибки", body: "Начните с одного понятного сценария.", bullets: ["Один процесс", "Ограниченная группа", "Заранее выбранный критерий"] },
     { layout: "bullets", eyebrow: "ПРОВЕРКА", title: "Критерии решения нужно согласовать до старта", body: "Так результат можно обсуждать предметно.", bullets: ["Что наблюдаем", "Когда подводим итог", "Кто принимает решение о продолжении"] },
     { layout: "statement", eyebrow: "РИСК", title: "Главный риск — принять удобный процесс за полезный", body: "Оцените не только удобство, но и качество результата для рабочей задачи.", bullets: [] },
@@ -391,13 +396,13 @@ function safeFallbackOutline(input: ReturnType<typeof parseRequest>) {
   const middleCount = Math.max(1, input.slideCount - 2);
   const selected = Array.from({ length: middleCount }, (_, index) => middle[index % middle.length]);
   const slides: PresentationSlide[] = [
-    { id: newId("slide"), layout: "title", eyebrow: "РАБОЧИЙ ЧЕРНОВИК", title: summary, body: input.audience ? `Для: ${input.audience}` : "Структура для обсуждения и проверки", bullets: [], speakerNotes: "" },
+    { id: newId("slide"), layout: "title", eyebrow: "ПРЕЗЕНТАЦИЯ", title: summary, body: input.audience ? `Для: ${input.audience}` : "Структура для обсуждения и решения", bullets: [], speakerNotes: "" },
     ...selected.map((slide) => ({ ...slide, id: newId("slide"), speakerNotes: "", bullets: [...slide.bullets] })),
-    { id: newId("slide"), layout: "closing", eyebrow: "СЛЕДУЮЩИЙ ШАГ", title: "Согласовать рамки пилота", body: "Определите сценарий, участников и критерий решения.", bullets: [], speakerNotes: "" },
+    { id: newId("slide"), layout: "closing", eyebrow: "СЛЕДУЮЩИЙ ШАГ", title: action, body: "Зафиксируйте формат, участников и критерий следующего решения.", bullets: [], speakerNotes: "" },
   ];
   return {
     name: summary,
-    description: "Безопасный структурный черновик: ИИ-ответ был восстановлен без выдуманных фактов.",
+    description: "Связная редактируемая структура без выдуманных фактов.",
     slides,
   };
 }
@@ -417,10 +422,13 @@ export async function generatePresentationOutline(request: Request, value: unkno
   if (reservation.replayed) return reservation.replayed;
   try {
     const theme = presentationTheme(input.themeId);
-    const instructions = `Ты — редактор и арт-директор деловых презентаций на русском языке. Создай связную презентацию строго по задаче пользователя. Работа презентации: к последнему слайду указанная аудитория должна понять вывод и совершить понятное действие. Построй накопительный сюжет, а не список разделов: контекст → напряжение или вопрос → аргументы и доказательства → вывод → действие. Каждый слайд выполняет одну смысловую работу и имеет заголовок-вывод, который можно произнести вслух. Первый слайд минимальный, последний закрывает исходный вопрос конкретным следующим шагом. Не выдумывай факты, цифры, отзывы, клиентов, даты, источники или результаты. Не превращай предположение пользователя в установленный факт: если доказательства не даны, называй это гипотезой, возможностью или тем, что нужно проверить. Запрещены неподтверждённые фразы вроде «команда ежедневно тратит часы», «значительно сокращает», «напрямую влияет» и любые количественные или причинные выводы без данных в userGoal. Не вставляй производственные заметки в видимый текст. Не делай agenda-слайд. Не повторяй одинаковую композицию подряд. Используй quote только для реальной цитаты из запроса; иначе не используй. Для stats допускаются только факты из запроса, иначе выбери другой layout. Тексты должны помещаться: title до 90 знаков по возможности, body до 420 знаков, не более 5 коротких bullets. speakerNotes содержит только полезные заметки выступающему; если фактов и внешних источников нет, оставь пустым. Верни ровно ${input.slideCount} слайдов и только валидный JSON.`;
+    const instructions = `Ты — старший редактор и арт-директор деловых презентаций на русском языке. Создай связную презентацию строго по задаче пользователя. Работа презентации: к последнему слайду указанная аудитория должна понять вывод и совершить понятное действие. Построй накопительный сюжет, а не список разделов: сильный вход → контекст → напряжение или вопрос → аргументы и доказательства → вывод → действие. Каждый слайд выполняет одну смысловую работу и имеет заголовок-вывод, который можно произнести вслух. Первый слайд минимальный, последний закрывает исходный вопрос конкретным следующим шагом. Учитывай presentationTone: executive — предельно ясно и по делу; persuasive — через проблему, ценность и доказательство; educational — через понятия, пример и применение; visual — минимум текста и больше выразительных statement/split-композиций. Не выдумывай факты, цифры, отзывы, клиентов, даты, источники или результаты. Не превращай предположение пользователя в установленный факт. Используй только factualContext и userGoal; если доказательства не даны, называй это гипотезой или тем, что нужно проверить. Не вставляй производственные заметки в видимый текст. Не делай agenda-слайд. Не повторяй одинаковую композицию подряд. Используй quote только для реальной цитаты из запроса; stats — только для данных из запроса. Тексты должны помещаться: title до 90 знаков, body до 360 знаков, не более 5 коротких bullets. speakerNotes может содержать подсказку выступающему или пометку, какие данные нужно добавить. Верни ровно ${input.slideCount} слайдов и только валидный JSON.`;
     const modelInput = {
       userGoal: input.goal,
       audience: input.audience || "Аудитория указана в задаче пользователя",
+      factualContext: input.context || "Дополнительные факты не предоставлены — не выдумывать их",
+      desiredAudienceAction: input.desiredAction || "Сформулировать уместный следующий шаг из задачи пользователя",
+      presentationTone: input.tone,
       slideCount: input.slideCount,
       selectedTheme: input.themeId,
     };
@@ -431,14 +439,14 @@ export async function generatePresentationOutline(request: Request, value: unkno
       body: JSON.stringify(selected.provider === "navyai" ? {
         model: selected.model,
         messages: [{ role: "system", content: instructions }, { role: "user", content: JSON.stringify(modelInput) }],
-        max_tokens: 5_000,
+        max_tokens: input.slideCount > 12 ? 4_500 : 3_500,
         response_format: { type: "json_object" },
       } : {
         model: selected.model,
         store: false,
         safety_identifier: await safetyIdentifier(request),
         reasoning: { effort: "low" },
-        max_output_tokens: 5_000,
+        max_output_tokens: input.slideCount > 12 ? 4_500 : 3_500,
         instructions,
         input: JSON.stringify(modelInput),
         text: { format: { type: "json_schema", name: "presentation_outline", strict: true, schema } },
@@ -447,7 +455,7 @@ export async function generatePresentationOutline(request: Request, value: unkno
     let { response, body: responseBody } = await callPresentationProvider(selected.endpoint, requestBody);
     if (
       !response.ok
-      && [400, 404, 422].includes(response.status)
+      && response.status !== 429
       && selected.provider === "navyai"
       && selected.fallbackModel
       && selected.model !== selected.fallbackModel

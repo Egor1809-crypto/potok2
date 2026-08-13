@@ -177,6 +177,7 @@ function isBuilderDocument(value: unknown): value is BuilderDocument {
     typeof value.previewText === "string" &&
     typeof value.accentColor === "string" &&
     typeof value.bodyBackground === "string" &&
+    (value.backgroundImageUrl === undefined || typeof value.backgroundImageUrl === "string") &&
     typeof value.workspaceBackground === "string" &&
     isFiniteNumber(value.contentWidth) &&
     (value.frameStyle === undefined || ["none", "hairline", "accent", "double", "dashed", "top-bottom", "left-band", "soft", "capsule", "stamp", "offset", "inset", "top-accent", "bottom-accent", "right-band", "editorial", "ticket", "window", "railway", "archive", "corner-cut", "top-ribbon", "side-lines", "luxury", "blueprint", "poster", "postcard", "focus"].includes(String(value.frameStyle))) &&
@@ -237,13 +238,19 @@ function storageSnapshotFingerprint(snapshot: string) {
   return `${snapshot.length}-${hash >>> 0}`;
 }
 
-function createDocumentWithStudioAsset(assetId: string, assetName: string) {
+function createDocumentWithStudioAsset(assetId: string, assetName: string, asBackground: boolean) {
   const document = createBlankDocument();
   const image = createBlock("image");
   const assetUrl = new URL(
     `/api/assets/${encodeURIComponent(assetId)}`,
     window.location.origin,
   ).toString();
+  if (asBackground) {
+    return {
+      ...document,
+      backgroundImageUrl: assetUrl,
+    };
+  }
   return {
     ...document,
     blocks: [{
@@ -268,6 +275,7 @@ export function EmailBuilderView(props: EmailBuilderViewProps) {
     ? query.get("asset") ?? ""
     : "";
   const importedAssetName = (query.get("assetName") ?? "").trim().slice(0, 180);
+  const importedAssetAsBackground = query.get("assetMode") === "background";
   const requestedTemplateId = createNew
     ? undefined
     : props.templateId ?? query.get("template") ?? undefined;
@@ -385,7 +393,7 @@ export function EmailBuilderView(props: EmailBuilderViewProps) {
 
   const baseDocument = createNew
     ? importedAssetId
-      ? createDocumentWithStudioAsset(importedAssetId, importedAssetName)
+      ? createDocumentWithStudioAsset(importedAssetId, importedAssetName, importedAssetAsBackground)
       : createBlankDocument()
     : restoredDocument ??
     (campaignMode && restoredState.emailBodyText
@@ -417,7 +425,7 @@ export function EmailBuilderView(props: EmailBuilderViewProps) {
   return (
     <ToastProvider>
       <EmailBuilderWorkspace
-        key={`${createNew ? importedAssetId || "blank" : resolvedTemplateId ?? "new"}:${resolvedCampaignName}:${resolvedContinueHref}:${campaignMode ? storageSnapshotFingerprint(browserDraftSnapshot) : "server"}`}
+        key={`${createNew ? `${importedAssetId || "blank"}:${importedAssetAsBackground ? "background" : "block"}` : resolvedTemplateId ?? "new"}:${resolvedCampaignName}:${resolvedContinueHref}:${campaignMode ? storageSnapshotFingerprint(browserDraftSnapshot) : "server"}`}
         templateId={resolvedTemplateId}
         campaignName={resolvedCampaignName}
         continueHref={resolvedContinueHref}

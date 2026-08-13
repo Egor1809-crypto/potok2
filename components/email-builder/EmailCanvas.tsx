@@ -95,7 +95,14 @@ export function EmailCanvas({
 
           <div
             className="overflow-hidden shadow-[0_18px_50px_rgba(28,32,44,0.12)]"
-            style={{ backgroundColor: document.bodyBackground, ...emailFrameCss(document.frameStyle, document.frameColor, document.frameRadius) }}
+            style={{
+              backgroundColor: document.bodyBackground,
+              backgroundImage: document.backgroundImageUrl ? `url(${JSON.stringify(document.backgroundImageUrl)})` : undefined,
+              backgroundPosition: "center top",
+              backgroundRepeat: "repeat",
+              backgroundSize: "cover",
+              ...emailFrameCss(document.frameStyle, document.frameColor, document.frameRadius),
+            }}
           >
             {document.blocks.length === 0 ? (
               <div className="grid min-h-[420px] place-items-center px-8 py-14 text-center">

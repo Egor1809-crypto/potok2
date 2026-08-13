@@ -41,6 +41,32 @@ test("presentation studio exposes real creation, editing and save flows", async 
   assert.match(view, /destinationLabel="презентации"/);
 });
 
+test("presentation library offers varied scenarios and practical filters", async () => {
+  const [templates, view] = await Promise.all([
+    readFile(new URL("../data/presentation-templates.ts", import.meta.url), "utf8"),
+    readFile(new URL("../components/presentations/PresentationStudio.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.ok((templates.match(/presentation-template-/g) ?? []).length >= 12);
+  assert.match(view, /filteredPresentationTemplates/);
+  assert.match(view, /Найти шаблон/);
+  assert.match(view, /Все задачи/);
+  assert.match(view, /Действие после презентации/);
+  assert.match(view, /Факты и исходные данные/);
+});
+
+test("image studio can apply a generated asset as a real email background", async () => {
+  const [studio, builder, compiler] = await Promise.all([
+    readFile(new URL("../components/image-studio/ImageStudioView.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/email-builder/EmailBuilderView.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/server/email-document.ts", import.meta.url), "utf8"),
+  ]);
+  assert.match(studio, /Фон для письма/);
+  assert.match(studio, /assetMode=background/);
+  assert.match(builder, /backgroundImageUrl: assetUrl/);
+  assert.match(compiler, /background-image:url/);
+  assert.match(compiler, /background=/);
+});
+
 test("AI presentation outline follows a narrative and does not invent evidence", async () => {
   const [server, route, schema, database, view] = await Promise.all([
     readFile(new URL("../lib/server/presentation-ai.ts", import.meta.url), "utf8"),

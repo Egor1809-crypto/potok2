@@ -81,6 +81,7 @@ export function ImageStudioView() {
   const [style, setStyle] = useState<ImageStudioStyle>("editorial");
   const [aspect, setAspect] = useState<ImageStudioAspect>("landscape");
   const [quality, setQuality] = useState<"standard" | "high">("standard");
+  const [purpose, setPurpose] = useState<"illustration" | "email-background">("illustration");
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
@@ -135,7 +136,15 @@ export function ImageStudioView() {
           Accept: "application/json",
           "Idempotency-Key": crypto.randomUUID(),
         },
-        body: JSON.stringify({ prompt: prompt.trim(), title: title.trim(), style, aspect, quality }),
+        body: JSON.stringify({
+          prompt: purpose === "email-background"
+            ? `${prompt.trim()}\n\nЭто фон email-письма: спокойный низкий контраст, много свободного пространства для читаемого текста поверх, без текста, логотипов, центрального лица и мелких шумных деталей.`
+            : prompt.trim(),
+          title: title.trim(),
+          style,
+          aspect: purpose === "email-background" ? "portrait" : aspect,
+          quality,
+        }),
       });
       const body = await response.json() as ImageStudioGenerateResponse | ApiError;
       if (!response.ok || !("asset" in body)) {
@@ -182,7 +191,8 @@ export function ImageStudioView() {
               <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground"><WandSparkles aria-hidden="true" className="size-4.5" /></span>
             </div>
             <div className="grid gap-4">
-              <FormField label="Что нужно создать" htmlFor="image-studio-prompt" required hint={`${prompt.length}/1600 · укажите сюжет, палитру, настроение и ограничения`}>
+              <fieldset className="grid gap-2"><legend className="text-[12px] font-medium">Назначение</legend><div className="grid grid-cols-2 gap-2"><button type="button" aria-pressed={purpose === "illustration"} onClick={() => setPurpose("illustration")} className="rounded-xl border border-border p-3 text-left outline-none transition hover:border-primary/30 aria-pressed:border-primary aria-pressed:bg-primary-subtle/40"><strong className="block text-[11px]">Иллюстрация</strong><span className="mt-1 block text-[9px] leading-4 text-text-muted">Отдельное изображение или обложка</span></button><button type="button" aria-pressed={purpose === "email-background"} onClick={() => { setPurpose("email-background"); setAspect("portrait"); }} className="rounded-xl border border-border p-3 text-left outline-none transition hover:border-primary/30 aria-pressed:border-primary aria-pressed:bg-primary-subtle/40"><strong className="block text-[11px]">Фон для письма</strong><span className="mt-1 block text-[9px] leading-4 text-text-muted">Подложка под текст и блоки письма</span></button></div></fieldset>
+              <FormField label={purpose === "email-background" ? "Каким должен быть фон" : "Что нужно создать"} htmlFor="image-studio-prompt" required hint={`${prompt.length}/1600 · укажите сюжет, палитру, настроение и ограничения`}>
                 <Textarea id="image-studio-prompt" value={prompt} maxLength={1600} onChange={(event) => setPrompt(event.target.value)} rows={7} placeholder="Например: обложка для приглашения на деловой форум. Молочный фон, кобальтовая сетка, тонкие контуры и один алый круг. Без людей, текста и логотипов." className="min-h-40 resize-y text-[13px] leading-6" />
               </FormField>
               <div className="flex flex-wrap gap-2">
@@ -193,7 +203,7 @@ export function ImageStudioView() {
               </FormField>
               <fieldset className="grid gap-2.5"><legend className="mb-1 text-[12px] font-medium">Арт-направление</legend><div className="grid gap-2 sm:grid-cols-2">{styles.map((item) => <button key={item.id} type="button" aria-pressed={style === item.id} onClick={() => setStyle(item.id)} className="flex min-w-0 items-center gap-3 rounded-xl border border-border bg-surface px-3 py-2.5 text-left outline-none transition hover:border-primary/30 aria-pressed:border-primary aria-pressed:bg-primary-subtle/40 focus-visible:ring-2 focus-visible:ring-primary/25"><span className={cn("size-9 shrink-0 rounded-lg bg-gradient-to-br", item.swatch)} /><span className="min-w-0"><strong className="block text-[11px]">{item.name}</strong><span className="mt-0.5 block text-[9px] leading-3.5 text-text-subtle">{item.description}</span></span></button>)}</div></fieldset>
               <div className="grid gap-3 sm:grid-cols-2">
-                <FormField label="Формат" htmlFor="image-studio-aspect"><Select id="image-studio-aspect" value={aspect} onChange={(event) => setAspect(event.target.value as ImageStudioAspect)} options={Object.entries(aspectLabels).map(([value, label]) => ({ value, label }))} /></FormField>
+                <FormField label="Формат" htmlFor="image-studio-aspect" hint={purpose === "email-background" ? "Для фона письма используется вертикальный формат" : undefined}><Select id="image-studio-aspect" value={purpose === "email-background" ? "portrait" : aspect} disabled={purpose === "email-background"} onChange={(event) => setAspect(event.target.value as ImageStudioAspect)} options={Object.entries(aspectLabels).map(([value, label]) => ({ value, label }))} /></FormField>
                 <FormField label="Качество" htmlFor="image-studio-quality" hint={quality === "high" ? "Больше деталей, генерация дольше" : "Быстрее для черновых вариантов"}><Select id="image-studio-quality" value={quality} onChange={(event) => setQuality(event.target.value as "standard" | "high")} options={[{ value: "standard", label: "Стандартное" }, { value: "high", label: "Высокое" }]} /></FormField>
               </div>
               <div className="rounded-xl border border-dashed border-border bg-surface-subtle p-3.5">
@@ -208,7 +218,7 @@ export function ImageStudioView() {
           <Card className="min-w-0 overflow-hidden">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
               <div><h2 className="m-0 text-[15px] font-semibold">Результат</h2><p className="mb-0 mt-0.5 text-[10px] text-text-muted">Файл хранится в Поток, а не по временной ссылке провайдера.</p></div>
-              {selectedAsset ? <div className="flex flex-wrap gap-2"><a href={`${selectedAsset.url}?download=1`} className={buttonVariants({ variant: "outline", size: "sm" })}><Download aria-hidden="true" className="size-3.5" />Скачать</a><Link href={`/email-builder?new=1&asset=${encodeURIComponent(selectedAsset.id)}&assetName=${encodeURIComponent(selectedAsset.filename)}`} className={buttonVariants({ variant: "primary", size: "sm" })}>Использовать в письме<ArrowRight aria-hidden="true" className="size-3.5" /></Link><Link href={`/presentations?new=1&asset=${encodeURIComponent(selectedAsset.id)}`} className={buttonVariants({ variant: "outline", size: "sm" })}><Presentation aria-hidden="true" className="size-3.5" />Использовать в презентации</Link></div> : null}
+              {selectedAsset ? <div className="flex flex-wrap gap-2"><a href={`${selectedAsset.url}?download=1`} className={buttonVariants({ variant: "outline", size: "sm" })}><Download aria-hidden="true" className="size-3.5" />Скачать</a><Link href={`/email-builder?new=1&asset=${encodeURIComponent(selectedAsset.id)}&assetName=${encodeURIComponent(selectedAsset.filename)}${purpose === "email-background" ? "&assetMode=background" : ""}`} className={buttonVariants({ variant: "primary", size: "sm" })}>{purpose === "email-background" ? "Поставить фоном письма" : "Добавить в письмо"}<ArrowRight aria-hidden="true" className="size-3.5" /></Link><Link href={`/presentations?new=1&asset=${encodeURIComponent(selectedAsset.id)}`} className={buttonVariants({ variant: "outline", size: "sm" })}><Presentation aria-hidden="true" className="size-3.5" />Использовать в презентации</Link></div> : null}
             </div>
             <div className="grid min-h-[480px] place-items-center bg-[radial-gradient(circle_at_top,#f1eaff_0,transparent_42%),linear-gradient(135deg,#f7f4fa,#efe9e2)] p-5 sm:p-8">
               {selectedAsset ? <div className="grid max-h-[700px] max-w-full gap-3 text-center"><div className="overflow-hidden rounded-2xl border border-white/70 bg-white shadow-[0_24px_80px_rgba(42,27,60,0.16)]"><img src={selectedAsset.url} alt={selectedAsset.filename} className="max-h-[610px] max-w-full object-contain" /></div><div><p className="m-0 text-[12px] font-semibold text-text-strong">{selectedAsset.filename}</p><p className="mb-0 mt-1 text-[10px] text-text-muted">{formatBytes(selectedAsset.size)} · сохранено {new Date(selectedAsset.createdAt).toLocaleDateString("ru-RU")}</p></div></div> : <div className="max-w-sm text-center"><span className="mx-auto grid size-14 place-items-center rounded-2xl border border-border bg-white/80 text-primary shadow-sm"><ImageIcon aria-hidden="true" className="size-6" /></span><h3 className="mb-0 mt-4 text-[16px] font-semibold">Здесь появится первая работа</h3><p className="mb-0 mt-2 text-[12px] leading-5 text-text-muted">Заполните промпт слева или выберите ранее сохранённое изображение в галерее ниже.</p></div>}

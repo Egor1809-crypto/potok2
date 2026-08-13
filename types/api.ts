@@ -197,6 +197,7 @@ export type EmailBuilderDocumentInput = {
   previewText: string;
   accentColor: string;
   bodyBackground: string;
+  backgroundImageUrl?: string;
   workspaceBackground: string;
   contentWidth: number;
   frameStyle?: "none" | "hairline" | "accent" | "double" | "dashed" | "top-bottom" | "left-band" | "soft" | "capsule" | "stamp" | "offset" | "inset" | "top-accent" | "bottom-accent" | "right-band" | "editorial" | "ticket" | "window" | "railway" | "archive" | "corner-cut" | "top-ribbon" | "side-lines" | "luxury" | "blueprint" | "poster" | "postcard" | "focus";
@@ -392,6 +393,9 @@ export type PresentationMutationResponse = {
 export type PresentationAiRequest = {
   goal: string;
   audience?: string;
+  context?: string;
+  desiredAction?: string;
+  tone?: "executive" | "persuasive" | "educational" | "visual";
   slideCount?: number;
   themeId?: PresentationThemeId;
 };

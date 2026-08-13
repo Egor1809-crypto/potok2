@@ -135,6 +135,9 @@ export function parseEmailBuilderDocument(
     previewText: text(source.previewText, "Прехедер", 500),
     accentColor: color(source.accentColor, "Акцент"),
     bodyBackground: color(source.bodyBackground, "Фон письма"),
+    ...(source.backgroundImageUrl === undefined || source.backgroundImageUrl === ""
+      ? {}
+      : { backgroundImageUrl: safeHttpsUrl(source.backgroundImageUrl, "Фоновое изображение письма", true) }),
     workspaceBackground: color(source.workspaceBackground, "Фон рабочей области"),
     contentWidth: number(source.contentWidth, "Ширина письма", 320, 760),
     frameStyle,
@@ -241,7 +244,10 @@ function blockHtml(block: EmailBuilderBlockInput, accent: string) {
 export function compileEmailDocument(document: EmailBuilderDocumentInput) {
   const blocks = document.blocks.map((block) => blockHtml(block, document.accentColor)).join("");
   const frameCss = emailFrameInlineCss(document.frameStyle ?? "none", document.frameColor ?? document.accentColor, document.frameRadius ?? 0);
-  const html = `<!doctype html><html><body style="margin:0;padding:0;background:${document.workspaceBackground};"><div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(document.previewText)}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:${document.workspaceBackground};"><tr><td align="center" style="padding:24px 12px;"><table role="presentation" width="${document.contentWidth}" cellspacing="0" cellpadding="0" style="width:100%;max-width:${document.contentWidth}px;background:${document.bodyBackground};${frameCss}overflow:hidden;">${blocks}</table></td></tr></table></body></html>`;
+  const backgroundImage = document.backgroundImageUrl
+    ? `background-image:url('${escapeHtml(document.backgroundImageUrl)}');background-repeat:repeat;background-position:center top;background-size:cover;`
+    : "";
+  const html = `<!doctype html><html><body style="margin:0;padding:0;background:${document.workspaceBackground};"><div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(document.previewText)}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:${document.workspaceBackground};"><tr><td align="center" style="padding:24px 12px;"><table role="presentation" width="${document.contentWidth}" cellspacing="0" cellpadding="0" background="${document.backgroundImageUrl ? escapeHtml(document.backgroundImageUrl) : ""}" style="width:100%;max-width:${document.contentWidth}px;background-color:${document.bodyBackground};${backgroundImage}${frameCss}overflow:hidden;">${blocks}</table></td></tr></table></body></html>`;
   if (html.length > 500_000) {
     throw new ApiRequestError("Скомпилированный HTML письма превышает 500 КБ.");
   }
