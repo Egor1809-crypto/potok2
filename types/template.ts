@@ -70,7 +70,7 @@ export interface EmailTemplate {
   backgroundColor: string;
   bodyBackground?: string;
   contentWidth?: number;
-  frameStyle?: "none" | "hairline" | "accent" | "double" | "dashed" | "top-bottom" | "left-band" | "soft";
+  frameStyle?: "none" | "hairline" | "accent" | "double" | "dashed" | "top-bottom" | "left-band" | "soft" | "capsule" | "stamp" | "offset" | "inset" | "top-accent" | "bottom-accent" | "right-band" | "editorial";
   frameColor?: string;
   frameRadius?: number;
   thumbnailVariant: "editorial" | "minimal" | "bold" | "classic";

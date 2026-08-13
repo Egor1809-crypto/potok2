@@ -526,6 +526,25 @@ async function seedDatabase(request: Request) {
     });
   }
 
+  const [visualTemplateLibraryState] = await db
+    .select({ key: systemState.key })
+    .from(systemState)
+    .where(eq(systemState.key, "email-template-library-v5-visual"))
+    .limit(1);
+  if (!visualTemplateLibraryState) {
+    for (const template of starterEmailTemplateValues().filter((item) => item.id.startsWith("template-v5-visual-"))) {
+      await db.insert(emailTemplates).values({ ...template, workspaceId: WORKSPACE_ID }).onConflictDoNothing();
+    }
+    await db.insert(systemState).values({
+      key: "email-template-library-v5-visual",
+      value: "seeded",
+      updatedAt: now,
+    }).onConflictDoUpdate({
+      target: systemState.key,
+      set: { value: "seeded", updatedAt: now },
+    });
+  }
+
   const [templateHeadersState] = await db
     .select({ key: systemState.key })
     .from(systemState)

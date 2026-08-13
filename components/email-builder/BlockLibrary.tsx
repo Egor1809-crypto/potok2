@@ -40,6 +40,7 @@ import type { EmailBlockType } from "@/types";
 import { cn } from "@/components/ui/utils";
 import type { BuilderDocument } from "./builder-types";
 import { emailFrameCss, emailFramePresets } from "./frame-presets";
+import { emailPatternCategoryLabels, emailPatternPresets } from "./pattern-presets";
 
 export type BlockLibraryItem = {
   type: EmailBlockType;
@@ -65,7 +66,7 @@ export const blockLibrary: BlockLibraryItem[] = [
   { type: "stats", label: "Показатели", description: "Цифры и результаты", icon: ChartNoAxesColumnIncreasing },
   { type: "product", label: "Карточка", description: "Продукт или услуга", icon: PackageOpen },
   { type: "signature", label: "Подпись", description: "Отправитель и контакты", icon: ContactRound },
-  { type: "pattern", label: "Узор", description: "12 рисунков и текстур", icon: Shapes },
+  { type: "pattern", label: "Узор", description: "32 орнамента и контура", icon: Shapes },
   { type: "banner", label: "Баннер", description: "Яркое объявление", icon: Megaphone },
   { type: "timeline", label: "Этапы", description: "Путь или программа", icon: ListTree },
   { type: "faq", label: "Вопросы", description: "Вопросы и ответы", icon: CircleHelp },
@@ -86,17 +87,17 @@ export function BlockLibrary({
   onUpdateDocument,
   className,
 }: {
-  onAdd: (type: EmailBlockType) => void;
+  onAdd: (type: EmailBlockType, patch?: { content?: string; fontSize?: number; letterSpacing?: number }) => void;
   document: BuilderDocument;
   onUpdateDocument: (patch: Partial<BuilderDocument>) => void;
   className?: string;
 }) {
   const [query, setQuery] = useState("");
-  const [tab, setTab] = useState<"content" | "layout" | "frame">("content");
+  const [tab, setTab] = useState<"content" | "layout" | "decor" | "frame">("content");
   const visibleItems = useMemo(() => {
     const layoutTypes = new Set<EmailBlockType>(["columns", "hero", "banner", "timeline", "product", "stats", "comparison", "document", "notice", "compliance"]);
     const normalized = query.trim().toLowerCase();
-    if (tab === "frame") return [];
+    if (tab === "frame" || tab === "decor") return [];
     return blockLibrary.filter((item) => (tab === "layout" ? layoutTypes.has(item.type) : !layoutTypes.has(item.type)) && (!normalized || `${item.label} ${item.description}`.toLowerCase().includes(normalized)));
   }, [query, tab]);
   return (
@@ -117,9 +118,10 @@ export function BlockLibrary({
           <span className="sr-only">Найти блок</span>
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Найти блок" className="min-w-0 flex-1 border-0 bg-transparent text-[11px] text-text-strong outline-none placeholder:text-text-subtle" />
         </label>
-        <div className="mt-3 grid grid-cols-3 rounded-lg bg-surface-subtle p-1" role="tablist" aria-label="Тип элементов">
+        <div className="mt-3 grid grid-cols-4 rounded-lg bg-surface-subtle p-1" role="tablist" aria-label="Тип элементов">
           <LibraryTab active={tab === "content"} onClick={() => setTab("content")} icon={AlignJustify}>Контент</LibraryTab>
           <LibraryTab active={tab === "layout"} onClick={() => setTab("layout")} icon={LayoutTemplate}>Структуры</LibraryTab>
+          <LibraryTab active={tab === "decor"} onClick={() => setTab("decor")} icon={Sparkles}>Декор</LibraryTab>
           <LibraryTab active={tab === "frame"} onClick={() => setTab("frame")} icon={Shapes}>Окантовки</LibraryTab>
         </div>
       </div>
@@ -143,6 +145,28 @@ export function BlockLibrary({
                 <span className="font-mono text-[9px] text-text-muted">{document.frameColor.toUpperCase()}</span>
               </span>
             </label>
+          </div>
+        ) : tab === "decor" ? (
+          <div className="space-y-4">
+            <p className="m-0 text-[10px] leading-4 text-text-muted">Орнамент добавится отдельным редактируемым блоком. Его можно поставить в шапку, между секциями или в финал письма.</p>
+            {(Object.keys(emailPatternCategoryLabels) as Array<keyof typeof emailPatternCategoryLabels>).map((category) => (
+              <section key={category} aria-labelledby={`pattern-${category}`}>
+                <h3 id={`pattern-${category}`} className="mb-2 mt-0 text-[10px] font-semibold text-text-strong">{emailPatternCategoryLabels[category]}</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  {emailPatternPresets.filter((preset) => preset.category === category).map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => onAdd("pattern", { content: preset.content, fontSize: preset.fontSize, letterSpacing: preset.letterSpacing })}
+                      className="min-w-0 rounded-[9px] border border-border bg-surface p-2 text-left outline-none transition hover:border-primary/40 hover:bg-primary-subtle/35 focus-visible:ring-2 focus-visible:ring-primary/30"
+                    >
+                      <span aria-hidden="true" className="block h-9 overflow-hidden whitespace-pre-line rounded-md bg-primary-subtle/70 px-1 py-1 text-center text-[7px] leading-3 text-primary">{preset.content}</span>
+                      <span className="mt-1.5 block truncate text-[9px] font-semibold text-text-strong">{preset.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ))}
           </div>
         ) : (
         <div className="grid grid-cols-2 gap-2 lg:grid-cols-1 xl:grid-cols-2">
@@ -170,7 +194,7 @@ export function BlockLibrary({
         </div>
         )}
 
-        {tab !== "frame" && visibleItems.length === 0 ? <p className="py-8 text-center text-[11px] text-text-muted">Подходящих элементов нет</p> : null}
+        {tab !== "frame" && tab !== "decor" && visibleItems.length === 0 ? <p className="py-8 text-center text-[11px] text-text-muted">Подходящих элементов нет</p> : null}
 
         <div className="mt-4 rounded-[11px] border border-primary/15 bg-primary-subtle/55 p-3">
           <div className="flex items-center gap-2 text-[11px] font-semibold text-primary">

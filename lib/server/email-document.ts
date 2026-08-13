@@ -114,7 +114,7 @@ export function parseEmailBuilderDocument(
       backgroundColor: color(block.backgroundColor, `Фон блока ${index + 1}`, true),
       textColor: color(block.textColor, `Текст блока ${index + 1}`),
       fontSize: number(block.fontSize, `Размер текста блока ${index + 1}`, 8, 64),
-      borderRadius: number(block.borderRadius, `Скругление блока ${index + 1}`, 0, 32),
+      borderRadius: number(block.borderRadius, `Скругление блока ${index + 1}`, 0, 48),
       fontFamily: (["Arial", "Georgia", "Verdana", "Trebuchet MS"] as const).includes(block.fontFamily as never) ? block.fontFamily as EmailBuilderBlockInput["fontFamily"] : "Arial",
       fontWeight: ([400, 500, 600, 700] as const).includes(block.fontWeight as never) ? block.fontWeight as EmailBuilderBlockInput["fontWeight"] : 400,
       lineHeight: block.lineHeight === undefined ? 155 : number(block.lineHeight, `Межстрочный интервал блока ${index + 1}`, 90, 220),
@@ -127,7 +127,7 @@ export function parseEmailBuilderDocument(
       buttonStyle: block.buttonStyle === "outline" || block.buttonStyle === "soft" ? block.buttonStyle : "solid",
     };
   });
-  const frameStyles = new Set<EmailFrameStyle>(["none", "hairline", "accent", "double", "dashed", "top-bottom", "left-band", "soft"]);
+  const frameStyles = new Set<EmailFrameStyle>(["none", "hairline", "accent", "double", "dashed", "top-bottom", "left-band", "soft", "capsule", "stamp", "offset", "inset", "top-accent", "bottom-accent", "right-band", "editorial"]);
   const frameStyle = frameStyles.has(source.frameStyle as EmailFrameStyle) ? source.frameStyle as EmailFrameStyle : "none";
   return {
     templateId: text(source.templateId, "ID шаблона", 160),
@@ -139,7 +139,7 @@ export function parseEmailBuilderDocument(
     contentWidth: number(source.contentWidth, "Ширина письма", 320, 760),
     frameStyle,
     frameColor: source.frameColor === undefined ? color(source.accentColor, "Цвет окантовки") : color(source.frameColor, "Цвет окантовки"),
-    frameRadius: source.frameRadius === undefined ? 0 : number(source.frameRadius, "Скругление окантовки", 0, 32),
+    frameRadius: source.frameRadius === undefined ? 0 : number(source.frameRadius, "Скругление окантовки", 0, 48),
     blocks,
   };
 }

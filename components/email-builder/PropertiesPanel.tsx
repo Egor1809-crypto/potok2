@@ -340,7 +340,7 @@ export function PropertiesPanel({
               label="Скругление"
               value={block.borderRadius}
               min={0}
-              max={24}
+              max={48}
               onChange={(value) => onUpdateBlock({ borderRadius: value })}
             />
           ) : null}

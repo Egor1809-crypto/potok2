@@ -199,7 +199,7 @@ export type EmailBuilderDocumentInput = {
   bodyBackground: string;
   workspaceBackground: string;
   contentWidth: number;
-  frameStyle?: "none" | "hairline" | "accent" | "double" | "dashed" | "top-bottom" | "left-band" | "soft";
+  frameStyle?: "none" | "hairline" | "accent" | "double" | "dashed" | "top-bottom" | "left-band" | "soft" | "capsule" | "stamp" | "offset" | "inset" | "top-accent" | "bottom-accent" | "right-band" | "editorial";
   frameColor?: string;
   frameRadius?: number;
   blocks: EmailBuilderBlockInput[];

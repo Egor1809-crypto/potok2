@@ -171,8 +171,8 @@ test("pattern gallery offers varied email-safe designs", async () => {
     readFile(new URL("../components/email-builder/EmailCanvas.tsx", import.meta.url), "utf8"),
     readFile(new URL("../lib/server/email-document.ts", import.meta.url), "utf8"),
   ]);
-  assert.ok((presets.match(/id: "/g) ?? []).length >= 12);
-  for (const name of ["Искры", "Точки", "Сетка", "Ромбы", "Волны", "Конфетти"]) assert.match(presets, new RegExp(name));
+  assert.ok((presets.match(/id: "/g) ?? []).length >= 32);
+  for (const name of ["Искры", "Точки", "Сетка", "Ромбы", "Волны", "Конфетти", "Арт-деко", "Мягкие углы", "Техноуглы", "Микропечать"]) assert.match(presets, new RegExp(name));
   assert.match(properties, /title="Рисунок узора"/);
   assert.match(properties, /label="Масштаб"/);
   assert.match(properties, /label="Расстояние"/);
@@ -192,6 +192,25 @@ test("a new letter starts empty and offers full-email frame presets", async () =
   assert.match(canvas, /Пустой холст/);
   assert.match(canvas, /Добавить первый блок/);
   assert.match(library, />Окантовки</);
-  assert.ok((frames.match(/id: "/g) ?? []).length >= 8);
+  assert.ok((frames.match(/id: "/g) ?? []).length >= 16);
   assert.match(compiler, /emailFrameInlineCss/);
+});
+
+test("visual systems library contains reference-inspired but original editable layouts", async () => {
+  const [templates, database, library, frames] = await Promise.all([
+    readFile(new URL("../data/templates.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/server/database-init.ts", import.meta.url), "utf8"),
+    readFile(new URL("../components/email-builder/BlockLibrary.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/email-builder/frame-presets.ts", import.meta.url), "utf8"),
+  ]);
+  assert.ok((templates.match(/id: "template-v5-visual-/g) ?? []).length >= 8);
+  for (const layout of ["Сервисное событие", "Оценка опыта", "Подтверждение доступа", "Юридическое досье", "Приглашение · Ticket", "Меморандум"]) {
+    assert.match(templates, new RegExp(layout));
+  }
+  for (const frame of ["capsule", "stamp", "offset", "inset", "top-accent", "right-band", "editorial"]) {
+    assert.match(frames, new RegExp(`"${frame}"`));
+  }
+  assert.match(library, />Декор</);
+  assert.match(library, /emailPatternCategoryLabels/);
+  assert.match(database, /email-template-library-v5-visual/);
 });

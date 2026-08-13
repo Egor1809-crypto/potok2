@@ -175,7 +175,7 @@ function isBuilderDocument(value: unknown): value is BuilderDocument {
     typeof value.bodyBackground === "string" &&
     typeof value.workspaceBackground === "string" &&
     isFiniteNumber(value.contentWidth) &&
-    (value.frameStyle === undefined || ["none", "hairline", "accent", "double", "dashed", "top-bottom", "left-band", "soft"].includes(String(value.frameStyle))) &&
+    (value.frameStyle === undefined || ["none", "hairline", "accent", "double", "dashed", "top-bottom", "left-band", "soft", "capsule", "stamp", "offset", "inset", "top-accent", "bottom-accent", "right-band", "editorial"].includes(String(value.frameStyle))) &&
     (value.frameColor === undefined || typeof value.frameColor === "string") &&
     (value.frameRadius === undefined || isFiniteNumber(value.frameRadius)) &&
     Array.isArray(value.blocks) &&
@@ -468,8 +468,8 @@ function EmailBuilderWorkspace({
     mutateDocument((current) => ({ ...current, ...patch }));
   };
 
-  const addBlock = (type: EmailBlockType) => {
-    const block = createBlock(type);
+  const addBlock = (type: EmailBlockType, patch?: { content?: string; fontSize?: number; letterSpacing?: number }) => {
+    const block = { ...createBlock(type), ...patch };
     mutateDocument((current) => {
       const selectedIndex = current.blocks.findIndex(
         (item) => item.id === selectedBlockId,
