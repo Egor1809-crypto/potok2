@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { ChevronRight, Plus, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -27,8 +27,11 @@ export function AppSidebar({
   className,
 }: AppSidebarProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const currentLocation = `${pathname}${searchParams.size ? `?${searchParams.toString()}` : ""}`;
   const [workspaceName, setWorkspaceName] = useState<string>(workspaceConfig.name);
   const [participantName, setParticipantName] = useState<string>(demoUser.name);
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(() => new Set(["Шаблоны", "Конструктор"]));
 
   useEffect(() => {
     const onWorkspaceUpdate = (event: Event) => {
@@ -110,17 +113,23 @@ export function AppSidebar({
             </p>
             <ul className="m-0 grid list-none gap-1 p-0">
               {group.items.map((item) => {
-                const active = isProductRouteActive(pathname, item);
+                const active = isProductRouteActive(currentLocation, item);
                 const Icon = item.icon;
+                const expanded = item.children?.length ? expandedItems.has(item.label) : false;
 
                 return (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      aria-current={active ? "page" : undefined}
-                      onClick={onNavigate}
+                  <li key={`${item.href}:${item.label}`}>
+                    {item.children?.length ? <button
+                      type="button"
+                      aria-expanded={expanded}
+                      onClick={() => setExpandedItems((current) => {
+                        const next = new Set(current);
+                        if (next.has(item.label)) next.delete(item.label);
+                        else next.add(item.label);
+                        return next;
+                      })}
                       className={cn(
-                        "group flex min-h-10 items-center gap-3 rounded-lg px-2.5 text-[13px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/30",
+                        "group flex min-h-10 w-full items-center gap-3 rounded-lg px-2.5 text-left text-[13px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/30",
                         active
                           ? "bg-primary-subtle text-primary"
                           : "text-text-muted hover:bg-surface-subtle hover:text-text-strong",
@@ -135,23 +144,26 @@ export function AppSidebar({
                         strokeWidth={1.8}
                       />
                       <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                      {item.children?.length ? (
-                        <ChevronRight
-                          aria-hidden="true"
-                          className={cn(
-                            "size-3.5 shrink-0 text-text-subtle transition-transform",
-                            active && "rotate-90 text-primary/70",
-                          )}
-                        />
-                      ) : null}
-                    </Link>
+                      <ChevronRight aria-hidden="true" className={cn("size-3.5 shrink-0 text-text-subtle transition-transform", expanded && "rotate-90", active && "text-primary/70")} />
+                    </button> : <Link
+                      href={item.href}
+                      aria-current={active ? "page" : undefined}
+                      onClick={onNavigate}
+                      className={cn(
+                        "group flex min-h-10 items-center gap-3 rounded-lg px-2.5 text-[13px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/30",
+                        active ? "bg-primary-subtle text-primary" : "text-text-muted hover:bg-surface-subtle hover:text-text-strong",
+                      )}
+                    >
+                      <Icon aria-hidden="true" className={cn("size-[18px] shrink-0", active ? "text-primary" : "text-text-subtle group-hover:text-text-muted")} strokeWidth={1.8} />
+                      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                    </Link>}
 
-                    {active && item.children?.length ? (
+                    {expanded && item.children?.length ? (
                       <ul className="mb-1 ml-[19px] mt-1 grid list-none gap-0.5 border-l border-border pl-3">
                         {item.children.map((child) => {
-                          const childActive = isProductRouteActive(pathname, child);
+                          const childActive = isProductRouteActive(currentLocation, child);
                           return (
-                            <li key={child.href}>
+                            <li key={`${child.href}:${child.label}`}>
                               <Link
                                 href={child.href}
                                 aria-current={childActive ? "page" : undefined}

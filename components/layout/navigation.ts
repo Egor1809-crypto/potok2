@@ -2,6 +2,7 @@ import {
   BarChart3,
   Cable,
   ContactRound,
+  FolderOpen,
   FileUp,
   Images,
   LayoutDashboard,
@@ -12,6 +13,7 @@ import {
   ScanSearch,
   Settings,
   UsersRound,
+  Wrench,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -48,35 +50,28 @@ export const productNavigation: ProductNavGroup[] = [
         keywords: ["главная", "сводка"],
       },
       {
-        label: "Шаблоны писем",
-        description: "Создание и редактирование писем",
+        label: "Шаблоны",
+        description: "Готовые основы для трёх форматов",
         href: "/templates",
-        icon: LayoutTemplate,
-        keywords: ["письмо", "дизайн", "типограф", "редактор", "email"],
+        icon: FolderOpen,
+        keywords: ["библиотека", "макеты", "основы"],
+        children: [
+          { label: "Шаблоны писем", description: "Библиотека email-макетов", href: "/templates", icon: LayoutTemplate, exact: true, keywords: ["письмо", "email", "макет"] },
+          { label: "Шаблоны презентаций", description: "Сценарии и темы слайдов", href: "/presentations?view=templates", icon: Presentation, exact: true, keywords: ["слайды", "pptx", "powerpoint"] },
+          { label: "Шаблоны фотографий", description: "Сохранённые визуалы и референсы", href: "/image-studio?view=library", icon: Images, exact: true, keywords: ["фото", "изображение", "медиатека", "референс"] },
+        ],
       },
       {
         label: "Конструктор",
-        description: "Собрать письмо из блоков или с ИИ",
+        description: "Создать письмо, слайды или изображение",
         href: "/email-builder",
-        icon: PenLine,
-        exact: true,
-        keywords: ["редактор", "контент", "блоки", "email", "ии"],
-      },
-      {
-        label: "Презентации",
-        description: "Слайды вручную, из письма или с ИИ",
-        href: "/presentations",
-        icon: Presentation,
-        exact: true,
-        keywords: ["слайды", "pptx", "powerpoint", "презентация", "ии"],
-      },
-      {
-        label: "Изображения",
-        description: "Создание и библиотека визуалов",
-        href: "/image-studio",
-        icon: Images,
-        exact: true,
-        keywords: ["фото", "картинка", "визуал", "обложка", "логотип", "ии"],
+        icon: Wrench,
+        keywords: ["редактор", "создать", "типограф", "ии"],
+        children: [
+          { label: "Конструктор писем", description: "Блоки, оформление и ИИ", href: "/email-builder?new=1", icon: PenLine, exact: true, keywords: ["письмо", "email", "блоки", "типограф"] },
+          { label: "Конструктор презентаций", description: "Редактируемые слайды и ИИ", href: "/presentations?new=1", icon: Presentation, exact: true, keywords: ["презентация", "слайды", "pptx"] },
+          { label: "Конструктор изображений", description: "Генерация визуалов по описанию", href: "/image-studio?view=create", icon: Images, exact: true, keywords: ["фото", "картинка", "визуал", "обложка", "ии"] },
+        ],
       },
     ],
   },
@@ -208,13 +203,23 @@ export const quickCreateRoutes: ProductNavItem[] = [
 
 export const secondaryProductRoutes: ProductNavItem[] = [];
 
-function isOwnRouteActive(pathname: string, item: ProductNavItem) {
-  if (item.exact) return pathname === item.href;
-  return pathname === item.href || pathname.startsWith(`${item.href}/`);
+function routeParts(value: string) {
+  const parsed = new URL(value, "https://potok.local");
+  return { pathname: parsed.pathname, searchParams: parsed.searchParams };
 }
 
-export function isProductRouteActive(pathname: string, item: ProductNavItem) {
-  return isOwnRouteActive(pathname, item) || item.children?.some((child) => isOwnRouteActive(pathname, child)) === true;
+function isOwnRouteActive(location: string, item: ProductNavItem) {
+  const current = routeParts(location);
+  const target = routeParts(item.href);
+  const pathnameMatches = item.exact
+    ? current.pathname === target.pathname
+    : current.pathname === target.pathname || current.pathname.startsWith(`${target.pathname}/`);
+  if (!pathnameMatches) return false;
+  return [...target.searchParams.entries()].every(([key, value]) => current.searchParams.get(key) === value);
+}
+
+export function isProductRouteActive(location: string, item: ProductNavItem) {
+  return isOwnRouteActive(location, item) || item.children?.some((child) => isOwnRouteActive(location, child)) === true;
 }
 
 export function getProductSection(pathname: string) {

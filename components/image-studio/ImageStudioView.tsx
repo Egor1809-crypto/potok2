@@ -4,6 +4,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   ArrowRight,
   Download,
@@ -70,6 +71,8 @@ function errorMessage(body: ApiError | undefined, fallback: string) {
 }
 
 export function ImageStudioView() {
+  const searchParams = useSearchParams();
+  const requestedView = searchParams.get("view");
   const [status, setStatus] = useState<ImageStudioStatusResponse | null>(null);
   const [assets, setAssets] = useState<EmailAssetRecord[]>([]);
   const [selectedId, setSelectedId] = useState("");
@@ -105,6 +108,12 @@ export function ImageStudioView() {
       .finally(() => setLoading(false));
     return () => controller.abort();
   }, []);
+
+  useEffect(() => {
+    const targetId = requestedView === "library" ? "image-template-library" : "image-constructor";
+    const frame = window.requestAnimationFrame(() => document.getElementById(targetId)?.scrollIntoView({ block: "start" }));
+    return () => window.cancelAnimationFrame(frame);
+  }, [requestedView]);
 
   const selectedAsset = useMemo(
     () => assets.find((asset) => asset.id === selectedId) ?? assets[0],
@@ -166,7 +175,7 @@ export function ImageStudioView() {
         ) : null}
         {error ? <Alert tone="danger" title="Не удалось выполнить действие">{error}</Alert> : null}
 
-        <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(340px,0.8fr)_minmax(520px,1.2fr)]">
+        <div id="image-constructor" className="scroll-mt-6 grid min-w-0 gap-5 xl:grid-cols-[minmax(340px,0.8fr)_minmax(520px,1.2fr)]">
           <Card className="min-w-0 p-5 sm:p-6">
             <div className="mb-5 flex items-start justify-between gap-4">
               <div><h2 className="m-0 text-[17px] font-semibold">Новая работа</h2><p className="mb-0 mt-1 text-[12px] text-text-muted">Один запрос создаёт один долговечный файл.</p></div>
@@ -207,8 +216,8 @@ export function ImageStudioView() {
           </Card>
         </div>
 
-        <section aria-labelledby="image-gallery-title" className="grid gap-4">
-          <div className="flex items-end justify-between gap-4"><div><div className="flex items-center gap-2"><Images aria-hidden="true" className="size-4 text-primary" /><h2 id="image-gallery-title" className="m-0 text-[18px] font-semibold">Медиатека</h2></div><p className="mb-0 mt-1 text-[12px] text-text-muted">ИИ-работы и загруженные фотографии доступны всем редакторам Поток.</p></div><span className="rounded-full border border-border bg-surface px-2.5 py-1 text-[10px] tabular-nums text-text-muted">{assets.length} файлов</span></div>
+        <section id="image-template-library" aria-labelledby="image-gallery-title" className="scroll-mt-6 grid gap-4">
+          <div className="flex items-end justify-between gap-4"><div><div className="flex items-center gap-2"><Images aria-hidden="true" className="size-4 text-primary" /><h2 id="image-gallery-title" className="m-0 text-[18px] font-semibold">Шаблоны фотографий</h2></div><p className="mb-0 mt-1 text-[12px] text-text-muted">Сохранённые ИИ-работы и загруженные фотографии можно повторно использовать как визуальную основу.</p></div><span className="rounded-full border border-border bg-surface px-2.5 py-1 text-[10px] tabular-nums text-text-muted">{assets.length} файлов</span></div>
           {loading ? <Card role="status" className="p-6 text-[12px] text-text-muted">Загружаем сохранённые изображения…</Card> : assets.length ? <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">{assets.map((asset) => <Card key={asset.id} className={cn("group overflow-hidden border transition", selectedAsset?.id === asset.id ? "border-primary ring-2 ring-primary/15" : "hover:border-primary/30")}><button type="button" aria-label={`Выбрать ${asset.filename}`} aria-pressed={selectedAsset?.id === asset.id} onClick={() => setSelectedId(asset.id)} className="block aspect-[4/3] w-full overflow-hidden bg-surface-subtle"><img src={asset.url} alt="" loading="lazy" className="size-full object-cover transition duration-300 group-hover:scale-[1.02]" /></button><div className="grid gap-2 p-3"><button type="button" aria-pressed={selectedAsset?.id === asset.id} onClick={() => setSelectedId(asset.id)} className="truncate text-left text-[11px] font-semibold" title={asset.filename}>{asset.filename}</button><div className="flex items-center justify-between gap-2 text-[9px] text-text-subtle"><span>{formatBytes(asset.size)}</span><div className="flex gap-1"><a href={`${asset.url}?download=1`} aria-label={`Скачать ${asset.filename}`} className="grid size-7 place-items-center rounded-lg border border-border bg-surface hover:border-primary/30 hover:text-primary"><Download aria-hidden="true" className="size-3" /></a><Link href={`/email-builder?new=1&asset=${encodeURIComponent(asset.id)}&assetName=${encodeURIComponent(asset.filename)}`} aria-label={`Использовать ${asset.filename} в письме`} className="grid size-7 place-items-center rounded-lg bg-primary text-primary-foreground"><ArrowRight aria-hidden="true" className="size-3" /></Link></div></div></div></Card>)}</div> : <Card className="grid min-h-40 place-items-center p-6 text-center"><div><ImageIcon aria-hidden="true" className="mx-auto size-5 text-text-subtle" /><p className="mb-0 mt-2 text-[12px] font-medium">Медиатека пока пуста</p><p className="mb-0 mt-1 text-[10px] text-text-muted">Первая успешная генерация сохранится здесь автоматически.</p></div></Card>}
         </section>
       </div>

@@ -168,7 +168,7 @@ export function CommandMenu({ open, onOpenChange }: CommandMenuProps) {
               {results.map((route, index) => {
                 const Icon = route.icon;
                 return (
-                  <li key={route.href}>
+                  <li key={`${route.href}:${route.label}`}>
                     <Link
                       href={route.href}
                       onClick={() => onOpenChange(false)}
