@@ -28,6 +28,10 @@ const BLOCK_TYPES = new Set<EmailBuilderBlockInput["type"]>([
   "faq",
   "coupon",
   "video",
+  "notice",
+  "comparison",
+  "document",
+  "compliance",
 ]);
 const COLOR = /^#[0-9a-f]{6}$/i;
 
@@ -218,6 +222,18 @@ function blockHtml(block: EmailBuilderBlockInput, accent: string) {
   } else if (block.type === "video") {
     const [title = "", duration = ""] = block.content.split("|");
     content = `<a href="${escapeHtml(block.href ?? "")}" style="display:block;padding:46px 24px;border-radius:${block.borderRadius}px;background:${block.backgroundColor === "transparent" ? "#17121c" : block.backgroundColor};font-family:${family},sans-serif;text-align:center;color:${block.textColor};text-decoration:none;"><span style="display:inline-block;font-size:28px;">▶</span><div style="margin-top:12px;font-size:${block.fontSize + 4}px;font-weight:700;">${lineBreaks(title)}</div><div style="margin-top:5px;font-size:12px;opacity:.65;">${lineBreaks(duration)}</div></a>`;
+  } else if (block.type === "notice") {
+    const [eyebrow = "", message = "", status = ""] = block.content.split("|");
+    content = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:${block.borderWidth || 1}px solid ${block.borderColor || accent};border-radius:${block.borderRadius}px;background:${block.backgroundColor === "transparent" ? `${accent}10` : block.backgroundColor};"><tr><td width="42" valign="top" style="padding:20px 0 20px 20px;font-size:22px;color:${accent};">●</td><td style="padding:20px;font-family:${family},sans-serif;color:${block.textColor};"><div style="font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:${accent};">${lineBreaks(eyebrow)}</div><div style="margin-top:7px;font-size:${block.fontSize + 3}px;font-weight:700;line-height:1.35;">${lineBreaks(message)}</div><div style="margin-top:6px;font-size:12px;line-height:1.5;opacity:.72;">${lineBreaks(status)}</div></td></tr></table>`;
+  } else if (block.type === "comparison") {
+    const items = block.content.split("|");
+    content = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>${[0, 2].map((index) => `<td width="49%" valign="top" style="padding:18px;border:1px solid ${block.borderColor || "#e5e7eb"};border-radius:${block.borderRadius}px;background:${block.backgroundColor === "transparent" ? "#ffffff" : block.backgroundColor};font-family:${family},sans-serif;color:${block.textColor};"><div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:${accent};">${lineBreaks(items[index] || "")}</div><div style="margin-top:8px;font-size:${block.fontSize}px;line-height:${lineHeight};">${lineBreaks(items[index + 1] || "")}</div></td>${index === 0 ? '<td width="2%"></td>' : ''}`).join("")}</tr></table>`;
+  } else if (block.type === "document") {
+    const [name = "", meta = "", status = ""] = block.content.split("|");
+    content = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid ${block.borderColor || "#e5e7eb"};border-radius:${block.borderRadius}px;background:${block.backgroundColor === "transparent" ? "#f7f7fa" : block.backgroundColor};"><tr><td width="58" valign="middle" style="padding:20px 0 20px 20px;font-size:28px;color:${accent};">▤</td><td style="padding:20px 12px;font-family:${family},sans-serif;color:${block.textColor};"><strong style="font-size:${block.fontSize + 2}px;">${lineBreaks(name)}</strong><div style="margin-top:5px;font-size:12px;opacity:.68;">${lineBreaks(meta)} · ${lineBreaks(status)}</div></td><td align="right" style="padding:20px;"><a href="${escapeHtml(block.href ?? "")}" style="display:inline-block;padding:10px 14px;border-radius:8px;background:${accent};color:#fff;font-family:${family},sans-serif;font-size:12px;font-weight:700;text-decoration:none;">${lineBreaks(block.label || "Открыть")}</a></td></tr></table>`;
+  } else if (block.type === "compliance") {
+    const [status = "", description = "", hint = ""] = block.content.split("|");
+    content = `<div style="padding:20px;border:1px solid ${block.borderColor || `${accent}55`};border-radius:${block.borderRadius}px;background:${block.backgroundColor === "transparent" ? `${accent}0d` : block.backgroundColor};font-family:${family},sans-serif;color:${block.textColor};"><div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:${accent};">✓ ${lineBreaks(status)}</div><div style="margin-top:8px;font-size:${block.fontSize}px;line-height:${lineHeight};">${lineBreaks(description)}</div><div style="margin-top:8px;font-size:12px;opacity:.68;">${lineBreaks(hint)}</div><a href="${escapeHtml(block.href ?? "")}" style="display:inline-block;margin-top:14px;color:${accent};font-size:12px;font-weight:700;text-decoration:underline;">${lineBreaks(block.label || "Настроить")}</a></div>`;
   }
   return `<tr><td style="${wrapper}"><div style="width:${block.widthPercent ?? 100}%;margin:${block.alignment === "center" ? "0 auto" : block.alignment === "right" ? "0 0 0 auto" : "0 auto 0 0"};border:${block.borderWidth ?? 0}px solid ${block.borderColor ?? "#e5e7eb"};border-radius:${block.borderRadius}px;box-sizing:border-box;">${content}</div></td></tr>`;
 }
@@ -241,7 +257,7 @@ export function emailDocumentPlainText(
     if (block.type === "columns") {
       return block.content.split("|").map((value) => value.trim());
     }
-    if (["hero", "quote", "checklist", "stats", "product", "signature", "banner", "timeline", "faq", "coupon", "video"].includes(block.type)) {
+    if (["hero", "quote", "checklist", "stats", "product", "signature", "banner", "timeline", "faq", "coupon", "video", "notice", "comparison", "document", "compliance"].includes(block.type)) {
       const parts = block.content.split("|").map((value) => value.trim()).filter(Boolean);
       if (block.type === "product" && block.label) parts.push(block.label);
       return parts;

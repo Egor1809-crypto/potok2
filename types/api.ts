@@ -164,7 +164,11 @@ export type EmailBuilderBlockInput = {
     | "timeline"
     | "faq"
     | "coupon"
-    | "video";
+    | "video"
+    | "notice"
+    | "comparison"
+    | "document"
+    | "compliance";
   content: string;
   label?: string;
   href?: string;

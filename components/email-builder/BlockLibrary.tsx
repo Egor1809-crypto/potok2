@@ -29,6 +29,10 @@ import {
   PlaySquare,
   Search,
   LayoutTemplate,
+  BellRing,
+  FileCheck2,
+  GitCompareArrows,
+  ShieldCheck,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -67,6 +71,10 @@ export const blockLibrary: BlockLibraryItem[] = [
   { type: "faq", label: "Вопросы", description: "Вопросы и ответы", icon: CircleHelp },
   { type: "coupon", label: "Промокод", description: "Купон или бонус", icon: TicketPercent },
   { type: "video", label: "Видео", description: "Обложка со ссылкой", icon: PlaySquare },
+  { type: "notice", label: "Уведомление", description: "Срок и важный статус", icon: BellRing },
+  { type: "comparison", label: "Что изменилось", description: "До и после рядом", icon: GitCompareArrows },
+  { type: "document", label: "Документ", description: "Файл, срок и действие", icon: FileCheck2 },
+  { type: "compliance", label: "Согласие", description: "Статус и настройка", icon: ShieldCheck },
 ];
 
 export const getBlockLabel = (type: EmailBlockType) =>
@@ -86,7 +94,7 @@ export function BlockLibrary({
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<"content" | "layout" | "frame">("content");
   const visibleItems = useMemo(() => {
-    const layoutTypes = new Set<EmailBlockType>(["columns", "hero", "banner", "timeline", "product", "stats"]);
+    const layoutTypes = new Set<EmailBlockType>(["columns", "hero", "banner", "timeline", "product", "stats", "comparison", "document", "notice", "compliance"]);
     const normalized = query.trim().toLowerCase();
     if (tab === "frame") return [];
     return blockLibrary.filter((item) => (tab === "layout" ? layoutTypes.has(item.type) : !layoutTypes.has(item.type)) && (!normalized || `${item.label} ${item.description}`.toLowerCase().includes(normalized)));

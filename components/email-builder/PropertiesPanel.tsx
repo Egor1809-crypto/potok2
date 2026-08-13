@@ -59,6 +59,10 @@ const compoundContentLabels: Partial<Record<BuilderBlock["type"], string[]>> = {
   video: ["Название видео", "Длительность"],
   timeline: ["Шаг 1", "Описание шага 1", "Шаг 2", "Описание шага 2"],
   faq: ["Вопрос 1", "Ответ 1", "Вопрос 2", "Ответ 2"],
+  notice: ["Метка", "Главное сообщение", "Статус или срок"],
+  comparison: ["Заголовок слева", "Описание слева", "Заголовок справа", "Описание справа"],
+  document: ["Название документа", "Формат и размер", "Срок или статус"],
+  compliance: ["Статус", "Описание согласия", "Подсказка к действию"],
 };
 
 type PropertiesPanelProps = {
@@ -185,7 +189,7 @@ export function PropertiesPanel({
               </FormField>
             )}
 
-            {block.type === "button" || block.type === "product" || block.type === "video" ? (
+            {block.type === "button" || block.type === "product" || block.type === "video" || block.type === "document" || block.type === "compliance" ? (
               <FormField label="Целевая ссылка" htmlFor="builder-button-link">
                 <div className="relative">
                   <Link2 aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-text-subtle" />

@@ -551,6 +551,22 @@ function BlockContent({
     const [title, duration] = block.content.split("|");
     return <div className="grid min-h-44 place-items-center p-6" style={{backgroundColor:block.backgroundColor,borderRadius:block.borderRadius,fontSize:block.fontSize,lineHeight:block.lineHeight/100,letterSpacing:block.letterSpacing}}><div><span className="mx-auto grid size-12 place-items-center rounded-full bg-white/15 text-xl">▶</span><strong className="mt-3 block">{renderTokens(title||"Видео")}</strong><span className="mt-1 block text-xs opacity-60">{duration}</span></div></div>;
   }
+  if (block.type === "notice") {
+    const [eyebrow, message, status] = block.content.split("|");
+    return <div className="flex gap-4 border p-5 text-left" style={{borderColor:block.borderColor||accentColor,borderRadius:block.borderRadius,backgroundColor:block.backgroundColor,fontSize:block.fontSize,lineHeight:block.lineHeight/100}}><span className="mt-1 size-3 shrink-0 rounded-full" style={{backgroundColor:accentColor}} /><span><span className="block text-[11px] font-bold uppercase tracking-[.12em]" style={{color:accentColor}}>{renderTokens(eyebrow||"Важное уведомление")}</span><strong className="mt-2 block text-[17px]">{renderTokens(message||"Главное сообщение")}</strong><span className="mt-1 block text-[12px] opacity-65">{renderTokens(status||"Статус или срок")}</span></span></div>;
+  }
+  if (block.type === "comparison") {
+    const items = block.content.split("|");
+    return <div className="grid grid-cols-2 gap-3">{[0,2].map(index=><div key={index} className="border p-4 text-left" style={{borderColor:block.borderColor,borderRadius:block.borderRadius,backgroundColor:block.backgroundColor,fontSize:block.fontSize,lineHeight:block.lineHeight/100}}><span className="block text-[11px] font-bold uppercase tracking-[.08em]" style={{color:accentColor}}>{renderTokens(items[index]||"Раздел")}</span><span className="mt-2 block">{renderTokens(items[index+1]||"Описание")}</span></div>)}</div>;
+  }
+  if (block.type === "document") {
+    const [name, meta, status] = block.content.split("|");
+    return <div className="flex items-center gap-4 border p-5 text-left" style={{borderColor:block.borderColor,borderRadius:block.borderRadius,backgroundColor:block.backgroundColor,fontSize:block.fontSize,lineHeight:block.lineHeight/100}}><span className="grid size-11 shrink-0 place-items-center rounded-lg text-lg font-bold text-white" style={{backgroundColor:accentColor}}>▤</span><span className="min-w-0 flex-1"><strong className="block truncate">{renderTokens(name||"Название документа")}</strong><span className="mt-1 block text-[11px] opacity-60">{renderTokens(meta||"PDF")} · {renderTokens(status||"Готов")}</span></span><span className="rounded-lg px-3 py-2 text-[11px] font-bold text-white" style={{backgroundColor:accentColor}}>{renderTokens(block.label||"Открыть")}</span></div>;
+  }
+  if (block.type === "compliance") {
+    const [status, description, hint] = block.content.split("|");
+    return <div className="border p-5 text-left" style={{borderColor:block.borderColor,borderRadius:block.borderRadius,backgroundColor:block.backgroundColor,fontSize:block.fontSize,lineHeight:block.lineHeight/100}}><span className="block text-[11px] font-bold uppercase tracking-[.08em]" style={{color:accentColor}}>✓ {renderTokens(status||"Статус")}</span><span className="mt-2 block">{renderTokens(description||"Описание согласия")}</span><span className="mt-2 block text-[11px] opacity-60">{renderTokens(hint||"Подсказка")}</span><span className="mt-3 inline-block text-[11px] font-bold underline" style={{color:accentColor}}>{renderTokens(block.label||"Настроить")}</span></div>;
+  }
 
   return (
     <p className="m-0 leading-5" style={{ fontSize: block.fontSize }}>

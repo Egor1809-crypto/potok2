@@ -216,6 +216,12 @@ function TemplateMiniBlock({ block, accentColor }: { block: TemplateMiniBlockVal
   if (block.type === "video") {
     return <div style={commonStyle}><div className="grid h-24 place-items-center rounded-lg bg-black/80 text-white"><span className="grid size-8 place-items-center rounded-full bg-white/20 text-[12px]">▶</span><span className="text-[8px] font-semibold">{parts[0]}</span></div></div>;
   }
+  if (block.type === "notice" || block.type === "document" || block.type === "compliance") {
+    return <div style={commonStyle}><div className="rounded-lg border border-black/10 p-3"><span className="text-[7px] font-bold uppercase tracking-wider" style={{ color: accentColor }}>{parts[0]}</span><strong className="mt-1 block text-[10px]">{parts[1]}</strong><span className="mt-1 block text-[7px] opacity-60">{parts[2]}</span></div></div>;
+  }
+  if (block.type === "comparison") {
+    return <div className="grid grid-cols-2 gap-2" style={commonStyle}>{[0, 2].map((index) => <div key={index} className="rounded-md border border-black/10 p-3"><strong className="text-[8px]" style={{ color: accentColor }}>{parts[index]}</strong><p className="mb-0 mt-1 text-[7px] opacity-70">{parts[index + 1]}</p></div>)}</div>;
+  }
   if (block.type === "product") {
     return <div style={commonStyle}><div className="rounded-lg border border-black/10 p-3"><strong className="text-[10px]">{parts[0]}</strong><p className="my-1 text-[7px] opacity-65">{parts[1]}</p><strong className="text-[9px]">{parts[2]}</strong></div></div>;
   }

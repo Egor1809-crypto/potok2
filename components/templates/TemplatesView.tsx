@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { ArrowLeft, FileText, Plus, RefreshCw, SearchX } from "lucide-react";
+import { ArrowLeft, FileText, Plus, RefreshCw, Scale, SearchX } from "lucide-react";
 
 import type { TemplateCategory } from "@/types";
 import type {
@@ -125,6 +125,7 @@ export function TemplatesView() {
   const [category, setCategory] = useState<CategoryFilter>("All");
   const [scope, setScope] = useState<ScopeFilter>(() => new URLSearchParams(browserSearch).get("scope") === "mine" ? "mine" : "all");
   const [query, setQuery] = useState("");
+  const [legalOnly, setLegalOnly] = useState(false);
   const [sort, setSort] = useState<SortMode>("recent");
   const [busy, setBusy] = useState<{ id: string; action: "clone" | "delete" } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -158,6 +159,7 @@ export function TemplatesView() {
     return templates
       .filter((template) => scope === "all" || !template.isStarter)
       .filter((template) => category === "All" || template.category === category)
+      .filter((template) => !legalOnly || template.id.startsWith("template-v4-legal-"))
       .filter((template) => !normalized || [
         template.name,
         template.category,
@@ -172,7 +174,7 @@ export function TemplatesView() {
         }
         return Date.parse(second.updatedAt) - Date.parse(first.updatedAt);
       });
-  }, [category, query, scope, sort, templates]);
+  }, [category, legalOnly, query, scope, sort, templates]);
 
   const scopedTemplates = useMemo(
     () => templates.filter((template) => scope === "all" || !template.isStarter),
@@ -276,6 +278,13 @@ export function TemplatesView() {
         </div>
       ) : (
         <div className="space-y-4">
+          {scope === "all" ? (
+            <button type="button" aria-pressed={legalOnly} onClick={() => { setLegalOnly((value) => !value); setCategory("All"); }} className="group flex w-full items-center gap-4 rounded-2xl border border-[#c9b8a0] bg-[#f5efe5] p-4 text-left outline-none transition hover:border-[#8d6d43] hover:shadow-[var(--shadow-sm)] focus-visible:ring-2 focus-visible:ring-primary/30 aria-pressed:border-[#1f1914] aria-pressed:bg-[#ede2d2] sm:p-5">
+              <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-[#1f1914] text-[#f4e7cf]"><Scale aria-hidden="true" className="size-5" /></span>
+              <span className="min-w-0 flex-1"><strong className="block text-[14px] text-[#1f1914]">Юридическая коллекция</strong><span className="mt-1 block text-[11px] leading-5 text-[#746555]">Условия, приватность, согласия, документы на подпись, статусы дел и политики ИИ.</span></span>
+              <span className="shrink-0 rounded-full border border-[#b9a182] bg-white/70 px-3 py-1 text-[10px] font-semibold text-[#5a442b]">{templates.filter((template) => template.id.startsWith("template-v4-legal-")).length} макетов</span>
+            </button>
+          ) : null}
           <div className="inline-flex rounded-xl border border-border bg-surface p-1" role="group" aria-label="Раздел шаблонов">
             <button type="button" aria-pressed={scope === "all"} onClick={() => setScope("all")} className="rounded-lg px-4 py-2 text-[12px] font-semibold text-text-muted outline-none transition hover:text-text-strong aria-pressed:bg-primary aria-pressed:text-white focus-visible:ring-2 focus-visible:ring-primary/30">
               Библиотека <span className="ml-1 opacity-70">{templates.length}</span>
@@ -345,7 +354,7 @@ export function TemplatesView() {
                   icon={<SearchX aria-hidden="true" className="size-5" />}
                   title={scope === "mine" && !scopedTemplates.length ? "У вас пока нет своих шаблонов" : templates.length ? "Подходящих шаблонов нет" : "Библиотека пуста"}
                   description={scope === "mine" && !scopedTemplates.length ? "Создайте макет с нуля или откройте стартовый шаблон и сохраните свой вариант." : templates.length ? "Измените запрос или категорию." : "Создайте первый шаблон в визуальном редакторе."}
-                  action={templates.length ? { label: scope === "mine" && !scopedTemplates.length ? "Показать библиотеку" : "Сбросить фильтры", onClick: () => { setQuery(""); setCategory("All"); if (scope === "mine" && !scopedTemplates.length) setScope("all"); } } : undefined}
+                  action={templates.length ? { label: scope === "mine" && !scopedTemplates.length ? "Показать библиотеку" : "Сбросить фильтры", onClick: () => { setQuery(""); setCategory("All"); setLegalOnly(false); if (scope === "mine" && !scopedTemplates.length) setScope("all"); } } : undefined}
                 />
               </div>
             )}

@@ -45,7 +45,7 @@ export type BuilderDocument = {
 };
 
 const advancedBlockDefaults = Object.fromEntries(([
-  "logo", "heading", "text", "image", "button", "columns", "divider", "spacer", "social", "footer", "hero", "quote", "checklist", "stats", "product", "signature", "pattern", "banner", "timeline", "faq", "coupon", "video",
+  "logo", "heading", "text", "image", "button", "columns", "divider", "spacer", "social", "footer", "hero", "quote", "checklist", "stats", "product", "signature", "pattern", "banner", "timeline", "faq", "coupon", "video", "notice", "comparison", "document", "compliance",
 ] satisfies EmailBlockType[]).map((type) => [type, {
   fontFamily: "Arial",
   fontWeight: type === "heading" || type === "hero" || type === "logo" ? 700 : 400,
@@ -201,6 +201,10 @@ const legacyBlockDefaults: Record<EmailBlockType, Pick<BuilderBlock, "paddingTop
   faq: { paddingTop: 18, paddingBottom: 18, backgroundColor: "#f8f6fb", textColor: "#302938", fontSize: 14, borderRadius: 12 },
   coupon: { paddingTop: 20, paddingBottom: 20, backgroundColor: "#f3edff", textColor: "#24182d", fontSize: 18, borderRadius: 14 },
   video: { paddingTop: 18, paddingBottom: 18, backgroundColor: "#17121c", textColor: "#ffffff", fontSize: 15, borderRadius: 14 },
+  notice: { paddingTop: 20, paddingBottom: 20, backgroundColor: "#fff7e6", textColor: "#3f2d16", fontSize: 15, borderRadius: 12 },
+  comparison: { paddingTop: 20, paddingBottom: 20, backgroundColor: "transparent", textColor: "#302938", fontSize: 14, borderRadius: 12 },
+  document: { paddingTop: 20, paddingBottom: 20, backgroundColor: "#f7f7fa", textColor: "#26222b", fontSize: 14, borderRadius: 12 },
+  compliance: { paddingTop: 18, paddingBottom: 18, backgroundColor: "#eef7f3", textColor: "#173d31", fontSize: 14, borderRadius: 12 },
 };
 
 const blockDefaults = Object.fromEntries(
@@ -282,6 +286,10 @@ const initialContent: Record<EmailBlockType, Pick<EmailBlock, "content" | "label
   faq: { content: "Что входит?|Короткий и понятный ответ|Как начать?|Оставьте заявку по кнопке", label: undefined, href: undefined },
   coupon: { content: "ПРОМОКОД|TECH2026|Действует до конца месяца", label: "Скопировать код", href: undefined },
   video: { content: "Посмотрите короткое видео|2 минуты", label: "Смотреть видео", href: "https://tech-pravo.ru/" },
+  notice: { content: "ВАЖНОЕ УВЕДОМЛЕНИЕ|Изменения вступят в силу 1 октября 2026 года.|Никаких действий не требуется", label: undefined, href: undefined },
+  comparison: { content: "Что было|Старые условия и прежний порядок|Что изменится|Новые условия и обновлённый порядок", label: undefined, href: undefined },
+  document: { content: "Дополнительное соглашение № 4|PDF · 428 КБ|Подписать до 30 сентября", label: "Открыть документ", href: "https://tech-pravo.ru/" },
+  compliance: { content: "Ваш выбор|Согласен получать информационные письма|Настроить согласие", label: "Управлять согласием", href: "https://tech-pravo.ru/" },
 };
 
 let blockSequence = 0;

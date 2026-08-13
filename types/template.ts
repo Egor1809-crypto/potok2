@@ -28,7 +28,11 @@ export type EmailBlockType =
   | "timeline"
   | "faq"
   | "coupon"
-  | "video";
+  | "video"
+  | "notice"
+  | "comparison"
+  | "document"
+  | "compliance";
 
 export interface EmailBlock {
   id: string;

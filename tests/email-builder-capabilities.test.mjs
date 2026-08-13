@@ -36,6 +36,26 @@ test("advanced editor controls and new content blocks compile into email-safe HT
   }
 });
 
+test("legal collection adds original scenarios and editable legal blocks", async () => {
+  const [templates, compiler, library, properties, seed] = await Promise.all([
+    readFile(new URL("../data/templates.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/server/email-document.ts", import.meta.url), "utf8"),
+    readFile(new URL("../components/email-builder/BlockLibrary.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/email-builder/PropertiesPanel.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/server/database-init.ts", import.meta.url), "utf8"),
+  ]);
+  assert.ok((templates.match(/id: "template-v4-legal-/g) ?? []).length >= 8);
+  for (const type of ["notice", "comparison", "document", "compliance"]) {
+    assert.match(compiler, new RegExp(`block\\.type === "${type}"`));
+    assert.match(library, new RegExp(`type: "${type}"`));
+    assert.match(properties, new RegExp(`${type}: \\[`));
+  }
+  for (const scenario of ["Обновление условий", "Политика конфиденциальности", "Документ на подпись", "Статус дела", "Правила использования ИИ", "Подтверждение согласия"]) {
+    assert.match(templates, new RegExp(scenario));
+  }
+  assert.match(seed, /email-template-library-v4-legal/);
+});
+
 test("AI design remains a separate version until the user chooses it", async () => {
   const [assistant, builder, server] = await Promise.all([
     readFile(new URL("../components/email-builder/AiEmailAssistant.tsx", import.meta.url), "utf8"),

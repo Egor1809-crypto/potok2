@@ -170,6 +170,10 @@ const BLOCK_STYLES: Record<EmailBuilderBlockInput["type"], BlockStyle> = {
   faq: { paddingTop: 18, paddingBottom: 18, backgroundColor: "#f8f6fb", textColor: "#302938", fontSize: 14, borderRadius: 12 },
   coupon: { paddingTop: 20, paddingBottom: 20, backgroundColor: "#f3edff", textColor: "#24182d", fontSize: 18, borderRadius: 14 },
   video: { paddingTop: 18, paddingBottom: 18, backgroundColor: "#17121c", textColor: "#ffffff", fontSize: 15, borderRadius: 14 },
+  notice: { paddingTop: 20, paddingBottom: 20, backgroundColor: "#fff7e6", textColor: "#3f2d16", fontSize: 15, borderRadius: 12 },
+  comparison: { paddingTop: 20, paddingBottom: 20, backgroundColor: "transparent", textColor: "#302938", fontSize: 14, borderRadius: 12 },
+  document: { paddingTop: 20, paddingBottom: 20, backgroundColor: "#f7f7fa", textColor: "#26222b", fontSize: 14, borderRadius: 12 },
+  compliance: { paddingTop: 18, paddingBottom: 18, backgroundColor: "#eef7f3", textColor: "#173d31", fontSize: 14, borderRadius: 12 },
 };
 
 export type StarterEmailTemplateValue = {
