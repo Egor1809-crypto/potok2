@@ -297,6 +297,7 @@ export type EmailAiRequest = {
 };
 
 export type EmailAiSuggestion = {
+  emailType?: "informational" | "welcome" | "invitation" | "promotion" | "event" | "news" | "notification" | "product_update" | "congratulation" | "transactional";
   subject: string;
   previewText: string;
   body: string;

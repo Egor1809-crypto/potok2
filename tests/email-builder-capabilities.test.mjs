@@ -13,6 +13,9 @@ test("new editor blocks have server-side email compilation", async () => {
   for (const type of ["hero", "quote", "checklist", "stats", "product"]) assert.match(source, new RegExp(`block\\.type === "${type}"`));
   assert.match(source, /<table role="presentation"/);
   assert.match(source, /escapeHtml\(block\.href/);
+  assert.match(source, /class="email-shell"/);
+  assert.match(source, /class="email-cta"/);
+  assert.match(source, /@media only screen and \(max-width:680px\)/);
 });
 
 test("uploaded logos are compiled as real images", async () => {
@@ -80,7 +83,7 @@ test("AI design remains a separate version until the user chooses it", async () 
   assert.match(assistant, /Сравнение редакций/);
   assert.match(assistant, /Продолжить с моим/);
   assert.match(assistant, /Заменить на вариант ИИ/);
-  assert.match(assistant, /Опишите задачу, настроение, стиль и желаемые цвета/);
+  assert.match(assistant, /аккуратный современный SaaS-email/);
   assert.match(assistant, /ИИ создаст одну предметную иллюстрацию/);
   assert.match(server, /api\.openverse\.org/);
   assert.match(server, /license_type/);
@@ -96,14 +99,18 @@ test("AI brief asks follow-up questions and accepts dragged user images", async 
   ]);
   assert.match(assistant, /Продолжить — уточнить детали/);
   assert.match(assistant, /Ответьте на вопросы по смыслу и предложению/);
-  assert.match(assistant, /Цвета повторно не спрашиваем/);
+  assert.match(assistant, /Визуальную систему ИИ подберёт автоматически/);
   assert.match(assistant, /Перетащите изображение сюда/);
   assert.match(assistant, /imageSource: \/без/);
   assert.match(assistant, /: "generate"/);
   assert.match(assistant, /prepareImageFile/);
   assert.match(assistant, /if \(!value\.trim\(\)\) return ""/);
   assert.match(assistant, /createImageBitmap/);
-  assert.match(server, /выразительных приёма/);
+  assert.match(server, /clean modern SaaS email/);
+  assert.match(server, /classifyEmailType/);
+  assert.match(server, /saasEmailBlockStyle/);
+  assert.match(server, /contentWidth: cleanSaas \? 620/);
+  assert.match(server, /frameStyle: cleanSaas \? "hairline"/);
   assert.match(server, /availableAssets/);
   assert.match(server, /Не спрашивай цвета/);
   assert.match(server, /createEditorialCopy/);

@@ -16,12 +16,9 @@ function nextPromptSuggestion(value: string) {
   if (value.trim().length < 12) return " для конкретной аудитории и с одним главным действием";
   if (!/(для кого|аудитор|юрист|руководител|клиент|партн[её]р|участник)/.test(normalized)) return ". Получатели — укажите должности или тип компаний";
   if (!/(цель|регистрац|купить|заказ|ответ|встреч|скачать|перейти|приглас)/.test(normalized)) return ". Цель письма — укажите одно действие читателя";
-  if (!/(стил|минимал|премиаль|редакцион|современн|делов|ярк|строг)/.test(normalized)) return ". Стиль — современный, деловой и уверенный";
-  if (!/(цвет|фон|графит|бел|фиолет|син|зел[её]н|красн|беж|ч[её]рн|пастел)/.test(normalized)) return ". Палитра — укажите основной цвет и фон";
   if (!/(до \d|срок|дат|сентябр|октябр|ноябр|декабр|январ|феврал|март|апрел|ма[йя]|июн|июл|август)/.test(normalized)) return ". Срок или дата — укажите, если они важны";
   if (!/https:\/\//.test(normalized)) return ". Ссылка главной кнопки — https://…";
-  if (!/(фото|изображен|иллюстрац|узор|паттерн|без фотограф)/.test(normalized)) return ". Визуальный приём — фото, иллюстрация или геометрический узор";
-  return ". Обязательно сохранить факты из запроса и не добавлять неподтверждённые обещания";
+  return ". Если нужен необычный стиль, укажите его отдельно; иначе будет чистый современный email";
 }
 
 export function AiEmailAssistant({ document, onApply }: { document: BuilderDocument; onApply: (document: BuilderDocument) => void }) {
@@ -151,7 +148,7 @@ export function AiEmailAssistant({ document, onApply }: { document: BuilderDocum
       <header className="text-center">
         <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-primary text-white shadow-lg"><Sparkles aria-hidden="true" className="size-5" /></span>
         <h2 className="mt-4 text-[28px] font-semibold tracking-[-0.04em] text-text-strong">{stage === "prompt" ? "Что нужно создать?" : "Уточним детали"}</h2>
-        <p className="mx-auto mt-2 max-w-2xl text-[13px] leading-6 text-text-muted">{stage === "prompt" ? "Опишите задачу, настроение, стиль и желаемые цвета прямо здесь. Чем конкретнее исходное описание, тем точнее арт-направление." : "Ответьте на вопросы по смыслу и предложению. Цвета повторно не спрашиваем — ИИ берёт их только из исходного описания."}</p>
+        <p className="mx-auto mt-2 max-w-2xl text-[13px] leading-6 text-text-muted">{stage === "prompt" ? "Опишите задачу письма, аудиторию и главное действие. Если стиль не указан, Поток создаст аккуратный современный SaaS-email." : "Ответьте на вопросы по смыслу и предложению. Визуальную систему ИИ подберёт автоматически, если вы не задали её в описании."}</p>
         <span className="mt-3 inline-flex rounded-full border border-border bg-surface px-3 py-1 text-[10px] font-medium text-text-muted">{configured === null ? "Проверяем подключение" : configured ? `${provider === "navyai" ? "NavyAI" : "OpenAI"} подключён` : "ИИ не подключён"}</span>
       </header>
 
@@ -159,7 +156,7 @@ export function AiEmailAssistant({ document, onApply }: { document: BuilderDocum
         <div className="card grid gap-4 p-5 sm:p-7">
           <div className="relative overflow-hidden rounded-xl">
             <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words px-4 py-3 text-[16px] font-medium leading-7"><span className="text-transparent">{goal}</span><span className="text-text-subtle/70">{promptSuggestion}</span></div>
-            <Textarea aria-describedby="ai-inline-suggestion-help" rows={9} maxLength={2000} value={goal} onChange={(event) => setGoal(event.target.value)} onKeyDown={(event) => { if ((event.key === "Enter" || event.key === "Tab") && !event.shiftKey && promptSuggestion) { event.preventDefault(); setGoal((value) => `${value}${promptSuggestion}`); } }} placeholder="Например: премиальное приглашение на конференцию для юристов. Тёмный графитовый фон, изумрудные акценты, тонкие геометрические линии. Цель — регистрация до 20 сентября…" className="relative z-10 resize-y !bg-transparent font-medium text-text-strong caret-primary" style={{ fontSize: 16, lineHeight: "28px", color: "var(--text-strong)" }} />
+            <Textarea aria-describedby="ai-inline-suggestion-help" rows={9} maxLength={2000} value={goal} onChange={(event) => setGoal(event.target.value)} onKeyDown={(event) => { if ((event.key === "Enter" || event.key === "Tab") && !event.shiftKey && promptSuggestion) { event.preventDefault(); setGoal((value) => `${value}${promptSuggestion}`); } }} placeholder="Например: письмо о запуске нового продукта для действующих клиентов. Коротко объяснить пользу и привести к странице продукта…" className="relative z-10 resize-y !bg-transparent font-medium text-text-strong caret-primary" style={{ fontSize: 16, lineHeight: "28px", color: "var(--text-strong)" }} />
             <span id="ai-inline-suggestion-help" className="sr-only">Серый текст рядом с курсором — предлагаемое продолжение. Нажмите Enter или Tab, чтобы принять его.</span>
           </div>
           {detectedUrl ? <div className="flex items-center gap-2 rounded-xl border border-primary/20 bg-primary-subtle/40 px-3 py-2.5 text-[11px]"><input id="ai-use-linked-context" type="checkbox" checked={useLinkedContext} onChange={(event) => setUseLinkedContext(event.target.checked)} className="accent-primary" /><label htmlFor="ai-use-linked-context" className="min-w-0"><strong className="block">Изучить страницу по ссылке</strong><span className="block truncate text-text-muted">{detectedUrl}</span></label></div> : null}
