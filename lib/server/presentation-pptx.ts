@@ -91,6 +91,42 @@ function presentationPatternShapes(
           ),
         );
       }
+  } else if (project.themeId === "modern") {
+    shapes.push(
+      rect(
+        id++,
+        "Современный · верхняя метка",
+        0.72 * EMU,
+        0.52 * EMU,
+        0.72 * EMU,
+        0.08 * EMU,
+        project.accentColor,
+        true,
+      ),
+    );
+    shapes.push(
+      rect(
+        id++,
+        "Современный · правая карточка",
+        10.1 * EMU,
+        0.58 * EMU,
+        2.22 * EMU,
+        1.22 * EMU,
+        soft,
+        true,
+      ),
+    );
+    shapes.push(
+      rect(
+        id++,
+        "Современный · нижняя линия",
+        0.72 * EMU,
+        6.5 * EMU,
+        11.6 * EMU,
+        0.035 * EMU,
+        project.accentColor,
+      ),
+    );
   } else if (project.themeId === "noir") {
     shapes.push(
       rect(

@@ -26,7 +26,6 @@ import {
   Palette,
   Plus,
   Save,
-  Send,
   Sparkles,
   Trash2,
   Type,
@@ -58,6 +57,7 @@ import type {
   PresentationAiResponse,
   PresentationMutationResponse,
   PresentationProjectRecord,
+  PresentationPatternId,
   PresentationSlide,
   PresentationSlideLayout,
   PresentationThemeId,
@@ -80,6 +80,20 @@ const sourceLabels: Record<PresentationProjectRecord["sourceType"], string> = {
   ai: "Черновик ИИ",
   email: "Из email-шаблона",
 };
+
+const presentationPatterns: Array<{
+  id: PresentationPatternId;
+  label: string;
+}> = [
+  { id: "auto", label: "По композиции" },
+  { id: "none", label: "Без узора" },
+  { id: "soft-grid", label: "Мягкая сетка" },
+  { id: "editorial-lines", label: "Линии" },
+  { id: "orbit", label: "Орбита" },
+  { id: "diagonal", label: "Диагональ" },
+  { id: "waves", label: "Волны" },
+  { id: "gold-frame", label: "Тонкая рамка" },
+];
 
 function apiError(body: unknown, fallback: string) {
   return body &&
@@ -145,8 +159,39 @@ function presentationPatternStyle(
   themeId: PresentationThemeId,
   accentColor: string,
   seed = "",
+  patternId: PresentationPatternId = "auto",
 ): CSSProperties {
   const accent = /^#[0-9a-f]{6}$/i.test(accentColor) ? accentColor : "#7C35F2";
+  if (patternId === "none") return {};
+  if (patternId === "soft-grid")
+    return {
+      backgroundImage: `linear-gradient(${accent}14 1px, transparent 1px), linear-gradient(90deg, ${accent}14 1px, transparent 1px)`,
+      backgroundSize: "48px 48px",
+    };
+  if (patternId === "editorial-lines")
+    return {
+      backgroundImage: `linear-gradient(90deg, ${accent}24 1px, transparent 1px), linear-gradient(${accent}18 1px, transparent 1px)`,
+      backgroundSize: "100% 100%, 100% 20%",
+    };
+  if (patternId === "orbit")
+    return {
+      backgroundImage: `radial-gradient(circle at 86% 22%, transparent 0 10%, ${accent}28 10.3% 10.8%, transparent 11.1% 17%, ${accent}16 17.3% 17.7%, transparent 18%)`,
+    };
+  if (patternId === "diagonal")
+    return {
+      backgroundImage: `linear-gradient(145deg, transparent 0 76%, ${accent}1F 76% 77%, transparent 77% 82%, ${accent}12 82% 83%, transparent 83%)`,
+    };
+  if (patternId === "waves")
+    return {
+      backgroundImage: `radial-gradient(circle at 100% 100%, transparent 0 18%, ${accent}22 18.4% 18.9%, transparent 19.3% 27%, ${accent}16 27.4% 27.9%, transparent 28.3%)`,
+    };
+  if (patternId === "gold-frame")
+    return {
+      backgroundImage: `linear-gradient(${accent} 0 0), linear-gradient(${accent} 0 0), linear-gradient(${accent} 0 0), linear-gradient(${accent} 0 0)`,
+      backgroundSize: "calc(100% - 10%) 1px, calc(100% - 10%) 1px, 1px calc(100% - 14%), 1px calc(100% - 14%)",
+      backgroundPosition: "center 7%, center 93%, 5% center, 95% center",
+      backgroundRepeat: "no-repeat",
+    };
   const variant =
     [...seed].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 4;
   if (seed && variant === 1) {
@@ -168,6 +213,11 @@ function presentationPatternStyle(
     };
   }
   switch (themeId) {
+    case "modern":
+      return {
+        backgroundImage: `linear-gradient(90deg, ${accent}14 1px, transparent 1px), linear-gradient(${accent}10 1px, transparent 1px), radial-gradient(circle at 91% 14%, ${accent}20 0 7%, transparent 7.4%)`,
+        backgroundSize: "64px 64px, 64px 64px, 100% 100%",
+      };
     case "premium":
       return {
         backgroundImage: `linear-gradient(90deg, ${accent}24 1px, transparent 1px), linear-gradient(${accent}18 1px, transparent 1px), radial-gradient(circle at 86% 20%, transparent 0 10%, ${accent}32 10.3% 10.8%, transparent 11.1%)`,
@@ -323,6 +373,7 @@ function SlidePreview({
           project.themeId,
           project.accentColor,
           slide.id,
+          slide.patternId ?? "auto",
         ),
       }}
     >
@@ -651,7 +702,7 @@ function ThemeStrip({
   onChange: (theme: PresentationThemeId) => void;
 }) {
   return (
-    <div className="grid grid-cols-5 gap-1.5">
+    <div className="grid grid-cols-3 gap-1.5">
       {presentationThemes.map((theme) => (
         <button
           key={theme.id}
@@ -1448,6 +1499,14 @@ export function PresentationStudio() {
             PPTX
           </Button>
           <Button
+            variant="outline"
+            size="sm"
+            leadingIcon={<Mail className="size-3.5" />}
+            onClick={() => void openEmailCampaign()}
+          >
+            В письмо
+          </Button>
+          <Button
             size="sm"
             leadingIcon={<Save className="size-3.5" />}
             onClick={() => void saveProject()}
@@ -1462,9 +1521,9 @@ export function PresentationStudio() {
             {error}
           </Alert>
         ) : null}
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-[var(--shadow-sm)]">
-          <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[176px_minmax(0,1fr)] 2xl:grid-cols-[176px_minmax(0,1fr)_340px]">
-            <aside className="flex min-h-0 flex-col border-b border-border bg-[#F2E9DF]/60 p-3 lg:border-b-0 lg:border-r">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden border border-border bg-surface">
+          <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[164px_minmax(0,1fr)] xl:grid-cols-[164px_minmax(0,1fr)_320px]">
+            <aside className="flex min-h-0 flex-col border-b border-border bg-surface-subtle p-3 lg:border-b-0 lg:border-r">
               <div className="mb-3 flex items-center justify-between">
                 <div>
                   <strong className="block text-[12px]">Слайды</strong>
@@ -1519,7 +1578,7 @@ export function PresentationStudio() {
                 })}
               </div>
             </aside>
-            <section className="flex min-w-0 flex-col bg-[#E9E2DE]/65">
+            <section className="flex min-w-0 min-h-0 flex-col bg-[#F2F3F5]">
               <div className="flex items-center justify-between border-b border-border bg-surface/85 px-4 py-2.5">
                 <div>
                   <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-primary">
@@ -1569,9 +1628,18 @@ export function PresentationStudio() {
                     Удалить
                   </Button>
                 </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="xl:hidden"
+                  leadingIcon={<Palette className="size-3.5" />}
+                  onClick={() => setQuickSlideOpen(true)}
+                >
+                  Инструменты
+                </Button>
               </div>
-              <div className="grid min-h-0 flex-1 place-items-center overflow-y-auto p-4 sm:p-6 xl:p-8">
-                <div className="w-full max-w-[1180px] overflow-hidden rounded-[14px] border border-border bg-surface shadow-[0_30px_90px_rgb(48_25_43/0.18)]">
+              <div className="grid min-h-0 flex-1 place-items-center overflow-hidden p-4 sm:p-5 xl:p-6">
+                <div className="w-full max-w-[1080px] overflow-hidden border border-border bg-surface shadow-[0_12px_36px_rgb(17_24_39/0.12)]">
                   <SlidePreview
                     project={project}
                     slide={selectedSlide}
@@ -1582,8 +1650,8 @@ export function PresentationStudio() {
                   />
                 </div>
               </div>
-              <div className="sticky bottom-0 z-10 border-t border-border bg-surface/95 px-4 py-3 backdrop-blur sm:px-6">
-                <div className="mx-auto flex max-w-[1180px] items-center justify-between gap-4">
+              <div className="shrink-0 border-t border-border bg-surface px-4 py-2.5 sm:px-5">
+                <div className="mx-auto flex max-w-[1080px] items-center justify-between gap-4">
                   <div className="min-w-0 flex-1">
                     <div className="h-1.5 overflow-hidden rounded-full bg-surface-inset">
                       <div
@@ -1615,8 +1683,52 @@ export function PresentationStudio() {
                 </div>
               </div>
             </section>
-            <aside className="min-h-0 overflow-hidden border-t border-border bg-surface p-4 lg:col-start-2 2xl:col-start-auto 2xl:border-l 2xl:border-t-0">
+            <aside className="hidden min-h-0 overflow-hidden border-l border-border bg-surface p-4 xl:block">
               <div className="grid h-full min-h-0 gap-5 overflow-y-auto pr-1">
+                <div className="sticky top-0 z-10 -mx-4 -mt-4 border-b border-border bg-surface px-4 py-3">
+                  <strong className="block text-[13px]">Инструменты слайда</strong>
+                  <span className="text-[10px] text-text-subtle">
+                    Композиция, контент, изображения и оформление
+                  </span>
+                </div>
+                <section>
+                  <h3 className="mb-2 mt-0 text-[12px] font-semibold">
+                    Добавить на слайд
+                  </h3>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      ["Текст", "statement"],
+                      ["Список", "bullets"],
+                      ["Фото", "split"],
+                      ["Цифры", "stats"],
+                      ["Цитата", "quote"],
+                      ["Кнопка", "closing"],
+                    ].map(([label, layout]) => (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => {
+                          if (label === "Фото") setSlideImageOpen(true);
+                          updateSlide({
+                            layout: layout as PresentationSlideLayout,
+                            ...(label === "Список" && !selectedSlide.bullets.length
+                              ? { bullets: ["Первый пункт", "Второй пункт"] }
+                              : {}),
+                            ...(label === "Цифры" && !selectedSlide.bullets.length
+                              ? { bullets: ["24% | рост", "3× | быстрее"] }
+                              : {}),
+                            ...(label === "Кнопка" && !selectedSlide.ctaLabel
+                              ? { ctaLabel: "Узнать подробнее" }
+                              : {}),
+                          });
+                        }}
+                        className="rounded-lg border border-border bg-surface px-2 py-2.5 text-[10px] font-semibold transition hover:border-primary/40 hover:bg-primary-subtle"
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </section>
                 <section>
                   <h3 className="mb-2 mt-0 text-[12px] font-semibold">
                     Композиция
@@ -1779,13 +1891,44 @@ export function PresentationStudio() {
                 </section>
                 <section>
                   <h3 className="mb-2 mt-0 text-[12px] font-semibold">
-                    Фон и цвета
+                    Оформление
                   </h3>
                   <p className="mb-3 mt-0 text-[10px] leading-4 text-text-muted">
                     Тема задаёт основу всей презентации. Цвета ниже меняют
                     только активный слайд.
                   </p>
                   <ThemeStrip value={project.themeId} onChange={changeTheme} />
+                  <div className="mt-3">
+                    <p className="mb-2 mt-0 text-[11px] font-semibold">
+                      Узор слайда
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {presentationPatterns.map((pattern) => (
+                        <button
+                          key={pattern.id}
+                          type="button"
+                          aria-pressed={(selectedSlide.patternId ?? "auto") === pattern.id}
+                          onClick={() => updateSlide({ patternId: pattern.id })}
+                          className="rounded-lg border border-border bg-surface p-2 text-left text-[10px] font-medium transition hover:border-primary/40 aria-pressed:border-primary aria-pressed:bg-primary-subtle"
+                        >
+                          <span
+                            className="mb-1.5 block aspect-[3/1] rounded border border-border"
+                            style={{
+                              backgroundColor:
+                                selectedSlide.backgroundColor ?? project.backgroundColor,
+                              ...presentationPatternStyle(
+                                project.themeId,
+                                selectedSlide.accentColor ?? project.accentColor,
+                                "preview",
+                                pattern.id,
+                              ),
+                            }}
+                          />
+                          {pattern.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <div className="mt-3 grid grid-cols-3 gap-2">
                     <FormField label="Акцент">
                       <Input
@@ -1864,23 +2007,6 @@ export function PresentationStudio() {
                 </section>
               </div>
             </aside>
-          </div>
-          <div className="flex flex-col gap-3 border-t border-border bg-[#1C171B] px-4 py-4 text-white sm:flex-row sm:items-center sm:justify-between sm:px-6">
-            <div>
-              <p className="m-0 text-[12px] font-semibold">
-                Презентация готова для письма
-              </p>
-              <p className="mb-0 mt-1 text-[10px] text-white/60">
-                В кампании выберите UniSender: Поток приложит сохранённый PPTX к
-                email.
-              </p>
-            </div>
-            <Button
-              onClick={() => void openEmailCampaign()}
-              leadingIcon={<Send className="size-4" />}
-            >
-              Отправить вместе с письмом
-            </Button>
           </div>
         </div>
         <Modal

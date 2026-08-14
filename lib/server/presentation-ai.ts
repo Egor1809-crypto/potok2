@@ -22,6 +22,7 @@ import { ensureDatabase, WORKSPACE_ID } from "./database-init";
 
 const THEMES = new Set<PresentationThemeId>([
   "atelier",
+  "modern",
   "violet",
   "noir",
   "ocean",
@@ -175,6 +176,8 @@ function resolvedThemeId(
   if (/технолог|digital|неон|футур|фиолет|сирен/.test(brief)) return "violet";
   if (/спокой|исслед|аналит|син|бирюз|вод|океан/.test(brief)) return "ocean";
   if (/т[её]пл|энерг|запуск|оранж|корал|солн/.test(brief)) return "sunrise";
+  if (/соврем|modern|минимал|saas|чист|аккурат|воздух/.test(brief))
+    return "modern";
   return input.themeId;
 }
 

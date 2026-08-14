@@ -362,7 +362,23 @@ export type EmailAiResponse = {
 };
 
 export type PresentationThemeId =
-  "atelier" | "violet" | "noir" | "ocean" | "sunrise" | "premium";
+  | "atelier"
+  | "modern"
+  | "violet"
+  | "noir"
+  | "ocean"
+  | "sunrise"
+  | "premium";
+
+export type PresentationPatternId =
+  | "auto"
+  | "none"
+  | "soft-grid"
+  | "editorial-lines"
+  | "orbit"
+  | "diagonal"
+  | "waves"
+  | "gold-frame";
 
 export type PresentationSlideLayout =
   "title" | "statement" | "split" | "bullets" | "quote" | "stats" | "closing";
@@ -383,6 +399,7 @@ export type PresentationSlide = {
   accentColor?: string;
   backgroundColor?: string;
   textColor?: string;
+  patternId?: PresentationPatternId;
 };
 
 export type PresentationSourceType = "blank" | "template" | "ai" | "email";

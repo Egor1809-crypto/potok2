@@ -16,6 +16,7 @@ import type {
   PresentationSlideLayout,
   PresentationSourceType,
   PresentationThemeId,
+  PresentationPatternId,
   PresentationsListResponse,
 } from "@/types/api";
 
@@ -30,11 +31,22 @@ import { ensureDatabase, WORKSPACE_ID } from "./database-init";
 
 const THEMES = new Set<PresentationThemeId>([
   "atelier",
+  "modern",
   "violet",
   "noir",
   "ocean",
   "sunrise",
   "premium",
+]);
+const PATTERNS = new Set<PresentationPatternId>([
+  "auto",
+  "none",
+  "soft-grid",
+  "editorial-lines",
+  "orbit",
+  "diagonal",
+  "waves",
+  "gold-frame",
 ]);
 const LAYOUTS = new Set<PresentationSlideLayout>([
   "title",
@@ -130,6 +142,13 @@ function parseSlide(value: unknown, index: number): PresentationSlide {
         return label && url ? [{ label, url }] : [];
       })
     : undefined;
+  const rawPattern = optionalText(
+    object.patternId,
+    `Узор слайда ${index + 1}`,
+    40,
+  );
+  if (rawPattern && !PATTERNS.has(rawPattern as PresentationPatternId))
+    throw new ApiRequestError(`Выберите допустимый узор слайда ${index + 1}.`);
   return {
     id:
       optionalText(object.id, `Идентификатор слайда ${index + 1}`, 160) ||
@@ -161,6 +180,7 @@ function parseSlide(value: unknown, index: number): PresentationSlide {
       ? { ctaUrl: safeLink(object.ctaUrl, `Ссылка кнопки слайда ${index + 1}`) }
       : {}),
     ...(socialLinks?.length ? { socialLinks } : {}),
+    ...(rawPattern ? { patternId: rawPattern as PresentationPatternId } : {}),
     ...(object.accentColor !== undefined
       ? {
           accentColor: color(

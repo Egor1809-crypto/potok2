@@ -174,6 +174,7 @@ test("AI presentation outline follows a narrative and does not invent evidence",
   assert.match(server, /safeFallbackOutline/);
   assert.match(server, /function resolvedThemeId/);
   assert.match(server, /return "premium"/);
+  assert.match(server, /return "modern"/);
   assert.match(server, /senior presentation designer/);
   assert.match(server, /Криптовалюты: возможности, риски и осознанные решения/);
   assert.match(
@@ -246,6 +247,18 @@ test("PowerPoint export builds OOXML and only fetches same-origin library assets
     ),
     /presentationPatternStyle/,
   );
+  const studio = await readFile(
+    new URL(
+      "../components/presentations/PresentationStudio.tsx",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  assert.match(studio, /presentationPatterns/);
+  assert.match(studio, /Инструменты слайда/);
+  assert.match(studio, /Добавить на слайд/);
+  assert.doesNotMatch(studio, /sticky bottom-0/);
+  assert.doesNotMatch(studio, /Презентация готова для письма/);
   assert.match(
     store,
     /Для слайда можно выбрать только изображение из общей медиатеки Поток/,

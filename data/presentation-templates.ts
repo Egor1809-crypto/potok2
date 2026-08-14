@@ -25,6 +25,15 @@ export const presentationThemes: PresentationTheme[] = [
     surfaceColor: "#F1E4D8",
   },
   {
+    id: "modern",
+    name: "Современный",
+    description: "Чистая модульная сетка, карточки и много воздуха",
+    accentColor: "#6558E8",
+    backgroundColor: "#F6F7FB",
+    textColor: "#111827",
+    surfaceColor: "#FFFFFF",
+  },
+  {
     id: "violet",
     name: "Ультрафиолет",
     description: "Контрастный digital-стиль для сильного питча",
