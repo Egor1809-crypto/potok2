@@ -39,7 +39,7 @@ export function AppShell({
   const [commandMenuOpen, setCommandMenuOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-background text-text-strong">
+    <div data-product-shell className="min-h-screen bg-background text-text-strong">
       <a
         href="#main-content"
         className="fixed left-3 top-3 z-[100] -translate-y-20 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground shadow-lg outline-none transition-transform focus:translate-y-0"

@@ -67,7 +67,7 @@ export function AppSidebar({
       aria-label="Навигация по платформе"
       className={cn(
         "relative flex h-dvh w-[264px] shrink-0 flex-col border-r border-border bg-surface text-text-strong",
-        mobile && "w-[min(86vw,304px)] shadow-2xl",
+        mobile && "w-[min(86vw,304px)] shadow-[var(--shadow-lg)]",
         className,
       )}
     >
@@ -203,7 +203,7 @@ export function AppSidebar({
           className={buttonVariants({
             variant: "primary",
             size: "sm",
-            className: "mb-3 w-full justify-center shadow-[0_5px_16px_rgba(124,53,242,0.24)]",
+            className: "mb-3 w-full justify-center",
           })}
         >
           <Plus aria-hidden="true" className="size-4" />

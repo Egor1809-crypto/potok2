@@ -1,39 +1,43 @@
 @import "tailwindcss";
 
 /*
- * MAILFLOW design tokens
- * Light is the product default. A matching dark token set is available through
- * .dark or [data-theme="dark"] without coupling components to a theme switcher.
+ * Поток: functional flat product tokens.
+ * The product UI intentionally uses high-contrast text, quiet white surfaces
+ * and a restrained yellow action accent. Document canvases keep their own
+ * author-selected palettes.
  */
 :root {
   color-scheme: light;
 
-  --background: #f7f0e7;
-  --foreground: #160f1b;
-  --surface: #fffaf3;
-  --surface-raised: #fffcf8;
-  --surface-subtle: #f1e7e2;
-  --surface-inset: #ece0dc;
+  --background: #f5f5f5;
+  --foreground: #111111;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-subtle: #f2f2f2;
+  --surface-inset: #ebebeb;
 
-  --primary: #7c35f2;
-  --primary-hover: #6a29dd;
-  --primary-active: #5920c5;
-  --primary-subtle: #ebdff0;
-  --primary-muted: #dcc7e8;
+  --primary: #111111;
+  --primary-hover: #2b2b2b;
+  --primary-active: #000000;
+  --primary-subtle: #fff1a8;
+  --primary-muted: #ffdf3a;
   --primary-foreground: #ffffff;
+  --action: #ffcc00;
+  --action-hover: #f2c200;
+  --action-active: #e6b800;
 
-  --text-strong: #160f1b;
-  --text: #382f3e;
-  --text-muted: #706476;
-  --text-subtle: #9a8d9f;
+  --text-strong: #000000;
+  --text: #111111;
+  --text-muted: #191919;
+  --text-subtle: #2b2b2b;
   --text-inverse: #ffffff;
   --text-primary: var(--text-strong);
   --text-secondary: var(--text-muted);
   --text-tertiary: var(--text-subtle);
 
-  --border: #dfcfe3;
-  --border-strong: #ceb9d6;
-  --border-focus: #7c35f2;
+  --border: #dedede;
+  --border-strong: #c7c7c7;
+  --border-focus: #111111;
 
   --success: #16855b;
   --success-subtle: #e8f7f0;
@@ -45,28 +49,25 @@
   --info: #2878c7;
   --info-subtle: #ebf5ff;
 
-  --chart-1: #7c35f2;
-  --chart-2: #aa6cf5;
+  --chart-1: #111111;
+  --chart-2: #ffcc00;
   --chart-3: #1e9b72;
   --chart-4: #b88532;
-  --chart-grid: #e7d8e5;
+  --chart-grid: #dedede;
 
-  --radius-xs: 5px;
-  --radius-sm: 8px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 18px;
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
   --radius-pill: 999px;
 
-  --shadow-xs: 0 1px 2px rgb(48 25 43 / 0.05);
-  --shadow-sm:
-    0 1px 2px rgb(48 25 43 / 0.05), 0 3px 10px rgb(48 25 43 / 0.04);
-  --shadow-md:
-    0 2px 5px rgb(48 25 43 / 0.05), 0 12px 28px rgb(75 39 69 / 0.08);
-  --shadow-lg:
-    0 4px 12px rgb(48 25 43 / 0.07), 0 24px 56px rgb(75 39 69 / 0.12);
+  --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.04);
+  --shadow-sm: 0 2px 8px rgb(0 0 0 / 0.07);
+  --shadow-md: 0 8px 24px rgb(0 0 0 / 0.09);
+  --shadow-lg: 0 16px 40px rgb(0 0 0 / 0.12);
   --shadow-floating: var(--shadow-lg);
-  --shadow-focus: 0 0 0 3px rgb(124 53 242 / 0.2);
+  --shadow-focus: 0 0 0 3px rgb(255 204 0 / 0.55);
 
   --sidebar-width: 252px;
   --topbar-height: 68px;
@@ -168,8 +169,8 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), Inter, ui-sans-serif, system-ui, sans-serif;
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: 16px;
+  line-height: 1.55;
 }
 
 button,
@@ -199,12 +200,12 @@ a {
 }
 
 ::selection {
-  background: var(--primary-muted);
+  background: var(--action);
   color: var(--text-strong);
 }
 
 :focus-visible {
-  outline: 2px solid var(--border-focus);
+  outline: 3px solid var(--action);
   outline-offset: 2px;
 }
 
@@ -226,7 +227,18 @@ a {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface);
-  box-shadow: var(--shadow-xs);
+  box-shadow: none;
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+a.surface:hover,
+a.card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
 }
 
 .surface-raised {
@@ -241,10 +253,13 @@ a {
   align-items: center;
   gap: 7px;
   margin: 0 0 10px;
-  color: var(--primary);
-  font-size: 11px;
-  font-weight: 680;
-  letter-spacing: 0.11em;
+  border-radius: var(--radius-sm);
+  background: var(--primary-subtle);
+  color: var(--text-strong);
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   line-height: 1.2;
   text-transform: uppercase;
 }
@@ -253,8 +268,7 @@ a {
   text-wrap: balance;
 }
 
-/* The marketing product mockups use compact literal utilities. Keep them in
- * the same warm cream and vivid violet family as the application shell. */
+/* Product mockups inherit the same high-contrast flat palette. */
 .mailflow-marketing [class~="bg-[#625cf6]"] {
   background-color: var(--primary);
 }
@@ -304,7 +318,7 @@ a {
 /* Buttons are available both as React primitives and plain utility classes. */
 .btn {
   display: inline-flex;
-  min-height: 38px;
+  min-height: 42px;
   align-items: center;
   justify-content: center;
   gap: 8px;
@@ -312,8 +326,8 @@ a {
   border-radius: var(--radius-md);
   padding: 0 14px;
   color: var(--text);
-  font-size: 13px;
-  font-weight: 620;
+  font-size: 15px;
+  font-weight: 650;
   line-height: 1;
   white-space: nowrap;
   user-select: none;
@@ -345,20 +359,21 @@ a {
 }
 
 .btn-primary {
-  border-color: var(--primary);
-  background: var(--primary);
-  color: var(--primary-foreground);
-  box-shadow: 0 1px 2px rgb(86 31 143 / 0.2);
+  border-color: var(--action);
+  background: var(--action);
+  color: var(--text-strong);
+  box-shadow: none;
 }
 
 .btn-primary:hover:not(:disabled) {
-  border-color: var(--primary-hover);
-  background: var(--primary-hover);
-  box-shadow: 0 5px 14px rgb(104 38 184 / 0.2);
+  border-color: var(--action-hover);
+  background: var(--action-hover);
+  box-shadow: var(--shadow-sm);
 }
 
 .btn-primary:active:not(:disabled) {
-  background: var(--primary-active);
+  border-color: var(--action-active);
+  background: var(--action-active);
 }
 
 .btn-secondary {
@@ -402,16 +417,16 @@ a {
 }
 
 .btn-sm {
-  min-height: 32px;
+  min-height: 36px;
   border-radius: var(--radius-sm);
   padding-inline: 11px;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .btn-lg {
-  min-height: 44px;
+  min-height: 48px;
   padding-inline: 18px;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .btn-icon {
@@ -423,13 +438,13 @@ a {
 /* Inputs */
 .input {
   width: 100%;
-  min-height: 40px;
+  min-height: 44px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
   background: var(--surface);
   color: var(--text-strong);
   padding: 0 12px;
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.4;
   box-shadow: var(--shadow-xs);
   transition:
@@ -487,9 +502,9 @@ select.input {
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   background: var(--surface-subtle);
-  color: var(--text-muted);
+  color: var(--text-strong);
   padding: 3px 9px;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 620;
   letter-spacing: 0.01em;
   line-height: 1.2;
@@ -549,7 +564,7 @@ select.input {
   width: 100%;
   border-collapse: collapse;
   color: var(--text);
-  font-size: 13px;
+  font-size: 15px;
   text-align: left;
 }
 
@@ -557,9 +572,9 @@ select.input {
   height: 42px;
   border-bottom: 1px solid var(--border);
   background: color-mix(in srgb, var(--surface-subtle) 64%, var(--surface));
-  color: var(--text-muted);
+  color: var(--text-strong);
   padding: 0 16px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 650;
   letter-spacing: 0.035em;
   text-transform: uppercase;
@@ -646,6 +661,45 @@ select.input {
 
 .animate-slide-up {
   animation: mf-slide-up 220ms var(--ease-out) both;
+}
+
+/*
+ * Older feature screens contain compact pixel utilities. Increase only the
+ * product chrome in one place, without changing author-defined typography in
+ * exported letters, images or presentation files.
+ */
+[data-product-shell] .text-\[8px\] {
+  font-size: 11px !important;
+}
+
+[data-product-shell] .text-\[9px\] {
+  font-size: 12px !important;
+}
+
+[data-product-shell] .text-\[10px\] {
+  font-size: 13px !important;
+}
+
+[data-product-shell] .text-\[11px\] {
+  font-size: 14px !important;
+}
+
+[data-product-shell] .text-\[12px\] {
+  font-size: 15px !important;
+}
+
+[data-product-shell] .text-\[13px\] {
+  font-size: 16px !important;
+}
+
+[data-product-shell] :where(.text-xs) {
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+[data-product-shell] :where(.text-sm) {
+  font-size: 15px;
+  line-height: 1.55;
 }
 
 @media (max-width: 767px) {

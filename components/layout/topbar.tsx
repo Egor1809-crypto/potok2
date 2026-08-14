@@ -40,7 +40,7 @@ export function Topbar({
   }, []);
 
   return (
-    <header className="sticky top-0 z-40 flex h-[var(--topbar-height)] shrink-0 items-center justify-between gap-3 border-b border-border/70 bg-surface/95 px-4 backdrop-blur-xl sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-40 flex h-[var(--topbar-height)] shrink-0 items-center justify-between gap-3 border-b border-border bg-surface px-4 sm:px-6 lg:px-8">
       <span className="sr-only">Текущий раздел: {currentSection}</span>
 
       <div className="flex min-w-0 items-center gap-2.5">

@@ -152,12 +152,12 @@ export function DashboardView() {
   const participantName = snapshot.participant.displayName || "Участник";
   const firstName = participantName.split(" ")[0];
   const metrics = [
-    { label: "Шаблоны", value: number.format(snapshot.templates.length), note: "Макеты можно редактировать и клонировать", Icon: LibraryBig, href: "/templates", iconTone: "bg-[#F0E7FF] text-[#7133D7] border-[#DFC9FF]" },
-    { label: "Презентации", value: number.format(creativeCounts.presentations), note: "Сохранённые редактируемые проекты", Icon: GalleryHorizontalEnd, href: "/presentations", iconTone: "bg-[#E8F0FF] text-[#3267C8] border-[#CEDDFF]" },
-    { label: "Изображения", value: number.format(creativeCounts.images), note: "Визуалы в общей медиатеке", Icon: ImagePlus, href: "/image-studio", iconTone: "bg-[#FFF0E6] text-[#C45A1A] border-[#FFD7BF]" },
-    { label: "Контакты", value: number.format(snapshot.stats.totalContacts), note: `${number.format(snapshot.stats.activeContacts)} доступны для работы`, Icon: UsersRound, href: "/contacts", iconTone: "bg-[#E8F8EF] text-[#208454] border-[#CBEBD8]" },
-    { label: "Кампании", value: number.format(snapshot.stats.totalCampaigns), note: `${number.format(snapshot.stats.activeCampaigns)} требуют внимания`, Icon: SendHorizontal, href: "/campaigns", iconTone: "bg-[#FFF0F3] text-[#BE3D5D] border-[#FFD2DC]" },
-    { label: "Подключённые каналы", value: number.format(snapshot.stats.connectedIntegrations), note: "Email, Telegram или ВКонтакте", Icon: Zap, href: "/integrations", iconTone: "bg-[#FFF7D9] text-[#9A7211] border-[#F4E4A5]" },
+    { label: "Шаблоны", value: number.format(snapshot.templates.length), note: "Макеты можно редактировать и клонировать", Icon: LibraryBig, href: "/templates", iconTone: "bg-primary-subtle text-text-strong border-border-strong" },
+    { label: "Презентации", value: number.format(creativeCounts.presentations), note: "Сохранённые редактируемые проекты", Icon: GalleryHorizontalEnd, href: "/presentations", iconTone: "bg-surface-subtle text-text-strong border-border-strong" },
+    { label: "Изображения", value: number.format(creativeCounts.images), note: "Визуалы в общей медиатеке", Icon: ImagePlus, href: "/image-studio", iconTone: "bg-surface-subtle text-text-strong border-border-strong" },
+    { label: "Контакты", value: number.format(snapshot.stats.totalContacts), note: `${number.format(snapshot.stats.activeContacts)} доступны для работы`, Icon: UsersRound, href: "/contacts", iconTone: "bg-surface-subtle text-text-strong border-border-strong" },
+    { label: "Кампании", value: number.format(snapshot.stats.totalCampaigns), note: `${number.format(snapshot.stats.activeCampaigns)} требуют внимания`, Icon: SendHorizontal, href: "/campaigns", iconTone: "bg-surface-subtle text-text-strong border-border-strong" },
+    { label: "Подключённые каналы", value: number.format(snapshot.stats.connectedIntegrations), note: "Email, Telegram или ВКонтакте", Icon: Zap, href: "/integrations", iconTone: "bg-primary-subtle text-text-strong border-border-strong" },
   ];
 
   return (
@@ -172,10 +172,10 @@ export function DashboardView() {
       </section>
 
       <section id="creative-studio" className="grid scroll-mt-24 gap-3 md:grid-cols-2 xl:grid-cols-4" aria-label="Творческие модули">
-        <StudioCard href="/email-builder?new=1" Icon={MailPlus} title="Письмо" description="Собрать из блоков, шаблона или вместе с ИИ." action="Создать письмо" iconTone="from-[#EEE3FF] to-[#F7F2FF] text-[#7434D6] border-[#DEC7FF]" />
-        <StudioCard href="/presentations?new=1" Icon={PanelsTopLeft} title="Презентация" description="Создать слайды с нуля, из письма или по задаче." action="Открыть презентации" iconTone="from-[#E1ECFF] to-[#F1F6FF] text-[#3267C8] border-[#C8D9FF]" />
-        <StudioCard href="/image-studio?new=1" Icon={ImagePlus} title="Изображение" description="Создать визуал и использовать его в письме или слайдах." action="Открыть студию" iconTone="from-[#FFE8DB] to-[#FFF5EE] text-[#C45A1A] border-[#FFD3BB]" />
-        <StudioCard href="/contact-finder" Icon={UserSearch} title="Контакты" description="Найти публичные email и телефоны, проверить и импортировать." action="Начать поиск" iconTone="from-[#DFF5E8] to-[#F1FBF5] text-[#208454] border-[#C5E8D3]" />
+        <StudioCard href="/email-builder?new=1" Icon={MailPlus} title="Письмо" description="Собрать из блоков, шаблона или вместе с ИИ." action="Создать письмо" featured />
+        <StudioCard href="/presentations?new=1" Icon={PanelsTopLeft} title="Презентация" description="Создать слайды с нуля, из письма или по задаче." action="Открыть презентации" />
+        <StudioCard href="/image-studio?new=1" Icon={ImagePlus} title="Изображение" description="Создать визуал и использовать его в письме или слайдах." action="Открыть студию" />
+        <StudioCard href="/contact-finder" Icon={UserSearch} title="Контакты" description="Найти публичные email и телефоны, проверить и импортировать." action="Начать поиск" />
       </section>
 
       <section className="card p-5 sm:p-6" aria-labelledby="workflow-title">
@@ -276,17 +276,17 @@ function ReadinessStep({ ready, label, action, href }: { ready: boolean; label: 
   );
 }
 
-function StudioCard({ href, Icon, title, description, action, iconTone }: {
+function StudioCard({ href, Icon, title, description, action, featured = false }: {
   href: string;
   Icon: typeof MailPlus;
   title: string;
   description: string;
   action: string;
-  iconTone: string;
+  featured?: boolean;
 }) {
   return (
     <Link href={href} className="group rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 transition hover:-translate-y-0.5 hover:border-[var(--primary)]/35 hover:shadow-sm">
-      <span className={`relative grid size-12 place-items-center overflow-hidden rounded-[15px] border bg-gradient-to-br shadow-[0_8px_24px_rgb(73_49_92/0.10)] ${iconTone}`}><span aria-hidden="true" className="absolute -right-2 -top-2 size-6 rounded-full bg-white/70" /><Icon aria-hidden="true" strokeWidth={1.75} className="relative size-6 transition duration-200 group-hover:scale-110" /></span>
+      <span className={`grid size-12 place-items-center rounded-xl border border-border-strong text-text-strong transition duration-200 group-hover:-rotate-2 group-hover:scale-105 ${featured ? "bg-primary-subtle" : "bg-surface-subtle"}`}><Icon aria-hidden="true" strokeWidth={1.9} className="size-6" /></span>
       <h2 className="mt-4 text-[15px] font-semibold">{title}</h2>
       <p className="mt-1.5 text-[11px] leading-5 text-[var(--text-muted)]">{description}</p>
       <span className="mt-4 inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--primary)]">{action}<ArrowRight aria-hidden="true" className="size-3.5 transition group-hover:translate-x-0.5" /></span>
