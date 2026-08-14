@@ -92,6 +92,14 @@ test("AI briefs preserve design, CTA and social links in emails and presentation
   }
   assert.match(emailAi, /designBrief/);
   assert.match(emailAi, /socialLinks/);
+  assert.match(emailAi, /function premiumEmailBlockStyle/);
+  assert.match(emailAi, /#C6A15B/);
+  assert.match(emailAi, /#11110F/);
+  assert.match(emailAi, /input\.visualStyle === "premium"/);
+  assert.match(
+    emailAi,
+    /Не возвращай белое, голубое, фиолетовое или стандартное светлое SaaS-оформление/,
+  );
   assert.match(
     emailCompiler,
     /<a href="\$\{escapeHtml\(items\[index \+ 1\]\)\}"/,

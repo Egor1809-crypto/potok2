@@ -91,7 +91,12 @@ function requestedVisualStyle(
   )
     return "editorial";
   if (/ярк|дерзк|bold|неон|контрастн/.test(text)) return "bold";
-  if (/премиаль|люкс|luxury/.test(text)) return "premium";
+  if (
+    /премиаль|премиум|люкс|luxury|дорог|элит|золот|black\s*(?:and|&)\s*gold|ч[её]рн[^\n]{0,40}золот/.test(
+      text,
+    )
+  )
+    return "premium";
   return "minimal";
 }
 
@@ -694,6 +699,46 @@ function saasEmailBlockStyle(
   };
 }
 
+function premiumEmailBlockStyle(
+  type: EmailBuilderBlockInput["type"],
+  accent: string,
+) {
+  const cardTypes = new Set<EmailBuilderBlockInput["type"]>([
+    "hero",
+    "columns",
+    "checklist",
+    "stats",
+    "product",
+    "notice",
+    "document",
+    "compliance",
+  ]);
+  const base = saasEmailBlockStyle(type, accent, "#1B1915", "#11110F");
+  const isCard = cardTypes.has(type);
+  return {
+    ...base,
+    backgroundColor:
+      type === "hero" ? "#181612" : isCard ? "#1B1915" : "transparent",
+    textColor:
+      type === "button"
+        ? "#11110F"
+        : type === "footer"
+          ? "#A79E90"
+          : type === "divider"
+            ? "#574A31"
+            : type === "text"
+              ? "#D8D1C4"
+              : "#F8F2E7",
+    borderColor: isCard ? accent : "#3A3326",
+    borderWidth: isCard ? 1 : 0,
+    borderRadius:
+      type === "hero" ? 20 : type === "button" ? 8 : isCard ? 14 : 0,
+    ...(type === "button"
+      ? { backgroundColor: "transparent", buttonStyle: "solid" as const }
+      : {}),
+  };
+}
+
 function parseSuggestion(
   value: string,
   input: EmailAiRequest,
@@ -777,6 +822,7 @@ function parseSuggestion(
   if (input.action !== "design") return suggestion;
   const cleanSaas =
     input.visualStyle !== "editorial" && input.visualStyle !== "bold";
+  const premium = input.visualStyle === "premium";
   const design =
     object.design &&
     typeof object.design === "object" &&
@@ -862,10 +908,9 @@ function parseSuggestion(
   const assetById = new Map(
     (input.availableAssets ?? []).map((asset) => [asset.id, asset]),
   );
-  const rawAccentColor = hexColor(
-    design.accentColor ?? input.primaryColor,
-    "#6D28D9",
-  );
+  const rawAccentColor = premium
+    ? hexColor(input.primaryColor, "#C6A15B")
+    : hexColor(design.accentColor ?? input.primaryColor, "#6D28D9");
   const red = Number.parseInt(rawAccentColor.slice(1, 3), 16);
   const green = Number.parseInt(rawAccentColor.slice(3, 5), 16);
   const blue = Number.parseInt(rawAccentColor.slice(5, 7), 16);
@@ -878,10 +923,25 @@ function parseSuggestion(
       ? "#2563EB"
       : rawAccentColor;
   const bodyBackground = hexColor(design.bodyBackground, "#FFFDF8");
-  const effectiveBodyBackground = cleanSaas ? "#FFFFFF" : bodyBackground;
-  const workspaceBackground = cleanSaas
-    ? "#F6F8FC"
-    : hexColor(design.workspaceBackground ?? input.secondaryColor, "#F2ECF7");
+  const effectiveBodyBackground = premium
+    ? "#11110F"
+    : cleanSaas
+      ? "#FFFFFF"
+      : bodyBackground;
+  const workspaceBackground = premium
+    ? "#EDE8DF"
+    : cleanSaas
+      ? "#F6F8FC"
+      : hexColor(design.workspaceBackground ?? input.secondaryColor, "#F2ECF7");
+  const styleBlock = (type: EmailBuilderBlockInput["type"]) =>
+    premium
+      ? premiumEmailBlockStyle(type, accentColor)
+      : saasEmailBlockStyle(
+          type,
+          accentColor,
+          "#EFF6FF",
+          effectiveBodyBackground,
+        );
   const allowedTypes = new Set<EmailBuilderBlockInput["type"]>([
     "logo",
     "heading",
@@ -1000,12 +1060,7 @@ function parseSuggestion(
               ? { href: input.websiteUrl }
               : {}),
         ...(cleanSaas
-          ? saasEmailBlockStyle(
-              type,
-              accentColor,
-              "#EFF6FF",
-              effectiveBodyBackground,
-            )
+          ? styleBlock(type)
           : creativeBlockStyle(
               type,
               index,
@@ -1048,12 +1103,7 @@ function parseSuggestion(
           : `Фотография: ${asset.filename}`,
       href: asset.url,
       ...(cleanSaas
-        ? saasEmailBlockStyle(
-            type,
-            accentColor,
-            "#EFF6FF",
-            effectiveBodyBackground,
-          )
+        ? styleBlock(type)
         : creativeBlockStyle(
             type,
             blocks.length,
@@ -1079,12 +1129,7 @@ function parseSuggestion(
       id: `ai-hero-${crypto.randomUUID()}`,
       type: "hero" as const,
       content: `${suggestion.subject}|${suggestion.previewText}`,
-      ...saasEmailBlockStyle(
-        "hero",
-        accentColor,
-        "#EFF6FF",
-        effectiveBodyBackground,
-      ),
+      ...styleBlock("hero"),
     };
     const logoIndex = blocks.findIndex((block) => block.type === "logo");
     blocks.splice(logoIndex >= 0 ? logoIndex + 1 : 0, 0, hero);
@@ -1096,17 +1141,15 @@ function parseSuggestion(
       id: `ai-heading-${crypto.randomUUID()}`,
       type: "heading",
       content: suggestion.subject,
-      ...blockDefaults("heading"),
-      fontFamily: "Arial",
-      fontWeight: 700,
-      lineHeight: 115,
-      letterSpacing: 0,
-      paddingLeft: 40,
-      paddingRight: 40,
-      borderWidth: 0,
-      borderColor: "#e5e7eb",
-      widthPercent: 100,
-      buttonStyle: "solid",
+      ...(cleanSaas
+        ? styleBlock("heading")
+        : creativeBlockStyle(
+            "heading",
+            0,
+            accentColor,
+            workspaceBackground,
+            bodyBackground,
+          )),
     });
   }
   if (!blocks.some((block) => block.type === "text")) {
@@ -1114,17 +1157,15 @@ function parseSuggestion(
       id: `ai-text-${crypto.randomUUID()}`,
       type: "text",
       content: suggestion.body,
-      ...blockDefaults("text"),
-      fontFamily: "Arial",
-      fontWeight: 400,
-      lineHeight: 155,
-      letterSpacing: 0,
-      paddingLeft: 40,
-      paddingRight: 40,
-      borderWidth: 0,
-      borderColor: "#e5e7eb",
-      widthPercent: 100,
-      buttonStyle: "solid",
+      ...(cleanSaas
+        ? styleBlock("text")
+        : creativeBlockStyle(
+            "text",
+            blocks.length,
+            accentColor,
+            workspaceBackground,
+            bodyBackground,
+          )),
     });
   }
   if (cleanSaas) {
@@ -1142,12 +1183,7 @@ function parseSuggestion(
         content: suggestion.cta,
         label: suggestion.cta,
         href: input.websiteUrl,
-        ...saasEmailBlockStyle(
-          "button",
-          accentColor,
-          "#EFF6FF",
-          effectiveBodyBackground,
-        ),
+        ...styleBlock("button"),
       });
     }
     if (input.websiteUrl) {
@@ -1178,12 +1214,7 @@ function parseSuggestion(
           content: input.socialLinks
             .flatMap((item) => [item.label, item.url])
             .join("|"),
-          ...saasEmailBlockStyle(
-            "social",
-            accentColor,
-            "#EFF6FF",
-            effectiveBodyBackground,
-          ),
+          ...styleBlock("social"),
         },
       );
     }
@@ -1193,12 +1224,7 @@ function parseSuggestion(
         id: `ai-divider-${crypto.randomUUID()}`,
         type: "divider",
         content: "",
-        ...saasEmailBlockStyle(
-          "divider",
-          accentColor,
-          "#EFF6FF",
-          effectiveBodyBackground,
-        ),
+        ...styleBlock("divider"),
       });
     }
     if (!blocks.some((block) => block.type === "footer")) {
@@ -1206,12 +1232,7 @@ function parseSuggestion(
         id: `ai-footer-${crypto.randomUUID()}`,
         type: "footer",
         content: `${input.brandName || "Компания"} · Вы получили письмо, потому что подписаны на обновления · Отписаться`,
-        ...saasEmailBlockStyle(
-          "footer",
-          accentColor,
-          "#EFF6FF",
-          effectiveBodyBackground,
-        ),
+        ...styleBlock("footer"),
       });
     }
   }
@@ -1252,7 +1273,7 @@ function parseSuggestion(
     workspaceBackground,
     contentWidth: cleanSaas ? 620 : 640,
     frameStyle: cleanSaas ? "hairline" : "none",
-    frameColor: "#E5E7EB",
+    frameColor: premium ? accentColor : "#E5E7EB",
     frameRadius: cleanSaas ? 16 : 0,
     blocks,
   });
@@ -1576,6 +1597,7 @@ function emailDesignInstructions(
   input: EmailAiRequest,
   cleanSaasDesign: boolean,
 ) {
+  const premium = input.visualStyle === "premium";
   const layoutRule = cleanSaasDesign
     ? `Пользователь не запросил экспериментальный стиль. Обязательная философия: clean modern SaaS email уровня Mailchimp, Brevo, Unisender, Customer.io или Resend. Структура: маленький logo/header (только при наличии логотипа или названия бренда) → компактный hero → при необходимости heading → короткие абзацы основного текста → ровно одна CTA при наличии ссылки → ссылки социальных сетей при наличии → divider → компактный footer. Допустимы только 1–2 дополнительных функциональных блока, если они действительно нужны сценарию: columns, checklist, stats, product, notice, document или compliance. ${/узор|паттерн|контур|геометр|декор/i.test(input.designBrief ?? "") ? "Пользователь явно попросил декор: добавь один сдержанный pattern-блок, согласованный с пожеланием." : "Не используй pattern, banner, quote, coupon, timeline, faq или video по умолчанию."} Hero не должен занимать большую часть письма. Никакой асимметрии и никакого выравнивания заголовка вправо.`
     : "Пользователь явно запросил нестандартный визуальный стиль. Можно использовать более выразительную композицию, но она всё равно обязана оставаться совместимым email-шаблоном шириной 600–640 пикселей, а не превращаться в лендинг или постер.";
@@ -1589,11 +1611,14 @@ function emailDesignInstructions(
     : input.imageSource === "generate"
       ? "Добавь не более одного компактного image-блока и предметный imagePrompt без текста на изображении."
       : "Не добавляй image.";
+  const paletteRule = premium
+    ? "Это премиальное письмо: обязательная палитра — почти чёрный фон письма #11110F, тёплое золото #C6A15B, светлый текст #F8F2E7 и приглушённый текст #D8D1C4. Hero и функциональные карточки тёмные, с тонкой золотой линией; кнопка золотая с почти чёрным текстом. Не возвращай белое, голубое, фиолетовое или стандартное светлое SaaS-оформление. Премиальность создают контраст, точная типографика, тонкая рамка и ритм — не огромные заголовки и не декоративная перегрузка."
+    : "Палитра спокойная: белый card, внешний фон около #F6F8FC, текст #111827/#4B5563, светлый accent-card около #EFF6FF. Не выбирай красный основным без прямой просьбы.";
   return `Ты senior email designer и редактор профессиональных маркетинговых писем на русском языке. Проектируй именно HTML EMAIL для Gmail, Outlook и Apple Mail — не лендинг, не презентацию, не постер, не журнальную страницу и не новостной сайт. authoritativeUserBrief задаёт тему и ограничения, а briefAnswers — только сырьё: нельзя копировать их списком или склеивать дословно. approvedEditorialCopy — утверждённая редакция темы, прехедера, основного текста и действия; сохрани её смысл. detectedEmailType — уже определённый сценарий письма, верни его как emailType и подбери композицию внутри общей email-дизайн-системы.
 
 ${layoutRule}
 
-Типографика: только Arial/Helvetica/sans-serif; H1 не более 34px, H2 20–26px, текст 15–17px, footer 12–14px; letter-spacing 0 кроме маленького логотипа. Палитра спокойная: белый card, внешний фон около #F6F8FC, текст #111827/#4B5563, светлый accent-card около #EFF6FF. Не выбирай красный основным без прямой просьбы. Отступы 24–40px, радиусы карточек 14–20px, кнопки 6–10px. Всего обычно 5–9 блоков.
+Типографика: только Arial/Helvetica/sans-serif; H1 не более 34px, H2 20–26px, текст 15–17px, footer 12–14px; letter-spacing 0 кроме маленького логотипа. ${paletteRule} Отступы 24–40px, радиусы карточек 14–20px, кнопки 6–10px. Всего обычно 5–9 блоков.
 
 Пожелания пользователя к оформлению находятся в designBrief и обязательны, пока не нарушают совместимость email. Текст, ссылка кнопки и socialLinks являются точными данными: не переименовывай и не выдумывай их. Запрещены giant headlines, breaking news, декоративные номера, uppercase-плашки, красные рамки, большие пустоты, полноэкранный hero, aggressive typography, журнальная сетка, производственные комментарии, названия блоков и HEX-коды в видимом тексте. artDirection и contentStrategy опиши отдельно. Составные блоки кодируй через вертикальную черту: hero — заголовок|пояснение, columns — две части, stats — число|подпись|число|подпись, product/document/compliance/notice — три части. Не создавай HTML: сервер сам соберёт table-based inline-CSS email. ${assetRule} ${imageRule} Не выдумывай факты, даты и цифры. Сохраняй только переменные {{first_name}}, {{last_name}}, {{company}}, {{position}}, {{city}}. Если websiteUrl отсутствует, не добавляй button, document или compliance. Цвета — только #RRGGBB. Ответ строго по JSON-схеме.`;
 }
