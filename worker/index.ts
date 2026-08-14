@@ -43,6 +43,14 @@ const worker = {
 
     return handler.fetch(request, env, ctx);
   },
+  async scheduled(_controller: ScheduledController, _env: Env, ctx: ExecutionContext) {
+    // Keep the scheduler's database/provider graph out of the SSR entry. It is
+    // only needed when Cloudflare invokes the cron handler.
+    ctx.waitUntil(
+      import("../lib/server/mailflow-store")
+        .then(({ runDueScheduledCampaignsSystem }) => runDueScheduledCampaignsSystem()),
+    );
+  },
 };
 
 export default worker;

@@ -40,6 +40,7 @@ export interface EmailBlock {
   content: string;
   alignment?: "left" | "center" | "right";
   href?: string;
+  linkHref?: string;
   label?: string;
   paddingTop?: number;
   paddingBottom?: number;

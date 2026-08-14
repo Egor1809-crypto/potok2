@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   CircleAlert,
   CircleDashed,
-  Download,
   Mail,
   MessageCircleMore,
   MessagesSquare,
@@ -66,10 +65,11 @@ const channelIcons = {
 const setupFields: Record<IntegrationProviderId, SetupField[]> = {
   "vk-workspace": [
     {
-      key: "exportLabel",
-      label: "Метка экспорта",
-      placeholder: "Основная рассылка",
-      hint: "Необязательное название ручного CSV-маршрута.",
+      key: "senderEmail",
+      label: "Корпоративный адрес отправителя",
+      placeholder: "mailing@company.ru",
+      type: "email",
+      hint: "Полный адрес ящика VK WorkSpace. Пароль приложения хранится только в защищённой конфигурации сервера.",
     },
   ],
   "telegram-bot-api": [
@@ -549,13 +549,13 @@ export function IntegrationsView() {
         <div className="rounded-xl border border-[#bcd8ff] bg-[#f3f8ff] p-5">
           <div className="flex items-start gap-3">
             <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#1777ff] text-white">
-              <Download aria-hidden="true" className="size-4" />
+              <Mail aria-hidden="true" className="size-4" />
             </span>
             <div>
-              <h2 className="text-[14px] font-semibold text-text-strong">Нативные «Рассылки» VK WorkSpace</h2>
+              <h2 className="text-[14px] font-semibold text-text-strong">VK WorkSpace SMTP внутри Потока</h2>
               <p className="mt-1 text-[12px] leading-5 text-text-muted">
-                Создайте кампанию, выберите аудиторию и пройдите проверку. Только после этого
-                Поток сформирует CSV именно для зафиксированных получателей. Письмо и запуск завершаются в VK WorkSpace вручную.
+                После подключения пароля приложения Поток сам отправит HTML-письмо с рабочими
+                кнопками выбранным получателям. Открывать VK WorkSpace и загружать CSV не потребуется.
               </p>
             </div>
           </div>

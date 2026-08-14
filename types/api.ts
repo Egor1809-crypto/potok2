@@ -166,6 +166,7 @@ export type EmailBuilderBlockInput = {
   content: string;
   label?: string;
   href?: string;
+  linkHref?: string;
   alignment?: "left" | "center" | "right";
   paddingTop: number;
   paddingBottom: number;

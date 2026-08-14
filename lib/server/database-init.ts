@@ -758,15 +758,19 @@ async function seedDatabase(request: Request) {
 }
 
 export async function ensureDatabase(request: Request): Promise<void> {
+  await ensureSystemDatabase();
+  await requireWorkspaceParticipant(request);
+}
+
+export async function ensureSystemDatabase(): Promise<void> {
   if (!initialization) {
     initialization = (async () => {
       await createSchema();
-      await seedDatabase(request);
+      await seedDatabase(new Request("http://potok.internal/system"));
     })().catch((error) => {
       initialization = null;
       throw error;
     });
   }
   await initialization;
-  await requireWorkspaceParticipant(request);
 }

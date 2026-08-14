@@ -452,7 +452,7 @@ function BlockContent({
 
   if (block.type === "image") {
     if (block.href) {
-      return (
+      const image = (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={previewImageSource(block.href)}
@@ -461,6 +461,7 @@ function BlockContent({
           style={{ borderRadius: block.borderRadius }}
         />
       );
+      return block.linkHref ? <a href={block.linkHref} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>{image}</a> : image;
     }
     return (
       <div

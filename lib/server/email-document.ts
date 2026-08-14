@@ -102,12 +102,16 @@ export function parseEmailBuilderDocument(
       : type === "image"
         ? safeHttpsUrl(block.href, `Ссылка изображения ${index + 1}`, true)
         : safeHttpsUrl(block.href, `Ссылка блока ${index + 1}`, false);
+    const linkHref = type === "image" || type === "logo"
+      ? safeHttpsUrl(block.linkHref, `Ссылка при нажатии ${index + 1}`, false)
+      : undefined;
     return {
       id: text(block.id, `ID блока ${index + 1}`, 160),
       type,
       content: text(block.content, `Контент блока ${index + 1}`, 20_000),
       ...(block.label === undefined ? {} : { label: text(block.label, `Подпись блока ${index + 1}`, 2_000) }),
       ...(href ? { href } : {}),
+      ...(linkHref ? { linkHref } : {}),
       alignment,
       paddingTop: number(block.paddingTop, `Верхний отступ блока ${index + 1}`, 0, 80),
       paddingBottom: number(block.paddingBottom, `Нижний отступ блока ${index + 1}`, 0, 80),
@@ -175,7 +179,8 @@ function blockHtml(block: EmailBuilderBlockInput, accent: string) {
   } else if (block.type === "text" || block.type === "footer" || block.type === "logo" || block.type === "signature") {
     const weight = block.type === "logo" ? "font-weight:700;letter-spacing:.12em;" : "";
     if (block.type === "logo" && block.href) {
-      content = `<img src="${escapeHtml(block.href)}" alt="${escapeHtml(block.content)}" style="display:inline-block;max-width:220px;max-height:88px;width:auto;height:auto;border:0;">`;
+      const image = `<img src="${escapeHtml(block.href)}" alt="${escapeHtml(block.content)}" style="display:inline-block;max-width:220px;max-height:88px;width:auto;height:auto;border:0;">`;
+      content = block.linkHref ? `<a href="${escapeHtml(block.linkHref)}" style="text-decoration:none;">${image}</a>` : image;
     } else {
       content = `<div style="margin:0;font-family:${family},sans-serif;font-size:${block.fontSize}px;font-weight:${block.fontWeight ?? 400};line-height:${lineHeight};letter-spacing:${tracking}px;color:${block.textColor};${weight}">${lineBreaks(block.content)}</div>`;
     }
@@ -184,7 +189,8 @@ function blockHtml(block: EmailBuilderBlockInput, accent: string) {
     const buttonColor = block.buttonStyle === "solid" || !block.buttonStyle ? block.textColor : accent;
     content = `<a class="email-cta" href="${escapeHtml(block.href ?? "")}" style="display:inline-block;padding:13px 24px;border:${block.buttonStyle === "outline" ? `2px solid ${accent}` : "0"};border-radius:${block.borderRadius}px;background:${buttonBackground};color:${buttonColor};font-family:${family},Helvetica,sans-serif;font-size:${block.fontSize}px;font-weight:${weight || 700};line-height:1.2;text-decoration:none;">${lineBreaks(block.label || block.content)}</a>`;
   } else if (block.type === "image") {
-    content = `<img src="${escapeHtml(block.href ?? "")}" alt="${escapeHtml(block.content)}" width="100%" style="display:block;width:100%;max-width:100%;height:auto;border:0;border-radius:${block.borderRadius}px;">`;
+    const image = `<img src="${escapeHtml(block.href ?? "")}" alt="${escapeHtml(block.content)}" width="100%" style="display:block;width:100%;max-width:100%;height:auto;border:0;border-radius:${block.borderRadius}px;">`;
+    content = block.linkHref ? `<a href="${escapeHtml(block.linkHref)}" style="display:block;text-decoration:none;">${image}</a>` : image;
   } else if (block.type === "columns") {
     const columns = block.content.split("|");
     content = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td width="50%" valign="top" style="padding:12px;border:1px solid #e5e7eb;border-radius:${block.borderRadius}px;font-family:Arial,sans-serif;font-size:${block.fontSize}px;line-height:1.5;color:${block.textColor};">${lineBreaks(columns[0] ?? "")}</td><td width="12"></td><td width="50%" valign="top" style="padding:12px;border:1px solid #e5e7eb;border-radius:${block.borderRadius}px;font-family:Arial,sans-serif;font-size:${block.fontSize}px;line-height:1.5;color:${block.textColor};">${lineBreaks(columns[1] ?? "")}</td></tr></table>`;

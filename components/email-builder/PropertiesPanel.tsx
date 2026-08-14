@@ -221,6 +221,22 @@ export function PropertiesPanel({
               />
             ) : null}
             {block.type === "image" || block.type === "logo" ? (
+              <FormField label="Ссылка при нажатии" htmlFor="builder-image-action" hint="Получатель откроет эту страницу, если нажмёт на фотографию или логотип.">
+                <div className="relative">
+                  <Link2 aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-text-subtle" />
+                  <Input
+                    id="builder-image-action"
+                    type="url"
+                    value={block.linkHref ?? ""}
+                    placeholder="https://company.ru/страница"
+                    onChange={(event) => onUpdateBlock({ linkHref: event.target.value })}
+                    onBlur={(event) => onUpdateBlock({ linkHref: normalizedActionUrl(event.target.value) })}
+                    className="pl-8 text-[11px]"
+                  />
+                </div>
+              </FormField>
+            ) : null}
+            {block.type === "image" || block.type === "logo" ? (
               <FormField
                 label="Или HTTPS-ссылка"
                 htmlFor="builder-image-link"

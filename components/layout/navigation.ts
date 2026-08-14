@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  CalendarDays,
   Cable,
   ContactRound,
   FolderOpen,
@@ -113,6 +114,14 @@ export const productNavigation: ProductNavGroup[] = [
   {
     label: "Проверка и отправка",
     items: [
+      {
+        label: "Календарь рассылок",
+        description: "Темы, группы и время отправки",
+        href: "/calendar",
+        icon: CalendarDays,
+        exact: true,
+        keywords: ["расписание", "дата", "группа", "тема", "планировщик"],
+      },
       {
         label: "Тест и отправка",
         description: "Проверить письмо и передать провайдеру",

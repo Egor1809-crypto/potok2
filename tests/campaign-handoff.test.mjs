@@ -63,5 +63,5 @@ test("a deleted recovered campaign is recreated instead of failing readiness", a
   assert.match(wizard, /updateResponse\.status === 404/);
   assert.match(wizard, /id = await createDraft\(\)/);
   assert.match(wizard, /Название рассылки/);
-  assert.match(wizard, /Подготовить запуск через VK WorkSpace/);
+  assert.match(wizard, /Проверить SMTP-отправку/);
 });

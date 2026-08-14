@@ -11,7 +11,7 @@ import type {
 type RuntimeEnv = Record<string, string | undefined>;
 
 const requiredSecretKeys: Record<IntegrationProviderId, string[]> = {
-  "vk-workspace": [],
+  "vk-workspace": ["VK_WORKSPACE_SMTP_PASSWORD"],
   "telegram-bot-api": ["TELEGRAM_BOT_TOKEN"],
   "vk-api": ["VK_COMMUNITY_ACCESS_TOKEN"],
   unisender: ["UNISENDER_API_KEY"],
@@ -21,7 +21,7 @@ const requiredPublicFields: Record<
   IntegrationProviderId,
   Partial<Record<"email" | "telegram" | "vk", string[]>>
 > = {
-  "vk-workspace": { email: [] },
+  "vk-workspace": { email: ["senderEmail"] },
   "telegram-bot-api": { telegram: ["botUsername"] },
   "vk-api": { vk: ["communityId"] },
   unisender: { email: ["senderEmail", "listId"] },

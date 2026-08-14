@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lte, or } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
   campaignEvents,
@@ -90,9 +90,11 @@ import {
 import { uniqueAcceptedContactIds } from "./delivery-metrics";
 import {
   ensureDatabase,
+  ensureSystemDatabase,
   PARTICIPANT_ID,
   WORKSPACE_ID,
 } from "./database-init";
+import { sendVkWorkspaceSmtpBatch } from "./vk-workspace-smtp";
 import {
   assertEmailTemplateReference,
   toEmailTemplateRecord,
@@ -1486,7 +1488,7 @@ function providerId(value: unknown): IntegrationProviderId {
 const SENSITIVE_KEY = /(token|secret|password|api.?key|credential|access.?key)/i;
 
 const PUBLIC_CONFIG_FIELDS: Record<IntegrationProviderId, string[]> = {
-  "vk-workspace": ["exportLabel"],
+  "vk-workspace": ["senderEmail"],
   "telegram-bot-api": ["botUsername"],
   "vk-api": ["communityId"],
   unisender: ["senderEmail", "listId"],
@@ -2230,17 +2232,8 @@ async function evaluateLaunch(
       }
     }
   }
-  if (
-    campaign.scheduledAt &&
-    Date.parse(campaign.scheduledAt) <= Date.now()
-  ) {
-    blockers.push(
-      "Дата запланированного запуска уже прошла. Выберите новую дату или уберите расписание.",
-    );
-  } else if (campaign.scheduledAt) {
-    blockers.push(
-      "Автоматический планировщик ещё не подключён. Для явной отправки выберите режим «Сейчас».",
-    );
+  if (campaign.scheduledAt && Date.parse(campaign.scheduledAt) <= Date.now()) {
+    blockers.push("Дата запланированного запуска уже прошла. Выберите новую дату или режим «Сейчас».");
   }
 
   for (const plan of plans) {
@@ -2283,12 +2276,12 @@ async function evaluateLaunch(
       if (!campaign.senderEmail.trim()) channelBlockers.push("Укажите email отправителя.");
       if (!campaign.emailBodyText.trim()) channelBlockers.push("Добавьте текст email-письма.");
       if (
-        plan.providerId === "unisender" &&
+        (plan.providerId === "unisender" || plan.providerId === "vk-workspace") &&
         provider?.publicConfig.senderEmail?.toLocaleLowerCase("en") !==
           campaign.senderEmail.toLocaleLowerCase("en")
       ) {
         channelBlockers.push(
-          "Email отправителя кампании должен совпадать с адресом, настроенным для UniSender.",
+          `Email отправителя кампании должен совпадать с адресом, настроенным для ${provider?.name ?? "провайдера"}.`,
         );
       }
     } else if (!campaign.messengerMessage.trim()) {
@@ -2324,7 +2317,7 @@ async function evaluateLaunch(
     status === "blocked"
       ? blockers.join(" ")
       : status === "scheduled"
-        ? `Проверка пройдена. План запуска сохранён на ${campaign.scheduledAt}; внешний адаптер отправки не запускался.`
+        ? `Проверка пройдена. Письмо будет передано провайдеру по расписанию: ${campaign.scheduledAt}.`
         : "Проверка пройдена. Кампания готова, но внешняя отправка не запускалась.";
   const metrics = { ...campaign.metrics, recipients: audience.length };
   const readyVersion = blockers.length
@@ -2592,6 +2585,55 @@ async function processUniSenderOutbox(
   };
 }
 
+async function processVkWorkspaceSmtpOutbox(
+  rows: DeliveryOutboxRecord[],
+  integration: IntegrationRecord,
+  version: CampaignVersionRecord,
+) {
+  if (!rows.length) return {} as Record<string, string>;
+  const contactsById = new Map(
+    (await getDb().select().from(contacts).where(eq(contacts.workspaceId, WORKSPACE_ID)))
+      .map(toContact)
+      .map((contact) => [contact.id, contact]),
+  );
+  await getDb().update(deliveryOutbox).set({
+    status: "processing",
+    attempts: 1,
+    statusMessage: "Поток передаёт персонализированное HTML-письмо в VK WorkSpace SMTP.",
+    updatedAt: new Date().toISOString(),
+  }).where(inArray(deliveryOutbox.id, rows.map((row) => row.id)));
+  const credentials = automaticProviderSecrets("vk-workspace") as { password?: string };
+  const senderEmail = integration.publicConfig.senderEmail?.trim() || version.snapshot.senderEmail;
+  const results = await sendVkWorkspaceSmtpBatch({
+    host: "smtp.mail.ru",
+    port: 465,
+    username: senderEmail,
+    password: credentials.password ?? "",
+    senderName: version.snapshot.senderName,
+    senderEmail,
+    timeoutMs: 20_000,
+  }, rows.flatMap((row) => {
+    const contact = contactsById.get(row.contactId);
+    if (!contact) return [];
+    return [{
+      outboxId: row.id,
+      to: row.recipientEndpoint,
+      subject: renderContactTemplate(version.snapshot.subject, contact),
+      text: renderContactTemplate(version.snapshot.emailBodyText, contact),
+      html: renderContactTemplate(version.snapshot.emailBodyHtml, contact),
+    }];
+  }));
+  const byId = new Map(results.map((result) => [result.outboxId, result]));
+  for (const row of rows) {
+    const result = byId.get(row.id);
+    await updateOutboxResult(row, result ?? {
+      status: "rejected",
+      message: "Контакт удалён до обработки SMTP-задания.",
+    });
+  }
+  return { mailbox: senderEmail, accepted: String(results.filter((item) => item.status === "accepted").length) };
+}
+
 async function dispatchCampaign(
   request: Request,
   campaignId: string,
@@ -2646,9 +2688,14 @@ async function dispatchCampaign(
       };
     }
   }
-  if (current.campaign.status !== "ready" || !current.campaign.readyVersionId) {
+  const scheduledIsDue = current.campaign.status === "scheduled" &&
+    Boolean(current.campaign.scheduledAt) &&
+    Date.parse(current.campaign.scheduledAt ?? "") <= Date.now();
+  if ((current.campaign.status !== "ready" && !scheduledIsDue) || !current.campaign.readyVersionId) {
     throw new ApiRequestError(
-      "Начать отправку можно только для кампании со статусом «Готова». Повторите проверку готовности.",
+      current.campaign.status === "scheduled"
+        ? "Время запланированной отправки ещё не наступило."
+        : "Начать отправку можно только для кампании со статусом «Готова». Повторите проверку готовности.",
       409,
     );
   }
@@ -2865,6 +2912,15 @@ async function dispatchCampaign(
         ),
       };
     }
+    const smtpRows = rows.filter((row) => row.providerId === "vk-workspace");
+    if (smtpRows.length) {
+      const integration = integrationsNow.find((item) => item.providerId === "vk-workspace");
+      if (!integration) throw new Error("Интеграция VK WorkSpace недоступна");
+      providerExternalIds = {
+        ...providerExternalIds,
+        "vk-workspace": await processVkWorkspaceSmtpOutbox(smtpRows, integration, version),
+      };
+    }
   } catch (error) {
     await db
       .update(deliveryOutbox)
@@ -2975,6 +3031,45 @@ async function dispatchCampaign(
     deliveryJob: toDeliveryJob(finalJobRow),
     event: event ?? startEvent,
   };
+}
+
+export type ScheduledRunResult = {
+  checkedAt: string;
+  dueCount: number;
+  dispatched: Array<{ campaignId: string; status: string; message: string }>;
+};
+
+async function runDueScheduledCampaignsCore(): Promise<ScheduledRunResult> {
+  const now = new Date().toISOString();
+  const due = await getDb().select().from(campaigns).where(and(
+    eq(campaigns.workspaceId, WORKSPACE_ID),
+    eq(campaigns.status, "scheduled"),
+    lte(campaigns.scheduledAt, now),
+  )).orderBy(asc(campaigns.scheduledAt)).limit(20);
+  const dispatched: ScheduledRunResult["dispatched"] = [];
+  for (const row of due) {
+    try {
+      const result = await dispatchCampaign(
+        new Request("http://potok.internal/scheduler"),
+        row.id,
+        `schedule:${row.readyVersionId ?? row.id}`,
+      );
+      dispatched.push({ campaignId: row.id, status: result.deliveryJob?.status ?? result.campaign.status, message: result.deliveryJob?.statusMessage ?? result.campaign.statusReason });
+    } catch (error) {
+      dispatched.push({ campaignId: row.id, status: "blocked", message: error instanceof Error ? error.message : "Не удалось обработать запланированную отправку." });
+    }
+  }
+  return { checkedAt: now, dueCount: due.length, dispatched };
+}
+
+export async function runDueScheduledCampaignsSystem() {
+  await ensureSystemDatabase();
+  return runDueScheduledCampaignsCore();
+}
+
+export async function runDueScheduledCampaigns(request: Request) {
+  await ensureDatabase(request);
+  return runDueScheduledCampaignsCore();
 }
 
 function csvValue(value: string) {

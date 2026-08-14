@@ -7,6 +7,7 @@ import {
   type ProviderCheckResult,
 } from "./provider-adapters";
 import { hasRuntimeCredentials, runtimeSecret } from "./runtime-integrations";
+import { checkVkWorkspaceSmtp } from "./vk-workspace-smtp";
 
 const CHECK_TIMEOUT_MS = 10_000;
 
@@ -21,12 +22,18 @@ export async function checkProviderConnection(
     return { ok: false, message: "Интеграция выключена." };
   }
   if (integration.providerId === "vk-workspace") {
-    return {
-      ok: true,
-      identity: "manual_export",
-      message:
-        "Ручной CSV-маршрут готов. Поток не подключается к несуществующему публичному API «Рассылок» VK WorkSpace.",
-    };
+    if (!hasRuntimeCredentials(integration.providerId)) {
+      return { ok: false, message: "Добавьте пароль приложения VK WorkSpace в защищённую конфигурацию сервера." };
+    }
+    const senderEmail = integration.publicConfig.senderEmail?.trim();
+    if (!senderEmail) return { ok: false, message: "Укажите полный адрес корпоративного ящика VK WorkSpace." };
+    return checkVkWorkspaceSmtp({
+      host: "smtp.mail.ru",
+      port: 465,
+      username: senderEmail,
+      password: runtimeSecret("VK_WORKSPACE_SMTP_PASSWORD"),
+      timeoutMs: CHECK_TIMEOUT_MS,
+    });
   }
   if (!hasRuntimeCredentials(integration.providerId)) {
     return {
@@ -66,6 +73,9 @@ export async function checkProviderConnection(
 }
 
 export function automaticProviderSecrets(providerId: IntegrationProviderId) {
+  if (providerId === "vk-workspace") {
+    return { password: runtimeSecret("VK_WORKSPACE_SMTP_PASSWORD") };
+  }
   if (providerId === "telegram-bot-api") {
     return { token: runtimeSecret("TELEGRAM_BOT_TOKEN") };
   }
