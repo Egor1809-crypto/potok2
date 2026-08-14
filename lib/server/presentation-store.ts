@@ -34,6 +34,7 @@ const THEMES = new Set<PresentationThemeId>([
   "noir",
   "ocean",
   "sunrise",
+  "premium",
 ]);
 const LAYOUTS = new Set<PresentationSlideLayout>([
   "title",
@@ -160,6 +161,33 @@ function parseSlide(value: unknown, index: number): PresentationSlide {
       ? { ctaUrl: safeLink(object.ctaUrl, `Ссылка кнопки слайда ${index + 1}`) }
       : {}),
     ...(socialLinks?.length ? { socialLinks } : {}),
+    ...(object.accentColor !== undefined
+      ? {
+          accentColor: color(
+            object.accentColor,
+            `Акцент слайда ${index + 1}`,
+            "#7C35F2",
+          ),
+        }
+      : {}),
+    ...(object.backgroundColor !== undefined
+      ? {
+          backgroundColor: color(
+            object.backgroundColor,
+            `Фон слайда ${index + 1}`,
+            "#FFF9F1",
+          ),
+        }
+      : {}),
+    ...(object.textColor !== undefined
+      ? {
+          textColor: color(
+            object.textColor,
+            `Текст слайда ${index + 1}`,
+            "#211827",
+          ),
+        }
+      : {}),
   };
 }
 

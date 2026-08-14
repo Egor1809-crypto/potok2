@@ -26,6 +26,7 @@ const THEMES = new Set<PresentationThemeId>([
   "noir",
   "ocean",
   "sunrise",
+  "premium",
 ]);
 const LAYOUTS = new Set<PresentationSlideLayout>([
   "title",
@@ -161,6 +162,20 @@ function parseRequest(
       optionalInteger(object.slideCount, "Количество слайдов", 3, 20) ?? 7,
     themeId: rawTheme as PresentationThemeId,
   };
+}
+
+function resolvedThemeId(
+  input: ReturnType<typeof parseRequest>,
+): PresentationThemeId {
+  const brief = `${input.designBrief ?? ""} ${input.goal}`.toLocaleLowerCase(
+    "ru-RU",
+  );
+  if (/преми|luxur|дорог|элит|золот|графит/.test(brief)) return "premium";
+  if (/т[её]мн|нуар|black|dark|контраст/.test(brief)) return "noir";
+  if (/технолог|digital|неон|футур|фиолет|сирен/.test(brief)) return "violet";
+  if (/спокой|исслед|аналит|син|бирюз|вод|океан/.test(brief)) return "ocean";
+  if (/т[её]пл|энерг|запуск|оранж|корал|солн/.test(brief)) return "sunrise";
+  return input.themeId;
 }
 
 function outputText(value: unknown): string {
@@ -894,97 +909,107 @@ function safeFallbackOutline(input: ReturnType<typeof parseRequest>) {
   > = [
     {
       layout: "statement",
-      eyebrow: "ЗАДАЧА",
-      title: "Презентация должна привести аудиторию к одному понятному решению",
-      body: input.goal.slice(0, 700),
+      eyebrow: "ГЛАВНАЯ МЫСЛЬ",
+      title: `${summary}: важно отделить реальную ценность от общих ожиданий`,
+      body: `Для аудитории «${audience}» тема становится полезной, когда связана с конкретной задачей, условиями применения и понятным результатом.`,
       bullets: [],
     },
     {
       layout: "split",
-      eyebrow: "КОНТЕКСТ",
-      title: "Исходная ситуация задаёт границы сильного предложения",
+      eyebrow: "ЧТО УЖЕ ИЗВЕСТНО",
+      title: "Исходные данные определяют границы корректного вывода",
       body: facts,
       bullets: [
-        "Что уже известно",
-        "Что остаётся гипотезой",
-        "Что нужно проверить",
+        "Подтверждённые факты",
+        "Рабочие предположения",
+        "Вопросы для проверки",
       ],
     },
     {
       layout: "bullets",
-      eyebrow: "АУДИТОРИЯ",
-      title: `${audience} оценивает не набор функций, а полезность в своей работе`,
-      body: "Свяжите предложение с реальным рабочим сценарием и критерием выбора.",
+      eyebrow: "КАК ЭТО УСТРОЕНО",
+      title: `Тему «${summary}» стоит разбирать через механизм, участников и результат`,
+      body: "Так обсуждение переходит от впечатления к причинно-следственной логике.",
       bullets: [
-        "Текущая задача аудитории",
-        "Предлагаемое изменение",
+        "Как запускается процесс",
+        "Кто влияет на результат",
+        "Где возникают ограничения",
+        "Как проверить эффект",
+      ],
+    },
+    {
+      layout: "split",
+      eyebrow: "ПРАКТИЧЕСКАЯ ЦЕННОСТЬ",
+      title: "Польза возникает только в конкретном сценарии применения",
+      body: `Для аудитории «${audience}» нужно показать изменение рабочего процесса, а не перечислять свойства темы.`,
+      bullets: [
+        "Задача до изменения",
+        "Новый способ действия",
         "Наблюдаемый результат",
       ],
     },
     {
-      layout: "statement",
-      eyebrow: "ЦЕННОСТЬ",
+      layout: "bullets",
+      eyebrow: "ВОЗМОЖНОСТИ",
+      title: "Сильные сценарии объединяет измеримая польза для участника",
+      body: "Приоритет получают применения, где понятны владелец, действие и критерий результата.",
+      bullets: [
+        "Ускорение понятного процесса",
+        "Снижение ручной нагрузки",
+        "Повышение прозрачности решения",
+        "Новый доступный сценарий",
+      ],
+    },
+    {
+      layout: "bullets",
+      eyebrow: "ОГРАНИЧЕНИЯ И РИСКИ",
       title:
-        "Сильное предложение объясняет изменение простым рабочим сценарием",
-      body: "Покажите путь от текущей ситуации к результату — без неподтверждённых обещаний.",
-      bullets: [],
-    },
-    {
-      layout: "split",
-      eyebrow: "ПИЛОТ",
-      title: "Ограниченный пилот снижает стоимость ошибки",
-      body: "Начните с одного понятного сценария.",
+        "До применения нужно проверить цену ошибки и границы ответственности",
+      body: "Риски определяются не только технологией, но и процессом, данными и действиями людей.",
       bullets: [
-        "Один процесс",
-        "Ограниченная группа",
-        "Заранее выбранный критерий",
-      ],
-    },
-    {
-      layout: "bullets",
-      eyebrow: "ПРОВЕРКА",
-      title: "Критерии решения нужно согласовать до старта",
-      body: "Так результат можно обсуждать предметно.",
-      bullets: [
-        "Что наблюдаем",
-        "Когда подводим итог",
-        "Кто принимает решение о продолжении",
+        "Качество исходных данных",
+        "Контроль и проверка результата",
+        "Правовые и организационные ограничения",
+        "Сценарий восстановления после ошибки",
       ],
     },
     {
       layout: "statement",
-      eyebrow: "РИСК",
-      title: "Главный риск — принять удобный процесс за полезный",
-      body: "Оцените не только удобство, но и качество результата для рабочей задачи.",
+      eyebrow: "КРИТЕРИЙ ВЫБОРА",
+      title:
+        "Решение стоит принимать по качеству результата, а не по новизне подхода",
+      body: "Сравните текущий и новый сценарий по точности, скорости, стоимости и управляемости риска.",
       bullets: [],
     },
     {
       layout: "split",
-      eyebrow: "РЕШЕНИЕ",
-      title: "Итог пилота должен вести к одному из трёх решений",
-      body: "Продолжить, изменить условия проверки или остановиться.",
+      eyebrow: "ПРАКТИЧЕСКАЯ ПРОВЕРКА",
+      title:
+        "Первый шаг должен проверять главный риск, а не охватывать всю систему",
+      body: "Выберите один сценарий и заранее определите, какой результат подтвердит ценность подхода.",
       bullets: [
-        "Масштабировать",
-        "Уточнить гипотезу",
-        "Отказаться без лишних затрат",
+        "Один реальный процесс",
+        "Ограниченный круг участников",
+        "Измеримый критерий",
       ],
     },
     {
       layout: "bullets",
-      eyebrow: "ПОДГОТОВКА",
-      title: "До запуска достаточно ответить на три вопроса",
-      body: "Не усложняйте первый цикл.",
+      eyebrow: "ЧТО НУЖНО РЕШИТЬ",
+      title: "До следующего шага достаточно согласовать четыре условия",
+      body: `Эти условия переводят тему «${summary}» в управляемое решение.`,
       bullets: [
-        "Какой сценарий берём",
-        "Кто участвует",
-        "Как фиксируем обратную связь",
+        "Какую задачу решаем",
+        "Кто отвечает за результат",
+        "Какие ограничения обязательны",
+        "Когда и как оцениваем эффект",
       ],
     },
     {
       layout: "statement",
       eyebrow: "ВЫВОД",
-      title: "Следующий шаг — согласовать рамки проверки",
-      body: "После этого презентацию можно дополнить подтверждёнными фактами и визуальными материалами.",
+      title: `${summary}: следующий шаг должен быть конкретным и проверяемым`,
+      body: `Рекомендуемое действие: ${action}.`,
       bullets: [],
     },
   ];
@@ -1000,8 +1025,8 @@ function safeFallbackOutline(input: ReturnType<typeof parseRequest>) {
       eyebrow: "ПРЕЗЕНТАЦИЯ",
       title: summary,
       body: input.audience
-        ? `Для: ${input.audience}`
-        : "Структура для обсуждения и решения",
+        ? `Практический разбор для аудитории: ${input.audience}`
+        : "Практический разбор: механизм, возможности, риски и решение",
       bullets: [],
       speakerNotes: "",
     },
@@ -1016,7 +1041,7 @@ function safeFallbackOutline(input: ReturnType<typeof parseRequest>) {
       layout: "closing",
       eyebrow: "СЛЕДУЮЩИЙ ШАГ",
       title: action,
-      body: "Зафиксируйте формат, участников и критерий следующего решения.",
+      body: `По теме «${summary}» зафиксируйте владельца действия, срок и критерий результата.`,
       bullets: [],
       speakerNotes: "",
     },
@@ -1054,8 +1079,19 @@ export async function generatePresentationOutline(
   const reservation = await reservePresentationGeneration(request, input);
   if (reservation.replayed) return reservation.replayed;
   try {
-    const theme = presentationTheme(input.themeId);
-    const instructions = `Ты — редактор и арт-директор деловых презентаций на русском языке. Самостоятельно раскрой тему пользователя: не превращай его поля в слайды и не повторяй формулировки анкеты. К последнему слайду аудитория должна понять вывод и увидеть понятное действие. Пожелания visualDesignBrief обязательны: используй их для композиции, плотности и характера узоров, но сохраняй читаемость. Построй накопительный сюжет: сильный вход → объяснение темы → механизм или контекст → возможности → ограничения и риски → практические критерии → вывод. Каждый слайд раскрывает один аспект темы и имеет заголовок-вывод. Не делай agenda-слайд и не пиши производственные заглушки вроде «нужно показать ценность», «добавьте факты», «согласуйте пилот», если пользователь не просил именно об этом. Не выдумывай конкретные цифры, даты, отзывы, клиентов или результаты. Разрешено объяснять общеизвестные определения, принципы работы, категории возможностей и рисков, относящиеся к теме. presentationTone: executive — кратко и по делу; persuasive — через проблему, пользу и доказательство; educational — от определения к применению; visual — минимум текста. Сам выбери выразительный layout для каждого слайда: title только первый, closing только последний, statement для одной сильной мысли, split для сравнения или механизма, bullets для системы, quote только для реальной цитаты, stats только при наличии подтверждённых чисел. Не повторяй один layout более двух раз подряд. eyebrow — короткая смысловая метка, speakerNotes — 1–3 предложения для выступающего, а не повтор текста. Тексты должны помещаться: title до 90 знаков, body до 360 знаков, не более 5 коротких bullets. Верни ровно ${input.slideCount} слайдов. Ответ — один JSON-объект с name, description и slides; у каждого слайда обязательны layout, eyebrow, title, body, bullets, speakerNotes. Никаких Markdown и комментариев.`;
+    const selectedThemeId = resolvedThemeId(input);
+    const theme = presentationTheme(selectedThemeId);
+    const instructions = `Ты — senior presentation designer и стратегический редактор. Создай на русском языке законченную профессиональную презентацию уровня сильной продуктовой/консалтинговой команды, а не набор текстовых карточек и не пересказ анкеты.
+
+Сначала молча определи: тему, реальную задачу аудитории, главный тезис, драматургию и визуальную систему. Затем раскрой тему самостоятельно, используя общеизвестные определения, механизмы, сценарии, возможности, ограничения и риски. Поля пользователя — контекст и ограничения, а не текст для копирования. Не выдумывай конкретные цифры, даты, отзывы, клиентов или результаты; цитаты тоже разрешены только из подтверждённого контекста.
+
+Драматургия: сильный вход → почему тема важна сейчас → как устроено → практические сценарии → ограничения/риски → критерии решения → ясный финал. У каждого слайда один вывод и своя функция. Заголовок должен сообщать вывод, а не называться «Возможности», «Риски» или «Итоги». Не делай agenda и не пиши заглушки «добавьте факты», «нужно показать», «согласуйте пилот».
+
+Композиция должна меняться осмысленно: title только первый, closing только последний; statement для одного тезиса; split для противопоставления/механизма; bullets для системы; stats только при подтверждённых числах; quote только для предоставленной реальной цитаты. Не повторяй layout более двух раз подряд. Для визуальной подачи чередуй крупный тезис, структурный слайд, контраст/сравнение и практический слайд. visualDesignBrief обязателен: он определяет арт-направление, характер узоров, контраст, плотность и ритм. «Премиальный» означает сдержанную типографику, графит/слоновую кость, тонкие линии и золотой акцент — не фиолетовый шаблон и не россыпь одинаковых точек.
+
+Тексты должны помещаться без уменьшения до нечитаемого размера: title до 80 знаков, body до 280 знаков, максимум 4 bullets по 90 знаков. eyebrow — короткая смысловая метка. speakerNotes — 1–3 полезных предложения для выступающего, не повтор текста. Верни ровно ${input.slideCount} слайдов.
+
+Ответ — только один JSON-объект с name, description и slides; у каждого слайда обязательны layout, eyebrow, title, body, bullets, speakerNotes. Никаких Markdown и комментариев.`;
     const modelInput = {
       userGoal: input.goal,
       audience: input.audience || "Аудитория указана в задаче пользователя",
@@ -1067,7 +1103,7 @@ export async function generatePresentationOutline(
         "Сформулировать уместный следующий шаг из задачи пользователя",
       presentationTone: input.tone,
       slideCount: input.slideCount,
-      selectedTheme: input.themeId,
+      selectedTheme: selectedThemeId,
       visualDesignBrief:
         input.designBrief ||
         "Выразительный, но деловой дизайн с аккуратными узорами и достаточным контрастом",
@@ -1092,15 +1128,15 @@ export async function generatePresentationOutline(
                 { role: "system", content: instructions },
                 { role: "user", content: JSON.stringify(modelInput) },
               ],
-              max_tokens: input.slideCount > 12 ? 4_200 : 3_400,
+              max_tokens: input.slideCount > 12 ? 5_600 : 4_600,
               response_format: { type: "json_object" },
             }
           : {
               model: selected.model,
               store: false,
               safety_identifier: await safetyIdentifier(request),
-              reasoning: { effort: "low" },
-              max_output_tokens: input.slideCount > 12 ? 4_200 : 3_400,
+              reasoning: { effort: "medium" },
+              max_output_tokens: input.slideCount > 12 ? 5_600 : 4_600,
               instructions,
               input: JSON.stringify(modelInput),
               text: {
@@ -1215,7 +1251,7 @@ export async function generatePresentationOutline(
         description:
           optionalModelText(parsed.description, "Описание презентации", 500) ??
           "Создано ИИ-помощником Поток.",
-        themeId: input.themeId,
+        themeId: selectedThemeId,
         accentColor: theme.accentColor,
         backgroundColor: theme.backgroundColor,
         textColor: theme.textColor,
@@ -1229,7 +1265,8 @@ export async function generatePresentationOutline(
       error instanceof ApiRequestError &&
       (error.status === 504 || error.status === 502 || error.status === 422)
     ) {
-      const theme = presentationTheme(input.themeId);
+      const selectedThemeId = resolvedThemeId(input);
+      const theme = presentationTheme(selectedThemeId);
       const fallback = safeFallbackOutline(input);
       const fallbackLast = fallback.slides.at(-1);
       if (fallbackLast)
@@ -1249,7 +1286,7 @@ export async function generatePresentationOutline(
           "ИИ-провайдер не ответил вовремя, поэтому Поток подготовил содержательную редактируемую версию по теме запроса.",
         outline: {
           ...fallback,
-          themeId: input.themeId,
+          themeId: selectedThemeId,
           accentColor: theme.accentColor,
           backgroundColor: theme.backgroundColor,
           textColor: theme.textColor,

@@ -5,9 +5,18 @@ import test from "node:test";
 test("presentation projects are durable and can originate from an email template", async () => {
   const [schema, database, store, route] = await Promise.all([
     readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
-    readFile(new URL("../lib/server/database-init.ts", import.meta.url), "utf8"),
-    readFile(new URL("../lib/server/presentation-store.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/api/presentations/route.ts", import.meta.url), "utf8"),
+    readFile(
+      new URL("../lib/server/database-init.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../lib/server/presentation-store.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../app/api/presentations/route.ts", import.meta.url),
+      "utf8",
+    ),
   ]);
   assert.match(schema, /export const presentationProjects/);
   assert.match(database, /CREATE TABLE IF NOT EXISTS presentation_projects/);
@@ -21,18 +30,45 @@ test("presentation projects are durable and can originate from an email template
 
 test("presentation studio exposes real creation, editing and save flows", async () => {
   const [view, imageStudio] = await Promise.all([
-    readFile(new URL("../components/presentations/PresentationStudio.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../components/image-studio/ImageStudioView.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL(
+        "../components/presentations/PresentationStudio.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../components/image-studio/ImageStudioView.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
   ]);
-  for (const control of ["Новая презентация", "Создать с ИИ", "Из письма", "Сохранить", "PPTX", "Дублировать", "Удалить", "Заметки выступающего"]) {
+  for (const control of [
+    "Новая презентация",
+    "Создать с ИИ",
+    "Из письма",
+    "Сохранить",
+    "PPTX",
+    "Дублировать",
+    "Удалить",
+    "Заметки выступающего",
+  ]) {
     assert.match(view, new RegExp(control));
   }
   assert.match(view, /searchParams\.get\("new"\) === "1"/);
   assert.match(view, /router\.replace\(\s*`\/presentations\?id=/);
   assert.match(view, /safeAssetQueryId/);
   assert.match(view, /slidesWithAsset\(requestedAssetId\)/);
-  assert.match(view, /imageUrl: `\/api\/assets\/\$\{encodeURIComponent\(assetId\)\}`/);
-  assert.match(imageStudio, /\/presentations\?new=1&asset=\$\{encodeURIComponent\(selectedAsset\.id\)\}/);
+  assert.match(
+    view,
+    /imageUrl: `\/api\/assets\/\$\{encodeURIComponent\(assetId\)\}`/,
+  );
+  assert.match(
+    imageStudio,
+    /\/presentations\?new=1&asset=\$\{encodeURIComponent\(selectedAsset\.id\)\}/,
+  );
   assert.match(imageStudio, /Использовать в презентации/);
   assert.match(view, /beforeunload/);
   assert.match(view, /editRevisionRef/);
@@ -41,12 +77,25 @@ test("presentation studio exposes real creation, editing and save flows", async 
   assert.match(view, /destinationLabel="презентации"/);
   assert.match(view, /Новая с ИИ/);
   assert.match(view, /\/presentations\?create=ai/);
+  assert.match(view, /onDoubleClick/);
+  assert.match(view, /Быстро изменить слайд/);
+  assert.match(view, /Добавить изображение/);
+  assert.match(view, /backgroundColor: slide\.backgroundColor/);
 });
 
 test("presentation library offers varied scenarios and practical filters", async () => {
   const [templates, view] = await Promise.all([
-    readFile(new URL("../data/presentation-templates.ts", import.meta.url), "utf8"),
-    readFile(new URL("../components/presentations/PresentationStudio.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL("../data/presentation-templates.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../components/presentations/PresentationStudio.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
   ]);
   assert.ok((templates.match(/presentation-template-/g) ?? []).length >= 12);
   assert.match(view, /filteredPresentationTemplates/);
@@ -58,9 +107,24 @@ test("presentation library offers varied scenarios and practical filters", async
 
 test("image studio can apply a generated asset as a real email background", async () => {
   const [studio, builder, compiler] = await Promise.all([
-    readFile(new URL("../components/image-studio/ImageStudioView.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../components/email-builder/EmailBuilderView.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../lib/server/email-document.ts", import.meta.url), "utf8"),
+    readFile(
+      new URL(
+        "../components/image-studio/ImageStudioView.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../components/email-builder/EmailBuilderView.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL("../lib/server/email-document.ts", import.meta.url),
+      "utf8",
+    ),
   ]);
   assert.match(studio, /Фон для письма/);
   assert.match(studio, /assetMode=background/);
@@ -71,21 +135,51 @@ test("image studio can apply a generated asset as a real email background", asyn
 
 test("AI presentation outline follows a narrative and does not invent evidence", async () => {
   const [server, route, schema, database, view] = await Promise.all([
-    readFile(new URL("../lib/server/presentation-ai.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/api/ai/presentations/route.ts", import.meta.url), "utf8"),
+    readFile(
+      new URL("../lib/server/presentation-ai.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../app/api/ai/presentations/route.ts", import.meta.url),
+      "utf8",
+    ),
     readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
-    readFile(new URL("../lib/server/database-init.ts", import.meta.url), "utf8"),
-    readFile(new URL("../components/presentations/PresentationStudio.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL("../lib/server/database-init.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../components/presentations/PresentationStudio.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
   ]);
   assert.match(server, /chat\/completions/);
   assert.match(server, /gemini-2\.5-flash-lite/);
-  assert.match(server, /Не выдумывай конкретные цифры, даты, отзывы, клиентов или результаты/);
+  assert.match(
+    server,
+    /Не выдумывай конкретные цифры, даты, отзывы, клиентов или результаты/,
+  );
   assert.match(server, /suggestedLayouts/);
-  assert.match(server, /обязательны layout, eyebrow, title, body, bullets, speakerNotes/);
-  assert.match(server, /slides\[index\]\.layout !== slides\[index - 1\]\.layout/);
+  assert.match(
+    server,
+    /обязательны layout, eyebrow, title, body, bullets, speakerNotes/,
+  );
+  assert.match(
+    server,
+    /slides\[index\]\.layout !== slides\[index - 1\]\.layout/,
+  );
   assert.match(server, /safeFallbackOutline/);
+  assert.match(server, /function resolvedThemeId/);
+  assert.match(server, /return "premium"/);
+  assert.match(server, /senior presentation designer/);
   assert.match(server, /Криптовалюты: возможности, риски и осознанные решения/);
-  assert.match(server, /Цифровой рубль: как устроена третья форма российской валюты/);
+  assert.match(
+    server,
+    /Цифровой рубль: как устроена третья форма российской валюты/,
+  );
   assert.match(server, /generationMode: "topic_fallback"/);
   assert.match(server, /NAVYAI_EMAIL_MODEL\?\.trim\(\)\s*\|\|\s*"gpt-5\.2"/);
   assert.match(server, /GENERATION_LIMIT = 8/);
@@ -97,7 +191,10 @@ test("AI presentation outline follows a narrative and does not invent evidence",
   assert.match(server, /timedOut \? 504 : 502/);
   assert.match(server, /ИИ временно перегружен/);
   assert.match(schema, /resultJson: text\("result_json"\)/);
-  assert.match(database, /ALTER TABLE ai_idempotency ADD COLUMN result_json TEXT/);
+  assert.match(
+    database,
+    /ALTER TABLE ai_idempotency ADD COLUMN result_json TEXT/,
+  );
   assert.match(view, /"Idempotency-Key": aiIdempotencyKeyRef\.current/);
   assert.match(route, /generatePresentationOutline/);
   assert.match(route, /MAX_REQUEST_BYTES = 12_000/);
@@ -108,19 +205,53 @@ test("AI presentation outline follows a narrative and does not invent evidence",
 
 test("PowerPoint export builds OOXML and only fetches same-origin library assets", async () => {
   const [exporter, route, store] = await Promise.all([
-    readFile(new URL("../lib/server/presentation-pptx.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/api/presentations/export/route.ts", import.meta.url), "utf8"),
-    readFile(new URL("../lib/server/presentation-store.ts", import.meta.url), "utf8"),
+    readFile(
+      new URL("../lib/server/presentation-pptx.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../app/api/presentations/export/route.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../lib/server/presentation-store.ts", import.meta.url),
+      "utf8",
+    ),
   ]);
   assert.match(exporter, /0x04034b50/);
   assert.match(exporter, /presentationml\.presentation\.main\+xml/);
   assert.match(exporter, /slideMasters\/slideMaster1\.xml/);
-  assert.match(exporter, /if \(!slide\.assetId \|\| !slide\.imageUrl\) return undefined/);
-  assert.match(exporter, /new URL\(\s*`\/api\/assets\/\$\{encodeURIComponent\(slide\.assetId\)\}`/);
+  assert.match(
+    exporter,
+    /if \(!slide\.assetId \|\| !slide\.imageUrl\) return undefined/,
+  );
+  assert.match(
+    exporter,
+    /new URL\(\s*`\/api\/assets\/\$\{encodeURIComponent\(slide\.assetId\)\}`/,
+  );
   assert.match(exporter, /redirect: "error"/);
   assert.match(exporter, /presentationPatternShapes/);
+  assert.match(
+    exporter,
+    /slide\.backgroundColor \?\? project\.backgroundColor/,
+  );
   assert.doesNotMatch(exporter, /new URL\(slide\.imageUrl/);
-  assert.match(await readFile(new URL("../components/presentations/PresentationStudio.tsx", import.meta.url), "utf8"), /presentationPatternStyle/);
-  assert.match(store, /Для слайда можно выбрать только изображение из общей медиатеки Поток/);
-  assert.match(route, /application\/vnd\.openxmlformats-officedocument\.presentationml\.presentation/);
+  assert.match(
+    await readFile(
+      new URL(
+        "../components/presentations/PresentationStudio.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    /presentationPatternStyle/,
+  );
+  assert.match(
+    store,
+    /Для слайда можно выбрать только изображение из общей медиатеки Поток/,
+  );
+  assert.match(
+    route,
+    /application\/vnd\.openxmlformats-officedocument\.presentationml\.presentation/,
+  );
 });

@@ -44,7 +44,9 @@ export function AppShell({
     <div
       data-product-shell
       className={cn(
-        viewportLocked ? "h-dvh overflow-hidden" : "min-h-screen",
+        viewportLocked
+          ? "fixed inset-0 h-dvh w-full overflow-hidden"
+          : "min-h-screen",
         "bg-background text-text-strong",
       )}
     >

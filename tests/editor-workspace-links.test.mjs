@@ -34,8 +34,8 @@ test("creative editors lock the page viewport and scroll inside their workspaces
     ]);
 
   assert.match(shell, /viewportLocked\?: boolean/);
-  assert.match(shell, /h-dvh overflow-hidden/);
-  assert.match(emailPage, /h-dvh overflow-hidden/);
+  assert.match(shell, /fixed inset-0 h-dvh w-full overflow-hidden/);
+  assert.match(emailPage, /fixed inset-0 h-dvh w-full overflow-hidden/);
   assert.match(presentationsPage, /viewportLocked/);
   assert.match(imageStudio, /viewportLocked/);
   assert.match(imageStudio, /overflow-y-auto overscroll-contain/);

@@ -362,7 +362,7 @@ export type EmailAiResponse = {
 };
 
 export type PresentationThemeId =
-  "atelier" | "violet" | "noir" | "ocean" | "sunrise";
+  "atelier" | "violet" | "noir" | "ocean" | "sunrise" | "premium";
 
 export type PresentationSlideLayout =
   "title" | "statement" | "split" | "bullets" | "quote" | "stats" | "closing";
@@ -380,6 +380,9 @@ export type PresentationSlide = {
   ctaLabel?: string;
   ctaUrl?: string;
   socialLinks?: Array<{ label: string; url: string }>;
+  accentColor?: string;
+  backgroundColor?: string;
+  textColor?: string;
 };
 
 export type PresentationSourceType = "blank" | "template" | "ai" | "email";

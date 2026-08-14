@@ -21,12 +21,15 @@ import {
   FilePlus2,
   LayoutTemplate,
   Mail,
+  Image as ImageIcon,
   LockKeyhole,
+  Palette,
   Plus,
   Save,
   Send,
   Sparkles,
   Trash2,
+  Type,
 } from "lucide-react";
 
 import { ImageAssetPicker } from "@/components/email-builder/ImageAssetPicker";
@@ -141,9 +144,35 @@ function slidesWithAsset(assetId?: string) {
 function presentationPatternStyle(
   themeId: PresentationThemeId,
   accentColor: string,
+  seed = "",
 ): CSSProperties {
   const accent = /^#[0-9a-f]{6}$/i.test(accentColor) ? accentColor : "#7C35F2";
+  const variant =
+    [...seed].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 4;
+  if (seed && variant === 1) {
+    return {
+      backgroundImage: `linear-gradient(115deg, transparent 0 67%, ${accent}16 67% 68%, transparent 68%), radial-gradient(circle at 83% 23%, transparent 0 8%, ${accent}26 8.4% 8.8%, transparent 9.2% 14%, ${accent}18 14.4% 14.8%, transparent 15.2%)`,
+      backgroundSize: "100% 100%",
+    };
+  }
+  if (seed && variant === 2) {
+    return {
+      backgroundImage: `linear-gradient(${accent}16 1px, transparent 1px), linear-gradient(90deg, ${accent}16 1px, transparent 1px), linear-gradient(145deg, transparent 0 82%, ${accent}20 82% 83%, transparent 83%)`,
+      backgroundSize: "42px 42px, 42px 42px, 100% 100%",
+    };
+  }
+  if (seed && variant === 3) {
+    return {
+      backgroundImage: `repeating-linear-gradient(135deg, transparent 0 52px, ${accent}12 53px 55px, transparent 56px 78px), radial-gradient(circle at 88% 78%, ${accent}22 0 7%, transparent 7.5%)`,
+      backgroundSize: "100% 100%",
+    };
+  }
   switch (themeId) {
+    case "premium":
+      return {
+        backgroundImage: `linear-gradient(90deg, ${accent}24 1px, transparent 1px), linear-gradient(${accent}18 1px, transparent 1px), radial-gradient(circle at 86% 20%, transparent 0 10%, ${accent}32 10.3% 10.8%, transparent 11.1%)`,
+        backgroundSize: "72px 72px, 72px 72px, 100% 100%",
+      };
     case "atelier":
       return {
         backgroundImage: `radial-gradient(circle at 88% 18%, ${accent}32 0 2px, transparent 2.5px), linear-gradient(135deg, transparent 0 78%, ${accent}18 78% 79%, transparent 79%), linear-gradient(90deg, transparent 0 94%, ${accent}12 94%)`,
@@ -173,12 +202,13 @@ function presentationPatternStyle(
 }
 
 function SlidePreview({
-  project,
+  project: baseProject,
   slide,
   compact = false,
   editable = false,
   onChange,
   onPickImage,
+  onOpenQuickEdit,
 }: {
   project: Pick<
     PresentationProjectRecord,
@@ -189,7 +219,14 @@ function SlidePreview({
   editable?: boolean;
   onChange?: (patch: Partial<PresentationSlide>) => void;
   onPickImage?: () => void;
+  onOpenQuickEdit?: () => void;
 }) {
+  const project = {
+    ...baseProject,
+    accentColor: slide.accentColor ?? baseProject.accentColor,
+    backgroundColor: slide.backgroundColor ?? baseProject.backgroundColor,
+    textColor: slide.textColor ?? baseProject.textColor,
+  };
   const inverse =
     project.backgroundColor.toLowerCase() === "#101113"
       ? "#F5F1E8"
@@ -272,10 +309,21 @@ function SlidePreview({
   return (
     <div
       className="relative aspect-video w-full overflow-hidden rounded-[inherit]"
+      onDoubleClick={(event) => {
+        if (!editable || !onOpenQuickEdit) return;
+        const target = event.target as HTMLElement;
+        if (target.closest("textarea,input,button,a,select")) return;
+        event.preventDefault();
+        onOpenQuickEdit();
+      }}
       style={{
         backgroundColor: project.backgroundColor,
         color: inverse,
-        ...presentationPatternStyle(project.themeId, project.accentColor),
+        ...presentationPatternStyle(
+          project.themeId,
+          project.accentColor,
+          slide.id,
+        ),
       }}
     >
       <div
@@ -661,6 +709,7 @@ export function PresentationStudio() {
   const [aiOpen, setAiOpen] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
   const [slideImageOpen, setSlideImageOpen] = useState(false);
+  const [quickSlideOpen, setQuickSlideOpen] = useState(false);
   const [aiGoal, setAiGoal] = useState("");
   const [aiAudience, setAiAudience] = useState("");
   const [aiSlideCount, setAiSlideCount] = useState(7);
@@ -1481,6 +1530,9 @@ export function PresentationStudio() {
                       ? "Подтверждён — можно уточнить"
                       : "Проверьте содержание и оформление"}
                   </p>
+                  <p className="m-0 mt-0.5 text-[9px] text-text-subtle">
+                    Двойной клик по свободной области — быстро изменить слайд
+                  </p>
                 </div>
                 <div className="hidden items-center gap-1 sm:flex">
                   <Button
@@ -1526,6 +1578,7 @@ export function PresentationStudio() {
                     editable
                     onChange={updateSlide}
                     onPickImage={() => setSlideImageOpen(true)}
+                    onOpenQuickEdit={() => setQuickSlideOpen(true)}
                   />
                 </div>
               </div>
@@ -1726,20 +1779,20 @@ export function PresentationStudio() {
                 </section>
                 <section>
                   <h3 className="mb-2 mt-0 text-[12px] font-semibold">
-                    Фон и цвета текущей презентации
+                    Фон и цвета
                   </h3>
                   <p className="mb-3 mt-0 text-[10px] leading-4 text-text-muted">
-                    Изменения сразу видны на большом слайде. Тема применяет
-                    согласованную палитру ко всей презентации.
+                    Тема задаёт основу всей презентации. Цвета ниже меняют
+                    только активный слайд.
                   </p>
                   <ThemeStrip value={project.themeId} onChange={changeTheme} />
                   <div className="mt-3 grid grid-cols-3 gap-2">
                     <FormField label="Акцент">
                       <Input
                         type="color"
-                        value={project.accentColor}
+                        value={selectedSlide.accentColor ?? project.accentColor}
                         onChange={(event) =>
-                          updateProject({
+                          updateSlide({
                             accentColor: event.target.value.toUpperCase(),
                           })
                         }
@@ -1749,9 +1802,12 @@ export function PresentationStudio() {
                     <FormField label="Фон слайда">
                       <Input
                         type="color"
-                        value={project.backgroundColor}
+                        value={
+                          selectedSlide.backgroundColor ??
+                          project.backgroundColor
+                        }
                         onChange={(event) =>
-                          updateProject({
+                          updateSlide({
                             backgroundColor: event.target.value.toUpperCase(),
                           })
                         }
@@ -1761,9 +1817,9 @@ export function PresentationStudio() {
                     <FormField label="Текст">
                       <Input
                         type="color"
-                        value={project.textColor}
+                        value={selectedSlide.textColor ?? project.textColor}
                         onChange={(event) =>
-                          updateProject({
+                          updateSlide({
                             textColor: event.target.value.toUpperCase(),
                           })
                         }
@@ -1771,6 +1827,24 @@ export function PresentationStudio() {
                       />
                     </FormField>
                   </div>
+                  {selectedSlide.accentColor ||
+                  selectedSlide.backgroundColor ||
+                  selectedSlide.textColor ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="mt-2"
+                      onClick={() =>
+                        updateSlide({
+                          accentColor: undefined,
+                          backgroundColor: undefined,
+                          textColor: undefined,
+                        })
+                      }
+                    >
+                      Вернуть цвета темы
+                    </Button>
+                  ) : null}
                 </section>
                 <section>
                   <FormField
@@ -1809,6 +1883,128 @@ export function PresentationStudio() {
             </Button>
           </div>
         </div>
+        <Modal
+          open={quickSlideOpen}
+          onOpenChange={setQuickSlideOpen}
+          title="Быстро изменить слайд"
+          description="Текст, изображение и фон меняются здесь и сразу видны на холсте."
+          size="lg"
+          footer={
+            <Button onClick={() => setQuickSlideOpen(false)}>Готово</Button>
+          }
+        >
+          <div className="grid gap-5">
+            <section className="grid gap-3 rounded-xl border border-border bg-surface-subtle/45 p-4">
+              <div className="flex items-center gap-2">
+                <Type className="size-4 text-primary" aria-hidden="true" />
+                <strong className="text-[13px]">Надписи</strong>
+              </div>
+              <FormField label="Заголовок-вывод" htmlFor="quick-slide-title">
+                <Textarea
+                  id="quick-slide-title"
+                  value={selectedSlide.title}
+                  onChange={(event) =>
+                    updateSlide({ title: event.target.value })
+                  }
+                  rows={2}
+                  data-autofocus
+                />
+              </FormField>
+              <FormField label="Пояснение" htmlFor="quick-slide-body">
+                <Textarea
+                  id="quick-slide-body"
+                  value={selectedSlide.body}
+                  onChange={(event) =>
+                    updateSlide({ body: event.target.value })
+                  }
+                  rows={3}
+                  placeholder="Добавьте короткое пояснение"
+                />
+              </FormField>
+              <FormField
+                label="Пункты — один на строку"
+                htmlFor="quick-slide-bullets"
+              >
+                <Textarea
+                  id="quick-slide-bullets"
+                  value={selectedSlide.bullets.join("\n")}
+                  onChange={(event) =>
+                    updateSlide({
+                      bullets: event.target.value.split("\n").slice(0, 8),
+                    })
+                  }
+                  rows={3}
+                />
+              </FormField>
+            </section>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setQuickSlideOpen(false);
+                  setSlideImageOpen(true);
+                }}
+                className="flex items-center gap-3 rounded-xl border border-border bg-surface p-4 text-left transition hover:border-primary/40 hover:bg-primary-subtle/20"
+              >
+                <span className="grid size-9 place-items-center rounded-lg bg-primary-subtle text-primary">
+                  <ImageIcon className="size-4" aria-hidden="true" />
+                </span>
+                <span>
+                  <strong className="block text-[12px]">
+                    Добавить изображение
+                  </strong>
+                  <span className="text-[10px] text-text-muted">
+                    Загрузить или выбрать из медиатеки
+                  </span>
+                </span>
+              </button>
+              <div className="rounded-xl border border-border bg-surface p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <Palette className="size-4 text-primary" aria-hidden="true" />
+                  <strong className="text-[12px]">Фон и узор</strong>
+                </div>
+                <ThemeStrip value={project.themeId} onChange={changeTheme} />
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  <Input
+                    aria-label="Акцент активного слайда"
+                    type="color"
+                    value={selectedSlide.accentColor ?? project.accentColor}
+                    onChange={(event) =>
+                      updateSlide({
+                        accentColor: event.target.value.toUpperCase(),
+                      })
+                    }
+                    className="h-9 p-1"
+                  />
+                  <Input
+                    aria-label="Фон активного слайда"
+                    type="color"
+                    value={
+                      selectedSlide.backgroundColor ?? project.backgroundColor
+                    }
+                    onChange={(event) =>
+                      updateSlide({
+                        backgroundColor: event.target.value.toUpperCase(),
+                      })
+                    }
+                    className="h-9 p-1"
+                  />
+                  <Input
+                    aria-label="Текст активного слайда"
+                    type="color"
+                    value={selectedSlide.textColor ?? project.textColor}
+                    onChange={(event) =>
+                      updateSlide({
+                        textColor: event.target.value.toUpperCase(),
+                      })
+                    }
+                    className="h-9 p-1"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </Modal>
         <Modal
           open={slideImageOpen}
           onOpenChange={setSlideImageOpen}
