@@ -89,7 +89,11 @@ function navigationBlock(id: string, color: string): EmailBlock {
   };
 }
 
-function footerBlock(id: string, backgroundColor: string, textColor: string): EmailBlock {
+function footerBlock(
+  id: string,
+  backgroundColor: string,
+  textColor: string,
+): EmailBlock {
   return {
     id,
     type: "footer",
@@ -109,7 +113,7 @@ function footerBlock(id: string, backgroundColor: string, textColor: string): Em
 
 const neonOpening: EmailTemplate = {
   id: "template-v10-conference-chain-01-neon-opening",
-  name: "Цепочка 1/5 · Неоновый анонс",
+  name: "Цепочка 1/30 · Неоновый анонс",
   category: "Events",
   description:
     "Стартовое письмо конференции: неоновый legal-tech, цифровой маскот, ключевые цифры и сильный первый импульс.",
@@ -129,7 +133,8 @@ const neonOpening: EmailTemplate = {
     {
       id: "conference-chain-01-banner",
       type: "banner",
-      content: "25–26 СЕНТЯБРЯ · МОСКВА|Конференция о практическом применении ИИ и технологий в юридическом бизнесе",
+      content:
+        "25–26 СЕНТЯБРЯ · МОСКВА|Конференция о практическом применении ИИ и технологий в юридическом бизнесе",
       alignment: "left",
       backgroundColor: "#0D2531",
       textColor: "#F4FEFF",
@@ -220,7 +225,7 @@ const neonOpening: EmailTemplate = {
 
 const gzhelPractice: EmailTemplate = {
   id: "template-v10-conference-chain-02-gzhel-practice",
-  name: "Цепочка 2/5 · Гжель-техно",
+  name: "Цепочка 2/30 · Гжель-техно",
   category: "Events",
   description:
     "Письмо о практической пользе ИИ: фарфоровая светлая система, гжельский орнамент и дружелюбный юридический маскот.",
@@ -314,12 +319,13 @@ const gzhelPractice: EmailTemplate = {
 
 const routeTakeaways: EmailTemplate = {
   id: "template-v10-conference-chain-03-route-takeaways",
-  name: "Цепочка 3/5 · Маршрут участника",
+  name: "Цепочка 3/30 · Маршрут участника",
   category: "Events",
   description:
     "Письмо-маршрут с шестью направлениями, практическими результатами и навигационной системой в стиле технологической карты.",
   subject: "Что вы сможете забрать с конференции в свою компанию",
-  previewText: "Практические идеи для процессов, команды и роста юридического бизнеса.",
+  previewText:
+    "Практические идеи для процессов, команды и роста юридического бизнеса.",
   accentColor: "#285EEA",
   backgroundColor: "#E8EEF8",
   bodyBackground: "#FFFFFF",
@@ -407,7 +413,7 @@ const routeTakeaways: EmailTemplate = {
 
 const audienceSignal: EmailTemplate = {
   id: "template-v10-conference-chain-04-audience-signal",
-  name: "Цепочка 4/5 · Кому стоит приехать",
+  name: "Цепочка 4/30 · Кому стоит приехать",
   category: "Events",
   description:
     "Сегментированное письмо с четырьмя профилями аудитории, цифровым маскотом и контрастной cyan–magenta системой.",
@@ -511,7 +517,7 @@ const audienceSignal: EmailTemplate = {
 
 const redGateFinale: EmailTemplate = {
   id: "template-v10-conference-chain-05-red-gate-finale",
-  name: "Цепочка 5/5 · Красные Ворота",
+  name: "Цепочка 5/30 · Красные Ворота",
   category: "Events",
   description:
     "Финальное письмо с архитектурной фотографией площадки, крупной датой, точным адресом и одним решающим действием.",

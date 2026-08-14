@@ -4,6 +4,7 @@ import { generatedTemplates } from "./generated-template-library";
 import { studioTemplates } from "./studio-template-library";
 import { creativeTemplates } from "./creative-template-library";
 import { conferenceTemplateSeries } from "./conference-template-series";
+import { conferenceSalesExpansion } from "./conference-sales-expansion";
 
 const curatedTemplates: EmailTemplate[] = [
   {
@@ -1362,6 +1363,7 @@ const curatedTemplates: EmailTemplate[] = [
 
 export const templates: EmailTemplate[] = [
   ...conferenceTemplateSeries,
+  ...conferenceSalesExpansion,
   ...curatedTemplates,
   ...generatedTemplates,
   ...studioTemplates,
