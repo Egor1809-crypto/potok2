@@ -660,6 +660,25 @@ async function seedDatabase(request: Request) {
     await db.insert(systemState).values({ key: "email-template-library-v9-creative-expansion", value: "seeded", updatedAt: now }).onConflictDoUpdate({ target: systemState.key, set: { value: "seeded", updatedAt: now } });
   }
 
+  const [conferenceTemplateSeriesState] = await db
+    .select({ key: systemState.key })
+    .from(systemState)
+    .where(eq(systemState.key, "email-template-library-v10-conference-series"))
+    .limit(1);
+  if (!conferenceTemplateSeriesState) {
+    for (const template of starterEmailTemplateValues().filter((item) => item.id.startsWith("template-v10-conference-chain-"))) {
+      await db.insert(emailTemplates).values({ ...template, workspaceId: WORKSPACE_ID }).onConflictDoNothing();
+    }
+    await db.insert(systemState).values({
+      key: "email-template-library-v10-conference-series",
+      value: "seeded",
+      updatedAt: now,
+    }).onConflictDoUpdate({
+      target: systemState.key,
+      set: { value: "seeded", updatedAt: now },
+    });
+  }
+
   const [templateHeadersState] = await db
     .select({ key: systemState.key })
     .from(systemState)

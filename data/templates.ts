@@ -3,6 +3,7 @@ import { BRAND_NAME } from "@/config/brand";
 import { generatedTemplates } from "./generated-template-library";
 import { studioTemplates } from "./studio-template-library";
 import { creativeTemplates } from "./creative-template-library";
+import { conferenceTemplateSeries } from "./conference-template-series";
 
 const curatedTemplates: EmailTemplate[] = [
   {
@@ -1359,7 +1360,13 @@ const curatedTemplates: EmailTemplate[] = [
   },
 ];
 
-export const templates: EmailTemplate[] = [...curatedTemplates, ...generatedTemplates, ...studioTemplates, ...creativeTemplates];
+export const templates: EmailTemplate[] = [
+  ...conferenceTemplateSeries,
+  ...curatedTemplates,
+  ...generatedTemplates,
+  ...studioTemplates,
+  ...creativeTemplates,
+];
 
 export const emailTemplates = templates;
 export const mockTemplates = templates;
