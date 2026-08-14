@@ -613,6 +613,210 @@ function slideShapes(
         ),
       );
     }
+  } else if (slide.layout === "timeline" || slide.layout === "process") {
+    shapes.push(
+      textBox(id++, "Заголовок", x, 0.95 * EMU, contentWidth, 1.15 * EMU, [
+        {
+          text: slide.title,
+          options: { color: text, fontSize: 34, bold: true },
+        },
+      ]),
+    );
+    const items = (
+      slide.bullets.length
+        ? slide.bullets
+        : ["Первый этап", "Второй этап", "Третий этап"]
+    ).slice(0, 3);
+    const cardWidth = (contentWidth - 0.5 * EMU) / 3;
+    items.forEach((item, index) => {
+      const itemX = x + index * (cardWidth + 0.25 * EMU);
+      shapes.push(
+        textBox(
+          id++,
+          `Этап ${index + 1}`,
+          itemX,
+          2.55 * EMU,
+          cardWidth,
+          2.65 * EMU,
+          [
+            {
+              text: `0${index + 1}`,
+              options: { color: accent, fontSize: 17, bold: true },
+            },
+            { text: item, options: { color: text, fontSize: 19, bold: true } },
+          ],
+          { fill: dark(background) ? "#24262A" : "#F0E8E2", radius: true },
+        ),
+      );
+    });
+    if (slide.body)
+      shapes.push(
+        textBox(id++, "Пояснение", x, 5.55 * EMU, contentWidth, 0.7 * EMU, [
+          { text: slide.body, options: { color: muted, fontSize: 15 } },
+        ]),
+      );
+  } else if (slide.layout === "comparison") {
+    shapes.push(
+      textBox(id++, "Заголовок", x, 0.95 * EMU, contentWidth, 1.15 * EMU, [
+        {
+          text: slide.title,
+          options: { color: text, fontSize: 34, bold: true },
+        },
+      ]),
+    );
+    const columnWidth = (contentWidth - 0.35 * EMU) / 2;
+    ["Сейчас", "Целевое состояние"].forEach((label, column) => {
+      const itemX = x + column * (columnWidth + 0.35 * EMU);
+      const items = (
+        slide.bullets.length
+          ? slide.bullets.filter((_, index) => index % 2 === column)
+          : column === 0
+            ? ["Текущий процесс", "Ограничение"]
+            : ["Новый процесс", "Ожидаемый эффект"]
+      ).slice(0, 3);
+      shapes.push(
+        textBox(
+          id++,
+          label,
+          itemX,
+          2.35 * EMU,
+          columnWidth,
+          3.25 * EMU,
+          [
+            {
+              text: label,
+              options: {
+                color: column ? accent : text,
+                fontSize: 19,
+                bold: true,
+              },
+            },
+            ...items.map((item) => ({
+              text: item,
+              options: { color: text, fontSize: 17, bullet: true },
+            })),
+          ],
+          {
+            fill: column ? accent : dark(background) ? "#24262A" : "#F0E8E2",
+            radius: true,
+          },
+        ),
+      );
+    });
+  } else if (slide.layout === "agenda" || slide.layout === "table") {
+    shapes.push(
+      textBox(id++, "Заголовок", x, 0.95 * EMU, 4.1 * EMU, 2.0 * EMU, [
+        {
+          text: slide.title,
+          options: { color: text, fontSize: 34, bold: true },
+        },
+        { text: slide.body, options: { color: muted, fontSize: 16 } },
+      ]),
+    );
+    const items = (
+      slide.bullets.length
+        ? slide.bullets
+        : [
+            "Первый раздел",
+            "Второй раздел",
+            "Третий раздел",
+            "Четвёртый раздел",
+          ]
+    ).slice(0, 6);
+    shapes.push(
+      textBox(
+        id++,
+        "Разделы",
+        5.25 * EMU,
+        1.1 * EMU,
+        7.0 * EMU,
+        4.95 * EMU,
+        items.map((item, index) => ({
+          text: `${String(index + 1).padStart(2, "0")}   ${item}`,
+          options: { color: text, fontSize: 19, bold: index === 0 },
+        })),
+      ),
+    );
+  } else if (slide.layout === "chart") {
+    shapes.push(
+      textBox(id++, "Заголовок", x, 0.95 * EMU, contentWidth, 1.15 * EMU, [
+        {
+          text: slide.title,
+          options: { color: text, fontSize: 34, bold: true },
+        },
+      ]),
+    );
+    const items = (
+      slide.bullets.length
+        ? slide.bullets
+        : ["24 | Сейчас", "48 | Этап 1", "67 | Этап 2", "86 | Цель"]
+    ).slice(0, 4);
+    const barWidth = contentWidth / items.length;
+    items.forEach((item, index) => {
+      const [rawValue = "0", label = ""] = item
+        .split("|")
+        .map((part) => part.trim());
+      const value = Math.max(
+        12,
+        Math.min(92, Number.parseFloat(rawValue) || 20),
+      );
+      const height = 3.4 * EMU * (value / 100);
+      const itemX = x + index * barWidth + 0.18 * EMU;
+      shapes.push(
+        rect(
+          id++,
+          `Столбец ${index + 1}`,
+          itemX,
+          5.65 * EMU - height,
+          barWidth - 0.36 * EMU,
+          height,
+          accent,
+          true,
+        ),
+      );
+      shapes.push(
+        textBox(
+          id++,
+          `Подпись ${index + 1}`,
+          itemX,
+          5.75 * EMU,
+          barWidth - 0.36 * EMU,
+          0.55 * EMU,
+          [
+            {
+              text: `${rawValue}\n${label}`,
+              options: { color: text, fontSize: 12, align: "ctr", bold: true },
+            },
+          ],
+        ),
+      );
+    });
+  } else if (slide.layout === "callout") {
+    shapes.push(
+      textBox(
+        id++,
+        "Акцент",
+        1.35 * EMU,
+        1.05 * EMU,
+        10.65 * EMU,
+        5.35 * EMU,
+        [
+          {
+            text: slide.eyebrow || "ГЛАВНАЯ МЫСЛЬ",
+            options: { color: accent, fontSize: 12, bold: true, align: "ctr" },
+          },
+          {
+            text: slide.title,
+            options: { color: text, fontSize: 38, bold: true, align: "ctr" },
+          },
+          {
+            text: slide.body,
+            options: { color: muted, fontSize: 18, align: "ctr" },
+          },
+        ],
+        { fill: dark(background) ? "#24262A" : "#F0E8E2", radius: true },
+      ),
+    );
   } else if (slide.layout === "quote") {
     shapes.push(
       textBox(id++, "Цитата", x, 1.25 * EMU, contentWidth, 3.7 * EMU, [

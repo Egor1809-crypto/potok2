@@ -23,6 +23,18 @@ import { ensureDatabase, WORKSPACE_ID } from "./database-init";
 const THEMES = new Set<PresentationThemeId>([
   "atelier",
   "modern",
+  "editorial",
+  "neon",
+  "botanical",
+  "glass",
+  "mono",
+  "clay",
+  "cobalt",
+  "berry",
+  "sky",
+  "sage",
+  "cinematic",
+  "playful",
   "violet",
   "noir",
   "ocean",
@@ -36,6 +48,14 @@ const LAYOUTS = new Set<PresentationSlideLayout>([
   "bullets",
   "quote",
   "stats",
+  "timeline",
+  "process",
+  "comparison",
+  "agenda",
+  "gallery",
+  "chart",
+  "table",
+  "callout",
   "closing",
 ]);
 const GENERATION_WINDOW_MS = 10 * 60 * 1_000;
@@ -172,6 +192,18 @@ function resolvedThemeId(
     "ru-RU",
   );
   if (/преми|luxur|дорог|элит|золот|графит/.test(brief)) return "premium";
+  if (/кино|cinema|dramatic|драмат|film/.test(brief)) return "cinematic";
+  if (/неон|cyber|кибер|ярк.*т[её]мн/.test(brief)) return "neon";
+  if (/редакц|editorial|журнал|fashion/.test(brief)) return "editorial";
+  if (/эко|природ|ботан|органич|зел[её]н/.test(brief)) return "botanical";
+  if (/стекл|glass|прозрач|градиент/.test(brief)) return "glass";
+  if (/моно|black.?white|ч[её]рно.?бел/.test(brief)) return "mono";
+  if (/терракот|керами|глин|землян/.test(brief)) return "clay";
+  if (/кобальт|ультрамарин|синий.*ж[её]лт/.test(brief)) return "cobalt";
+  if (/розов|ягод|малин|magenta/.test(brief)) return "berry";
+  if (/неб|воздуш|голуб/.test(brief)) return "sky";
+  if (/шалф|приглуш.*зел|sage/.test(brief)) return "sage";
+  if (/игр|дружелюб|детск|playful/.test(brief)) return "playful";
   if (/т[её]мн|нуар|black|dark|контраст/.test(brief)) return "noir";
   if (/технолог|digital|неон|футур|фиолет|сирен/.test(brief)) return "violet";
   if (/спокой|исслед|аналит|син|бирюз|вод|океан/.test(brief)) return "ocean";
@@ -266,9 +298,13 @@ function parseSlides(
       "statement",
       "split",
       "bullets",
-      "statement",
-      "split",
-      "bullets",
+      "timeline",
+      "comparison",
+      "process",
+      "stats",
+      "gallery",
+      "callout",
+      "chart",
     ];
     const rawLayout =
       optionalModelText(object.layout, `Макет слайда ${index + 1}`, 30) ??
@@ -648,6 +684,14 @@ function responseSchema(slideCount: number) {
                 "bullets",
                 "quote",
                 "stats",
+                "timeline",
+                "process",
+                "comparison",
+                "agenda",
+                "gallery",
+                "chart",
+                "table",
+                "callout",
                 "closing",
               ],
             },
@@ -1090,7 +1134,7 @@ export async function generatePresentationOutline(
 
 Драматургия: сильный вход → почему тема важна сейчас → как устроено → практические сценарии → ограничения/риски → критерии решения → ясный финал. У каждого слайда один вывод и своя функция. Заголовок должен сообщать вывод, а не называться «Возможности», «Риски» или «Итоги». Не делай agenda и не пиши заглушки «добавьте факты», «нужно показать», «согласуйте пилот».
 
-Композиция должна меняться осмысленно: title только первый, closing только последний; statement для одного тезиса; split для противопоставления/механизма; bullets для системы; stats только при подтверждённых числах; quote только для предоставленной реальной цитаты. Не повторяй layout более двух раз подряд. Для визуальной подачи чередуй крупный тезис, структурный слайд, контраст/сравнение и практический слайд. visualDesignBrief обязателен: он определяет арт-направление, характер узоров, контраст, плотность и ритм. «Премиальный» означает сдержанную типографику, графит/слоновую кость, тонкие линии и золотой акцент — не фиолетовый шаблон и не россыпь одинаковых точек.
+Композиция должна меняться осмысленно: title только первый, closing только последний; statement — один тезис; split — текст и изображение; bullets — система; timeline — этапы во времени; process — последовательность действий; comparison — честное сравнение; agenda — структура выступления; gallery — визуальная история; chart и stats — только подтверждённые числа; table — компактная матрица; callout — важное предупреждение или вывод; quote — только предоставленная реальная цитата. Не повторяй layout более двух раз подряд. Для визуальной подачи чередуй крупный тезис, структурный слайд, контраст/сравнение и практический слайд. visualDesignBrief обязателен: он определяет арт-направление, характер узоров, контраст, плотность и ритм. «Премиальный» означает сдержанную типографику, графит/слоновую кость, тонкие линии и золотой акцент — не фиолетовый шаблон и не россыпь одинаковых точек.
 
 Тексты должны помещаться без уменьшения до нечитаемого размера: title до 80 знаков, body до 280 знаков, максимум 4 bullets по 90 знаков. eyebrow — короткая смысловая метка. speakerNotes — 1–3 полезных предложения для выступающего, не повтор текста. Верни ровно ${input.slideCount} слайдов.
 

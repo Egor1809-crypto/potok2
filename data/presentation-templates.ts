@@ -34,6 +34,115 @@ export const presentationThemes: PresentationTheme[] = [
     surfaceColor: "#FFFFFF",
   },
   {
+    id: "editorial",
+    name: "Редакционный",
+    description: "Крупная типографика, журнальная сетка и коралловый акцент",
+    accentColor: "#E8543E",
+    backgroundColor: "#F6EFE5",
+    textColor: "#171310",
+    surfaceColor: "#FFFFFF",
+  },
+  {
+    id: "neon",
+    name: "Неон",
+    description: "Тёмный digital-фон, лаймовый свет и технологичные карточки",
+    accentColor: "#B7FF4A",
+    backgroundColor: "#0A0D12",
+    textColor: "#F7F9FC",
+    surfaceColor: "#161B23",
+  },
+  {
+    id: "botanical",
+    name: "Ботаника",
+    description: "Натуральная зелень, мягкая бумага и органические формы",
+    accentColor: "#467A5A",
+    backgroundColor: "#F4F1E8",
+    textColor: "#1B2A20",
+    surfaceColor: "#E1E8DC",
+  },
+  {
+    id: "glass",
+    name: "Стекло",
+    description: "Холодные градиенты, прозрачные панели и воздушная сетка",
+    accentColor: "#4F7CFF",
+    backgroundColor: "#EAF1FF",
+    textColor: "#152342",
+    surfaceColor: "#FFFFFF",
+  },
+  {
+    id: "mono",
+    name: "Моно",
+    description: "Чёрно-белая система, строгая сетка и высокий контраст",
+    accentColor: "#111111",
+    backgroundColor: "#F8F8F6",
+    textColor: "#111111",
+    surfaceColor: "#FFFFFF",
+  },
+  {
+    id: "clay",
+    name: "Терракота",
+    description: "Тёплая керамическая палитра и спокойные геометрические формы",
+    accentColor: "#B85C45",
+    backgroundColor: "#F7EBDD",
+    textColor: "#3B241E",
+    surfaceColor: "#EFD4C5",
+  },
+  {
+    id: "cobalt",
+    name: "Кобальт",
+    description: "Яркий синий, лимонные акценты и динамичная геометрия",
+    accentColor: "#1249D8",
+    backgroundColor: "#EFF3FF",
+    textColor: "#101C3A",
+    surfaceColor: "#FFE96A",
+  },
+  {
+    id: "berry",
+    name: "Ягода",
+    description: "Насыщенный пурпур, розовые поверхности и мягкие градиенты",
+    accentColor: "#B22672",
+    backgroundColor: "#FFF0F7",
+    textColor: "#371528",
+    surfaceColor: "#F5C9DE",
+  },
+  {
+    id: "sky",
+    name: "Небо",
+    description: "Светлая голубая палитра и плавные воздушные линии",
+    accentColor: "#2980C8",
+    backgroundColor: "#EEF8FF",
+    textColor: "#12324C",
+    surfaceColor: "#D7EEFF",
+  },
+  {
+    id: "sage",
+    name: "Шалфей",
+    description: "Приглушённая зелень для отчётов, исследований и экопроектов",
+    accentColor: "#657A52",
+    backgroundColor: "#F2F3EA",
+    textColor: "#283020",
+    surfaceColor: "#DDE2CF",
+  },
+  {
+    id: "cinematic",
+    name: "Кино",
+    description:
+      "Глубокий графит, красный акцент и кинематографичная композиция",
+    accentColor: "#E4463A",
+    backgroundColor: "#151515",
+    textColor: "#F8F5EF",
+    surfaceColor: "#292929",
+  },
+  {
+    id: "playful",
+    name: "Игра",
+    description: "Лаванда, апельсин и дружелюбные модульные карточки",
+    accentColor: "#FF6B35",
+    backgroundColor: "#F5F0FF",
+    textColor: "#2B2140",
+    surfaceColor: "#DCCBFF",
+  },
+  {
     id: "violet",
     name: "Ультрафиолет",
     description: "Контрастный digital-стиль для сильного питча",
@@ -158,7 +267,7 @@ function starter(
   };
 }
 
-export const presentationTemplates: PresentationStarterTemplate[] = [
+const corePresentationTemplates: PresentationStarterTemplate[] = [
   starter(
     "presentation-template-pitch",
     "Питч для клиента",
@@ -787,6 +896,320 @@ export const presentationTemplates: PresentationStarterTemplate[] = [
       ),
     ],
   ),
+];
+
+type StyleTemplateSpec = {
+  slug: string;
+  name: string;
+  description: string;
+  useCase: string;
+  themeId: PresentationThemeId;
+  eyebrow: string;
+};
+
+const styleTemplateSpecs: StyleTemplateSpec[] = [
+  {
+    slug: "product-glass",
+    name: "Запуск продукта · Glass",
+    description: "Воздушный продуктовый анонс с дорожной картой и сравнением.",
+    useCase: "Продукт",
+    themeId: "glass",
+    eyebrow: "PRODUCT LAUNCH",
+  },
+  {
+    slug: "cyber-neon",
+    name: "Кибербезопасность · Neon",
+    description:
+      "Контрастный технологический доклад с процессом защиты и метриками.",
+    useCase: "Технологии",
+    themeId: "neon",
+    eyebrow: "SECURITY BRIEF",
+  },
+  {
+    slug: "brand-editorial",
+    name: "Манифест бренда · Editorial",
+    description:
+      "Редакционная история о характере, голосе и визуальной системе бренда.",
+    useCase: "Брендинг",
+    themeId: "editorial",
+    eyebrow: "BRAND STORY",
+  },
+  {
+    slug: "eco-botanical",
+    name: "Экологическая инициатива",
+    description:
+      "Органичная история проекта с целями, этапами и измеримым эффектом.",
+    useCase: "ESG",
+    themeId: "botanical",
+    eyebrow: "IMPACT",
+  },
+  {
+    slug: "legal-mono",
+    name: "Правовая стратегия · Mono",
+    description:
+      "Строгая аргументация: позиция, риски, сравнение сценариев и решение.",
+    useCase: "Право",
+    themeId: "mono",
+    eyebrow: "LEGAL STRATEGY",
+  },
+  {
+    slug: "architecture-clay",
+    name: "Архитектурная концепция",
+    description:
+      "Тёплая визуальная подача пространства, материалов и этапов проекта.",
+    useCase: "Архитектура",
+    themeId: "clay",
+    eyebrow: "CONCEPT",
+  },
+  {
+    slug: "investor-cobalt",
+    name: "Инвесторский отчёт · Cobalt",
+    description:
+      "Энергичный квартальный обзор с диаграммами, таблицей и следующим шагом.",
+    useCase: "Финансы",
+    themeId: "cobalt",
+    eyebrow: "INVESTOR UPDATE",
+  },
+  {
+    slug: "culture-berry",
+    name: "Культурная программа",
+    description: "Выразительный анонс программы, спикеров и ключевых событий.",
+    useCase: "События",
+    themeId: "berry",
+    eyebrow: "CULTURE PROGRAM",
+  },
+  {
+    slug: "health-sky",
+    name: "Медицинское исследование",
+    description:
+      "Спокойная доказательная структура для результатов исследования.",
+    useCase: "Исследования",
+    themeId: "sky",
+    eyebrow: "RESEARCH",
+  },
+  {
+    slug: "esg-sage",
+    name: "Отчёт об устойчивости",
+    description:
+      "Сдержанный ESG-отчёт с показателями, инициативами и планом действий.",
+    useCase: "Отчёты",
+    themeId: "sage",
+    eyebrow: "SUSTAINABILITY",
+  },
+  {
+    slug: "documentary-cinematic",
+    name: "Питч документального проекта",
+    description:
+      "Кинематографичная заявка: конфликт, герои, визуальный мир и производство.",
+    useCase: "Медиа",
+    themeId: "cinematic",
+    eyebrow: "DOCUMENTARY PITCH",
+  },
+  {
+    slug: "education-playful",
+    name: "Интерактивный урок",
+    description:
+      "Дружелюбная учебная структура с вопросами, процессом и итоговой проверкой.",
+    useCase: "Образование",
+    themeId: "playful",
+    eyebrow: "LEARNING LAB",
+  },
+  {
+    slug: "luxury-premium",
+    name: "Премиальное предложение",
+    description: "Чёрно-золотая презентация предложения без визуального шума.",
+    useCase: "Продажи",
+    themeId: "premium",
+    eyebrow: "PRIVATE OFFER",
+  },
+  {
+    slug: "startup-violet",
+    name: "Стартап-питч · Violet",
+    description: "Проблема, решение, рынок, модель и запрос к инвестору.",
+    useCase: "Стартап",
+    themeId: "violet",
+    eyebrow: "VENTURE PITCH",
+  },
+  {
+    slug: "strategy-noir",
+    name: "Стратегическая сессия · Noir",
+    description:
+      "Тёмная управленческая подача для решений, приоритетов и рисков.",
+    useCase: "Стратегия",
+    themeId: "noir",
+    eyebrow: "EXECUTIVE SESSION",
+  },
+  {
+    slug: "ocean-data",
+    name: "Аналитика продукта",
+    description: "Спокойная data-story с метриками, сравнением и выводами.",
+    useCase: "Аналитика",
+    themeId: "ocean",
+    eyebrow: "PRODUCT DATA",
+  },
+  {
+    slug: "sunrise-event",
+    name: "Открытие мероприятия",
+    description:
+      "Энергичная программа события с таймлайном и призывом к участию.",
+    useCase: "События",
+    themeId: "sunrise",
+    eyebrow: "EVENT OPENING",
+  },
+  {
+    slug: "atelier-portfolio",
+    name: "Портфолио студии",
+    description: "Редакционная подборка проектов, подхода и результатов.",
+    useCase: "Портфолио",
+    themeId: "atelier",
+    eyebrow: "SELECTED WORK",
+  },
+  {
+    slug: "modern-roadmap",
+    name: "Дорожная карта продукта",
+    description:
+      "Чистая модульная структура этапов, владельцев и критериев готовности.",
+    useCase: "Продукт",
+    themeId: "modern",
+    eyebrow: "PRODUCT ROADMAP",
+  },
+  {
+    slug: "glass-service",
+    name: "Презентация сервиса",
+    description:
+      "Лёгкая SaaS-презентация с выгодами, процессом подключения и CTA.",
+    useCase: "Продажи",
+    themeId: "glass",
+    eyebrow: "SERVICE OVERVIEW",
+  },
+  {
+    slug: "mono-report",
+    name: "Годовой отчёт · Mono",
+    description:
+      "Чёрно-белый управленческий отчёт с фактами и краткими выводами.",
+    useCase: "Отчёты",
+    themeId: "mono",
+    eyebrow: "ANNUAL REPORT",
+  },
+  {
+    slug: "berry-social",
+    name: "Креативная кампания",
+    description:
+      "Смелая концепция кампании: аудитория, механика, контент и каналы.",
+    useCase: "Маркетинг",
+    themeId: "berry",
+    eyebrow: "CAMPAIGN IDEA",
+  },
+  {
+    slug: "cobalt-sales",
+    name: "Коммерческое предложение",
+    description:
+      "Динамичная продажная история с ценностью, доказательствами и планом запуска.",
+    useCase: "Продажи",
+    themeId: "cobalt",
+    eyebrow: "BUSINESS PROPOSAL",
+  },
+  {
+    slug: "sage-policy",
+    name: "Публичная политика",
+    description:
+      "Спокойная презентация инициативы, заинтересованных сторон и дорожной карты.",
+    useCase: "Государство",
+    themeId: "sage",
+    eyebrow: "POLICY BRIEF",
+  },
+];
+
+function styleTemplate(spec: StyleTemplateSpec): PresentationStarterTemplate {
+  const prefix = `style-${spec.slug}`;
+  return starter(
+    `presentation-template-${spec.slug}`,
+    spec.name,
+    spec.description,
+    spec.useCase,
+    spec.themeId,
+    [
+      slide(
+        `${prefix}-1`,
+        "title",
+        spec.name,
+        spec.description,
+        [],
+        spec.eyebrow,
+      ),
+      slide(
+        `${prefix}-2`,
+        "agenda",
+        "Как устроена история",
+        "Короткая навигация по содержанию.",
+        [
+          "Контекст и задача",
+          "Главная идея",
+          "Доказательства",
+          "План действий",
+        ],
+        "СТРУКТУРА",
+      ),
+      slide(
+        `${prefix}-3`,
+        "comparison",
+        "Почему прежний подход больше не работает",
+        "Сопоставьте текущую ситуацию и целевое состояние.",
+        [
+          "Разрозненный процесс",
+          "Низкая прозрачность",
+          "Единая система",
+          "Проверяемый результат",
+        ],
+        "КОНТЕКСТ",
+      ),
+      slide(
+        `${prefix}-4`,
+        "process",
+        "Путь к результату состоит из трёх шагов",
+        "Каждый шаг заканчивается понятным решением.",
+        ["Исследовать", "Собрать решение", "Проверить эффект"],
+        "ПОДХОД",
+      ),
+      slide(
+        `${prefix}-5`,
+        "chart",
+        "Динамика, которую важно показать",
+        "Замените значения подтверждёнными данными.",
+        ["24 | Сейчас", "48 | Этап 1", "67 | Этап 2", "86 | Цель"],
+        "ДАННЫЕ",
+      ),
+      slide(
+        `${prefix}-6`,
+        "gallery",
+        "Визуальное доказательство идеи",
+        "Добавьте фотографию, продуктовый кадр или схему из медиатеки.",
+        [],
+        "ВИЗУАЛЬНЫЙ МИР",
+      ),
+      slide(
+        `${prefix}-7`,
+        "callout",
+        "Следующий шаг должен быть простым",
+        "Зафиксируйте одно действие, срок и ответственного.",
+        [],
+        "РЕШЕНИЕ",
+      ),
+      slide(
+        `${prefix}-8`,
+        "closing",
+        "Готовы перейти к следующему шагу?",
+        "Добавьте ссылку, контакт или конкретный запрос к аудитории.",
+        [],
+        "СПАСИБО",
+      ),
+    ],
+  );
+}
+
+export const presentationTemplates: PresentationStarterTemplate[] = [
+  ...corePresentationTemplates,
+  ...styleTemplateSpecs.map(styleTemplate),
 ];
 
 export function presentationTheme(themeId: PresentationThemeId) {

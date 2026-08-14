@@ -364,6 +364,18 @@ export type EmailAiResponse = {
 export type PresentationThemeId =
   | "atelier"
   | "modern"
+  | "editorial"
+  | "neon"
+  | "botanical"
+  | "glass"
+  | "mono"
+  | "clay"
+  | "cobalt"
+  | "berry"
+  | "sky"
+  | "sage"
+  | "cinematic"
+  | "playful"
   | "violet"
   | "noir"
   | "ocean"
@@ -381,7 +393,21 @@ export type PresentationPatternId =
   | "gold-frame";
 
 export type PresentationSlideLayout =
-  "title" | "statement" | "split" | "bullets" | "quote" | "stats" | "closing";
+  | "title"
+  | "statement"
+  | "split"
+  | "bullets"
+  | "quote"
+  | "stats"
+  | "timeline"
+  | "process"
+  | "comparison"
+  | "agenda"
+  | "gallery"
+  | "chart"
+  | "table"
+  | "callout"
+  | "closing";
 
 export type PresentationSlide = {
   id: string;

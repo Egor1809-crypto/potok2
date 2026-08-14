@@ -14,7 +14,6 @@ import {
   Blocks,
   Library,
   PenTool,
-  Save,
   SlidersHorizontal,
   Sparkles,
   SquareDashedMousePointer,
@@ -30,7 +29,6 @@ import type {
 } from "@/types/api";
 import {
   Alert,
-  Button,
   FormField,
   Input,
   Select,
@@ -1082,112 +1080,59 @@ function EmailBuilderWorkspace({
       ) : (
         <>
           {mode === "template" ? (
-            <div className="border-b border-border bg-surface-subtle/45 px-4 py-3">
+            <div className="border-b border-border bg-surface-subtle/45 px-4 py-2">
               {editingStarter && !savedTemplateId ? (
-                <div className="mb-3 rounded-xl border border-primary/20 bg-primary-subtle/60 px-3 py-2.5 text-[11px] leading-5 text-text-muted">
-                  Это готовый макет из библиотеки. Кнопка «Сохранить в мои
-                  шаблоны» создаст вашу отдельную копию — исходный шаблон
-                  останется без изменений.
+                <div className="mb-2 rounded-lg border border-primary/20 bg-primary-subtle/60 px-3 py-1.5 text-[10px] leading-4 text-text-muted">
+                  Вы редактируете готовый макет. «Сохранить в мои шаблоны»
+                  создаст отдельную копию.
                 </div>
               ) : null}
-              <div className="grid gap-3 md:grid-cols-[minmax(240px,1fr)_190px] md:items-end">
-                <FormField
-                  label="Имя шаблона"
-                  htmlFor="builder-template-name"
-                  hint="Так он появится в разделе «Мои шаблоны»"
-                >
-                  <Input
-                    id="builder-template-name"
-                    value={campaignName}
-                    maxLength={160}
-                    onChange={(event) =>
-                      setCampaignNameDirty(event.target.value)
-                    }
-                    placeholder="Например, Приглашение на конференцию"
-                    className="font-semibold"
-                  />
-                </FormField>
-                <FormField
-                  label="Категория"
-                  htmlFor="builder-template-category"
-                >
-                  <Select
-                    id="builder-template-category"
-                    value={templateCategory}
-                    onChange={(event) => {
-                      setTemplateCategory(
-                        event.target.value as TemplateCategory,
-                      );
-                      markDirty();
-                    }}
-                    options={[
-                      { value: "Business", label: "Бизнес" },
-                      { value: "Events", label: "События" },
-                      { value: "Outreach", label: "Первичный контакт" },
-                      { value: "Newsletter", label: "Дайджест" },
-                      { value: "Follow-up", label: "Продолжение" },
-                      { value: "Transactional", label: "Сервисное" },
-                    ]}
-                  />
-                </FormField>
-                <FormField
-                  label="Описание"
-                  htmlFor="builder-template-description"
-                  hint="Помогает найти нужный шаблон в библиотеке"
-                  className="md:col-span-2"
-                >
-                  <Input
-                    id="builder-template-description"
-                    value={templateDescription}
-                    maxLength={1000}
-                    onChange={(event) => {
-                      setTemplateDescription(event.target.value);
-                      markDirty();
-                    }}
-                    placeholder="Для какой задачи подходит этот макет"
-                  />
-                </FormField>
-              </div>
-            </div>
-          ) : null}
-
-          {mode === "template" && creationMode === "manual" ? (
-            <div className="flex flex-col gap-3 border-b border-primary/15 bg-primary-subtle/35 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0">
-                <strong className="block text-[12px] text-text-strong">
-                  Сохраните результат как рабочий шаблон
-                </strong>
-                <span className="mt-0.5 block text-[10px] leading-4 text-text-muted">
-                  Текущий дизайн, текст, логотипы и фотографии появятся в
-                  разделе «Мои шаблоны».
-                </span>
-              </div>
-              <div className="flex shrink-0 flex-wrap gap-2">
-                <Link
-                  href="/templates?scope=mine"
-                  onClick={continueFromEditor}
-                  className={buttonVariants({
-                    variant: "secondary",
-                    size: "sm",
-                  })}
-                >
-                  <Library aria-hidden="true" className="size-3.5" />
-                  Мои шаблоны
-                </Link>
-                <Button
-                  type="button"
-                  variant="primary"
-                  size="md"
-                  loading={savingTemplate}
-                  loadingText="Сохраняем…"
-                  onClick={save}
-                >
-                  <Save aria-hidden="true" className="size-4" />
-                  {savedTemplateId
-                    ? "Сохранить изменения"
-                    : "Сохранить в «Мои шаблоны»"}
-                </Button>
-              </div>
+              <details className="group">
+                <summary className="flex cursor-pointer list-none items-center justify-between text-[10px] font-semibold text-text-muted hover:text-text-strong">
+                  Категория и описание шаблона
+                  <span className="transition group-open:rotate-180">⌄</span>
+                </summary>
+                <div className="mt-2 grid gap-2 md:grid-cols-[190px_minmax(0,1fr)]">
+                  <FormField
+                    label="Категория"
+                    htmlFor="builder-template-category"
+                  >
+                    <Select
+                      id="builder-template-category"
+                      value={templateCategory}
+                      onChange={(event) => {
+                        setTemplateCategory(
+                          event.target.value as TemplateCategory,
+                        );
+                        markDirty();
+                      }}
+                      options={[
+                        { value: "Business", label: "Бизнес" },
+                        { value: "Events", label: "События" },
+                        { value: "Outreach", label: "Первичный контакт" },
+                        { value: "Newsletter", label: "Дайджест" },
+                        { value: "Follow-up", label: "Продолжение" },
+                        { value: "Transactional", label: "Сервисное" },
+                      ]}
+                    />
+                  </FormField>
+                  <FormField
+                    label="Описание"
+                    htmlFor="builder-template-description"
+                  >
+                    <Input
+                      id="builder-template-description"
+                      value={templateDescription}
+                      maxLength={1000}
+                      onChange={(event) => {
+                        setTemplateDescription(event.target.value);
+                        markDirty();
+                      }}
+                      placeholder="Для какой задачи подходит макет"
+                    />
+                  </FormField>
+                </div>
+              </details>
             </div>
           ) : null}
 

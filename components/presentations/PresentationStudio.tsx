@@ -71,6 +71,14 @@ const layoutLabels: Record<PresentationSlideLayout, string> = {
   bullets: "Список",
   quote: "Цитата",
   stats: "Показатели",
+  timeline: "Таймлайн",
+  process: "Процесс",
+  comparison: "Сравнение",
+  agenda: "Повестка",
+  gallery: "Галерея",
+  chart: "Диаграмма",
+  table: "Таблица",
+  callout: "Акцент",
   closing: "Финал",
 };
 
@@ -188,7 +196,8 @@ function presentationPatternStyle(
   if (patternId === "gold-frame")
     return {
       backgroundImage: `linear-gradient(${accent} 0 0), linear-gradient(${accent} 0 0), linear-gradient(${accent} 0 0), linear-gradient(${accent} 0 0)`,
-      backgroundSize: "calc(100% - 10%) 1px, calc(100% - 10%) 1px, 1px calc(100% - 14%), 1px calc(100% - 14%)",
+      backgroundSize:
+        "calc(100% - 10%) 1px, calc(100% - 10%) 1px, 1px calc(100% - 14%), 1px calc(100% - 14%)",
       backgroundPosition: "center 7%, center 93%, 5% center, 95% center",
       backgroundRepeat: "no-repeat",
     };
@@ -213,6 +222,42 @@ function presentationPatternStyle(
     };
   }
   switch (themeId) {
+    case "neon":
+    case "cinematic":
+      return {
+        backgroundImage: `linear-gradient(90deg, ${accent}1F 1px, transparent 1px), linear-gradient(${accent}17 1px, transparent 1px), linear-gradient(135deg, transparent 0 74%, ${accent}2A 74% 75%, transparent 75%)`,
+        backgroundSize: "44px 44px, 44px 44px, 100% 100%",
+      };
+    case "editorial":
+    case "mono":
+      return {
+        backgroundImage: `linear-gradient(90deg, ${accent}28 1px, transparent 1px), linear-gradient(${accent}18 1px, transparent 1px), linear-gradient(90deg, transparent 0 91%, ${accent}14 91%)`,
+        backgroundSize: "25% 100%, 100% 25%, 100% 100%",
+      };
+    case "botanical":
+    case "sage":
+      return {
+        backgroundImage: `radial-gradient(ellipse at 92% 18%, ${accent}22 0 10%, transparent 10.5%), radial-gradient(ellipse at 84% 31%, ${accent}18 0 8%, transparent 8.5%), radial-gradient(circle at 7% 90%, transparent 0 13%, ${accent}1F 13.3% 13.8%, transparent 14.1%)`,
+        backgroundSize: "100% 100%",
+      };
+    case "glass":
+    case "sky":
+      return {
+        backgroundImage: `radial-gradient(circle at 88% 16%, ${accent}2B 0 13%, transparent 13.5%), radial-gradient(circle at 75% 92%, ${accent}18 0 18%, transparent 18.5%), linear-gradient(125deg, transparent 0 63%, ${accent}10 63% 80%, transparent 80%)`,
+        backgroundSize: "100% 100%",
+      };
+    case "clay":
+    case "berry":
+    case "playful":
+      return {
+        backgroundImage: `radial-gradient(circle at 90% 18%, ${accent}2C 0 9%, transparent 9.5%), radial-gradient(circle at 82% 25%, transparent 0 13%, ${accent}20 13.4% 14%, transparent 14.4%), linear-gradient(145deg, transparent 0 78%, ${accent}18 78% 86%, transparent 86%)`,
+        backgroundSize: "100% 100%",
+      };
+    case "cobalt":
+      return {
+        backgroundImage: `linear-gradient(150deg, transparent 0 70%, ${accent}22 70% 78%, transparent 78%), linear-gradient(90deg, ${accent}18 1px, transparent 1px), radial-gradient(circle at 91% 17%, ${accent}2D 0 7%, transparent 7.5%)`,
+        backgroundSize: "100% 100%, 84px 100%, 100% 100%",
+      };
     case "modern":
       return {
         backgroundImage: `linear-gradient(90deg, ${accent}14 1px, transparent 1px), linear-gradient(${accent}10 1px, transparent 1px), radial-gradient(circle at 91% 14%, ${accent}20 0 7%, transparent 7.4%)`,
@@ -524,6 +569,260 @@ function SlidePreview({
                     </li>
                   ))}
               </ul>
+            )}
+          </div>
+        </div>
+      ) : slide.layout === "timeline" || slide.layout === "process" ? (
+        <div className="absolute inset-x-[6.2%] inset-y-[12%]">
+          {slide.eyebrow ? (
+            <p
+              className={cn(
+                "m-0 font-bold uppercase tracking-[0.15em]",
+                compact ? "text-[3px]" : "text-[10px]",
+              )}
+              style={{ color: project.accentColor }}
+            >
+              {slide.eyebrow}
+            </p>
+          ) : null}
+          {editableTitle(
+            cn(
+              "mt-[3%] max-w-[82%]",
+              compact
+                ? titleClass
+                : "text-[clamp(20px,2.2vw,36px)] leading-[1.08]",
+            ),
+          )}
+          <div className="relative mt-[8%] grid grid-cols-3 gap-[3%]">
+            <span
+              className="absolute left-[8%] right-[8%] top-[16%] h-px"
+              style={{ backgroundColor: `${project.accentColor}55` }}
+            />
+            {(slide.bullets.length
+              ? slide.bullets
+              : ["Первый этап", "Второй этап", "Третий этап"]
+            )
+              .slice(0, 3)
+              .map((item, index) => (
+                <div
+                  key={`${item}-${index}`}
+                  className="relative rounded-[7%] border border-current/10 bg-white/55 p-[8%]"
+                >
+                  <span
+                    className={cn(
+                      "relative z-10 grid rounded-full font-bold text-white",
+                      compact
+                        ? "size-3 place-items-center text-[3px]"
+                        : "size-8 place-items-center text-[11px]",
+                    )}
+                    style={{ backgroundColor: project.accentColor }}
+                  >
+                    {index + 1}
+                  </span>
+                  <p className={cn("mb-0 mt-[9%] font-semibold", bodyClass)}>
+                    {item}
+                  </p>
+                </div>
+              ))}
+          </div>
+        </div>
+      ) : slide.layout === "comparison" ? (
+        <div className="absolute inset-x-[6.2%] inset-y-[12%]">
+          {editableTitle(
+            cn(
+              "max-w-[80%]",
+              compact
+                ? titleClass
+                : "text-[clamp(20px,2.2vw,36px)] leading-[1.08]",
+            ),
+          )}
+          <div className="mt-[7%] grid grid-cols-2 gap-[4%]">
+            {[0, 1].map((column) => (
+              <div
+                key={column}
+                className="rounded-[7%] border border-current/10 p-[7%]"
+                style={{
+                  backgroundColor: column
+                    ? `${project.accentColor}20`
+                    : "rgba(255,255,255,.56)",
+                }}
+              >
+                <strong
+                  className={cn(
+                    "block",
+                    compact ? "text-[5px]" : "text-[16px]",
+                  )}
+                >
+                  {column ? "Целевое состояние" : "Сейчас"}
+                </strong>
+                <ul
+                  className={cn(
+                    "mb-0 mt-[7%] grid gap-[5%] pl-[8%]",
+                    bodyClass,
+                  )}
+                >
+                  {(slide.bullets.length
+                    ? slide.bullets
+                    : ["Первый критерий", "Второй критерий", "Третий критерий"]
+                  )
+                    .filter((_, index) => index % 2 === column)
+                    .slice(0, 3)
+                    .map((item, index) => (
+                      <li key={`${item}-${index}`}>{item}</li>
+                    ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : slide.layout === "agenda" || slide.layout === "table" ? (
+        <div className="absolute inset-x-[6.2%] inset-y-[12%] grid grid-cols-[38%_1fr] gap-[7%]">
+          <div>
+            {slide.eyebrow ? (
+              <p
+                className={cn(
+                  "m-0 font-bold uppercase tracking-[0.15em]",
+                  compact ? "text-[3px]" : "text-[10px]",
+                )}
+                style={{ color: project.accentColor }}
+              >
+                {slide.eyebrow}
+              </p>
+            ) : null}
+            {editableTitle(
+              cn(
+                "mt-[5%]",
+                compact
+                  ? titleClass
+                  : "text-[clamp(20px,2.2vw,36px)] leading-[1.08]",
+              ),
+            )}
+            {editableBody(cn("mt-[7%] opacity-65", bodyClass))}
+          </div>
+          <div className="grid content-center gap-[3%]">
+            {(slide.bullets.length
+              ? slide.bullets
+              : [
+                  "Первый раздел",
+                  "Второй раздел",
+                  "Третий раздел",
+                  "Четвёртый раздел",
+                ]
+            )
+              .slice(0, 6)
+              .map((item, index) => (
+                <div
+                  key={`${item}-${index}`}
+                  className="grid grid-cols-[12%_1fr] items-center border-b border-current/15 py-[3%]"
+                >
+                  <strong
+                    className={cn(compact ? "text-[4px]" : "text-[13px]")}
+                    style={{ color: project.accentColor }}
+                  >
+                    {String(index + 1).padStart(2, "0")}
+                  </strong>
+                  <span className={bodyClass}>{item}</span>
+                </div>
+              ))}
+          </div>
+        </div>
+      ) : slide.layout === "gallery" ? (
+        <div className="absolute inset-x-[6.2%] inset-y-[11%] grid grid-cols-[38%_1fr] gap-[5%]">
+          <div className="flex min-w-0 flex-col justify-end pb-[4%]">
+            {editableTitle(
+              cn(
+                compact
+                  ? titleClass
+                  : "text-[clamp(20px,2.35vw,38px)] leading-[1.06]",
+              ),
+            )}
+            {editableBody(cn("mt-[7%] opacity-65", bodyClass))}
+          </div>
+          <div className="overflow-hidden rounded-[6%] bg-black/5">
+            {imageArea}
+          </div>
+        </div>
+      ) : slide.layout === "chart" ? (
+        <div className="absolute inset-x-[6.2%] inset-y-[12%]">
+          {editableTitle(
+            cn(
+              "max-w-[80%]",
+              compact
+                ? titleClass
+                : "text-[clamp(20px,2.2vw,36px)] leading-[1.08]",
+            ),
+          )}
+          <div className="mt-[8%] grid h-[48%] grid-cols-4 items-end gap-[4%] border-b border-current/20">
+            {(slide.bullets.length
+              ? slide.bullets
+              : ["18 | А", "42 | Б", "68 | В", "84 | Г"]
+            )
+              .slice(0, 4)
+              .map((item, index) => {
+                const [value, label] = item
+                  .split("|")
+                  .map((part) => part.trim());
+                const numeric = Math.max(
+                  18,
+                  Math.min(92, Number.parseFloat(value) || 28 + index * 17),
+                );
+                return (
+                  <div
+                    key={`${item}-${index}`}
+                    className="flex h-full flex-col justify-end text-center"
+                  >
+                    <strong
+                      className={cn(
+                        "mb-[4%]",
+                        compact ? "text-[4px]" : "text-[12px]",
+                      )}
+                    >
+                      {value}
+                    </strong>
+                    <span
+                      className="mx-auto block w-[64%] rounded-t-md"
+                      style={{
+                        height: `${numeric}%`,
+                        backgroundColor: project.accentColor,
+                      }}
+                    />
+                    <span
+                      className={cn(
+                        "mt-[5%] opacity-65",
+                        compact ? "text-[3px]" : "text-[10px]",
+                      )}
+                    >
+                      {label}
+                    </span>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+      ) : slide.layout === "callout" ? (
+        <div className="absolute inset-[8%] grid place-items-center rounded-[5%] border border-current/10 bg-white/55 px-[10%] text-center">
+          <div>
+            {slide.eyebrow ? (
+              <p
+                className={cn(
+                  "m-0 font-bold uppercase tracking-[0.16em]",
+                  compact ? "text-[3px]" : "text-[10px]",
+                )}
+                style={{ color: project.accentColor }}
+              >
+                {slide.eyebrow}
+              </p>
+            ) : null}
+            {editableTitle(
+              cn(
+                "mt-[5%]",
+                compact
+                  ? titleClass
+                  : "text-[clamp(24px,3vw,48px)] leading-[1.08]",
+              ),
+            )}
+            {editableBody(
+              cn("mx-auto mt-[6%] max-w-[78%] opacity-70", bodyClass),
             )}
           </div>
         </div>
@@ -1686,7 +1985,9 @@ export function PresentationStudio() {
             <aside className="hidden min-h-0 overflow-hidden border-l border-border bg-surface p-4 xl:block">
               <div className="grid h-full min-h-0 gap-5 overflow-y-auto pr-1">
                 <div className="sticky top-0 z-10 -mx-4 -mt-4 border-b border-border bg-surface px-4 py-3">
-                  <strong className="block text-[13px]">Инструменты слайда</strong>
+                  <strong className="block text-[13px]">
+                    Инструменты слайда
+                  </strong>
                   <span className="text-[10px] text-text-subtle">
                     Композиция, контент, изображения и оформление
                   </span>
@@ -1703,18 +2004,41 @@ export function PresentationStudio() {
                       ["Цифры", "stats"],
                       ["Цитата", "quote"],
                       ["Кнопка", "closing"],
+                      ["Таймлайн", "timeline"],
+                      ["Процесс", "process"],
+                      ["Сравнение", "comparison"],
+                      ["Повестка", "agenda"],
+                      ["Галерея", "gallery"],
+                      ["Диаграмма", "chart"],
+                      ["Таблица", "table"],
+                      ["Акцент", "callout"],
                     ].map(([label, layout]) => (
                       <button
                         key={label}
                         type="button"
                         onClick={() => {
-                          if (label === "Фото") setSlideImageOpen(true);
+                          if (label === "Фото" || label === "Галерея")
+                            setSlideImageOpen(true);
                           updateSlide({
                             layout: layout as PresentationSlideLayout,
-                            ...(label === "Список" && !selectedSlide.bullets.length
-                              ? { bullets: ["Первый пункт", "Второй пункт"] }
+                            ...([
+                              "Список",
+                              "Таймлайн",
+                              "Процесс",
+                              "Сравнение",
+                              "Повестка",
+                              "Таблица",
+                            ].includes(label) && !selectedSlide.bullets.length
+                              ? {
+                                  bullets: [
+                                    "Первый пункт",
+                                    "Второй пункт",
+                                    "Третий пункт",
+                                  ],
+                                }
                               : {}),
-                            ...(label === "Цифры" && !selectedSlide.bullets.length
+                            ...(["Цифры", "Диаграмма"].includes(label) &&
+                            !selectedSlide.bullets.length
                               ? { bullets: ["24% | рост", "3× | быстрее"] }
                               : {}),
                             ...(label === "Кнопка" && !selectedSlide.ctaLabel
@@ -1907,7 +2231,9 @@ export function PresentationStudio() {
                         <button
                           key={pattern.id}
                           type="button"
-                          aria-pressed={(selectedSlide.patternId ?? "auto") === pattern.id}
+                          aria-pressed={
+                            (selectedSlide.patternId ?? "auto") === pattern.id
+                          }
                           onClick={() => updateSlide({ patternId: pattern.id })}
                           className="rounded-lg border border-border bg-surface p-2 text-left text-[10px] font-medium transition hover:border-primary/40 aria-pressed:border-primary aria-pressed:bg-primary-subtle"
                         >
@@ -1915,10 +2241,12 @@ export function PresentationStudio() {
                             className="mb-1.5 block aspect-[3/1] rounded border border-border"
                             style={{
                               backgroundColor:
-                                selectedSlide.backgroundColor ?? project.backgroundColor,
+                                selectedSlide.backgroundColor ??
+                                project.backgroundColor,
                               ...presentationPatternStyle(
                                 project.themeId,
-                                selectedSlide.accentColor ?? project.accentColor,
+                                selectedSlide.accentColor ??
+                                  project.accentColor,
                                 "preview",
                                 pattern.id,
                               ),

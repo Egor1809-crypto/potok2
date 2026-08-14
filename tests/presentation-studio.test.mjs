@@ -98,11 +98,50 @@ test("presentation library offers varied scenarios and practical filters", async
     ),
   ]);
   assert.ok((templates.match(/presentation-template-/g) ?? []).length >= 12);
+  assert.match(templates, /styleTemplateSpecs/);
+  assert.match(templates, /slug: "product-glass"/);
+  assert.match(templates, /slug: "cyber-neon"/);
+  assert.match(templates, /slug: "brand-editorial"/);
+  for (const layout of [
+    "process",
+    "comparison",
+    "agenda",
+    "gallery",
+    "chart",
+    "callout",
+  ]) {
+    assert.match(templates, new RegExp(`"${layout}"`));
+  }
   assert.match(view, /filteredPresentationTemplates/);
   assert.match(view, /Найти шаблон/);
   assert.match(view, /Все задачи/);
   assert.match(view, /Действие после презентации/);
   assert.match(view, /Факты и исходные данные/);
+  for (const blockLabel of [
+    "Таймлайн",
+    "Процесс",
+    "Сравнение",
+    "Повестка",
+    "Галерея",
+    "Диаграмма",
+    "Таблица",
+    "Акцент",
+  ]) {
+    assert.match(view, new RegExp(blockLabel));
+  }
+});
+
+test("email template editor keeps metadata secondary to the canvas", async () => {
+  const view = await readFile(
+    new URL(
+      "../components/email-builder/EmailBuilderView.tsx",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  assert.match(view, /<details className="group">/);
+  assert.match(view, /Категория и описание шаблона/);
+  assert.doesNotMatch(view, /Сохраните результат как рабочий шаблон/);
 });
 
 test("image studio can apply a generated asset as a real email background", async () => {
