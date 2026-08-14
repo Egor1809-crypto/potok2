@@ -35,6 +35,15 @@ type EmailCanvasProps = {
   className?: string;
 };
 
+const PROTECTED_SITE_ORIGIN = "https://mailflow-outreach.isakovegor820.chatgpt.site";
+
+function previewImageSource(href: string) {
+  if (href.startsWith(`${PROTECTED_SITE_ORIGIN}/conference-series/`)) {
+    return href.slice(PROTECTED_SITE_ORIGIN.length);
+  }
+  return href;
+}
+
 export function EmailCanvas({
   document,
   previewMode,
@@ -335,7 +344,7 @@ function BlockContent({
       return (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={block.href}
+          src={previewImageSource(block.href)}
           alt={block.content}
           className="inline-block max-h-24 max-w-full object-contain"
         />
@@ -446,7 +455,7 @@ function BlockContent({
       return (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={block.href}
+          src={previewImageSource(block.href)}
           alt={block.content}
           className="block h-auto w-full object-cover"
           style={{ borderRadius: block.borderRadius }}
