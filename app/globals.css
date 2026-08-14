@@ -16,15 +16,15 @@
   --surface-subtle: #f2f2f2;
   --surface-inset: #ebebeb;
 
-  --primary: #111111;
-  --primary-hover: #2b2b2b;
-  --primary-active: #000000;
-  --primary-subtle: #fff1a8;
-  --primary-muted: #ffdf3a;
+  --primary: #7c35f2;
+  --primary-hover: #6a29dd;
+  --primary-active: #5920c5;
+  --primary-subtle: #f0e7ff;
+  --primary-muted: #ddc9ff;
   --primary-foreground: #ffffff;
-  --action: #ffcc00;
-  --action-hover: #f2c200;
-  --action-active: #e6b800;
+  --action: #7c35f2;
+  --action-hover: #6a29dd;
+  --action-active: #5920c5;
 
   --text-strong: #000000;
   --text: #111111;
@@ -37,7 +37,7 @@
 
   --border: #dedede;
   --border-strong: #c7c7c7;
-  --border-focus: #111111;
+  --border-focus: #7c35f2;
 
   --success: #16855b;
   --success-subtle: #e8f7f0;
@@ -49,8 +49,8 @@
   --info: #2878c7;
   --info-subtle: #ebf5ff;
 
-  --chart-1: #111111;
-  --chart-2: #ffcc00;
+  --chart-1: #7c35f2;
+  --chart-2: #b488ff;
   --chart-3: #1e9b72;
   --chart-4: #b88532;
   --chart-grid: #dedede;
@@ -67,7 +67,7 @@
   --shadow-md: 0 8px 24px rgb(0 0 0 / 0.09);
   --shadow-lg: 0 16px 40px rgb(0 0 0 / 0.12);
   --shadow-floating: var(--shadow-lg);
-  --shadow-focus: 0 0 0 3px rgb(255 204 0 / 0.55);
+  --shadow-focus: 0 0 0 3px rgb(124 53 242 / 0.24);
 
   --sidebar-width: 252px;
   --topbar-height: 68px;
@@ -361,7 +361,7 @@ a.card:hover {
 .btn-primary {
   border-color: var(--action);
   background: var(--action);
-  color: var(--text-strong);
+  color: var(--primary-foreground);
   box-shadow: none;
 }
 

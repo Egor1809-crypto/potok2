@@ -290,20 +290,18 @@ function parseSuggestion(value: string, input: EmailAiRequest): EmailAiSuggestio
     previewText: cleanText(modelText(object.previewText) ?? modelText(object.preheader) ?? subject, "Прехедер", 500),
     body: cleanText(body, "Текст", 8_000),
     cta: cleanText(modelText(object.cta) ?? modelText(object.callToAction) ?? "Узнать подробнее", "Призыв к действию", 160),
-    artDirection: optionalText(object.artDirection, "Арт-направление", 600),
-    contentStrategy: optionalText(object.contentStrategy, "Стратегия текста", 600),
+    artDirection: typeof object.artDirection === "string" ? optionalText(object.artDirection, "Арт-направление", 600) : undefined,
+    contentStrategy: typeof object.contentStrategy === "string" ? optionalText(object.contentStrategy, "Стратегия текста", 600) : undefined,
   };
   if (input.action !== "design") return suggestion;
   const design = object.design && typeof object.design === "object" && !Array.isArray(object.design)
     ? asObject(object.design)
     : {};
-  const fallbackDetails = (input.briefAnswers ?? []).map((item) => item.answer).filter(Boolean);
   const fallbackBlocks: Record<string, unknown>[] = [
     { type: "pattern", content: "✦  ·  ✦  ·  ✦", label: null, assetId: null, imagePrompt: null },
     { type: "hero", content: `${suggestion.subject}|${suggestion.previewText}`, label: null, assetId: null, imagePrompt: null },
     { type: "text", content: suggestion.body, label: null, assetId: null, imagePrompt: null },
-    ...(fallbackDetails.length ? [{ type: "notice", content: `Главное|${fallbackDetails.slice(0, 2).join(" · ")}|${fallbackDetails.slice(2).join(" · ") || "Все детали указаны в письме"}`, label: null, assetId: null, imagePrompt: null }] : []),
-    { type: "checklist", content: fallbackDetails.slice(0, 3).join("|") || "Понятная ценность|Конкретные детали|Одно главное действие", label: null, assetId: null, imagePrompt: null },
+    { type: "divider", content: "", label: null, assetId: null, imagePrompt: null },
     ...(input.websiteUrl ? [{ type: "button", content: suggestion.cta, label: suggestion.cta, assetId: null, imagePrompt: null }] : []),
     { type: "footer", content: `${input.brandName || "Поток"} · Настроить подписку · Отписаться`, label: null, assetId: null, imagePrompt: null },
   ];
@@ -339,6 +337,27 @@ function parseSuggestion(value: string, input: EmailAiRequest): EmailAiSuggestio
       ...(["hero", "heading", "banner"].includes(type) && content.length > 90 ? { fontSize: type === "banner" ? 17 : 28, lineHeight: 120 } : {}),
     }];
   });
+  const usedAssetUrls = new Set(blocks.map((block) => block.href).filter(Boolean));
+  for (const asset of input.availableAssets ?? []) {
+    if (usedAssetUrls.has(asset.url) || asset.kind === "logo" && !input.includeLogo) continue;
+    const type = asset.kind === "logo" ? "logo" as const : "image" as const;
+    const assetBlock = {
+      id: `ai-${type}-${crypto.randomUUID()}`,
+      type,
+      content: asset.kind === "logo" ? asset.filename : `Фотография: ${asset.filename}`,
+      href: asset.url,
+      ...creativeBlockStyle(type, blocks.length, accentColor, workspaceBackground, bodyBackground),
+      widthPercent: asset.kind === "logo" ? 44 : 100,
+      borderRadius: asset.kind === "logo" ? 0 : 16,
+    };
+    if (type === "logo") {
+      blocks.unshift(assetBlock);
+    } else {
+      const heroIndex = blocks.findIndex((block) => block.type === "hero" || block.type === "heading");
+      blocks.splice(heroIndex >= 0 ? heroIndex + 1 : 0, 0, assetBlock);
+    }
+    usedAssetUrls.add(asset.url);
+  }
   if (!blocks.some((block) => block.type === "heading" || block.type === "hero")) {
     blocks.unshift({ id: `ai-heading-${crypto.randomUUID()}`, type: "heading", content: suggestion.subject, ...blockDefaults("heading"), fontFamily:"Arial", fontWeight:700, lineHeight:115, letterSpacing:0, paddingLeft:40, paddingRight:40, borderWidth:0, borderColor:"#e5e7eb", widthPercent:100, buttonStyle:"solid" });
   }
@@ -372,6 +391,70 @@ function parseSuggestion(value: string, input: EmailAiRequest): EmailAiSuggestio
     return matching ? [{ blockId: matching.id, prompt: imagePrompt, alt: matching.content, kind: raw.type === "logo" ? "logo" as const : "photo" as const }] : [];
   });
   return suggestion;
+}
+
+function applyEditorialCopy(suggestion: EmailAiSuggestion, copy?: EmailAiSuggestion) {
+  if (!copy || !suggestion.document) return suggestion;
+  suggestion.subject = copy.subject;
+  suggestion.previewText = copy.previewText;
+  suggestion.body = copy.body;
+  suggestion.cta = copy.cta;
+  suggestion.document.subject = copy.subject;
+  suggestion.document.previewText = copy.previewText;
+  const hero = suggestion.document.blocks.find((block) => block.type === "hero" || block.type === "heading");
+  if (hero) hero.content = hero.type === "hero" ? `${copy.subject}|${copy.previewText}` : copy.subject;
+  const body = suggestion.document.blocks.find((block) => block.type === "text");
+  if (body) body.content = copy.body;
+  const button = suggestion.document.blocks.find((block) => block.type === "button");
+  if (button) {
+    button.content = copy.cta;
+    button.label = copy.cta;
+  }
+  return suggestion;
+}
+
+async function createEditorialCopy(
+  request: Request,
+  selected: NonNullable<ReturnType<typeof aiProvider>>,
+  input: EmailAiRequest,
+  linkedContext: string[],
+) {
+  const instructions = `Ты — сильный русскоязычный редактор email-писем. Самостоятельно напиши готовое письмо по задаче пользователя. Ответы на уточнения — это сырьё и ограничения, а не текст для копирования: не перечисляй их и не склеивай дословно. Преврати их в связное убедительное повествование с естественными переходами. Структура: конкретный заход для получателя → понятная польза → детали или доказательство → одно действие. Запрещены канцелярит и пустые заходы «в современном мире», «не остаётся в стороне», «рады сообщить», «уникальная возможность», «настоящим письмом». Первый абзац сразу говорит о ситуации получателя или сути предложения. Не используй рекламные клише, метакомментарии и инструкции дизайнеру. Допустимы только факты пользователя и общеизвестные связующие формулировки; не выдумывай цифры, клиентов и обещания. body — 650–1600 знаков и 3–6 коротких абзацев. subject до 90 знаков, previewText до 160, cta до 55. Верни только JSON с subject, previewText, body, cta.`;
+  const modelInput = {
+    userTask: input.goal,
+    audience: input.audience,
+    sourceNotes: input.briefAnswers,
+    verifiedWebsiteContext: linkedContext.filter(Boolean),
+    desiredLink: input.websiteUrl,
+    tone: input.tone,
+  };
+  const body = selected.provider === "navyai" ? {
+    model: selected.model,
+    messages: [{ role: "system", content: instructions }, { role: "user", content: JSON.stringify(modelInput) }],
+    max_tokens: 2_400,
+    response_format: { type: "json_object" },
+  } : {
+    model: selected.model,
+    store: false,
+    safety_identifier: await safetyIdentifier(request),
+    reasoning: { effort: "medium" },
+    max_output_tokens: 2_400,
+    instructions,
+    input: JSON.stringify(modelInput),
+    text: { format: { type: "json_schema", name: "email_copy", strict: true, schema: { type: "object", additionalProperties: false, required: ["subject", "previewText", "body", "cta"], properties: { subject: { type: "string" }, previewText: { type: "string" }, body: { type: "string" }, cta: { type: "string" } } } } },
+  };
+  try {
+    let response = await fetch(selected.endpoint, { method: "POST", headers: { Authorization: `Bearer ${selected.key}`, "Content-Type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(45_000) });
+    let responseBody: unknown = await response.json().catch(() => null);
+    if (!response.ok && selected.provider === "navyai" && selected.fallbackModel && selected.model !== selected.fallbackModel) {
+      response = await fetch(selected.endpoint, { method: "POST", headers: { Authorization: `Bearer ${selected.key}`, "Content-Type": "application/json" }, body: JSON.stringify({ ...body, model: selected.fallbackModel }), signal: AbortSignal.timeout(45_000) });
+      responseBody = await response.json().catch(() => null);
+    }
+    if (!response.ok) return undefined;
+    return parseSuggestion(outputText(responseBody), { ...input, action: "compose" });
+  } catch {
+    return undefined;
+  }
 }
 
 async function generateDesignImages(request: Request, provider: NonNullable<ReturnType<typeof aiProvider>>, suggestion: EmailAiSuggestion, onlyLogos = false) {
@@ -456,6 +539,9 @@ export async function generateEmailSuggestion(request: Request, value: unknown):
       return (await response.text()).replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 10_000);
     } catch { return ""; }
   }));
+  const editorialCopy = input.action === "design"
+    ? await createEditorialCopy(request, provider, input, linkedContext)
+    : undefined;
   const modelInput = {
     authoritativeUserBrief: {
       goal: input.goal,
@@ -464,6 +550,12 @@ export async function generateEmailSuggestion(request: Request, value: unknown):
       availableAssets: input.availableAssets,
     },
     linkedPageReference: linkedContext.filter(Boolean),
+    approvedEditorialCopy: editorialCopy ? {
+      subject: editorialCopy.subject,
+      previewText: editorialCopy.previewText,
+      body: editorialCopy.body,
+      cta: editorialCopy.cta,
+    } : undefined,
     designPreferences: {
       visualStyle: input.visualStyle,
       imageSource: input.imageSource,
@@ -474,7 +566,7 @@ export async function generateEmailSuggestion(request: Request, value: unknown):
   const instructions = input.action === "brief"
         ? "Ты продуктовый стратег. authoritativeUserBrief — главный источник задачи. linkedPageReference служит только справочником для проверки бренда и фактов и никогда не меняет тему, аудиторию, оффер или цель пользователя. Задавай 4–6 конкретных вопросов только о недостающем смысле: аудитория, обещание/оффер, доказательство, обязательные факты, срок и главное действие. Не спрашивай цвета, палитру или визуальный стиль — пользователь пишет их в исходном описании. Не спрашивай то, что уже указано. Каждый вопрос должен заметно влиять на текст будущего письма. Верни вопросы строго по JSON-схеме."
         : input.action === "design"
-        ? `Ты старший арт-директор и редактор деловых email-писем на русском языке. authoritativeUserBrief — единственный главный источник темы, аудитории, оффера, срока и действия. linkedPageReference можно использовать только для подтверждённых фактов и визуального языка бренда; он не имеет права заменить задачу пользователя содержанием сайта. Каждый непустой ответ briefAnswers обязан быть заметно отражён в видимом тексте. Сначала выбери одну сильную визуальную идею, затем создай убедительное письмо по ней. Композиция должна заметно отличаться от базовой вертикальной стопки: используй 2–4 осмысленных выразительных приёма из hero, banner, pattern, quote, columns, stats, coupon, notice, comparison, document, compliance, изображения, асимметрии и воздуха. Для юридического уведомления предпочитай notice для срока/статуса, comparison для изменений, document для файла и compliance для согласия. Не добавляй блок ради количества: достаточно 5–9 блоков. Напиши конкретный текст с логикой: захват внимания → ценность → доказательство/детали → одно действие. Запрещено выводить в письмо технические инструкции, названия блоков, описания паттернов, HEX-коды, слова «акцент», «фон», «отступы», «типографика», «CTA-кнопка» и комментарии арт-директора. artDirection и contentStrategy опиши отдельно — они не являются контентом блоков. Составные блоки кодируй строго через вертикальную черту: hero/banner/quote — заголовок|пояснение, columns/comparison — четыре части, stats — число|подпись|число|подпись, product/document/compliance/notice — три части, timeline/faq — пары через |. Не создавай HTML. ${input.includeLogo ? `Если в authoritativeUserBrief.availableAssets есть kind=logo, обязательно выбери его assetId.` : "Не добавляй logo."} ${(input.availableAssets ?? []).some((asset) => asset.kind === "photo") ? "Используй подходящие фотографии из authoritativeUserBrief.availableAssets." : input.imageSource === "generate" ? "Добавь один блок image и напиши предметный imagePrompt, непосредственно связанный с целью, аудиторией и фактом из authoritativeUserBrief; никаких случайных стоковых сюжетов и текста на изображении." : "Не добавляй image: работай композицией, цветом, рамками, узорами и типографикой."} Не выдумывай факты, даты и цифры. Сохраняй только переменные {{first_name}}, {{last_name}}, {{company}}, {{position}}, {{city}}. Если websiteUrl отсутствует, не добавляй button, video, document или compliance. Цвета выводи только в полях design и строго #RRGGBB. Ответ строго по JSON-схеме.`
+        ? `Ты старший арт-директор деловых email-писем на русском языке. authoritativeUserBrief задаёт тему и ограничения, но briefAnswers — это сырьё: нельзя копировать их списком или склеивать дословно. approvedEditorialCopy, если передан, уже написан отдельным редактором: используй его тему, прехедер, основной текст и действие как главную редакцию, а не заменяй ответами пользователя. linkedPageReference можно использовать только для подтверждённых фактов и визуального языка бренда. Сначала выбери одну сильную визуальную идею, затем спроектируй письмо вокруг неё. Композиция должна заметно отличаться от базовой вертикальной стопки: используй 2–4 осмысленных выразительных приёма из hero, banner, pattern, quote, columns, stats, coupon, notice, comparison, document, compliance, изображения, асимметрии и воздуха. Не добавляй блок ради количества: достаточно 5–9 блоков. Запрещено выводить технические инструкции, названия блоков, описания паттернов, HEX-коды, слова «акцент», «фон», «отступы», «типографика», «CTA-кнопка» и комментарии арт-директора. artDirection и contentStrategy опиши отдельно. Составные блоки кодируй строго через вертикальную черту: hero/banner/quote — заголовок|пояснение, columns/comparison — четыре части, stats — число|подпись|число|подпись, product/document/compliance/notice — три части, timeline/faq — пары через |. Не создавай HTML. ${input.includeLogo ? `Каждый asset kind=logo из authoritativeUserBrief.availableAssets обязательно помести отдельным logo-блоком с его assetId.` : "Не добавляй logo."} ${(input.availableAssets ?? []).some((asset) => asset.kind === "photo") ? "Каждую загруженную фотографию из authoritativeUserBrief.availableAssets обязательно помести отдельным image-блоком с её assetId — это часть задания, а не необязательный референс." : input.imageSource === "generate" ? "Добавь один блок image и напиши предметный imagePrompt, непосредственно связанный с целью и аудиторией; никаких случайных стоковых сюжетов и текста на изображении." : "Не добавляй image: работай композицией, цветом, рамками, узорами и типографикой."} Не выдумывай факты, даты и цифры. Сохраняй только переменные {{first_name}}, {{last_name}}, {{company}}, {{position}}, {{city}}. Если websiteUrl отсутствует, не добавляй button, video, document или compliance. Цвета выводи только в полях design и строго #RRGGBB. Ответ строго по JSON-схеме.`
         : "Ты редактор деловых email-писем на русском языке. Верни только четыре коротких поля JSON: subject, previewText, body, cta. Никакого HTML, Markdown, таблиц, дизайна или пояснений. body — обычный текст до 1800 символов. subject — до 140 символов, previewText — до 240, cta — до 80. Не выдумывай даты, цифры, ссылки и факты. Сохраняй только переменные {{first_name}}, {{last_name}}, {{company}}, {{position}}, {{city}}. Ответ строго по JSON-схеме.";
   const schema = input.action === "brief" ? {
             type: "object", additionalProperties: false, required: ["questions"], properties: { questions: { type: "array", minItems: 3, maxItems: 6, items: { type: "object", additionalProperties: false, required: ["id", "question", "placeholder", "required"], properties: { id: { type: "string" }, question: { type: "string" }, placeholder: { type: "string" }, required: { type: "boolean" } } } } }
@@ -556,5 +648,6 @@ export async function generateEmailSuggestion(request: Request, value: unknown):
         : input.includeLogo
           ? await generateDesignImages(request, provider, suggestion, true)
           : suggestion;
+  if (input.action === "design") applyEditorialCopy(designed, editorialCopy);
   return { configured: true, provider: provider.provider, suggestion: designed };
 }

@@ -106,7 +106,10 @@ test("AI brief asks follow-up questions and accepts dragged user images", async 
   assert.match(server, /выразительных приёма/);
   assert.match(server, /availableAssets/);
   assert.match(server, /Не спрашивай цвета/);
-  assert.match(server, /Каждый непустой ответ briefAnswers обязан быть заметно отражён/);
+  assert.match(server, /createEditorialCopy/);
+  assert.match(server, /сырьё и ограничения, а не текст для копирования/);
+  assert.match(server, /Каждую загруженную фотографию/);
+  assert.match(server, /blocks\.splice\(heroIndex/);
   assert.match(server, /visibleBlockContent/);
   assert.match(server, /creativeBlockStyle/);
   assert.match(server, /artDirection/);

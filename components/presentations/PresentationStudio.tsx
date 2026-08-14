@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowDown,
@@ -124,6 +124,37 @@ function slidesWithAsset(assetId?: string) {
   return slides;
 }
 
+function presentationPatternStyle(themeId: PresentationThemeId, accentColor: string): CSSProperties {
+  const accent = /^#[0-9a-f]{6}$/i.test(accentColor) ? accentColor : "#7C35F2";
+  switch (themeId) {
+    case "atelier":
+      return {
+        backgroundImage: `radial-gradient(circle at 88% 18%, ${accent}32 0 2px, transparent 2.5px), linear-gradient(135deg, transparent 0 78%, ${accent}18 78% 79%, transparent 79%), linear-gradient(90deg, transparent 0 94%, ${accent}12 94%)`,
+        backgroundSize: "18px 18px, 100% 100%, 100% 100%",
+      };
+    case "noir":
+      return {
+        backgroundImage: `linear-gradient(${accent}22 1px, transparent 1px), linear-gradient(90deg, ${accent}22 1px, transparent 1px), radial-gradient(circle at 88% 18%, ${accent}34 0 8%, transparent 8.5%)`,
+        backgroundSize: "32px 32px, 32px 32px, 100% 100%",
+      };
+    case "ocean":
+      return {
+        backgroundImage: `radial-gradient(circle at 100% 100%, transparent 0 18%, ${accent}24 18.5% 19%, transparent 19.5% 27%, ${accent}18 27.5% 28%, transparent 28.5%), linear-gradient(120deg, transparent 0 68%, ${accent}12 68% 82%, transparent 82%)`,
+        backgroundSize: "100% 100%",
+      };
+    case "sunrise":
+      return {
+        backgroundImage: `radial-gradient(circle at 86% 18%, ${accent}2E 0 10%, transparent 10.5%), repeating-linear-gradient(145deg, transparent 0 34px, ${accent}12 35px 37px, transparent 38px 56px)`,
+        backgroundSize: "100% 100%",
+      };
+    default:
+      return {
+        backgroundImage: `radial-gradient(circle at 86% 18%, ${accent}30 0 9%, transparent 9.5%), radial-gradient(circle at 76% 88%, ${accent}18 0 15%, transparent 15.5%), repeating-linear-gradient(135deg, transparent 0 42px, ${accent}12 43px 45px, transparent 46px 66px)`,
+        backgroundSize: "100% 100%",
+      };
+  }
+}
+
 function SlidePreview({
   project,
   slide,
@@ -132,7 +163,7 @@ function SlidePreview({
   onChange,
   onPickImage,
 }: {
-  project: Pick<PresentationProjectRecord, "accentColor" | "backgroundColor" | "textColor">;
+  project: Pick<PresentationProjectRecord, "themeId" | "accentColor" | "backgroundColor" | "textColor">;
   slide: PresentationSlide;
   compact?: boolean;
   editable?: boolean;
@@ -165,7 +196,7 @@ function SlidePreview({
   return (
     <div
       className="relative aspect-video w-full overflow-hidden rounded-[inherit]"
-      style={{ backgroundColor: project.backgroundColor, color: inverse }}
+      style={{ backgroundColor: project.backgroundColor, color: inverse, ...presentationPatternStyle(project.themeId, project.accentColor) }}
     >
       <div className={cn("absolute rounded-full", compact ? "left-[6%] top-[7%] h-[2px] w-[8%]" : "left-[6.2%] top-[7.5%] h-1.5 w-[7%]")} style={{ backgroundColor: project.accentColor }} />
       {slide.layout === "closing" ? (
@@ -240,7 +271,7 @@ function ThemeStrip({ value, onChange }: { value: PresentationThemeId; onChange:
     <div className="grid grid-cols-5 gap-1.5">
       {presentationThemes.map((theme) => (
         <button key={theme.id} type="button" onClick={() => onChange(theme.id)} aria-label={`Тема ${theme.name}`} aria-pressed={value === theme.id} className="group rounded-lg border border-border bg-surface p-1.5 text-left transition hover:border-primary/40 aria-pressed:border-primary aria-pressed:ring-2 aria-pressed:ring-primary/15">
-          <span className="block aspect-[4/3] rounded-md" style={{ backgroundColor: theme.backgroundColor }}><span className="ml-[12%] mt-[12%] block h-1 w-[35%] rounded-full" style={{ backgroundColor: theme.accentColor }} /></span>
+          <span className="block aspect-[4/3] rounded-md" style={{ backgroundColor: theme.backgroundColor, ...presentationPatternStyle(theme.id, theme.accentColor) }}><span className="ml-[12%] mt-[12%] block h-1 w-[35%] rounded-full" style={{ backgroundColor: theme.accentColor }} /></span>
           <span className="mt-1 block truncate text-[9px] font-medium text-text-muted group-aria-pressed:text-primary">{theme.name}</span>
         </button>
       ))}

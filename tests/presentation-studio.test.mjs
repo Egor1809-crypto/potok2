@@ -81,12 +81,13 @@ test("AI presentation outline follows a narrative and does not invent evidence",
   assert.match(server, /gemini-2\.5-flash-lite/);
   assert.match(server, /Не выдумывай конкретные цифры, даты, отзывы, клиентов или результаты/);
   assert.match(server, /suggestedLayouts/);
-  assert.match(server, /у каждого слайда только title, body и bullets/);
+  assert.match(server, /обязательны layout, eyebrow, title, body, bullets, speakerNotes/);
   assert.match(server, /slides\[index\]\.layout !== slides\[index - 1\]\.layout/);
   assert.match(server, /safeFallbackOutline/);
   assert.match(server, /Криптовалюты: возможности, риски и осознанные решения/);
+  assert.match(server, /Цифровой рубль: как устроена третья форма российской валюты/);
   assert.match(server, /generationMode: "topic_fallback"/);
-  assert.match(server, /NAVYAI_PRESENTATION_MODEL\?\.trim\(\) \|\| "gemini-2\.5-flash-lite"/);
+  assert.match(server, /NAVYAI_EMAIL_MODEL\?\.trim\(\) \|\| "gpt-5\.2"/);
   assert.match(server, /GENERATION_LIMIT = 8/);
   assert.match(server, /INSERT INTO ai_request_limits/);
   assert.match(server, /INSERT OR IGNORE INTO ai_idempotency/);
@@ -117,7 +118,9 @@ test("PowerPoint export builds OOXML and only fetches same-origin library assets
   assert.match(exporter, /if \(!slide\.assetId \|\| !slide\.imageUrl\) return undefined/);
   assert.match(exporter, /new URL\(`\/api\/assets\/\$\{encodeURIComponent\(slide\.assetId\)\}`/);
   assert.match(exporter, /redirect: "error"/);
+  assert.match(exporter, /presentationPatternShapes/);
   assert.doesNotMatch(exporter, /new URL\(slide\.imageUrl/);
+  assert.match(await readFile(new URL("../components/presentations/PresentationStudio.tsx", import.meta.url), "utf8"), /presentationPatternStyle/);
   assert.match(store, /Для слайда можно выбрать только изображение из общей медиатеки Поток/);
   assert.match(route, /application\/vnd\.openxmlformats-officedocument\.presentationml\.presentation/);
 });

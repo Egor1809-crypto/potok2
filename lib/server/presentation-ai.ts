@@ -25,7 +25,7 @@ const LAYOUTS = new Set<PresentationSlideLayout>(["title", "statement", "split",
 const GENERATION_WINDOW_MS = 10 * 60 * 1_000;
 const GENERATION_LIMIT = 8;
 const IDEMPOTENCY_STALE_MS = 15 * 60 * 1_000;
-const PROVIDER_TIMEOUT_MS = 24_000;
+const PROVIDER_TIMEOUT_MS = 55_000;
 const MAX_PROVIDER_RESPONSE_BYTES = 1_000_000;
 
 function runtime() {
@@ -47,10 +47,8 @@ function provider() {
       key: navyKey,
       provider: "navyai" as const,
       endpoint: `${runtime().NAVYAI_BASE_URL?.trim().replace(/\/$/, "") || "https://api.navy/v1"}/chat/completions`,
-      // Presentations need predictable latency more than deep reasoning. Do not
-      // inherit the slower email model when a presentation model is not set.
-      model: runtime().NAVYAI_PRESENTATION_MODEL?.trim() || "gemini-2.5-flash-lite",
-      fallbackModel: runtime().NAVYAI_PRESENTATION_MODEL?.trim() ? "gemini-2.5-flash-lite" : undefined,
+      model: runtime().NAVYAI_PRESENTATION_MODEL?.trim() || runtime().NAVYAI_EMAIL_MODEL?.trim() || "gpt-5.2",
+      fallbackModel: "gemini-2.5-flash-lite",
     };
   }
   const openAiKey = runtime().OPENAI_API_KEY?.trim();
@@ -116,15 +114,19 @@ function parseJson(value: string) {
   }
 }
 
+function optionalModelText(value: unknown, field: string, max: number) {
+  return typeof value === "string" ? optionalText(value, field, max) : undefined;
+}
+
 function parseSlides(value: unknown, expectedCount: number): PresentationSlide[] {
   if (!Array.isArray(value)) throw new ApiRequestError("ИИ не вернул слайды презентации.", 502);
   const slides = value.slice(0, 20).flatMap((candidate, index) => {
     if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return [];
     const object = candidate as Record<string, unknown>;
-    const title = optionalText(object.title, `Заголовок слайда ${index + 1}`, 300);
+    const title = optionalModelText(object.title, `Заголовок слайда ${index + 1}`, 300);
     if (!title) return [];
     const suggestedLayouts: PresentationSlideLayout[] = ["statement", "split", "bullets", "statement", "split", "bullets"];
-    const rawLayout = optionalText(object.layout, `Макет слайда ${index + 1}`, 30)
+    const rawLayout = optionalModelText(object.layout, `Макет слайда ${index + 1}`, 30)
       ?? (index === 0 ? "title" : index === expectedCount - 1 ? "closing" : suggestedLayouts[(index - 1) % suggestedLayouts.length]);
     const layout = LAYOUTS.has(rawLayout as PresentationSlideLayout) ? rawLayout as PresentationSlideLayout : "statement";
     const bullets = Array.isArray(object.bullets)
@@ -133,12 +135,12 @@ function parseSlides(value: unknown, expectedCount: number): PresentationSlide[]
     return [{
       id: newId("slide"),
       layout,
-      eyebrow: optionalText(object.eyebrow, `Надзаголовок слайда ${index + 1}`, 120)
+      eyebrow: optionalModelText(object.eyebrow, `Надзаголовок слайда ${index + 1}`, 120)
         ?? (index === 0 ? "ПРЕЗЕНТАЦИЯ" : index === expectedCount - 1 ? "ВЫВОД" : `РАЗДЕЛ ${String(index).padStart(2, "0")}`),
       title,
-      body: optionalText(object.body, `Текст слайда ${index + 1}`, 1_500) ?? "",
+      body: optionalModelText(object.body, `Текст слайда ${index + 1}`, 1_500) ?? "",
       bullets,
-      speakerNotes: optionalText(object.speakerNotes, `Заметки слайда ${index + 1}`, 3_000) ?? "",
+      speakerNotes: optionalModelText(object.speakerNotes, `Заметки слайда ${index + 1}`, 3_000) ?? "",
     } satisfies PresentationSlide];
   });
   if (slides.length < Math.min(3, expectedCount)) throw new ApiRequestError("ИИ вернул слишком мало содержательных слайдов. Повторите запрос.", 502);
@@ -337,7 +339,7 @@ async function callPresentationProvider(endpoint: string, init: RequestInit) {
     const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
     throw new ApiRequestError(
       timedOut
-        ? "ИИ не ответил за 24 секунды. Поток подготовит редактируемую резервную структуру."
+        ? "ИИ не ответил за 55 секунд. Поток подготовит редактируемую резервную структуру."
         : "Не удалось связаться с ИИ-провайдером. Повторите запрос позже.",
       timedOut ? 504 : 502,
     );
@@ -366,11 +368,14 @@ function responseSchema(slideCount: number) {
         items: {
           type: "object",
           additionalProperties: false,
-          required: ["title", "body", "bullets"],
+          required: ["layout", "eyebrow", "title", "body", "bullets", "speakerNotes"],
           properties: {
+            layout: { type: "string", enum: ["title", "statement", "split", "bullets", "quote", "stats", "closing"] },
+            eyebrow: { type: "string", maxLength: 120 },
             title: { type: "string", maxLength: 300 },
             body: { type: "string", maxLength: 1_500 },
             bullets: { type: "array", maxItems: 8, items: { type: "string", maxLength: 240 } },
+            speakerNotes: { type: "string", maxLength: 3_000 },
           },
         },
       },
@@ -388,6 +393,62 @@ function safeFallbackOutline(input: ReturnType<typeof parseRequest>) {
   const audience = input.audience || "целевая аудитория";
   const facts = input.context?.trim() || "Подтверждённые данные не указаны; этот слайд нужно дополнить фактами перед показом.";
   const action = input.desiredAction?.trim() || "Согласовать следующий шаг";
+  const digitalRubleTopic = /цифров(?:ой|ого|ому|ым|ом)\s+рубл|цифров(?:ая|ой)\s+валют.*центральн/i.test(`${summary} ${input.context ?? ""}`);
+  if (digitalRubleTopic) {
+    const digitalRubleSlides: PresentationSlide[] = [
+      {
+        id: newId("slide"), layout: "title", eyebrow: "ЦИФРОВОЙ РУБЛЬ",
+        title: "Цифровой рубль: как устроена третья форма российской валюты",
+        body: input.audience ? `Практическое объяснение для аудитории: ${input.audience}` : "Механика, сценарии применения и вопросы внедрения",
+        bullets: [], speakerNotes: "Сразу отделите цифровой рубль от криптовалют: это форма национальной валюты, а не отдельный инвестиционный актив.",
+      },
+      {
+        id: newId("slide"), layout: "statement", eyebrow: "ГЛАВНАЯ МЫСЛЬ",
+        title: "Новая форма денег меняет инфраструктуру расчётов, но не номинал рубля",
+        body: "Цифровой рубль дополняет наличные и безналичные деньги. Его практическая ценность определяется не названием технологии, а тем, как будут устроены кошелёк, перевод и интеграция с привычными финансовыми процессами.",
+        bullets: [], speakerNotes: "Не обещайте автоматических выгод: для каждого сценария важны правила доступа, стоимость интеграции и операционная готовность.",
+      },
+      {
+        id: newId("slide"), layout: "split", eyebrow: "ТРИ ФОРМЫ",
+        title: "Разница — в способе хранения и проведения операции",
+        body: "Наличные существуют физически, безналичные учитываются на банковских счетах, а цифровая форма предполагает отдельную инфраструктуру учёта и цифровой кошелёк.",
+        bullets: ["Наличные: прямой физический расчёт", "Безналичные: банковский счёт и платёжная система", "Цифровые: кошелёк и единая инфраструктура"],
+        speakerNotes: "Покажите отличие на одном бытовом сценарии — например, оплате поставщику или переводу между организациями.",
+      },
+      {
+        id: newId("slide"), layout: "bullets", eyebrow: "СЦЕНАРИИ",
+        title: "Польза появляется в процессах, где важны прозрачность и управляемость расчёта",
+        body: "Оценивать технологию стоит через конкретный процесс, а не через общий интерес к цифровым финансам.",
+        bullets: ["Расчёты между гражданами и организациями", "Автоматизация отдельных условий платежа", "Контроль движения средств в согласованном сценарии", "Интеграция с государственными и корпоративными системами"],
+        speakerNotes: "Каждый сценарий требует проверки действующих правил и возможностей платформы на момент внедрения.",
+      },
+      {
+        id: newId("slide"), layout: "split", eyebrow: "ГОТОВНОСТЬ",
+        title: "Техническая доступность не равна готовности бизнеса",
+        body: "Нужно определить владельца процесса, обновить интеграции, права доступа и контроль операций, а также подготовить поддержку пользователей.",
+        bullets: ["ИТ-интеграция", "Юридическая модель", "Бухгалтерский учёт", "Информационная безопасность", "Обучение сотрудников"],
+        speakerNotes: "Переведите обсуждение из уровня тренда в список конкретных изменений процесса.",
+      },
+      {
+        id: newId("slide"), layout: "bullets", eyebrow: "ВОПРОСЫ И РИСКИ",
+        title: "До пилота нужно проверить ограничения, ответственность и устойчивость",
+        body: "Критичны не только технология, но и порядок восстановления доступа, обработка ошибок и разделение ответственности между участниками.",
+        bullets: ["Кто и как управляет доступом к кошельку?", "Что происходит при ошибочной операции?", "Как обеспечивается непрерывность расчётов?", "Какие данные видят участники процесса?", "Какие правила действуют именно сейчас?"],
+        speakerNotes: "Не давайте юридических или финансовых обещаний без проверки актуальных нормативных документов.",
+      },
+      {
+        id: newId("slide"), layout: "closing", eyebrow: "СЛЕДУЮЩИЙ ШАГ",
+        title: action,
+        body: "Выберите один реальный платёжный процесс, проверьте актуальные правила и оцените интеграцию до масштабирования.",
+        bullets: [], speakerNotes: "Завершите конкретным действием, указанным пользователем, или предложите рабочую сессию по выбору пилотного сценария.",
+      },
+    ];
+    return {
+      name: "Цифровой рубль: механика и применение",
+      description: "Содержательная презентация о принципах работы цифрового рубля, сценариях применения и критериях готовности.",
+      slides: digitalRubleSlides.slice(0, Math.max(3, input.slideCount - 1)).concat(digitalRubleSlides.at(-1)!).slice(0, input.slideCount),
+    };
+  }
   const cryptoTopic = /крипт|биткоин|блокчейн|цифров(?:ая|ые) валют/i.test(`${summary} ${input.context ?? ""}`);
   if (cryptoTopic) {
     const cryptoSlides: PresentationSlide[] = [
@@ -485,7 +546,7 @@ export async function generatePresentationOutline(request: Request, value: unkno
   if (reservation.replayed) return reservation.replayed;
   try {
     const theme = presentationTheme(input.themeId);
-    const instructions = `Ты — старший редактор деловых презентаций на русском языке. Создай содержательную презентацию строго по теме и задаче пользователя. К последнему слайду аудитория должна понять вывод и увидеть понятное действие. Построй накопительный сюжет: сильный вход → объяснение темы → механизм или контекст → возможности → ограничения и риски → практические критерии → вывод. Каждый слайд раскрывает один аспект темы и имеет заголовок-вывод. Не делай agenda-слайд и не пиши общие производственные фразы вроде «нужно показать ценность», «добавьте факты», «согласуйте пилот», если пользователь не просил именно об этом. Не выдумывай конкретные цифры, даты, отзывы, клиентов или результаты. Разрешено объяснять общеизвестные определения, принципы работы, категории возможностей и рисков, прямо относящиеся к теме. presentationTone: executive — кратко и по делу; persuasive — через проблему, пользу и доказательство; educational — от определения к применению; visual — минимум текста. Тексты должны помещаться: title до 90 знаков, body до 360 знаков, не более 5 коротких bullets. Верни ровно ${input.slideCount} слайдов. Формат намеренно простой: один JSON-объект с name, description и slides; у каждого слайда только title, body и bullets. Никаких layout, eyebrow, speakerNotes, Markdown или комментариев.`;
+    const instructions = `Ты — редактор и арт-директор деловых презентаций на русском языке. Самостоятельно раскрой тему пользователя: не превращай его поля в слайды и не повторяй формулировки анкеты. К последнему слайду аудитория должна понять вывод и увидеть понятное действие. Построй накопительный сюжет: сильный вход → объяснение темы → механизм или контекст → возможности → ограничения и риски → практические критерии → вывод. Каждый слайд раскрывает один аспект темы и имеет заголовок-вывод. Не делай agenda-слайд и не пиши производственные заглушки вроде «нужно показать ценность», «добавьте факты», «согласуйте пилот», если пользователь не просил именно об этом. Не выдумывай конкретные цифры, даты, отзывы, клиентов или результаты. Разрешено объяснять общеизвестные определения, принципы работы, категории возможностей и рисков, относящиеся к теме. presentationTone: executive — кратко и по делу; persuasive — через проблему, пользу и доказательство; educational — от определения к применению; visual — минимум текста. Сам выбери выразительный layout для каждого слайда: title только первый, closing только последний, statement для одной сильной мысли, split для сравнения или механизма, bullets для системы, quote только для реальной цитаты, stats только при наличии подтверждённых чисел. Не повторяй один layout более двух раз подряд. eyebrow — короткая смысловая метка, speakerNotes — 1–3 предложения для выступающего, а не повтор текста. Тексты должны помещаться: title до 90 знаков, body до 360 знаков, не более 5 коротких bullets. Верни ровно ${input.slideCount} слайдов. Ответ — один JSON-объект с name, description и slides; у каждого слайда обязательны layout, eyebrow, title, body, bullets, speakerNotes. Никаких Markdown и комментариев.`;
     const modelInput = {
       userGoal: input.goal,
       audience: input.audience || "Аудитория указана в задаче пользователя",
@@ -575,8 +636,8 @@ export async function generatePresentationOutline(request: Request, value: unkno
         generationNotice: "Ответ ИИ не прошёл проверку структуры, поэтому Поток собрал содержательную редактируемую версию по теме запроса.",
       } : {}),
       outline: {
-        name: optionalText(parsed.name, "Название презентации", 120) || input.goal.split(/[.!?\n]/)[0]?.slice(0, 120) || "Новая презентация",
-        description: optionalText(parsed.description, "Описание презентации", 500) ?? "Создано ИИ-помощником Поток.",
+        name: optionalModelText(parsed.name, "Название презентации", 120) || input.goal.split(/[.!?\n]/)[0]?.slice(0, 120) || "Новая презентация",
+        description: optionalModelText(parsed.description, "Описание презентации", 500) ?? "Создано ИИ-помощником Поток.",
         themeId: input.themeId,
         accentColor: theme.accentColor,
         backgroundColor: theme.backgroundColor,

@@ -32,6 +32,41 @@ function rect(id: number, name: string, x: number, y: number, w: number, h: numb
   return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="${xml(name)}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="${Math.round(x)}" y="${Math.round(y)}"/><a:ext cx="${Math.round(w)}" cy="${Math.round(h)}"/></a:xfrm><a:prstGeom prst="${radius ? "roundRect" : "rect"}"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="${hex(fill)}"/></a:solidFill><a:ln><a:noFill/></a:ln></p:spPr></p:sp>`;
 }
 
+function presentationPatternShapes(project: PresentationProjectRecord, startId: number) {
+  let id = startId;
+  const shapes: string[] = [];
+  const soft = dark(project.backgroundColor)
+    ? project.themeId === "noir" ? "#263746" : "#292330"
+    : project.themeId === "ocean" ? "#D9F1EE" : project.themeId === "sunrise" ? "#FFE1C7" : "#EDE3FA";
+  if (project.themeId === "atelier") {
+    shapes.push(rect(id++, "Узор · редакционная полоса", 11.88 * EMU, 0, 0.34 * EMU, 6.45 * EMU, soft));
+    shapes.push(rect(id++, "Узор · нижний угол", 0, 6.62 * EMU, 3.1 * EMU, 0.12 * EMU, project.accentColor));
+    for (let row = 0; row < 3; row += 1) for (let column = 0; column < 4; column += 1) {
+      shapes.push(rect(id++, `Узор · точка ${row + 1}.${column + 1}`, (10.95 + column * 0.22) * EMU, (0.35 + row * 0.22) * EMU, 0.055 * EMU, 0.055 * EMU, project.accentColor, true));
+    }
+  } else if (project.themeId === "noir") {
+    shapes.push(rect(id++, "Узор · верхняя рейка", 8.65 * EMU, 0.3 * EMU, 3.75 * EMU, 0.07 * EMU, project.accentColor));
+    shapes.push(rect(id++, "Узор · правая рейка", 12.35 * EMU, 0.3 * EMU, 0.07 * EMU, 2.0 * EMU, project.accentColor));
+    shapes.push(rect(id++, "Узор · нижняя панель", 9.25 * EMU, 6.58 * EMU, 3.0 * EMU, 0.22 * EMU, soft));
+  } else if (project.themeId === "ocean") {
+    shapes.push(rect(id++, "Узор · волна 1", 10.95 * EMU, 0.35 * EMU, 1.45 * EMU, 0.14 * EMU, project.accentColor, true));
+    shapes.push(rect(id++, "Узор · волна 2", 11.25 * EMU, 0.62 * EMU, 1.15 * EMU, 0.14 * EMU, soft, true));
+    shapes.push(rect(id++, "Узор · волна 3", 11.58 * EMU, 0.89 * EMU, 0.82 * EMU, 0.14 * EMU, project.accentColor, true));
+    shapes.push(rect(id++, "Узор · береговая линия", 0, 6.72 * EMU, 12.25 * EMU, 0.07 * EMU, soft));
+  } else if (project.themeId === "sunrise") {
+    shapes.push(rect(id++, "Узор · солнечная плашка", 10.8 * EMU, 0, 1.42 * EMU, 1.15 * EMU, soft, true));
+    shapes.push(rect(id++, "Узор · луч 1", 10.12 * EMU, 0.23 * EMU, 0.55 * EMU, 0.08 * EMU, project.accentColor));
+    shapes.push(rect(id++, "Узор · луч 2", 10.28 * EMU, 0.52 * EMU, 0.42 * EMU, 0.08 * EMU, project.accentColor));
+    shapes.push(rect(id++, "Узор · нижняя лента", 0, 6.54 * EMU, 5.1 * EMU, 0.25 * EMU, soft));
+  } else {
+    shapes.push(rect(id++, "Узор · фиолетовый модуль", 10.72 * EMU, 0, 1.5 * EMU, 1.28 * EMU, soft, true));
+    shapes.push(rect(id++, "Узор · диагональ 1", 11.0 * EMU, 1.45 * EMU, 1.25 * EMU, 0.09 * EMU, project.accentColor));
+    shapes.push(rect(id++, "Узор · диагональ 2", 11.35 * EMU, 1.73 * EMU, 0.9 * EMU, 0.09 * EMU, soft));
+    shapes.push(rect(id++, "Узор · нижний ритм", 8.45 * EMU, 6.56 * EMU, 3.8 * EMU, 0.22 * EMU, soft));
+  }
+  return { shapes, nextId: id };
+}
+
 type TextOptions = {
   color: string;
   fontSize: number;
@@ -127,6 +162,9 @@ function slideShapes(project: PresentationProjectRecord, slide: PresentationSlid
   const contentWidth = image ? 6.75 * EMU : fullWidth;
   let id = 2;
   const shapes: string[] = [];
+  const pattern = presentationPatternShapes(project, id);
+  shapes.push(...pattern.shapes);
+  id = pattern.nextId;
   if (slide.layout !== "closing") {
     shapes.push(rect(id++, "Акцентная линия", x, 0.52 * EMU, 0.68 * EMU, 0.08 * EMU, accent, true));
     if (slide.eyebrow) shapes.push(textBox(id++, "Надзаголовок", x, 0.72 * EMU, contentWidth, 0.36 * EMU, [{ text: slide.eyebrow.toUpperCase(), options: { color: accent, fontSize: 12, bold: true } }]));
