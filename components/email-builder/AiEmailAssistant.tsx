@@ -60,6 +60,48 @@ function nextPromptSuggestion(value: string) {
   return ". Если нужен необычный стиль, укажите его отдельно; иначе будет чистый современный email";
 }
 
+function fallbackBriefQuestions(goal: string) {
+  const normalized = goal.toLocaleLowerCase("ru-RU");
+  return [
+    ...(!/(для кого|аудитор|юрист|руководител|клиент|партн[её]р)/.test(
+      normalized,
+    )
+      ? [
+          {
+            id: "audience",
+            question: "Кто должен получить письмо и что для них важно?",
+            placeholder: "Опишите получателей и их основную задачу",
+            required: true,
+          },
+        ]
+      : []),
+    {
+      id: "offer",
+      question: "Какую главную ценность нужно донести?",
+      placeholder: "Что конкретно получит читатель",
+      required: true,
+    },
+    {
+      id: "proof",
+      question: "Какие проверенные факты обязательно использовать?",
+      placeholder: "Программа, даты, цифры, кейсы или ограничения",
+      required: false,
+    },
+    ...(!/(цель|регистрац|купить|заказ|ответ|встреч|скачать|перейти)/.test(
+      normalized,
+    )
+      ? [
+          {
+            id: "action",
+            question: "Какое одно действие должен совершить читатель?",
+            placeholder: "Перейти, зарегистрироваться, ответить…",
+            required: true,
+          },
+        ]
+      : []),
+  ].slice(0, 6);
+}
+
 export function AiEmailAssistant({
   document,
   onApply,
@@ -179,12 +221,13 @@ export function AiEmailAssistant({
       setQuestions(body.suggestion?.questions ?? []);
       setAnswers({});
       setStage("questions");
-    } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "Не удалось подготовить вопросы.",
-      );
+    } catch {
+      // Уточнения не должны зависеть от доступности внешнего ИИ: если провайдер
+      // временно не отвечает, пользователь всё равно продолжает сценарий.
+      setQuestions(fallbackBriefQuestions(goal));
+      setAnswers({});
+      setStage("questions");
+      setError("");
     } finally {
       setBusy(false);
     }

@@ -104,6 +104,8 @@ test("AI brief asks follow-up questions and accepts dragged user images", async 
   assert.match(assistant, /imageSource: \/без/);
   assert.match(assistant, /: "generate"/);
   assert.match(assistant, /prepareImageFile/);
+  assert.match(assistant, /setQuestions\(fallbackBriefQuestions\(goal\)\)/);
+  assert.match(assistant, /setStage\("questions"\)/);
   assert.match(assistant, /if \(!value\.trim\(\)\) return ""/);
   assert.match(assistant, /createImageBitmap/);
   assert.match(server, /clean modern SaaS email/);
@@ -113,6 +115,7 @@ test("AI brief asks follow-up questions and accepts dragged user images", async 
   assert.match(server, /frameStyle: cleanSaas \? "hairline"/);
   assert.match(server, /availableAssets/);
   assert.match(server, /Не спрашивай цвета/);
+  assert.match(server, /suggestion: fallbackBriefQuestions\(input\.goal\)/);
   assert.match(server, /createEditorialCopy/);
   assert.match(server, /сырьё и ограничения, а не текст для копирования/);
   assert.match(server, /Каждую загруженную фотографию/);

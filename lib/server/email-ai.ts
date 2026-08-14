@@ -1856,25 +1856,48 @@ export async function generateEmailSuggestion(
           },
     ),
   } satisfies RequestInit;
-  let response = await fetch(provider.endpoint, requestBody);
-  let responseBody: unknown = await response.json().catch(() => null);
-  if (
-    !response.ok &&
-    provider.provider === "navyai" &&
-    provider.fallbackModel &&
-    provider.model !== provider.fallbackModel
-  ) {
-    const fallbackBody = {
-      ...(JSON.parse(String(requestBody.body)) as Record<string, unknown>),
-      model: provider.fallbackModel,
-    };
-    response = await fetch(provider.endpoint, {
-      ...requestBody,
-      body: JSON.stringify(fallbackBody),
-    });
+  let response: Response;
+  let responseBody: unknown;
+  try {
+    response = await fetch(provider.endpoint, requestBody);
     responseBody = await response.json().catch(() => null);
+    if (
+      !response.ok &&
+      provider.provider === "navyai" &&
+      provider.fallbackModel &&
+      provider.model !== provider.fallbackModel
+    ) {
+      const fallbackBody = {
+        ...(JSON.parse(String(requestBody.body)) as Record<string, unknown>),
+        model: provider.fallbackModel,
+      };
+      response = await fetch(provider.endpoint, {
+        ...requestBody,
+        body: JSON.stringify(fallbackBody),
+      });
+      responseBody = await response.json().catch(() => null);
+    }
+  } catch {
+    if (input.action === "brief") {
+      return {
+        configured: true,
+        provider: provider.provider,
+        suggestion: fallbackBriefQuestions(input.goal),
+      };
+    }
+    throw new ApiRequestError(
+      "ИИ-помощник временно недоступен. Повторите попытку.",
+      502,
+    );
   }
   if (!response.ok) {
+    if (input.action === "brief") {
+      return {
+        configured: true,
+        provider: provider.provider,
+        suggestion: fallbackBriefQuestions(input.goal),
+      };
+    }
     console.error(
       "OpenAI email assistant error",
       response.status,
