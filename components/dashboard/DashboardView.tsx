@@ -3,23 +3,31 @@
 import Link from "next/link";
 import {
   ArrowRight,
+  Blocks,
   Cable,
   Check,
   CircleAlert,
   Clock3,
   ContactRound,
   FileText,
-  Images,
+  GalleryHorizontalEnd,
+  ImagePlus,
+  LibraryBig,
+  MailPlus,
   LayoutTemplate,
   LoaderCircle,
   Megaphone,
   Plus,
-  Presentation,
+  PanelsTopLeft,
+  Paintbrush,
   RefreshCw,
   Send,
-  ScanSearch,
-  Sparkles,
+  SearchCheck,
+  SendHorizontal,
   Upload,
+  UsersRound,
+  UserSearch,
+  Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -144,12 +152,12 @@ export function DashboardView() {
   const participantName = snapshot.participant.displayName || "Участник";
   const firstName = participantName.split(" ")[0];
   const metrics = [
-    { label: "Шаблоны", value: number.format(snapshot.templates.length), note: "Макеты можно редактировать и клонировать", Icon: LayoutTemplate, href: "/templates" },
-    { label: "Презентации", value: number.format(creativeCounts.presentations), note: "Сохранённые редактируемые проекты", Icon: Presentation, href: "/presentations" },
-    { label: "Изображения", value: number.format(creativeCounts.images), note: "Визуалы в общей медиатеке", Icon: Images, href: "/image-studio" },
-    { label: "Контакты", value: number.format(snapshot.stats.totalContacts), note: `${number.format(snapshot.stats.activeContacts)} доступны для работы`, Icon: ContactRound, href: "/contacts" },
-    { label: "Кампании", value: number.format(snapshot.stats.totalCampaigns), note: `${number.format(snapshot.stats.activeCampaigns)} требуют внимания`, Icon: Megaphone, href: "/campaigns" },
-    { label: "Подключённые каналы", value: number.format(snapshot.stats.connectedIntegrations), note: "Email, Telegram или ВКонтакте", Icon: Cable, href: "/integrations" },
+    { label: "Шаблоны", value: number.format(snapshot.templates.length), note: "Макеты можно редактировать и клонировать", Icon: LibraryBig, href: "/templates", iconTone: "bg-[#F0E7FF] text-[#7133D7] border-[#DFC9FF]" },
+    { label: "Презентации", value: number.format(creativeCounts.presentations), note: "Сохранённые редактируемые проекты", Icon: GalleryHorizontalEnd, href: "/presentations", iconTone: "bg-[#E8F0FF] text-[#3267C8] border-[#CEDDFF]" },
+    { label: "Изображения", value: number.format(creativeCounts.images), note: "Визуалы в общей медиатеке", Icon: ImagePlus, href: "/image-studio", iconTone: "bg-[#FFF0E6] text-[#C45A1A] border-[#FFD7BF]" },
+    { label: "Контакты", value: number.format(snapshot.stats.totalContacts), note: `${number.format(snapshot.stats.activeContacts)} доступны для работы`, Icon: UsersRound, href: "/contacts", iconTone: "bg-[#E8F8EF] text-[#208454] border-[#CBEBD8]" },
+    { label: "Кампании", value: number.format(snapshot.stats.totalCampaigns), note: `${number.format(snapshot.stats.activeCampaigns)} требуют внимания`, Icon: SendHorizontal, href: "/campaigns", iconTone: "bg-[#FFF0F3] text-[#BE3D5D] border-[#FFD2DC]" },
+    { label: "Подключённые каналы", value: number.format(snapshot.stats.connectedIntegrations), note: "Email, Telegram или ВКонтакте", Icon: Zap, href: "/integrations", iconTone: "bg-[#FFF7D9] text-[#9A7211] border-[#F4E4A5]" },
   ];
 
   return (
@@ -164,19 +172,19 @@ export function DashboardView() {
       </section>
 
       <section id="creative-studio" className="grid scroll-mt-24 gap-3 md:grid-cols-2 xl:grid-cols-4" aria-label="Творческие модули">
-        <StudioCard href="/email-builder?new=1" Icon={Sparkles} title="Письмо" description="Собрать из блоков, шаблона или вместе с ИИ." action="Создать письмо" />
-        <StudioCard href="/presentations?new=1" Icon={Presentation} title="Презентация" description="Создать слайды с нуля, из письма или по задаче." action="Открыть презентации" />
-        <StudioCard href="/image-studio?new=1" Icon={Images} title="Изображение" description="Создать визуал и использовать его в письме или слайдах." action="Открыть студию" />
-        <StudioCard href="/contact-finder" Icon={ScanSearch} title="Контакты" description="Найти публичные email и телефоны, проверить и импортировать." action="Начать поиск" />
+        <StudioCard href="/email-builder?new=1" Icon={MailPlus} title="Письмо" description="Собрать из блоков, шаблона или вместе с ИИ." action="Создать письмо" iconTone="from-[#EEE3FF] to-[#F7F2FF] text-[#7434D6] border-[#DEC7FF]" />
+        <StudioCard href="/presentations?new=1" Icon={PanelsTopLeft} title="Презентация" description="Создать слайды с нуля, из письма или по задаче." action="Открыть презентации" iconTone="from-[#E1ECFF] to-[#F1F6FF] text-[#3267C8] border-[#C8D9FF]" />
+        <StudioCard href="/image-studio?new=1" Icon={ImagePlus} title="Изображение" description="Создать визуал и использовать его в письме или слайдах." action="Открыть студию" iconTone="from-[#FFE8DB] to-[#FFF5EE] text-[#C45A1A] border-[#FFD3BB]" />
+        <StudioCard href="/contact-finder" Icon={UserSearch} title="Контакты" description="Найти публичные email и телефоны, проверить и импортировать." action="Начать поиск" iconTone="from-[#DFF5E8] to-[#F1FBF5] text-[#208454] border-[#C5E8D3]" />
       </section>
 
       <section className="card p-5 sm:p-6" aria-labelledby="workflow-title">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><p className="section-eyebrow">Единый рабочий процесс</p><h2 id="workflow-title" className="mt-1 text-[17px] font-semibold">От источника до готового материала</h2></div><p className="max-w-xl text-[11px] leading-5 text-[var(--text-muted)]">Каждый переход сохраняет результат в рабочем пространстве: ничего не нужно переносить вручную между модулями.</p></div>
         <ol className="mt-5 grid gap-3 md:grid-cols-4">
-          <WorkflowStep index="01" title="Найти" text="Укажите сайт или вставьте текст, затем проверьте найденные данные." />
-          <WorkflowStep index="02" title="Создать визуал" text="Сохраните изображение в общей библиотеке материалов." />
-          <WorkflowStep index="03" title="Собрать" text="Добавьте визуал в письмо или презентацию и отредактируйте." />
-          <WorkflowStep index="04" title="Использовать" text="Скачайте результат или передайте готовое письмо в рассылку." />
+          <WorkflowStep index="01" Icon={SearchCheck} title="Найти" text="Укажите сайт или вставьте текст, затем проверьте найденные данные." />
+          <WorkflowStep index="02" Icon={Paintbrush} title="Создать визуал" text="Сохраните изображение в общей библиотеке материалов." />
+          <WorkflowStep index="03" Icon={Blocks} title="Собрать" text="Добавьте визуал в письмо или презентацию и отредактируйте." />
+          <WorkflowStep index="04" Icon={SendHorizontal} title="Использовать" text="Скачайте результат или передайте готовое письмо в рассылку." />
         </ol>
         <div className="mt-4 flex flex-wrap gap-2 border-t border-[var(--border)] pt-4">
           <Link href="/templates?import=1" className="btn btn-secondary gap-2"><Upload aria-hidden="true" className="size-4" />Импортировать свой макет</Link>
@@ -197,9 +205,9 @@ export function DashboardView() {
       </section>
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-label="Состояние рабочего пространства">
-        {metrics.map(({ label, value, note, Icon, href }) => (
+        {metrics.map(({ label, value, note, Icon, href, iconTone }) => (
           <Link key={label} href={href} className="card group p-4 transition hover:border-[var(--primary)]/30 hover:shadow-sm sm:p-5">
-            <div className="flex items-start justify-between gap-3"><p className="text-[12px] font-semibold text-[var(--text-muted)]">{label}</p><Icon aria-hidden="true" className="size-4 text-[var(--primary)]" /></div>
+            <div className="flex items-start justify-between gap-3"><p className="pt-1 text-[12px] font-semibold text-[var(--text-muted)]">{label}</p><span className={`grid size-9 place-items-center rounded-xl border ${iconTone} transition group-hover:scale-105`}><Icon aria-hidden="true" strokeWidth={1.8} className="size-[18px]" /></span></div>
             <p className="mt-4 text-[26px] font-semibold tracking-[-.04em]">{value}</p>
             <p className="mt-1 text-[11px] leading-4 text-[var(--text-subtle)]">{note}</p>
           </Link>
@@ -268,16 +276,17 @@ function ReadinessStep({ ready, label, action, href }: { ready: boolean; label: 
   );
 }
 
-function StudioCard({ href, Icon, title, description, action }: {
+function StudioCard({ href, Icon, title, description, action, iconTone }: {
   href: string;
-  Icon: typeof Sparkles;
+  Icon: typeof MailPlus;
   title: string;
   description: string;
   action: string;
+  iconTone: string;
 }) {
   return (
     <Link href={href} className="group rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 transition hover:-translate-y-0.5 hover:border-[var(--primary)]/35 hover:shadow-sm">
-      <span className="grid size-10 place-items-center rounded-xl bg-[var(--primary-subtle)] text-[var(--primary)]"><Icon aria-hidden="true" className="size-5" /></span>
+      <span className={`relative grid size-12 place-items-center overflow-hidden rounded-[15px] border bg-gradient-to-br shadow-[0_8px_24px_rgb(73_49_92/0.10)] ${iconTone}`}><span aria-hidden="true" className="absolute -right-2 -top-2 size-6 rounded-full bg-white/70" /><Icon aria-hidden="true" strokeWidth={1.75} className="relative size-6 transition duration-200 group-hover:scale-110" /></span>
       <h2 className="mt-4 text-[15px] font-semibold">{title}</h2>
       <p className="mt-1.5 text-[11px] leading-5 text-[var(--text-muted)]">{description}</p>
       <span className="mt-4 inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--primary)]">{action}<ArrowRight aria-hidden="true" className="size-3.5 transition group-hover:translate-x-0.5" /></span>
@@ -285,11 +294,11 @@ function StudioCard({ href, Icon, title, description, action }: {
   );
 }
 
-function WorkflowStep({ index, title, text }: { index: string; title: string; text: string }) {
+function WorkflowStep({ index, Icon, title, text }: { index: string; Icon: typeof SearchCheck; title: string; text: string }) {
   return (
     <li className="rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)] p-4">
-      <span className="text-[10px] font-semibold tracking-[.14em] text-[var(--primary)]">{index}</span>
-      <h3 className="mt-2 text-[13px] font-semibold">{title}</h3>
+      <div className="flex items-center justify-between"><span className="text-[10px] font-semibold tracking-[.14em] text-[var(--primary)]">{index}</span><span className="grid size-8 place-items-center rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--primary)]"><Icon aria-hidden="true" strokeWidth={1.8} className="size-4" /></span></div>
+      <h3 className="mt-3 text-[13px] font-semibold">{title}</h3>
       <p className="mt-1 text-[10px] leading-4 text-[var(--text-muted)]">{text}</p>
     </li>
   );
