@@ -60,7 +60,9 @@ export function EmailCanvas({
       <div className="flex h-10 shrink-0 items-center justify-between border-b border-border/70 bg-surface/75 px-3.5 backdrop-blur-sm">
         <div className="flex items-center gap-2">
           <span className="size-1.5 rounded-full bg-success" />
-          <span className="text-[10px] font-medium text-text-muted">Предпросмотр в реальном времени</span>
+          <span className="text-[10px] font-medium text-text-muted">
+            Предпросмотр в реальном времени
+          </span>
         </div>
         <span className="rounded-md border border-border bg-surface px-2 py-0.5 font-mono text-[9px] text-text-subtle">
           {isMobile ? "360 пикс." : `${document.contentWidth} пикс.`}
@@ -83,7 +85,9 @@ export function EmailCanvas({
               <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-1.5 text-[10px] font-semibold text-text-strong">
                   Егор Сабалин
-                  <span className="font-normal text-text-subtle">&lt;egor@mailflow.example&gt;</span>
+                  <span className="font-normal text-text-subtle">
+                    &lt;egor@mailflow.example&gt;
+                  </span>
                 </span>
                 <span className="block truncate text-[10px] text-text-muted">
                   {document.subject}
@@ -97,11 +101,17 @@ export function EmailCanvas({
             className="overflow-hidden shadow-[0_18px_50px_rgba(28,32,44,0.12)]"
             style={{
               backgroundColor: document.bodyBackground,
-              backgroundImage: document.backgroundImageUrl ? `url(${JSON.stringify(document.backgroundImageUrl)})` : undefined,
+              backgroundImage: document.backgroundImageUrl
+                ? `url(${JSON.stringify(document.backgroundImageUrl)})`
+                : undefined,
               backgroundPosition: "center top",
               backgroundRepeat: "repeat",
               backgroundSize: "cover",
-              ...emailFrameCss(document.frameStyle, document.frameColor, document.frameRadius),
+              ...emailFrameCss(
+                document.frameStyle,
+                document.frameColor,
+                document.frameRadius,
+              ),
             }}
           >
             {document.blocks.length === 0 ? (
@@ -110,10 +120,20 @@ export function EmailCanvas({
                   <span className="mx-auto grid size-12 place-items-center rounded-2xl border border-dashed border-primary/40 bg-primary-subtle text-primary">
                     <Plus aria-hidden="true" className="size-5" />
                   </span>
-                  <strong className="mt-4 block text-[16px] text-text-strong">Пустой холст</strong>
-                  <p className="mt-2 text-[11px] leading-5 text-text-muted">Добавьте первый блок слева или откройте «Окантовки», чтобы оформить край письма.</p>
-                  <button type="button" onClick={onOpenBlocks} className="mt-4 inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-4 text-[11px] font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
-                    <Plus aria-hidden="true" className="size-3.5" />Добавить первый блок
+                  <strong className="mt-4 block text-[16px] text-text-strong">
+                    Пустой холст
+                  </strong>
+                  <p className="mt-2 text-[11px] leading-5 text-text-muted">
+                    Добавьте первый блок слева или откройте «Окантовки», чтобы
+                    оформить край письма.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={onOpenBlocks}
+                    className="mt-4 inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-4 text-[11px] font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                  >
+                    <Plus aria-hidden="true" className="size-3.5" />
+                    Добавить первый блок
                   </button>
                 </div>
               </div>
@@ -135,7 +155,10 @@ export function EmailCanvas({
               />
             ))}
 
-            <div className="px-6 py-5 text-center" style={{ backgroundColor: document.bodyBackground }}>
+            <div
+              className="px-6 py-5 text-center"
+              style={{ backgroundColor: document.bodyBackground }}
+            >
               <button
                 type="button"
                 onClick={onOpenBlocks}
@@ -148,7 +171,8 @@ export function EmailCanvas({
           </div>
 
           <p className="m-0 px-4 pb-2 pt-4 text-center text-[9px] leading-4 text-text-subtle">
-            Переменные показаны как метки. Перед запуском сервер проверит их и подставит данные каждого контакта.
+            Переменные показаны как метки. Перед запуском сервер проверит их и
+            подставит данные каждого контакта.
           </p>
         </div>
       </div>
@@ -183,9 +207,7 @@ function CanvasBlock({
 }) {
   const horizontalPadding = compact ? 24 : 46;
   const backgroundColor =
-    block.backgroundColor === "transparent"
-      ? undefined
-      : block.backgroundColor;
+    block.backgroundColor === "transparent" ? undefined : block.backgroundColor;
 
   return (
     <div
@@ -208,8 +230,12 @@ function CanvasBlock({
       style={{
         paddingTop: block.paddingTop,
         paddingBottom: block.paddingBottom,
-        paddingLeft: compact ? Math.min(block.paddingLeft, horizontalPadding) : block.paddingLeft,
-        paddingRight: compact ? Math.min(block.paddingRight, horizontalPadding) : block.paddingRight,
+        paddingLeft: compact
+          ? Math.min(block.paddingLeft, horizontalPadding)
+          : block.paddingLeft,
+        paddingRight: compact
+          ? Math.min(block.paddingRight, horizontalPadding)
+          : block.paddingRight,
         backgroundColor,
         color: block.textColor,
         textAlign: block.alignment ?? "left",
@@ -265,8 +291,27 @@ function CanvasBlock({
         </div>
       ) : null}
 
-      <div style={{ width: `${block.widthPercent}%`, marginLeft: block.alignment === "right" ? "auto" : block.alignment === "center" ? "auto" : 0, marginRight: block.alignment === "center" ? "auto" : 0, border: `${block.borderWidth}px solid ${block.borderColor}`, borderRadius: block.borderRadius }}>
-        <BlockContent block={block} accentColor={accentColor} compact={compact} selected={selected} onInlineEdit={onInlineEdit} />
+      <div
+        style={{
+          width: `${block.widthPercent}%`,
+          marginLeft:
+            block.alignment === "right"
+              ? "auto"
+              : block.alignment === "center"
+                ? "auto"
+                : 0,
+          marginRight: block.alignment === "center" ? "auto" : 0,
+          border: `${block.borderWidth}px solid ${block.borderColor}`,
+          borderRadius: block.borderRadius,
+        }}
+      >
+        <BlockContent
+          block={block}
+          accentColor={accentColor}
+          compact={compact}
+          selected={selected}
+          onInlineEdit={onInlineEdit}
+        />
       </div>
     </div>
   );
@@ -289,15 +334,27 @@ function BlockContent({
     if (block.href) {
       return (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={block.href} alt={block.content} className="inline-block max-h-24 max-w-full object-contain" />
+        <img
+          src={block.href}
+          alt={block.content}
+          className="inline-block max-h-24 max-w-full object-contain"
+        />
       );
     }
     return (
       <div
         className="inline-flex items-center gap-2"
-        style={{ fontSize: block.fontSize, fontWeight: block.fontWeight, lineHeight: block.lineHeight / 100, letterSpacing: block.letterSpacing }}
+        style={{
+          fontSize: block.fontSize,
+          fontWeight: block.fontWeight,
+          lineHeight: block.lineHeight / 100,
+          letterSpacing: block.letterSpacing,
+        }}
       >
-        <span className="grid size-6 place-items-center rounded-md text-[9px] font-bold text-white" style={{ backgroundColor: accentColor }}>
+        <span
+          className="grid size-6 place-items-center rounded-md text-[9px] font-bold text-white"
+          style={{ backgroundColor: accentColor }}
+        >
           M
         </span>
         {renderTokens(block.content)}
@@ -333,7 +390,12 @@ function BlockContent({
         onPointerDown={(event) => event.stopPropagation()}
         onBlur={(event) => onInlineEdit(event.currentTarget.textContent ?? "")}
         className="m-0 whitespace-pre-wrap"
-        style={{ fontSize: block.fontSize, fontWeight: block.fontWeight, lineHeight: block.lineHeight / 100, letterSpacing: block.letterSpacing }}
+        style={{
+          fontSize: block.fontSize,
+          fontWeight: block.fontWeight,
+          lineHeight: block.lineHeight / 100,
+          letterSpacing: block.letterSpacing,
+        }}
       >
         {renderTokens(block.content)}
       </p>
@@ -341,8 +403,14 @@ function BlockContent({
   }
 
   if (block.type === "button") {
-    const buttonBackground = block.buttonStyle === "outline" ? "transparent" : block.buttonStyle === "soft" ? `${accentColor}18` : accentColor;
-    const buttonColor = block.buttonStyle === "solid" ? block.textColor : accentColor;
+    const buttonBackground =
+      block.buttonStyle === "outline"
+        ? "transparent"
+        : block.buttonStyle === "soft"
+          ? `${accentColor}18`
+          : accentColor;
+    const buttonColor =
+      block.buttonStyle === "solid" ? block.textColor : accentColor;
     return (
       <a
         href={block.href || undefined}
@@ -358,7 +426,10 @@ function BlockContent({
           borderRadius: block.borderRadius,
           backgroundColor: buttonBackground,
           color: buttonColor,
-          border: block.buttonStyle === "outline" ? `2px solid ${accentColor}` : undefined,
+          border:
+            block.buttonStyle === "outline"
+              ? `2px solid ${accentColor}`
+              : undefined,
           fontSize: block.fontSize,
           fontWeight: block.fontWeight,
           lineHeight: block.lineHeight / 100,
@@ -391,7 +462,10 @@ function BlockContent({
           backgroundColor: "#f4f5f8",
         }}
       >
-        <div className="absolute inset-0 opacity-70" style={{ backgroundColor: `${accentColor}10` }} />
+        <div
+          className="absolute inset-0 opacity-70"
+          style={{ backgroundColor: `${accentColor}10` }}
+        />
         <div className="relative mx-auto flex h-full max-w-sm flex-col overflow-hidden rounded-lg border border-white/80 bg-white shadow-[0_12px_30px_rgba(32,37,52,0.12)]">
           <div className="flex h-7 items-center gap-1 border-b border-[#eceef3] px-2">
             <span className="size-1.5 rounded-full bg-[#f3a5aa]" />
@@ -400,7 +474,10 @@ function BlockContent({
           </div>
           <div className="grid flex-1 grid-cols-[27%_1fr]">
             <div className="border-r border-[#eceef3] bg-[#f8f9fb] p-2">
-              <span className="block h-2 w-12 rounded-full" style={{ backgroundColor: `${accentColor}30` }} />
+              <span
+                className="block h-2 w-12 rounded-full"
+                style={{ backgroundColor: `${accentColor}30` }}
+              />
               <span className="mt-3 block h-1.5 w-10 rounded-full bg-[#dfe2e9]" />
               <span className="mt-2 block h-1.5 w-8 rounded-full bg-[#e6e8ed]" />
               <span className="mt-2 block h-1.5 w-11 rounded-full bg-[#e6e8ed]" />
@@ -409,7 +486,10 @@ function BlockContent({
               <span className="block h-2 w-24 rounded-full bg-[#cfd3dc]" />
               <div className="mt-3 grid grid-cols-3 gap-2">
                 {[0, 1, 2].map((item) => (
-                  <span key={item} className="h-9 rounded border border-[#eceef3] bg-[#fafbfc]" />
+                  <span
+                    key={item}
+                    className="h-9 rounded border border-[#eceef3] bg-[#fafbfc]"
+                  />
                 ))}
               </div>
               <span className="mt-3 block h-1.5 w-full rounded-full bg-[#e5e7ec]" />
@@ -429,24 +509,39 @@ function BlockContent({
     const columns = block.content.split("|");
     return (
       <div className="grid grid-cols-2 gap-3">
-        {[columns[0] || "Первый столбец", columns[1] || "Второй столбец"].map((column, index) => (
-          <div
-            key={`${column}-${index}`}
-            className="rounded-lg border border-black/5 bg-black/[0.025] p-3"
-            style={{ borderRadius: block.borderRadius, fontSize: block.fontSize, lineHeight: block.lineHeight / 100, letterSpacing: block.letterSpacing }}
-          >
-            <span className="mb-2 block size-5 rounded-md text-center text-[10px] font-bold leading-5 text-white" style={{ backgroundColor: accentColor }}>
-              {index + 1}
-            </span>
-            <span>{renderTokens(column)}</span>
-          </div>
-        ))}
+        {[columns[0] || "Первый столбец", columns[1] || "Второй столбец"].map(
+          (column, index) => (
+            <div
+              key={`${column}-${index}`}
+              className="rounded-lg border border-black/5 bg-black/[0.025] p-3"
+              style={{
+                borderRadius: block.borderRadius,
+                fontSize: block.fontSize,
+                lineHeight: block.lineHeight / 100,
+                letterSpacing: block.letterSpacing,
+              }}
+            >
+              <span
+                className="mb-2 block size-5 rounded-md text-center text-[10px] font-bold leading-5 text-white"
+                style={{ backgroundColor: accentColor }}
+              >
+                {index + 1}
+              </span>
+              <span>{renderTokens(column)}</span>
+            </div>
+          ),
+        )}
       </div>
     );
   }
 
   if (block.type === "divider") {
-    return <hr className="m-0 border-0 border-t" style={{ borderColor: block.textColor }} />;
+    return (
+      <hr
+        className="m-0 border-0 border-t"
+        style={{ borderColor: block.textColor }}
+      />
+    );
   }
 
   if (block.type === "spacer") {
@@ -461,14 +556,51 @@ function BlockContent({
 
   if (block.type === "social") {
     const items = block.content.split("|");
+    const linked =
+      items.length >= 2 &&
+      items.length % 2 === 0 &&
+      items.every(
+        (item, index) => index % 2 === 0 || item.trim().startsWith("https://"),
+      );
+    const visibleItems = linked
+      ? items.filter((_, index) => index % 2 === 0)
+      : items;
     return (
-      <div className="inline-flex flex-wrap items-center gap-2" style={{ lineHeight: block.lineHeight / 100, letterSpacing: block.letterSpacing }}>
-        {items.map((item, index) => (
-          <span key={`${item}-${index}`} className="inline-flex items-center gap-1.5 rounded-full border border-black/10 px-2.5 py-1.5 font-medium" style={{ fontSize: block.fontSize }}>
-            {index === 0 ? <Linkedin aria-hidden="true" className="size-3" /> : <Globe2 aria-hidden="true" className="size-3" />}
-            {item}
-          </span>
-        ))}
+      <div
+        className="inline-flex flex-wrap items-center gap-2"
+        style={{
+          lineHeight: block.lineHeight / 100,
+          letterSpacing: block.letterSpacing,
+        }}
+      >
+        {visibleItems.map((item, index) =>
+          linked ? (
+            <a
+              key={`${item}-${index}`}
+              href={items[index * 2 + 1]?.trim()}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(event) => event.stopPropagation()}
+              className="inline-flex items-center gap-1.5 rounded-full border border-black/10 px-2.5 py-1.5 font-medium no-underline"
+              style={{ fontSize: block.fontSize, color: accentColor }}
+            >
+              {index === 0 ? (
+                <Linkedin aria-hidden="true" className="size-3" />
+              ) : (
+                <Globe2 aria-hidden="true" className="size-3" />
+              )}
+              {item}
+            </a>
+          ) : (
+            <span
+              key={`${item}-${index}`}
+              className="inline-flex items-center gap-1.5 rounded-full border border-black/10 px-2.5 py-1.5 font-medium"
+              style={{ fontSize: block.fontSize }}
+            >
+              {item}
+            </span>
+          ),
+        )}
       </div>
     );
   }
@@ -476,9 +608,36 @@ function BlockContent({
   if (block.type === "hero") {
     const [title, subtitle] = block.content.split("|");
     return (
-      <div className="rounded-2xl p-6" style={{ backgroundColor: block.backgroundColor === "transparent" ? `${accentColor}12` : block.backgroundColor, borderRadius: block.borderRadius }}>
-        <h2 className="m-0" style={{ fontSize: compact ? Math.min(block.fontSize, 29) : block.fontSize, fontWeight: block.fontWeight, lineHeight: block.lineHeight / 100, letterSpacing: block.letterSpacing }}>{renderTokens(title || "Главная идея письма")}</h2>
-        <p className="mb-0 mt-3 whitespace-pre-wrap opacity-75" style={{ fontSize: Math.max(13, Math.round(block.fontSize * 0.48)), lineHeight: block.lineHeight / 100 }}>{renderTokens(subtitle || "Коротко объясните ценность предложения")}</p>
+      <div
+        className="rounded-2xl p-6"
+        style={{
+          backgroundColor:
+            block.backgroundColor === "transparent"
+              ? `${accentColor}12`
+              : block.backgroundColor,
+          borderRadius: block.borderRadius,
+        }}
+      >
+        <h2
+          className="m-0"
+          style={{
+            fontSize: compact ? Math.min(block.fontSize, 29) : block.fontSize,
+            fontWeight: block.fontWeight,
+            lineHeight: block.lineHeight / 100,
+            letterSpacing: block.letterSpacing,
+          }}
+        >
+          {renderTokens(title || "Главная идея письма")}
+        </h2>
+        <p
+          className="mb-0 mt-3 whitespace-pre-wrap opacity-75"
+          style={{
+            fontSize: Math.max(13, Math.round(block.fontSize * 0.48)),
+            lineHeight: block.lineHeight / 100,
+          }}
+        >
+          {renderTokens(subtitle || "Коротко объясните ценность предложения")}
+        </p>
       </div>
     );
   }
@@ -486,9 +645,30 @@ function BlockContent({
   if (block.type === "quote") {
     const [quote, author] = block.content.split("|");
     return (
-      <blockquote className="m-0 rounded-xl border-l-4 p-5" style={{ borderLeftColor: accentColor, backgroundColor: block.backgroundColor === "transparent" ? "#f8f8fb" : block.backgroundColor, borderRadius: block.borderRadius }}>
-        <p className="m-0 italic" style={{ fontSize: block.fontSize, lineHeight: block.lineHeight / 100, letterSpacing: block.letterSpacing }}>“{renderTokens(quote || "Цитата клиента или важная мысль")}”</p>
-        <footer className="mt-2 text-[12px] font-semibold opacity-70">{renderTokens(author || "Имя, должность")}</footer>
+      <blockquote
+        className="m-0 rounded-xl border-l-4 p-5"
+        style={{
+          borderLeftColor: accentColor,
+          backgroundColor:
+            block.backgroundColor === "transparent"
+              ? "#f8f8fb"
+              : block.backgroundColor,
+          borderRadius: block.borderRadius,
+        }}
+      >
+        <p
+          className="m-0 italic"
+          style={{
+            fontSize: block.fontSize,
+            lineHeight: block.lineHeight / 100,
+            letterSpacing: block.letterSpacing,
+          }}
+        >
+          “{renderTokens(quote || "Цитата клиента или важная мысль")}”
+        </p>
+        <footer className="mt-2 text-[12px] font-semibold opacity-70">
+          {renderTokens(author || "Имя, должность")}
+        </footer>
       </blockquote>
     );
   }
@@ -496,12 +676,28 @@ function BlockContent({
   if (block.type === "checklist") {
     return (
       <ul className="m-0 grid list-none gap-2 p-0">
-        {block.content.split("|").filter(Boolean).map((item, index) => (
-          <li key={`${item}-${index}`} className="flex items-start gap-2" style={{ fontSize: block.fontSize, lineHeight: block.lineHeight / 100, letterSpacing: block.letterSpacing }}>
-            <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full text-[11px] font-bold text-white" style={{ backgroundColor: accentColor }}>✓</span>
-            <span>{renderTokens(item.trim())}</span>
-          </li>
-        ))}
+        {block.content
+          .split("|")
+          .filter(Boolean)
+          .map((item, index) => (
+            <li
+              key={`${item}-${index}`}
+              className="flex items-start gap-2"
+              style={{
+                fontSize: block.fontSize,
+                lineHeight: block.lineHeight / 100,
+                letterSpacing: block.letterSpacing,
+              }}
+            >
+              <span
+                className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full text-[11px] font-bold text-white"
+                style={{ backgroundColor: accentColor }}
+              >
+                ✓
+              </span>
+              <span>{renderTokens(item.trim())}</span>
+            </li>
+          ))}
       </ul>
     );
   }
@@ -511,9 +707,29 @@ function BlockContent({
     return (
       <div className="grid grid-cols-2 gap-3">
         {[0, 2].map((index) => (
-          <div key={index} className="rounded-xl p-4 text-center" style={{ backgroundColor: block.backgroundColor === "transparent" ? "#f7f8fc" : block.backgroundColor, borderRadius: block.borderRadius }}>
-            <strong className="block text-[26px]" style={{ color: accentColor }}>{renderTokens(items[index] || "—")}</strong>
-            <span className="mt-1 block opacity-70" style={{ fontSize: block.fontSize }}>{renderTokens(items[index + 1] || "Показатель")}</span>
+          <div
+            key={index}
+            className="rounded-xl p-4 text-center"
+            style={{
+              backgroundColor:
+                block.backgroundColor === "transparent"
+                  ? "#f7f8fc"
+                  : block.backgroundColor,
+              borderRadius: block.borderRadius,
+            }}
+          >
+            <strong
+              className="block text-[26px]"
+              style={{ color: accentColor }}
+            >
+              {renderTokens(items[index] || "—")}
+            </strong>
+            <span
+              className="mt-1 block opacity-70"
+              style={{ fontSize: block.fontSize }}
+            >
+              {renderTokens(items[index + 1] || "Показатель")}
+            </span>
           </div>
         ))}
       </div>
@@ -523,11 +739,44 @@ function BlockContent({
   if (block.type === "product") {
     const [name, description, price] = block.content.split("|");
     return (
-      <div className="rounded-xl border border-black/10 p-5" style={{ backgroundColor: block.backgroundColor === "transparent" ? "#fff" : block.backgroundColor, borderRadius: block.borderRadius, lineHeight: block.lineHeight / 100, letterSpacing: block.letterSpacing }}>
-        <strong className="block text-[19px]">{renderTokens(name || "Название предложения")}</strong>
-        <p className="mb-0 mt-2 opacity-75" style={{ fontSize: block.fontSize }}>{renderTokens(description || "Короткое описание пользы")}</p>
-        <strong className="mt-3 block text-[17px]">{renderTokens(price || "Цена")}</strong>
-        <a href={block.href || undefined} target="_blank" rel="noreferrer" aria-disabled={!block.href} onClick={(event) => { event.stopPropagation(); if (!block.href) event.preventDefault(); }} className="mt-4 inline-flex rounded-lg px-4 py-2 text-[12px] font-semibold text-white" style={{ backgroundColor: accentColor }}>{renderTokens(block.label || "Узнать подробнее")}</a>
+      <div
+        className="rounded-xl border border-black/10 p-5"
+        style={{
+          backgroundColor:
+            block.backgroundColor === "transparent"
+              ? "#fff"
+              : block.backgroundColor,
+          borderRadius: block.borderRadius,
+          lineHeight: block.lineHeight / 100,
+          letterSpacing: block.letterSpacing,
+        }}
+      >
+        <strong className="block text-[19px]">
+          {renderTokens(name || "Название предложения")}
+        </strong>
+        <p
+          className="mb-0 mt-2 opacity-75"
+          style={{ fontSize: block.fontSize }}
+        >
+          {renderTokens(description || "Короткое описание пользы")}
+        </p>
+        <strong className="mt-3 block text-[17px]">
+          {renderTokens(price || "Цена")}
+        </strong>
+        <a
+          href={block.href || undefined}
+          target="_blank"
+          rel="noreferrer"
+          aria-disabled={!block.href}
+          onClick={(event) => {
+            event.stopPropagation();
+            if (!block.href) event.preventDefault();
+          }}
+          className="mt-4 inline-flex rounded-lg px-4 py-2 text-[12px] font-semibold text-white"
+          style={{ backgroundColor: accentColor }}
+        >
+          {renderTokens(block.label || "Узнать подробнее")}
+        </a>
       </div>
     );
   }
@@ -535,52 +784,347 @@ function BlockContent({
   if (block.type === "signature") {
     const [name, position, contact] = block.content.split("|");
     return (
-      <div className="inline-flex items-center gap-3" style={{ fontSize: block.fontSize, lineHeight: block.lineHeight / 100, letterSpacing: block.letterSpacing }}>
-        <span className="grid size-10 shrink-0 place-items-center rounded-full text-sm font-bold text-white" style={{ backgroundColor: accentColor }}>{(name || "М").slice(0, 1)}</span>
-        <span><strong className="block">{renderTokens(name || "Имя отправителя")}</strong><span className="block opacity-70">{renderTokens(position || "Должность")}</span><span className="block text-[11px] opacity-55">{renderTokens(contact || "Контакты")}</span></span>
+      <div
+        className="inline-flex items-center gap-3"
+        style={{
+          fontSize: block.fontSize,
+          lineHeight: block.lineHeight / 100,
+          letterSpacing: block.letterSpacing,
+        }}
+      >
+        <span
+          className="grid size-10 shrink-0 place-items-center rounded-full text-sm font-bold text-white"
+          style={{ backgroundColor: accentColor }}
+        >
+          {(name || "М").slice(0, 1)}
+        </span>
+        <span>
+          <strong className="block">
+            {renderTokens(name || "Имя отправителя")}
+          </strong>
+          <span className="block opacity-70">
+            {renderTokens(position || "Должность")}
+          </span>
+          <span className="block text-[11px] opacity-55">
+            {renderTokens(contact || "Контакты")}
+          </span>
+        </span>
       </div>
     );
   }
 
   if (block.type === "pattern") {
-    return <div aria-hidden="true" className="whitespace-pre-line py-2.5 text-center font-normal" style={{ backgroundColor: block.backgroundColor === "transparent" ? `${accentColor}12` : block.backgroundColor, borderRadius: block.borderRadius, color: block.textColor, fontFamily: block.fontFamily, fontSize: block.fontSize, letterSpacing: block.letterSpacing, lineHeight: block.lineHeight / 100 }}>{block.content}</div>;
+    return (
+      <div
+        aria-hidden="true"
+        className="whitespace-pre-line py-2.5 text-center font-normal"
+        style={{
+          backgroundColor:
+            block.backgroundColor === "transparent"
+              ? `${accentColor}12`
+              : block.backgroundColor,
+          borderRadius: block.borderRadius,
+          color: block.textColor,
+          fontFamily: block.fontFamily,
+          fontSize: block.fontSize,
+          letterSpacing: block.letterSpacing,
+          lineHeight: block.lineHeight / 100,
+        }}
+      >
+        {block.content}
+      </div>
+    );
   }
 
   if (block.type === "banner") {
     const [title, subtitle] = block.content.split("|");
-    return <div className="p-6" style={{ backgroundColor: block.backgroundColor, borderRadius: block.borderRadius, fontSize: block.fontSize, lineHeight: block.lineHeight / 100, letterSpacing: block.letterSpacing }}><strong className="block" style={{ fontSize: block.fontSize + 8 }}>{renderTokens(title || "Важное объявление")}</strong><span className="mt-2 block opacity-75">{renderTokens(subtitle || "Короткое пояснение")}</span></div>;
+    return (
+      <div
+        className="p-6"
+        style={{
+          backgroundColor: block.backgroundColor,
+          borderRadius: block.borderRadius,
+          fontSize: block.fontSize,
+          lineHeight: block.lineHeight / 100,
+          letterSpacing: block.letterSpacing,
+        }}
+      >
+        <strong className="block" style={{ fontSize: block.fontSize + 8 }}>
+          {renderTokens(title || "Важное объявление")}
+        </strong>
+        <span className="mt-2 block opacity-75">
+          {renderTokens(subtitle || "Короткое пояснение")}
+        </span>
+      </div>
+    );
   }
   if (block.type === "timeline") {
     const items = block.content.split("|");
-    return <ol className="m-0 grid list-none gap-3 p-0" style={{ fontSize: block.fontSize, lineHeight: block.lineHeight / 100, letterSpacing: block.letterSpacing }}>{Array.from({length:Math.ceil(items.length/2)},(_,index)=><li key={index} className="flex gap-3"><span className="grid size-7 shrink-0 place-items-center rounded-full text-xs font-bold text-white" style={{backgroundColor:accentColor}}>{index+1}</span><span><strong className="block">{renderTokens(items[index*2]||"")}</strong><span className="opacity-65">{renderTokens(items[index*2+1]||"")}</span></span></li>)}</ol>;
+    return (
+      <ol
+        className="m-0 grid list-none gap-3 p-0"
+        style={{
+          fontSize: block.fontSize,
+          lineHeight: block.lineHeight / 100,
+          letterSpacing: block.letterSpacing,
+        }}
+      >
+        {Array.from({ length: Math.ceil(items.length / 2) }, (_, index) => (
+          <li key={index} className="flex gap-3">
+            <span
+              className="grid size-7 shrink-0 place-items-center rounded-full text-xs font-bold text-white"
+              style={{ backgroundColor: accentColor }}
+            >
+              {index + 1}
+            </span>
+            <span>
+              <strong className="block">
+                {renderTokens(items[index * 2] || "")}
+              </strong>
+              <span className="opacity-65">
+                {renderTokens(items[index * 2 + 1] || "")}
+              </span>
+            </span>
+          </li>
+        ))}
+      </ol>
+    );
   }
   if (block.type === "faq") {
     const items = block.content.split("|");
-    return <div className="grid" style={{ fontSize: block.fontSize, lineHeight: block.lineHeight / 100, letterSpacing: block.letterSpacing }}>{Array.from({length:Math.ceil(items.length/2)},(_,index)=><div key={index} className="border-b border-black/10 py-3"><strong className="block">{renderTokens(items[index*2]||"")}</strong><span className="mt-1 block opacity-65">{renderTokens(items[index*2+1]||"")}</span></div>)}</div>;
+    return (
+      <div
+        className="grid"
+        style={{
+          fontSize: block.fontSize,
+          lineHeight: block.lineHeight / 100,
+          letterSpacing: block.letterSpacing,
+        }}
+      >
+        {Array.from({ length: Math.ceil(items.length / 2) }, (_, index) => (
+          <div key={index} className="border-b border-black/10 py-3">
+            <strong className="block">
+              {renderTokens(items[index * 2] || "")}
+            </strong>
+            <span className="mt-1 block opacity-65">
+              {renderTokens(items[index * 2 + 1] || "")}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
   }
   if (block.type === "coupon") {
     const [eyebrow, code, note] = block.content.split("|");
-    return <div className="border-2 border-dashed p-5" style={{borderColor:accentColor,borderRadius:block.borderRadius,backgroundColor:block.backgroundColor,fontSize:block.fontSize,lineHeight:block.lineHeight/100,letterSpacing:block.letterSpacing}}><span className="block text-[11px] uppercase tracking-wider">{eyebrow}</span><strong className="my-2 block tracking-wider" style={{color:accentColor,fontSize:block.fontSize+8}}>{code}</strong><span className="block text-[11px] opacity-65">{note}</span></div>;
+    return (
+      <div
+        className="border-2 border-dashed p-5"
+        style={{
+          borderColor: accentColor,
+          borderRadius: block.borderRadius,
+          backgroundColor: block.backgroundColor,
+          fontSize: block.fontSize,
+          lineHeight: block.lineHeight / 100,
+          letterSpacing: block.letterSpacing,
+        }}
+      >
+        <span className="block text-[11px] uppercase tracking-wider">
+          {eyebrow}
+        </span>
+        <strong
+          className="my-2 block tracking-wider"
+          style={{ color: accentColor, fontSize: block.fontSize + 8 }}
+        >
+          {code}
+        </strong>
+        <span className="block text-[11px] opacity-65">{note}</span>
+      </div>
+    );
   }
   if (block.type === "video") {
     const [title, duration] = block.content.split("|");
-    return <a href={block.href || undefined} target="_blank" rel="noreferrer" aria-disabled={!block.href} onClick={(event) => { event.stopPropagation(); if (!block.href) event.preventDefault(); }} className="grid min-h-44 place-items-center p-6 no-underline" style={{backgroundColor:block.backgroundColor,borderRadius:block.borderRadius,fontSize:block.fontSize,lineHeight:block.lineHeight/100,letterSpacing:block.letterSpacing,color:block.textColor}}><span><span className="mx-auto grid size-12 place-items-center rounded-full bg-white/15 text-xl">▶</span><strong className="mt-3 block">{renderTokens(title||"Видео")}</strong><span className="mt-1 block text-xs opacity-60">{duration}</span></span></a>;
+    return (
+      <a
+        href={block.href || undefined}
+        target="_blank"
+        rel="noreferrer"
+        aria-disabled={!block.href}
+        onClick={(event) => {
+          event.stopPropagation();
+          if (!block.href) event.preventDefault();
+        }}
+        className="grid min-h-44 place-items-center p-6 no-underline"
+        style={{
+          backgroundColor: block.backgroundColor,
+          borderRadius: block.borderRadius,
+          fontSize: block.fontSize,
+          lineHeight: block.lineHeight / 100,
+          letterSpacing: block.letterSpacing,
+          color: block.textColor,
+        }}
+      >
+        <span>
+          <span className="mx-auto grid size-12 place-items-center rounded-full bg-white/15 text-xl">
+            ▶
+          </span>
+          <strong className="mt-3 block">
+            {renderTokens(title || "Видео")}
+          </strong>
+          <span className="mt-1 block text-xs opacity-60">{duration}</span>
+        </span>
+      </a>
+    );
   }
   if (block.type === "notice") {
     const [eyebrow, message, status] = block.content.split("|");
-    return <div className="flex gap-4 border p-5 text-left" style={{borderColor:block.borderColor||accentColor,borderRadius:block.borderRadius,backgroundColor:block.backgroundColor,fontSize:block.fontSize,lineHeight:block.lineHeight/100}}><span className="mt-1 size-3 shrink-0 rounded-full" style={{backgroundColor:accentColor}} /><span><span className="block text-[11px] font-bold uppercase tracking-[.12em]" style={{color:accentColor}}>{renderTokens(eyebrow||"Важное уведомление")}</span><strong className="mt-2 block text-[17px]">{renderTokens(message||"Главное сообщение")}</strong><span className="mt-1 block text-[12px] opacity-65">{renderTokens(status||"Статус или срок")}</span></span></div>;
+    return (
+      <div
+        className="flex gap-4 border p-5 text-left"
+        style={{
+          borderColor: block.borderColor || accentColor,
+          borderRadius: block.borderRadius,
+          backgroundColor: block.backgroundColor,
+          fontSize: block.fontSize,
+          lineHeight: block.lineHeight / 100,
+        }}
+      >
+        <span
+          className="mt-1 size-3 shrink-0 rounded-full"
+          style={{ backgroundColor: accentColor }}
+        />
+        <span>
+          <span
+            className="block text-[11px] font-bold uppercase tracking-[.12em]"
+            style={{ color: accentColor }}
+          >
+            {renderTokens(eyebrow || "Важное уведомление")}
+          </span>
+          <strong className="mt-2 block text-[17px]">
+            {renderTokens(message || "Главное сообщение")}
+          </strong>
+          <span className="mt-1 block text-[12px] opacity-65">
+            {renderTokens(status || "Статус или срок")}
+          </span>
+        </span>
+      </div>
+    );
   }
   if (block.type === "comparison") {
     const items = block.content.split("|");
-    return <div className="grid grid-cols-2 gap-3">{[0,2].map(index=><div key={index} className="border p-4 text-left" style={{borderColor:block.borderColor,borderRadius:block.borderRadius,backgroundColor:block.backgroundColor,fontSize:block.fontSize,lineHeight:block.lineHeight/100}}><span className="block text-[11px] font-bold uppercase tracking-[.08em]" style={{color:accentColor}}>{renderTokens(items[index]||"Раздел")}</span><span className="mt-2 block">{renderTokens(items[index+1]||"Описание")}</span></div>)}</div>;
+    return (
+      <div className="grid grid-cols-2 gap-3">
+        {[0, 2].map((index) => (
+          <div
+            key={index}
+            className="border p-4 text-left"
+            style={{
+              borderColor: block.borderColor,
+              borderRadius: block.borderRadius,
+              backgroundColor: block.backgroundColor,
+              fontSize: block.fontSize,
+              lineHeight: block.lineHeight / 100,
+            }}
+          >
+            <span
+              className="block text-[11px] font-bold uppercase tracking-[.08em]"
+              style={{ color: accentColor }}
+            >
+              {renderTokens(items[index] || "Раздел")}
+            </span>
+            <span className="mt-2 block">
+              {renderTokens(items[index + 1] || "Описание")}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
   }
   if (block.type === "document") {
     const [name, meta, status] = block.content.split("|");
-    return <a href={block.href || undefined} target="_blank" rel="noreferrer" aria-disabled={!block.href} onClick={(event) => { event.stopPropagation(); if (!block.href) event.preventDefault(); }} className="flex items-center gap-4 border p-5 text-left no-underline" style={{borderColor:block.borderColor,borderRadius:block.borderRadius,backgroundColor:block.backgroundColor,fontSize:block.fontSize,lineHeight:block.lineHeight/100,color:block.textColor}}><span className="grid size-11 shrink-0 place-items-center rounded-lg text-lg font-bold text-white" style={{backgroundColor:accentColor}}>▤</span><span className="min-w-0 flex-1"><strong className="block truncate">{renderTokens(name||"Название документа")}</strong><span className="mt-1 block text-[11px] opacity-60">{renderTokens(meta||"PDF")} · {renderTokens(status||"Готов")}</span></span><span className="rounded-lg px-3 py-2 text-[11px] font-bold text-white" style={{backgroundColor:accentColor}}>{renderTokens(block.label||"Открыть")}</span></a>;
+    return (
+      <a
+        href={block.href || undefined}
+        target="_blank"
+        rel="noreferrer"
+        aria-disabled={!block.href}
+        onClick={(event) => {
+          event.stopPropagation();
+          if (!block.href) event.preventDefault();
+        }}
+        className="flex items-center gap-4 border p-5 text-left no-underline"
+        style={{
+          borderColor: block.borderColor,
+          borderRadius: block.borderRadius,
+          backgroundColor: block.backgroundColor,
+          fontSize: block.fontSize,
+          lineHeight: block.lineHeight / 100,
+          color: block.textColor,
+        }}
+      >
+        <span
+          className="grid size-11 shrink-0 place-items-center rounded-lg text-lg font-bold text-white"
+          style={{ backgroundColor: accentColor }}
+        >
+          ▤
+        </span>
+        <span className="min-w-0 flex-1">
+          <strong className="block truncate">
+            {renderTokens(name || "Название документа")}
+          </strong>
+          <span className="mt-1 block text-[11px] opacity-60">
+            {renderTokens(meta || "PDF")} · {renderTokens(status || "Готов")}
+          </span>
+        </span>
+        <span
+          className="rounded-lg px-3 py-2 text-[11px] font-bold text-white"
+          style={{ backgroundColor: accentColor }}
+        >
+          {renderTokens(block.label || "Открыть")}
+        </span>
+      </a>
+    );
   }
   if (block.type === "compliance") {
     const [status, description, hint] = block.content.split("|");
-    return <div className="border p-5 text-left" style={{borderColor:block.borderColor,borderRadius:block.borderRadius,backgroundColor:block.backgroundColor,fontSize:block.fontSize,lineHeight:block.lineHeight/100}}><span className="block text-[11px] font-bold uppercase tracking-[.08em]" style={{color:accentColor}}>✓ {renderTokens(status||"Статус")}</span><span className="mt-2 block">{renderTokens(description||"Описание согласия")}</span><span className="mt-2 block text-[11px] opacity-60">{renderTokens(hint||"Подсказка")}</span><a href={block.href || undefined} target="_blank" rel="noreferrer" aria-disabled={!block.href} onClick={(event) => { event.stopPropagation(); if (!block.href) event.preventDefault(); }} className="mt-3 inline-block text-[11px] font-bold underline" style={{color:accentColor}}>{renderTokens(block.label||"Настроить")}</a></div>;
+    return (
+      <div
+        className="border p-5 text-left"
+        style={{
+          borderColor: block.borderColor,
+          borderRadius: block.borderRadius,
+          backgroundColor: block.backgroundColor,
+          fontSize: block.fontSize,
+          lineHeight: block.lineHeight / 100,
+        }}
+      >
+        <span
+          className="block text-[11px] font-bold uppercase tracking-[.08em]"
+          style={{ color: accentColor }}
+        >
+          ✓ {renderTokens(status || "Статус")}
+        </span>
+        <span className="mt-2 block">
+          {renderTokens(description || "Описание согласия")}
+        </span>
+        <span className="mt-2 block text-[11px] opacity-60">
+          {renderTokens(hint || "Подсказка")}
+        </span>
+        <a
+          href={block.href || undefined}
+          target="_blank"
+          rel="noreferrer"
+          aria-disabled={!block.href}
+          onClick={(event) => {
+            event.stopPropagation();
+            if (!block.href) event.preventDefault();
+          }}
+          className="mt-3 inline-block text-[11px] font-bold underline"
+          style={{ color: accentColor }}
+        >
+          {renderTokens(block.label || "Настроить")}
+        </a>
+      </div>
+    );
   }
 
   return (

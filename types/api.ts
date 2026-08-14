@@ -35,11 +35,7 @@ export type ParticipantRecord = {
   updatedAt: string;
 };
 
-export type ContactStatus =
-  | "active"
-  | "unsubscribed"
-  | "bounced"
-  | "invalid";
+export type ContactStatus = "active" | "unsubscribed" | "bounced" | "invalid";
 
 export type ContactRecord = {
   id: string;
@@ -111,9 +107,7 @@ export type SegmentRecord = {
 };
 
 export type IntegrationConnectionStatus =
-  | "disconnected"
-  | "needs_attention"
-  | "connected";
+  "disconnected" | "needs_attention" | "connected";
 
 export type IntegrationRecord = {
   id: string;
@@ -200,7 +194,35 @@ export type EmailBuilderDocumentInput = {
   backgroundImageUrl?: string;
   workspaceBackground: string;
   contentWidth: number;
-  frameStyle?: "none" | "hairline" | "accent" | "double" | "dashed" | "top-bottom" | "left-band" | "soft" | "capsule" | "stamp" | "offset" | "inset" | "top-accent" | "bottom-accent" | "right-band" | "editorial" | "ticket" | "window" | "railway" | "archive" | "corner-cut" | "top-ribbon" | "side-lines" | "luxury" | "blueprint" | "poster" | "postcard" | "focus";
+  frameStyle?:
+    | "none"
+    | "hairline"
+    | "accent"
+    | "double"
+    | "dashed"
+    | "top-bottom"
+    | "left-band"
+    | "soft"
+    | "capsule"
+    | "stamp"
+    | "offset"
+    | "inset"
+    | "top-accent"
+    | "bottom-accent"
+    | "right-band"
+    | "editorial"
+    | "ticket"
+    | "window"
+    | "railway"
+    | "archive"
+    | "corner-cut"
+    | "top-ribbon"
+    | "side-lines"
+    | "luxury"
+    | "blueprint"
+    | "poster"
+    | "postcard"
+    | "focus";
   frameColor?: string;
   frameRadius?: number;
   blocks: EmailBuilderBlockInput[];
@@ -269,13 +291,7 @@ export type ImageStudioGenerateResponse = {
 };
 
 export type EmailAiAction =
-  | "brief"
-  | "design"
-  | "compose"
-  | "rewrite"
-  | "shorten"
-  | "subject"
-  | "cta";
+  "brief" | "design" | "compose" | "rewrite" | "shorten" | "subject" | "cta";
 
 export type EmailAiRequest = {
   action: EmailAiAction;
@@ -286,25 +302,50 @@ export type EmailAiRequest = {
   currentPreviewText?: string;
   currentText?: string;
   websiteUrl?: string;
+  ctaLabel?: string;
+  designBrief?: string;
+  socialLinks?: Array<{ label: string; url: string }>;
   primaryColor?: string;
   secondaryColor?: string;
   brandName?: string;
   includeLogo?: boolean;
   visualStyle?: "minimal" | "editorial" | "bold" | "premium";
   imageSource?: "internet" | "generate" | "none";
-  availableAssets?: Array<Pick<EmailAssetRecord, "id" | "filename" | "kind" | "url">>;
+  availableAssets?: Array<
+    Pick<EmailAssetRecord, "id" | "filename" | "kind" | "url">
+  >;
   briefAnswers?: Array<{ question: string; answer: string }>;
 };
 
 export type EmailAiSuggestion = {
-  emailType?: "informational" | "welcome" | "invitation" | "promotion" | "event" | "news" | "notification" | "product_update" | "congratulation" | "transactional";
+  emailType?:
+    | "informational"
+    | "welcome"
+    | "invitation"
+    | "promotion"
+    | "event"
+    | "news"
+    | "notification"
+    | "product_update"
+    | "congratulation"
+    | "transactional";
   subject: string;
   previewText: string;
   body: string;
   cta: string;
   document?: EmailBuilderDocumentInput;
-  imagePrompts?: Array<{ blockId: string; prompt: string; alt: string; kind: "photo" | "logo" }>;
-  questions?: Array<{ id: string; question: string; placeholder: string; required: boolean }>;
+  imagePrompts?: Array<{
+    blockId: string;
+    prompt: string;
+    alt: string;
+    kind: "photo" | "logo";
+  }>;
+  questions?: Array<{
+    id: string;
+    question: string;
+    placeholder: string;
+    required: boolean;
+  }>;
   artDirection?: string;
   contentStrategy?: string;
 };
@@ -321,20 +362,10 @@ export type EmailAiResponse = {
 };
 
 export type PresentationThemeId =
-  | "atelier"
-  | "violet"
-  | "noir"
-  | "ocean"
-  | "sunrise";
+  "atelier" | "violet" | "noir" | "ocean" | "sunrise";
 
 export type PresentationSlideLayout =
-  | "title"
-  | "statement"
-  | "split"
-  | "bullets"
-  | "quote"
-  | "stats"
-  | "closing";
+  "title" | "statement" | "split" | "bullets" | "quote" | "stats" | "closing";
 
 export type PresentationSlide = {
   id: string;
@@ -346,6 +377,9 @@ export type PresentationSlide = {
   speakerNotes: string;
   assetId?: string;
   imageUrl?: string;
+  ctaLabel?: string;
+  ctaUrl?: string;
+  socialLinks?: Array<{ label: string; url: string }>;
 };
 
 export type PresentationSourceType = "blank" | "template" | "ai" | "email";
@@ -399,6 +433,10 @@ export type PresentationAiRequest = {
   tone?: "executive" | "persuasive" | "educational" | "visual";
   slideCount?: number;
   themeId?: PresentationThemeId;
+  ctaLabel?: string;
+  ctaUrl?: string;
+  designBrief?: string;
+  socialLinks?: Array<{ label: string; url: string }>;
 };
 
 export type PresentationAiResponse = {

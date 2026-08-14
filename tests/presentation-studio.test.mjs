@@ -28,7 +28,7 @@ test("presentation studio exposes real creation, editing and save flows", async 
     assert.match(view, new RegExp(control));
   }
   assert.match(view, /searchParams\.get\("new"\) === "1"/);
-  assert.match(view, /router\.replace\(`\/presentations\?id=/);
+  assert.match(view, /router\.replace\(\s*`\/presentations\?id=/);
   assert.match(view, /safeAssetQueryId/);
   assert.match(view, /slidesWithAsset\(requestedAssetId\)/);
   assert.match(view, /imageUrl: `\/api\/assets\/\$\{encodeURIComponent\(assetId\)\}`/);
@@ -87,7 +87,7 @@ test("AI presentation outline follows a narrative and does not invent evidence",
   assert.match(server, /Криптовалюты: возможности, риски и осознанные решения/);
   assert.match(server, /Цифровой рубль: как устроена третья форма российской валюты/);
   assert.match(server, /generationMode: "topic_fallback"/);
-  assert.match(server, /NAVYAI_EMAIL_MODEL\?\.trim\(\) \|\| "gpt-5\.2"/);
+  assert.match(server, /NAVYAI_EMAIL_MODEL\?\.trim\(\)\s*\|\|\s*"gpt-5\.2"/);
   assert.match(server, /GENERATION_LIMIT = 8/);
   assert.match(server, /INSERT INTO ai_request_limits/);
   assert.match(server, /INSERT OR IGNORE INTO ai_idempotency/);
@@ -116,7 +116,7 @@ test("PowerPoint export builds OOXML and only fetches same-origin library assets
   assert.match(exporter, /presentationml\.presentation\.main\+xml/);
   assert.match(exporter, /slideMasters\/slideMaster1\.xml/);
   assert.match(exporter, /if \(!slide\.assetId \|\| !slide\.imageUrl\) return undefined/);
-  assert.match(exporter, /new URL\(`\/api\/assets\/\$\{encodeURIComponent\(slide\.assetId\)\}`/);
+  assert.match(exporter, /new URL\(\s*`\/api\/assets\/\$\{encodeURIComponent\(slide\.assetId\)\}`/);
   assert.match(exporter, /redirect: "error"/);
   assert.match(exporter, /presentationPatternShapes/);
   assert.doesNotMatch(exporter, /new URL\(slide\.imageUrl/);

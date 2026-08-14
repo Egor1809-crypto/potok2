@@ -193,7 +193,9 @@ function blockHtml(block: EmailBuilderBlockInput, accent: string) {
   } else if (block.type === "spacer") {
     content = "&nbsp;";
   } else if (block.type === "social") {
-    content = `<div style="font-family:Arial,sans-serif;font-size:${block.fontSize}px;line-height:1.6;color:${block.textColor};">${block.content.split("|").map((item) => escapeHtml(item.trim())).filter(Boolean).join(" &nbsp;·&nbsp; ")}</div>`;
+    const items = block.content.split("|").map((item) => item.trim()).filter(Boolean);
+    const links = items.length >= 2 && items.length % 2 === 0 && items.every((item, index) => index % 2 === 0 || item.startsWith("https://"));
+    content = `<div style="font-family:Arial,sans-serif;font-size:${block.fontSize}px;line-height:1.6;color:${block.textColor};">${links ? items.flatMap((item, index) => index % 2 === 0 ? [`<a href="${escapeHtml(items[index + 1])}" style="color:${accent};font-weight:600;text-decoration:none;">${escapeHtml(item)}</a>`] : []).join(" &nbsp;·&nbsp; ") : items.map(escapeHtml).join(" &nbsp;·&nbsp; ")}</div>`;
   } else if (block.type === "hero") {
     const [title = "", subtitle = ""] = block.content.split("|");
     content = `<div style="padding:28px;border-radius:${block.borderRadius}px;background:${block.backgroundColor === "transparent" ? "#f3f2ff" : block.backgroundColor};"><div style="font-family:Arial,sans-serif;font-size:${block.fontSize}px;font-weight:700;line-height:1.12;color:${block.textColor};">${lineBreaks(title)}</div><div style="margin-top:12px;font-family:Arial,sans-serif;font-size:16px;line-height:1.55;color:${block.textColor};opacity:.78;">${lineBreaks(subtitle)}</div></div>`;
