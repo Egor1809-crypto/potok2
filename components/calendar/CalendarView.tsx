@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Filter, Play, Plus, UsersRound } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -62,6 +63,8 @@ const statusLabel: Record<CampaignRecord["status"], string> = {
 };
 
 export function CalendarView() {
+  const params = useSearchParams();
+  const targetCampaignId = params.get("campaign");
   const [snapshot, setSnapshot] = React.useState<WorkspaceSnapshot | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [month, setMonth] = React.useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
@@ -87,6 +90,17 @@ export function CalendarView() {
     const frame = window.requestAnimationFrame(() => void load());
     return () => window.cancelAnimationFrame(frame);
   }, [load]);
+
+  React.useEffect(() => {
+    if (!snapshot || !targetCampaignId) return;
+    const campaign = snapshot.campaigns.find((item) => item.id === targetCampaignId);
+    if (!campaign?.scheduledAt) return;
+    const key = dateKeyInTimezone(campaign.scheduledAt, snapshot.workspace.timezone);
+    const [year, monthNumber] = key.split("-").map(Number);
+    if (!year || !monthNumber) return;
+    const frame = window.requestAnimationFrame(() => setMonth(new Date(year, monthNumber - 1, 1)));
+    return () => window.cancelAnimationFrame(frame);
+  }, [snapshot, targetCampaignId]);
 
   const campaigns = React.useMemo(() => {
     if (!snapshot) return [];
@@ -176,15 +190,38 @@ export function CalendarView() {
             const items = campaignsByDay.get(key) ?? [];
             const outside = day.getMonth() !== month.getMonth();
             const today = key === dateKey(new Date());
+            const selected = Boolean(targetCampaignId && items.some((item) => item.id === targetCampaignId));
             return (
-              <div key={key} className={cn("min-h-[118px] border-b border-r border-border p-1.5 sm:min-h-[138px] sm:p-2", outside && "bg-surface-subtle/60")}>
+              <div key={key} className={cn(
+                "min-h-[118px] border-b border-r border-border p-1.5 sm:min-h-[138px] sm:p-2",
+                outside && "bg-surface-subtle/60",
+                items.length > 0 && !outside && "bg-primary/[0.035]",
+                selected && "relative z-[1] ring-2 ring-inset ring-primary",
+              )}>
                 <div className="flex items-center justify-between">
                   <span className={cn("grid size-7 place-items-center rounded-full text-[12px] font-semibold", today ? "bg-primary text-white" : outside ? "text-text-subtle" : "text-text-strong")}>{day.getDate()}</span>
-                  {!outside ? <Link href={`/campaigns/new?scheduledDate=${key}`} aria-label={`Запланировать на ${key}`} className="grid size-7 place-items-center rounded-full text-text-subtle hover:bg-primary/10 hover:text-primary"><Plus className="size-3.5" /></Link> : null}
+                  {!outside ? (
+                    <div className="flex items-center gap-1">
+                      {items.length > 0 ? (
+                        <span
+                          className="inline-flex min-w-6 items-center justify-center gap-1 rounded-full bg-primary px-1.5 py-1 text-[10px] font-bold leading-none text-white"
+                          aria-label={`Рассылок на этот день: ${items.length}`}
+                          title={`Рассылок: ${items.length}`}
+                        >
+                          <span aria-hidden="true" className="size-1.5 rounded-full bg-white" />
+                          {items.length}
+                        </span>
+                      ) : null}
+                      <Link href={`/campaigns/new?scheduledDate=${key}`} aria-label={`Запланировать на ${key}`} className="grid size-7 place-items-center rounded-full text-text-subtle hover:bg-primary/10 hover:text-primary"><Plus className="size-3.5" /></Link>
+                    </div>
+                  ) : null}
                 </div>
                 <div className="mt-1 space-y-1">
                   {items.slice(0, 3).map((campaign) => (
-                    <Link key={campaign.id} href={`/campaigns/${campaign.id}`} className="block rounded-lg border border-primary/15 bg-primary/[0.06] p-1.5 hover:border-primary/40">
+                    <Link key={campaign.id} href={`/campaigns/${campaign.id}`} className={cn(
+                      "block rounded-lg border border-primary/15 bg-white/85 p-1.5 shadow-[0_1px_2px_rgba(17,24,39,0.04)] hover:border-primary/40",
+                      campaign.id === targetCampaignId && "border-primary bg-primary/[0.09] ring-1 ring-primary/25",
+                    )}>
                       <div className="flex items-center gap-1 text-[10px] font-semibold text-primary"><Clock3 className="size-3" />{formatTime(campaign.scheduledAt!, snapshot?.workspace.timezone ?? "Europe/Moscow")}</div>
                       <div className="mt-0.5 truncate text-[11px] font-semibold text-text-strong">{campaign.subject || campaign.name}</div>
                       <div className="mt-0.5 flex items-center gap-1 truncate text-[10px] text-text-muted"><UsersRound className="size-3 shrink-0" />{snapshot ? audienceLabel(campaign, snapshot) : ""}</div>

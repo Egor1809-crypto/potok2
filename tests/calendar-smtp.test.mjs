@@ -21,8 +21,12 @@ test("calendar connects scheduled campaigns, audience filters and the due queue"
   assert.match(calendar, /Тема, название или группа/);
   assert.match(calendar, /Все группы/);
   assert.match(calendar, /scheduledDate=/);
+  assert.match(calendar, /Рассылок на этот день/);
+  assert.match(calendar, /targetCampaignId/);
   assert.match(wizard, /scheduledAt/);
   assert.match(wizard, /Поставить в календарь/);
+  assert.match(wizard, /Дата сохранена — рассылка отмечена в календаре как черновик/);
+  assert.match(wizard, /Показать в календаре/);
   assert.match(store, /eq\(campaigns\.status, "scheduled"\)/);
   assert.match(store, /lte\(campaigns\.scheduledAt, now\)/);
   assert.match(worker, /scheduled\(_controller/);

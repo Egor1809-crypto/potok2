@@ -451,7 +451,8 @@ function CampaignWizardState({
   const [notice, setNotice] = React.useState<string | null>(null);
   const [evaluation, setEvaluation] = React.useState<Evaluation | null>(null);
   const [setupDialogOpen, setSetupDialogOpen] = React.useState(false);
-  const [finishedCampaign, setFinishedCampaign] = React.useState<{ id: string; status: string } | null>(null);
+  const [finishedCampaign, setFinishedCampaign] = React.useState<{ id: string; status: string; scheduledAt: string | null } | null>(null);
+  const scheduleSaveTimer = React.useRef<number | null>(null);
   const hydratedCampaignId = React.useRef<string | null>(null);
   const hydratedQueryTemplateId = React.useRef<string | null>(null);
   const recoveredCampaignId = seedDraft?.campaignId;
@@ -766,7 +767,11 @@ function CampaignWizardState({
     scheduledAt,
   });
 
-  const mutateCampaign = async (action: "save" | "launch") => {
+  const mutateCampaign = async (
+    action: "save" | "launch",
+    payloadOverride?: CampaignCreateInput,
+    successNotice?: string,
+  ) => {
     if (action === "launch" && clientBlockers.some((blocker) => !blocker.includes("не подключён"))) {
       setEvaluation({ status: "blocked", eligibleByChannel: {}, blockers: clientBlockers });
       setError("Исправьте обязательные поля перед серверной проверкой.");
@@ -778,12 +783,13 @@ function CampaignWizardState({
     setError(null);
     setNotice(null);
     try {
+      const payload = payloadOverride ?? campaignPayload();
       let id = campaignId;
       const createDraft = async () => {
         const createResponse = await fetch("/api/campaigns", {
           method: "POST",
           headers: { "Content-Type": "application/json", Accept: "application/json" },
-          body: JSON.stringify(campaignPayload()),
+          body: JSON.stringify(payload),
         });
         const createBody = await createResponse.json() as CampaignMutationResponse | ApiError;
         if (!createResponse.ok || !("campaign" in createBody)) {
@@ -798,7 +804,7 @@ function CampaignWizardState({
         const response = await fetch("/api/campaigns", {
           method: "PATCH",
           headers: { "Content-Type": "application/json", Accept: "application/json" },
-          body: JSON.stringify({ id: campaignDraftId, ...campaignPayload(), action }),
+          body: JSON.stringify({ id: campaignDraftId, ...payload, action }),
         });
         const body = await response.json() as CampaignMutationResponse | ApiError;
         return { response, body };
@@ -821,7 +827,7 @@ function CampaignWizardState({
       setApiMode("online");
       setCampaignId(body.campaign.id);
       if (action === "save") {
-        setNotice("Черновик сохранён в рабочем пространстве.");
+        setNotice(successNotice ?? "Черновик сохранён в рабочем пространстве.");
         return;
       }
 
@@ -843,6 +849,7 @@ function CampaignWizardState({
         setFinishedCampaign({
           id: body.campaign.id,
           status: body.campaign.status ?? serverEvaluation.status ?? "ready",
+          scheduledAt: body.campaign.scheduledAt,
         });
       }
     } catch (mutationError) {
@@ -853,6 +860,26 @@ function CampaignWizardState({
       setBusyAction(null);
     }
   };
+
+  const changeSchedule = (next: string | null) => {
+    setScheduledAt(next);
+    setEvaluation(null);
+    if (scheduleSaveTimer.current !== null) window.clearTimeout(scheduleSaveTimer.current);
+    scheduleSaveTimer.current = window.setTimeout(() => {
+      scheduleSaveTimer.current = null;
+      void mutateCampaign(
+        "save",
+        { name: campaignName.trim() || "Новая рассылка", scheduledAt: next },
+        next
+          ? "Дата сохранена — рассылка отмечена в календаре как черновик."
+          : "Расписание убрано из календаря.",
+      );
+    }, 500);
+  };
+
+  React.useEffect(() => () => {
+    if (scheduleSaveTimer.current !== null) window.clearTimeout(scheduleSaveTimer.current);
+  }, []);
 
   if (finishedCampaign) {
     return (
@@ -871,6 +898,11 @@ function CampaignWizardState({
           </p>
           <div className="mt-7 flex flex-col justify-center gap-2 sm:flex-row">
             <Link href="/campaigns" className={buttonVariants({ variant: "secondary" })}>Все рассылки</Link>
+            {finishedCampaign.scheduledAt ? (
+              <Link href={`/calendar?campaign=${encodeURIComponent(finishedCampaign.id)}`} className={buttonVariants({ variant: "secondary" })}>
+                Показать в календаре
+              </Link>
+            ) : null}
             <Link href={`/campaigns/${finishedCampaign.id}`} className={buttonVariants({ variant: "primary" })}>
               Открыть кампанию
               <ArrowRight aria-hidden="true" className="size-4" />
@@ -1072,7 +1104,7 @@ function CampaignWizardState({
               evaluation={evaluation}
               manualVkWorkspace={channels.includes("email") && providers.email === "vk-workspace"}
               scheduledAt={scheduledAt}
-              onScheduledAtChange={setScheduledAt}
+              onScheduledAtChange={changeSchedule}
               minimumScheduledAt={minimumScheduledAt}
             />
           ) : null}
