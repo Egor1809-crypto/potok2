@@ -2187,6 +2187,22 @@ function renderContactTemplate(value: string, contact: ContactRecord) {
   });
 }
 
+function localEmailAssetUrls(campaign: CampaignRecord) {
+  return (campaign.emailBuilderDocument?.blocks ?? [])
+    .filter((block) => block.type === "image" || block.type === "logo")
+    .map((block) => block.href)
+    .filter((href): href is string => Boolean(href))
+    .filter((href) => {
+      try {
+        const url = new URL(href);
+        const host = url.hostname.toLocaleLowerCase("en");
+        return host === "localhost" || host === "127.0.0.1" || host === "::1" || host.endsWith(".local");
+      } catch {
+        return false;
+      }
+    });
+}
+
 async function evaluateLaunch(
   request: Request,
   campaignId: string,
@@ -2214,6 +2230,11 @@ async function evaluateLaunch(
   if (unknownTokens.length) {
     blockers.push(
       `Неизвестные поля персонализации: ${unknownTokens.map((token) => `{{${token}}}`).join(", ")}.`,
+    );
+  }
+  if (localEmailAssetUrls(campaign).length) {
+    blockers.push(
+      "В письме есть изображение с локального адреса. Откройте и сохраните шаблон на опубликованном домене «Потока», затем повторите проверку — иначе получатель не увидит картинку.",
     );
   }
   if (!audience.length) blockers.push("В аудитории нет подходящих контактов.");

@@ -151,6 +151,13 @@ export function DashboardView() {
   const nextAction = getNextAction(snapshot);
   const participantName = snapshot.participant.displayName || "Участник";
   const firstName = participantName.split(" ")[0];
+  const connectedEmailProvider = snapshot.integrations.some(
+    (integration) =>
+      integration.enabled &&
+      integration.status === "connected" &&
+      integration.deliveryMode === "automatic" &&
+      integration.channels.includes("email"),
+  );
   const metrics = [
     { label: "Шаблоны", value: number.format(snapshot.templates.length), note: "Макеты можно редактировать и клонировать", Icon: LibraryBig, href: "/templates", iconTone: "bg-primary-subtle text-text-strong border-border-strong" },
     { label: "Презентации", value: number.format(creativeCounts.presentations), note: "Сохранённые редактируемые проекты", Icon: GalleryHorizontalEnd, href: "/presentations", iconTone: "bg-surface-subtle text-text-strong border-border-strong" },
@@ -232,12 +239,12 @@ export function DashboardView() {
         <div className="card p-5 sm:p-6">
           <div className="flex items-center justify-between gap-3"><div><h2 className="text-[15px] font-semibold">Готовность к рассылке</h2><p className="mt-1 text-[11px] text-[var(--text-subtle)]">Проверяется перед каждым запуском</p></div><Check aria-hidden="true" className="size-5 text-[var(--success)]" /></div>
           <ol className="mt-5 space-y-1">
-            <ReadinessStep ready={snapshot.stats.totalContacts > 0} label="Есть контакты" action="Добавить" href="/contacts" />
-            <ReadinessStep ready={snapshot.stats.totalSegments > 0} label="Есть сохранённая аудитория" action="Создать" href="/segments" />
-            <ReadinessStep ready={snapshot.stats.connectedIntegrations > 0} label="Подключён хотя бы один канал" action="Подключить" href="/integrations" />
+            <ReadinessStep ready={snapshot.templates.length > 0} label="Есть шаблон письма" action="Создать" href="/email-builder?new=1" />
+            <ReadinessStep ready={snapshot.stats.totalContacts > 0} label="Есть получатели" action="Добавить" href="/contacts" />
+            <ReadinessStep ready={connectedEmailProvider} label="Подключён Email-провайдер" action="Подключить" href="/integrations" />
             <ReadinessStep ready={recentCampaigns.some((campaign) => campaign.status === "ready" || campaign.status === "scheduled")} label="Есть проверенная кампания" action="Проверить" href="/campaigns" />
           </ol>
-          <p className="mt-5 rounded-xl bg-[var(--surface-subtle)] p-3 text-[11px] leading-5 text-[var(--text-muted)]">Запуск не изображается как успешная отправка: без настроенного провайдера кампания получает статус «Нужна настройка» и показывает причину.</p>
+          <p className="mt-5 rounded-xl bg-[var(--surface-subtle)] p-3 text-[11px] leading-5 text-[var(--text-muted)]">Для разовой рассылки достаточно выбрать конкретных получателей — сохранённый сегмент не обязателен. Перед запуском «Поток» повторно проверит провайдера, согласие и содержание письма.</p>
         </div>
       </section>
     </div>
