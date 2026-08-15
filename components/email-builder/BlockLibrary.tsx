@@ -38,9 +38,12 @@ import type { LucideIcon } from "lucide-react";
 
 import type { EmailBlockType } from "@/types";
 import { cn } from "@/components/ui/utils";
-import type { BuilderDocument } from "./builder-types";
+import type { BuilderBlock, BuilderDocument } from "./builder-types";
 import { emailFrameCss, emailFramePresets } from "./frame-presets";
-import { emailPatternCategoryLabels, emailPatternPresets } from "./pattern-presets";
+import { emailBackgroundPresets, emailPatternCategoryLabels, emailPatternPresets } from "./pattern-presets";
+
+const PRODUCTION_ORIGIN = "https://mailflow-outreach.isakovegor820.chatgpt.site";
+const localAsset = (url: string) => url.startsWith(PRODUCTION_ORIGIN) ? url.slice(PRODUCTION_ORIGIN.length) : url;
 
 export type BlockLibraryItem = {
   type: EmailBlockType;
@@ -66,7 +69,7 @@ export const blockLibrary: BlockLibraryItem[] = [
   { type: "stats", label: "Показатели", description: "Цифры и результаты", icon: ChartNoAxesColumnIncreasing },
   { type: "product", label: "Карточка", description: "Продукт или услуга", icon: PackageOpen },
   { type: "signature", label: "Подпись", description: "Отправитель и контакты", icon: ContactRound },
-  { type: "pattern", label: "Узор", description: "64 орнамента и контура", icon: Shapes },
+  { type: "pattern", label: "Узор", description: "30 технологических фонов", icon: Shapes },
   { type: "banner", label: "Баннер", description: "Яркое объявление", icon: Megaphone },
   { type: "timeline", label: "Этапы", description: "Путь или программа", icon: ListTree },
   { type: "faq", label: "Вопросы", description: "Вопросы и ответы", icon: CircleHelp },
@@ -87,7 +90,7 @@ export function BlockLibrary({
   onUpdateDocument,
   className,
 }: {
-  onAdd: (type: EmailBlockType, patch?: { content?: string; fontSize?: number; letterSpacing?: number }) => void;
+  onAdd: (type: EmailBlockType, patch?: Partial<BuilderBlock>) => void;
   document: BuilderDocument;
   onUpdateDocument: (patch: Partial<BuilderDocument>) => void;
   className?: string;
@@ -148,7 +151,33 @@ export function BlockLibrary({
           </div>
         ) : tab === "decor" ? (
           <div className="space-y-4">
-            <p className="m-0 text-[10px] leading-4 text-text-muted">Орнамент добавится отдельным редактируемым блоком. Его можно поставить в шапку, между секциями или в финал письма.</p>
+            <section aria-labelledby="brand-backgrounds">
+              <h3 id="brand-backgrounds" className="mb-1 mt-0 text-[10px] font-semibold text-text-strong">Фоны «Технологий права»</h3>
+              <p className="mb-2 mt-0 text-[9px] leading-4 text-text-muted">Фон применяется ко всему письму. Текст и кнопки остаются отдельными редактируемыми блоками поверх изображения.</p>
+              <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Фон письма">
+                {emailBackgroundPresets.map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={document.backgroundImageUrl === preset.imageUrl}
+                    onClick={() => onUpdateDocument({
+                      backgroundImageUrl: preset.imageUrl,
+                      bodyBackground: preset.bodyBackground,
+                      workspaceBackground: preset.workspaceBackground,
+                    })}
+                    className="min-w-0 rounded-[9px] border border-border bg-surface p-1.5 text-left outline-none transition hover:border-primary/40 focus-visible:ring-2 focus-visible:ring-primary/30 aria-checked:border-primary aria-checked:ring-2 aria-checked:ring-primary/20"
+                  >
+                    <span className="block aspect-[2/3] max-h-24 rounded-md bg-cover bg-center" style={{ backgroundImage: `url(${JSON.stringify(localAsset(preset.imageUrl))})` }} />
+                    <span className="mt-1.5 block truncate text-[9px] font-semibold text-text-strong">{preset.name}</span>
+                  </button>
+                ))}
+              </div>
+              {document.backgroundImageUrl ? (
+                <button type="button" onClick={() => onUpdateDocument({ backgroundImageUrl: undefined })} className="mt-2 text-[9px] font-semibold text-primary hover:underline">Убрать фон</button>
+              ) : null}
+            </section>
+            <p className="m-0 border-t border-border/70 pt-4 text-[10px] leading-4 text-text-muted">Узор добавится отдельной фоновой плашкой. После добавления замените текст на свой.</p>
             {(Object.keys(emailPatternCategoryLabels) as Array<keyof typeof emailPatternCategoryLabels>).map((category) => (
               <section key={category} aria-labelledby={`pattern-${category}`}>
                 <h3 id={`pattern-${category}`} className="mb-2 mt-0 text-[10px] font-semibold text-text-strong">{emailPatternCategoryLabels[category]}</h3>
@@ -157,10 +186,19 @@ export function BlockLibrary({
                     <button
                       key={preset.id}
                       type="button"
-                      onClick={() => onAdd("pattern", { content: preset.content, fontSize: preset.fontSize, letterSpacing: preset.letterSpacing })}
+                      onClick={() => onAdd("pattern", {
+                        content: preset.content,
+                        href: preset.imageUrl,
+                        fontSize: preset.fontSize,
+                        letterSpacing: preset.letterSpacing,
+                        textColor: preset.textColor,
+                        fontWeight: 700,
+                        lineHeight: 125,
+                        borderRadius: 12,
+                      })}
                       className="min-w-0 rounded-[9px] border border-border bg-surface p-2 text-left outline-none transition hover:border-primary/40 hover:bg-primary-subtle/35 focus-visible:ring-2 focus-visible:ring-primary/30"
                     >
-                      <span aria-hidden="true" className="block h-9 overflow-hidden whitespace-pre-line rounded-md bg-primary-subtle/70 px-1 py-1 text-center text-[7px] leading-3 text-primary">{preset.content}</span>
+                      <span aria-hidden="true" className="block h-9 rounded-md bg-cover bg-center" style={{ backgroundImage: `url(${JSON.stringify(localAsset(preset.imageUrl))})` }} />
                       <span className="mt-1.5 block truncate text-[9px] font-semibold text-text-strong">{preset.name}</span>
                     </button>
                   ))}

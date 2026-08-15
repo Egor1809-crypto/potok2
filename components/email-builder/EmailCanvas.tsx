@@ -38,7 +38,10 @@ type EmailCanvasProps = {
 const PROTECTED_SITE_ORIGIN = "https://mailflow-outreach.isakovegor820.chatgpt.site";
 
 function previewImageSource(href: string) {
-  if (href.startsWith(`${PROTECTED_SITE_ORIGIN}/conference-series/`)) {
+  if (
+    href.startsWith(`${PROTECTED_SITE_ORIGIN}/conference-series/`) ||
+    href.startsWith(`${PROTECTED_SITE_ORIGIN}/email-brand/`)
+  ) {
     return href.slice(PROTECTED_SITE_ORIGIN.length);
   }
   return href;
@@ -114,7 +117,7 @@ export function EmailCanvas({
                 ? `url(${JSON.stringify(document.backgroundImageUrl)})`
                 : undefined,
               backgroundPosition: "center top",
-              backgroundRepeat: "repeat",
+              backgroundRepeat: "no-repeat",
               backgroundSize: "cover",
               ...emailFrameCss(
                 document.frameStyle,
@@ -824,11 +827,12 @@ function BlockContent({
   }
 
   if (block.type === "pattern") {
+    const patternImage = block.href ? previewImageSource(block.href) : undefined;
     return (
       <div
-        aria-hidden="true"
-        className="whitespace-pre-line py-2.5 text-center font-normal"
+        className="flex min-h-[88px] items-center justify-center whitespace-pre-line bg-cover bg-center px-5 py-4 text-center font-semibold"
         style={{
+          backgroundImage: patternImage ? `url(${JSON.stringify(patternImage)})` : undefined,
           backgroundColor:
             block.backgroundColor === "transparent"
               ? `${accentColor}12`
@@ -841,7 +845,7 @@ function BlockContent({
           lineHeight: block.lineHeight / 100,
         }}
       >
-        {block.content}
+        {renderTokens(block.content)}
       </div>
     );
   }

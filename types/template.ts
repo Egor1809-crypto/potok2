@@ -70,6 +70,7 @@ export interface EmailTemplate {
   accentColor: string;
   backgroundColor: string;
   bodyBackground?: string;
+  backgroundImageUrl?: string;
   contentWidth?: number;
   frameStyle?: "none" | "hairline" | "accent" | "double" | "dashed" | "top-bottom" | "left-band" | "soft" | "capsule" | "stamp" | "offset" | "inset" | "top-accent" | "bottom-accent" | "right-band" | "editorial" | "ticket" | "window" | "railway" | "archive" | "corner-cut" | "top-ribbon" | "side-lines" | "luxury" | "blueprint" | "poster" | "postcard" | "focus";
   frameColor?: string;

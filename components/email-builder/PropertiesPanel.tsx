@@ -39,6 +39,9 @@ import { getBlockLabel } from "./BlockLibrary";
 import { ImageAssetPicker } from "./ImageAssetPicker";
 import { emailPatternPresets } from "./pattern-presets";
 
+const PRODUCTION_ORIGIN = "https://mailflow-outreach.isakovegor820.chatgpt.site";
+const localAsset = (url: string) => url.startsWith(PRODUCTION_ORIGIN) ? url.slice(PRODUCTION_ORIGIN.length) : url;
+
 const personalizationFields = [
   { label: "Имя", token: "{{first_name}}", example: "Иван" },
   { label: "Фамилия", token: "{{last_name}}", example: "Петров" },
@@ -262,11 +265,11 @@ export function PropertiesPanel({
         {block.type === "pattern" ? (
           <PropertySection icon={Shapes} title="Рисунок узора">
             <p className="m-0 text-[10px] leading-4 text-text-muted">
-              Выберите основу, затем настройте её размер, воздух и цвета ниже.
+              Выберите фон, затем напишите свой текст и настройте его ниже.
             </p>
             <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Вариант узора">
               {emailPatternPresets.map((preset) => {
-                const selected = block.content === preset.content;
+                const selected = block.href === preset.imageUrl;
                 return (
                   <button
                     key={preset.id}
@@ -274,7 +277,8 @@ export function PropertiesPanel({
                     role="radio"
                     aria-checked={selected}
                     onClick={() => onUpdateBlock({
-                      content: preset.content,
+                      href: preset.imageUrl,
+                      textColor: preset.textColor,
                       fontSize: preset.fontSize,
                       letterSpacing: preset.letterSpacing,
                       lineHeight: 115,
@@ -284,10 +288,9 @@ export function PropertiesPanel({
                   >
                     <span
                       aria-hidden="true"
-                      className="block h-8 overflow-hidden whitespace-pre-line rounded-md bg-primary-subtle px-1 py-1 text-center text-[8px] leading-3 text-primary"
-                    >
-                      {preset.content}
-                    </span>
+                      className="block h-8 rounded-md bg-cover bg-center"
+                      style={{ backgroundImage: `url(${JSON.stringify(localAsset(preset.imageUrl))})` }}
+                    />
                     <span className="mt-1.5 block truncate text-[10px] font-semibold text-text-strong">{preset.name}</span>
                   </button>
                 );

@@ -230,6 +230,7 @@ export function starterEmailTemplateValues(): StarterEmailTemplateValue[] {
       previewText: template.previewText,
       accentColor: template.accentColor,
       bodyBackground: template.bodyBackground ?? "#ffffff",
+      backgroundImageUrl: template.backgroundImageUrl,
       workspaceBackground: template.backgroundColor,
       contentWidth: template.contentWidth ?? 640,
       frameStyle: template.frameStyle ?? "none",

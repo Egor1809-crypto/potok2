@@ -332,25 +332,23 @@ test("pattern gallery offers varied email-safe designs", async () => {
       "utf8",
     ),
   ]);
-  assert.ok((presets.match(/id: "/g) ?? []).length >= 32);
+  const patternNames = presets.match(/const patternNames = \[([\s\S]*?)\] as const;/)?.[1] ?? "";
+  assert.equal((patternNames.match(/"[^"]+"/g) ?? []).length, 30);
   for (const name of [
-    "Искры",
-    "Точки",
-    "Сетка",
-    "Ромбы",
-    "Волны",
-    "Конфетти",
-    "Арт-деко",
-    "Мягкие углы",
-    "Техноуглы",
-    "Микропечать",
+    "Схема и импульс",
+    "Ночная плата",
+    "Глобальная сеть",
+    "Золотая плата",
+    "Умный город",
   ])
     assert.match(presets, new RegExp(name));
   assert.match(properties, /title="Рисунок узора"/);
   assert.match(properties, /label="Масштаб"/);
   assert.match(properties, /label="Расстояние"/);
   assert.match(canvas, /whitespace-pre-line/);
+  assert.match(canvas, /backgroundImage: patternImage/);
   assert.match(compiler, /letter-spacing:\$\{tracking\}px/);
+  assert.match(compiler, /background-position:center/);
 });
 
 test("a new letter starts empty and offers full-email frame presets", async () => {
@@ -632,7 +630,7 @@ test("NavyAI uses its supported chat endpoint and a working structured-output fa
   assert.match(server, /\(\?:responses\|chat\\\/completions\)/);
 });
 
-test("decor library now contains sixty-four motifs and twenty-eight email frames", async () => {
+test("decor library contains thirty supplied image motifs and twenty-eight email frames", async () => {
   const [patterns, frames, compiler, builder, library] = await Promise.all([
     readFile(
       new URL(
@@ -661,20 +659,21 @@ test("decor library now contains sixty-four motifs and twenty-eight email frames
       "utf8",
     ),
   ]);
-  assert.equal((patterns.match(/\{ id: "/g) ?? []).length, 64);
+  const patternNames = patterns.match(/const patternNames = \[([\s\S]*?)\] as const;/)?.[1] ?? "";
+  assert.equal((patternNames.match(/"[^"]+"/g) ?? []).length, 30);
   assert.equal((frames.match(/\{ id: "/g) ?? []).length, 28);
   for (const category of [
-    "Ботанические",
-    "Ретро и печать",
-    "Цифровые",
-    "Праздничные",
+    "Светлые технологии",
+    "Тёмные технологии",
+    "Сети и данные",
+    "Безопасность",
   ])
     assert.match(patterns, new RegExp(category));
   for (const name of [
-    "Вьюнок",
-    "Почтовые марки",
-    "Микросхема",
-    "Фейерверк",
+    "Схема и импульс",
+    "Ночная плата",
+    "Защищённый контур",
+    "Умный город",
     "Билет",
     "Окно",
     "Архив",
@@ -697,7 +696,8 @@ test("decor library now contains sixty-four motifs and twenty-eight email frames
     assert.match(compiler, new RegExp(`"${id}"`));
     assert.match(builder, new RegExp(`"${id}"`));
   }
-  assert.match(library, /64 орнамента и контура/);
+  assert.match(library, /30 технологических фонов/);
+  assert.match(library, /Фоны «Технологий права»/);
 });
 
 test("creative expansion adds seventy more scenario-led studio templates", async () => {

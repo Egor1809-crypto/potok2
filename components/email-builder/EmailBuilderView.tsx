@@ -609,7 +609,7 @@ function EmailBuilderWorkspace({
 
   const addBlock = (
     type: EmailBlockType,
-    patch?: { content?: string; fontSize?: number; letterSpacing?: number },
+    patch?: Partial<BuilderBlock>,
   ) => {
     const block = { ...createBlock(type), ...patch };
     mutateDocument((current) => {
