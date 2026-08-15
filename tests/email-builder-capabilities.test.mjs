@@ -238,9 +238,7 @@ test("manual controls and export are wired to live updates without popup PDF", a
   assert.match(exports, /contentDocument/);
   assert.match(exports, /html2canvas/);
   assert.match(exports, /application\/pdf/);
-  assert.match(exports, /makeHtmlSelfContained/);
-  assert.match(exports, /readAsDataURL/);
-  assert.match(exports, /portableHtml/);
+  assert.match(exports, /email-export\?portable=1/);
   assert.doesNotMatch(exports, /window\.open/);
 });
 

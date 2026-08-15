@@ -53,6 +53,14 @@ function validSignature(bytes: Uint8Array, mime: AllowedMime) {
   return bytes.length >= 6 && new TextDecoder().decode(bytes.slice(0, 6)).startsWith("GIF8");
 }
 
+function bytesToBase64(bytes: Uint8Array) {
+  let binary = "";
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+  }
+  return btoa(binary);
+}
+
 async function persistEmailAsset(request: Request, bytes: Uint8Array, mimeType: AllowedMime, filename: string, kind: "photo" | "logo") {
   const id = newId("asset");
   const extension = mimeType === "image/png" ? "png" : mimeType === "image/gif" ? "gif" : mimeType === "image/webp" ? "webp" : "jpg";
@@ -178,6 +186,27 @@ export async function getEmailAsset(request: Request, idValue: unknown): Promise
   return new Response(object.body, {
     headers,
   });
+}
+
+export async function getEmailAssetDataUrl(
+  request: Request,
+  idValue: unknown,
+): Promise<string> {
+  await ensureDatabase(request);
+  const id = cleanText(idValue, "Изображение", 160);
+  const [row] = await getDb()
+    .select()
+    .from(emailAssets)
+    .where(and(eq(emailAssets.id, id), eq(emailAssets.workspaceId, WORKSPACE_ID)))
+    .limit(1);
+  if (!row) throw new ApiRequestError("Изображение из медиатеки не найдено.", 404);
+  const object = await bucket().get(row.objectKey);
+  if (!object) throw new ApiRequestError("Файл изображения не найден в хранилище.", 404);
+  const bytes = new Uint8Array(await object.arrayBuffer());
+  if (bytes.byteLength < 1 || bytes.byteLength > MAX_GENERATED_IMAGE_BYTES) {
+    throw new ApiRequestError("Изображение нельзя встроить в файл: недопустимый размер.", 413);
+  }
+  return `data:${row.mimeType};base64,${bytesToBase64(bytes)}`;
 }
 
 export async function deleteEmailAsset(request: Request, idValue: unknown) {

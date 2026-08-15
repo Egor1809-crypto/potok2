@@ -27,82 +27,6 @@ function saveBlob(content: BlobPart, type: string, filename: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
 }
 
-function blobAsDataUrl(blob: Blob) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.addEventListener("load", () => {
-      if (typeof reader.result === "string") resolve(reader.result);
-      else reject(new Error("Не удалось встроить изображение в файл."));
-    }, { once: true });
-    reader.addEventListener("error", () => reject(new Error("Не удалось прочитать изображение.")), { once: true });
-    reader.readAsDataURL(blob);
-  });
-}
-
-async function downloadImageAsDataUrl(source: string) {
-  if (source.startsWith("data:")) return source;
-  const url = new URL(source, window.location.href);
-  const response = await fetch(url, {
-    credentials: url.origin === window.location.origin ? "same-origin" : "omit",
-    headers: { Accept: "image/avif,image/webp,image/png,image/jpeg,image/gif,image/svg+xml" },
-  });
-  if (!response.ok) throw new Error(`Изображение «${url.pathname.split("/").pop() || url.hostname}» недоступно.`);
-  const blob = await response.blob();
-  if (!blob.type.startsWith("image/") || blob.size < 1) {
-    throw new Error("Один из файлов в письме не является изображением.");
-  }
-  if (blob.size > 10 * 1024 * 1024) {
-    throw new Error("Изображение больше 10 МБ. Сожмите его и повторите экспорт.");
-  }
-  return blobAsDataUrl(blob);
-}
-
-/**
- * Turns an exported email into one portable file. Uploaded images normally
- * point at /api/assets, which works in the editor but not after the HTML is
- * moved to another computer. Embedding the bytes also makes PDF rendering
- * deterministic and independent of authentication, CORS and network timing.
- */
-async function makeHtmlSelfContained(html: string) {
-  const parsed = new DOMParser().parseFromString(html, "text/html");
-  const sources = new Set<string>();
-  parsed.querySelectorAll<HTMLImageElement>("img[src]").forEach((image) => {
-    if (image.src) sources.add(image.src);
-  });
-  parsed.querySelectorAll<HTMLElement>("[background]").forEach((element) => {
-    const source = element.getAttribute("background");
-    if (source) sources.add(new URL(source, window.location.href).toString());
-  });
-  parsed.querySelectorAll<HTMLElement>("[style]").forEach((element) => {
-    const source = element.style.backgroundImage.match(/^url\(["']?(.*?)["']?\)$/)?.[1];
-    if (source) sources.add(new URL(source, window.location.href).toString());
-  });
-
-  const embedded = new Map<string, string>();
-  await Promise.all([...sources].map(async (source) => {
-    embedded.set(source, await downloadImageAsDataUrl(source));
-  }));
-
-  parsed.querySelectorAll<HTMLImageElement>("img[src]").forEach((image) => {
-    const replacement = embedded.get(image.src);
-    if (replacement) image.src = replacement;
-  });
-  parsed.querySelectorAll<HTMLElement>("[background]").forEach((element) => {
-    const source = element.getAttribute("background");
-    if (!source) return;
-    const replacement = embedded.get(new URL(source, window.location.href).toString());
-    if (replacement) element.setAttribute("background", replacement);
-  });
-  parsed.querySelectorAll<HTMLElement>("[style]").forEach((element) => {
-    const source = element.style.backgroundImage.match(/^url\(["']?(.*?)["']?\)$/)?.[1];
-    if (!source) return;
-    const replacement = embedded.get(new URL(source, window.location.href).toString());
-    if (replacement) element.style.backgroundImage = `url("${replacement}")`;
-  });
-
-  return `<!doctype html>${parsed.documentElement.outerHTML}`;
-}
-
 async function renderPdf(html: string) {
   const frame = window.document.createElement("iframe");
   frame.setAttribute("aria-hidden", "true");
@@ -174,7 +98,7 @@ export function EmailExportMenu({ document, name }: { document: BuilderDocument;
   }, [dialog]);
 
   const compiled = async () => {
-    const response = await fetch("/api/email-export", {
+    const response = await fetch("/api/email-export?portable=1", {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify(document),
@@ -194,18 +118,15 @@ export function EmailExportMenu({ document, name }: { document: BuilderDocument;
         for (let index = 1; index <= copies; index += 1) saveBlob(JSON.stringify(document, null, 2), "application/json;charset=utf-8", `${filename}${copies > 1 ? `-${index}` : ""}.mailflow.json`);
       } else {
         const result = await compiled();
-        const portableHtml = format === "html" || format === "doc" || format === "pdf"
-          ? await makeHtmlSelfContained(result.html)
-          : result.html;
-        if (format === "html") for (let index = 1; index <= copies; index += 1) saveBlob(portableHtml, "text/html;charset=utf-8", `${filename}${copies > 1 ? `-${index}` : ""}.html`);
+        if (format === "html") for (let index = 1; index <= copies; index += 1) saveBlob(result.html, "text/html;charset=utf-8", `${filename}${copies > 1 ? `-${index}` : ""}.html`);
         if (format === "txt") for (let index = 1; index <= copies; index += 1) saveBlob(result.text, "text/plain;charset=utf-8", `${filename}${copies > 1 ? `-${index}` : ""}.txt`);
         if (format === "doc") {
-          const wordBody = new DOMParser().parseFromString(portableHtml, "text/html").body.innerHTML;
+          const wordBody = new DOMParser().parseFromString(result.html, "text/html").body.innerHTML;
           const wordHtml = `<!doctype html><html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" lang="ru"><head><meta charset="utf-8"><title>${filename}</title></head><body>${wordBody}</body></html>`;
           for (let index = 1; index <= copies; index += 1) saveBlob(wordHtml, "application/msword;charset=utf-8", `${filename}${copies > 1 ? `-${index}` : ""}.doc`);
         }
         if (format === "pdf") {
-          const pdf = await renderPdf(portableHtml);
+          const pdf = await renderPdf(result.html);
           for (let index = 1; index <= copies; index += 1) saveBlob(pdf, "application/pdf", `${filename}${copies > 1 ? `-${index}` : ""}.pdf`);
           const downloadName = `${filename}.pdf`;
           setDialog({ title: "PDF готов", message: copies === 1 ? "Скачивание началось. Если браузер его остановил, нажмите кнопку ниже." : `Подготовлено файлов: ${copies}. Если браузер остановил загрузки, скачайте первый файл кнопкой ниже.`, download: { url: URL.createObjectURL(pdf), filename: downloadName } });
