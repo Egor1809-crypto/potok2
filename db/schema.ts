@@ -63,12 +63,62 @@ export const participants = sqliteTable(
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
     authUserId: text("auth_user_id"),
+    login: text("login"),
+    passwordHash: text("password_hash"),
+    passwordSalt: text("password_salt"),
     displayName: text("display_name").notNull(),
     email: text("email").notNull(),
+    color: text("color").notNull().default("#6558E8"),
+    status: text("status").notNull().default("active"),
+    lastLoginAt: text("last_login_at"),
     ...timestamps,
   },
   (table) => [
-    uniqueIndex("idx_participants_workspace_singleton").on(table.workspaceId),
+    uniqueIndex("idx_participants_workspace_login")
+      .on(table.workspaceId, table.login)
+      .where(sql`${table.login} IS NOT NULL`),
+    index("idx_participants_workspace_status").on(table.workspaceId, table.status),
+  ],
+);
+
+export const authSessions = sqliteTable(
+  "auth_sessions",
+  {
+    id: text("id").primaryKey(),
+    participantId: text("participant_id")
+      .notNull()
+      .references(() => participants.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: text("expires_at").notNull(),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    lastSeenAt: text("last_seen_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("idx_auth_sessions_token_hash").on(table.tokenHash),
+    index("idx_auth_sessions_participant").on(table.participantId),
+    index("idx_auth_sessions_expires").on(table.expiresAt),
+  ],
+);
+
+export const teamInvites = sqliteTable(
+  "team_invites",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    codeHash: text("code_hash").notNull(),
+    createdByParticipantId: text("created_by_participant_id")
+      .notNull()
+      .references(() => participants.id, { onDelete: "cascade" }),
+    expiresAt: text("expires_at").notNull(),
+    maxUses: integer("max_uses").notNull().default(1),
+    useCount: integer("use_count").notNull().default(0),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("idx_team_invites_code_hash").on(table.codeHash),
+    index("idx_team_invites_workspace_expires").on(table.workspaceId, table.expiresAt),
   ],
 );
 
@@ -109,6 +159,14 @@ export const contacts = sqliteTable(
       .notNull()
       .default(false),
     lastContactedAt: text("last_contacted_at"),
+    createdByParticipantId: text("created_by_participant_id").references(
+      () => participants.id,
+      { onDelete: "set null" },
+    ),
+    updatedByParticipantId: text("updated_by_participant_id").references(
+      () => participants.id,
+      { onDelete: "set null" },
+    ),
     ...timestamps,
   },
   (table) => [
@@ -126,6 +184,10 @@ export const contacts = sqliteTable(
     index("idx_contacts_workspace_company").on(
       table.workspaceId,
       table.companyId,
+    ),
+    index("idx_contacts_workspace_creator").on(
+      table.workspaceId,
+      table.createdByParticipantId,
     ),
     uniqueIndex("idx_contacts_workspace_telegram")
       .on(table.workspaceId, table.telegramChatId)

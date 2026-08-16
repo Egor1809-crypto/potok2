@@ -91,7 +91,6 @@ import { uniqueAcceptedContactIds } from "./delivery-metrics";
 import {
   ensureDatabase,
   ensureSystemDatabase,
-  PARTICIPANT_ID,
   WORKSPACE_ID,
 } from "./database-init";
 import { sendVkWorkspaceSmtpBatch } from "./vk-workspace-smtp";
@@ -174,8 +173,12 @@ function toParticipant(
   return {
     id: row.id,
     workspaceId: row.workspaceId,
+    login: row.login ?? "",
     displayName: row.displayName,
     email: row.email,
+    color: row.color,
+    status: row.status === "disabled" ? "disabled" : "active",
+    lastLoginAt: row.lastLoginAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -206,6 +209,8 @@ function toContact(row: ContactRow): ContactRecord {
     vkUserId: row.vkUserId,
     vkConsent: row.vkConsent,
     lastContactedAt: row.lastContactedAt,
+    createdByParticipantId: row.createdByParticipantId,
+    updatedByParticipantId: row.updatedByParticipantId,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -421,11 +426,12 @@ function toSegment(
   };
 }
 
-async function loadCoreRows() {
+async function loadCoreRows(participantId: string) {
   const db = getDb();
   const [
     workspaceRows,
     participantRows,
+    memberRows,
     contactRows,
     segmentRows,
     integrationRows,
@@ -439,8 +445,13 @@ async function loadCoreRows() {
     db
       .select()
       .from(participants)
-      .where(eq(participants.id, PARTICIPANT_ID))
+      .where(eq(participants.id, participantId))
       .limit(1),
+    db
+      .select()
+      .from(participants)
+      .where(eq(participants.workspaceId, WORKSPACE_ID))
+      .orderBy(participants.createdAt),
     db
       .select()
       .from(contacts)
@@ -488,6 +499,7 @@ async function loadCoreRows() {
   return {
     workspace,
     participant,
+    memberRows,
     contactRows,
     segmentRows,
     integrationRows,
@@ -502,8 +514,8 @@ async function loadCoreRows() {
 export async function getWorkspaceSnapshot(
   request: Request,
 ): Promise<WorkspaceSnapshot> {
-  await ensureDatabase(request);
-  const rows = await loadCoreRows();
+  const actor = await ensureDatabase(request);
+  const rows = await loadCoreRows(actor.participant.id);
   const contactRecords = rows.contactRows.map(toContact);
   const campaignRecords = rows.campaignRows.map(toCampaign);
   // Rows from providers removed from the product stay inert in older databases
@@ -514,6 +526,7 @@ export async function getWorkspaceSnapshot(
   return {
     workspace: toWorkspace(rows.workspace),
     participant: toParticipant(rows.participant),
+    members: rows.memberRows.filter((member) => member.passwordHash).map(toParticipant),
     contacts: contactRecords,
     segments: rows.segmentRows.map((segment) =>
       toSegment(segment, contactRecords, rows.campaignRows),
@@ -703,6 +716,7 @@ function contactValues(
   id: string,
   now: string,
   existing?: ContactRecord,
+  actorId?: string,
 ) {
   return {
     id,
@@ -728,6 +742,8 @@ function contactValues(
     vkUserId: input.vkUserId ?? null,
     vkConsent: input.vkConsent ?? false,
     lastContactedAt: existing?.lastContactedAt ?? null,
+    createdByParticipantId: existing?.createdByParticipantId ?? actorId ?? null,
+    updatedByParticipantId: actorId ?? existing?.updatedByParticipantId ?? null,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };
@@ -791,10 +807,22 @@ async function findContactsByIdentifiers(
     );
 }
 
+async function duplicateOwnerMessage(row: ContactRow, fallback: string) {
+  if (!row.createdByParticipantId) return fallback;
+  const [owner] = await getDb()
+    .select({ displayName: participants.displayName })
+    .from(participants)
+    .where(eq(participants.id, row.createdByParticipantId))
+    .limit(1);
+  return owner?.displayName
+    ? `${fallback} Его добавил участник ${owner.displayName}.`
+    : fallback;
+}
+
 export async function listContacts(request: Request): Promise<ContactsListResponse> {
   await ensureDatabase(request);
   const db = getDb();
-  const [rows, workspaceRows] = await Promise.all([
+  const [rows, workspaceRows, memberRows] = await Promise.all([
     db
       .select()
       .from(contacts)
@@ -805,9 +833,15 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
       .from(workspaces)
       .where(eq(workspaces.id, WORKSPACE_ID))
       .limit(1),
+    db
+      .select()
+      .from(participants)
+      .where(eq(participants.workspaceId, WORKSPACE_ID))
+      .orderBy(participants.createdAt),
   ]);
   return {
     contacts: rows.map(toContact),
+    members: memberRows.filter((member) => member.passwordHash).map(toParticipant),
     timezone: workspaceRows[0]?.timezone ?? "Europe/Moscow",
   };
 }
@@ -816,20 +850,20 @@ export async function createContact(
   request: Request,
   payload: unknown,
 ): Promise<ContactMutationResponse> {
-  await ensureDatabase(request);
+  const actor = await ensureDatabase(request);
   const input = parseContact(payload);
   const db = getDb();
   const duplicate = await findContactsByIdentifiers(input);
   if (duplicate.length) {
     throw new ApiRequestError(
-      "Контакт с таким email, телефоном или идентификатором мессенджера уже существует. Откройте его и сохраните изменения.",
+      await duplicateOwnerMessage(duplicate[0], "Контакт с таким email, телефоном или идентификатором мессенджера уже существует. Откройте его и сохраните изменения."),
       409,
     );
   }
   const now = new Date().toISOString();
   const [row] = await db
     .insert(contacts)
-    .values(contactValues(input, newId("contact"), now))
+    .values(contactValues(input, newId("contact"), now, undefined, actor.participant.id))
     .onConflictDoNothing()
     .returning();
   if (!row) {
@@ -845,7 +879,7 @@ export async function createContactsBatch(
   request: Request,
   payload: unknown,
 ): Promise<ContactsBatchCreateResponse> {
-  await ensureDatabase(request);
+  const actor = await ensureDatabase(request);
   const object = asObject(payload);
   if (!Array.isArray(object.contacts) || object.contacts.length === 0) {
     throw new ApiRequestError("Добавьте хотя бы один контакт для импорта.");
@@ -976,7 +1010,7 @@ export async function createContactsBatch(
       const merged = parseContact(input, toContact(existing));
       await db
         .update(contacts)
-        .set({ ...contactValues(merged, existing.id, now, toContact(existing)), updatedAt: now })
+        .set({ ...contactValues(merged, existing.id, now, toContact(existing), actor.participant.id), updatedAt: now })
         .where(eq(contacts.id, existing.id));
       affectedIds.push(existing.id);
       updatedCount += 1;
@@ -984,7 +1018,7 @@ export async function createContactsBatch(
       const id = newId("contact");
       const [created] = await db
         .insert(contacts)
-        .values(contactValues(input, id, now))
+        .values(contactValues(input, id, now, undefined, actor.participant.id))
         .onConflictDoNothing()
         .returning({ id: contacts.id });
       if (created) {
@@ -1014,23 +1048,24 @@ export async function updateContact(
   request: Request,
   payload: unknown,
 ): Promise<ContactMutationResponse> {
-  await ensureDatabase(request);
+  const actor = await ensureDatabase(request);
   const object = asObject(payload);
   const id = cleanText(object.id, "Идентификатор контакта", 120);
   const existing = await contactById(id);
   const input = parseContact(object, existing);
   const db = getDb();
   const duplicate = await findContactsByIdentifiers(input);
-  if (duplicate.some((row) => row.id !== id)) {
+  const conflictingContact = duplicate.find((row) => row.id !== id);
+  if (conflictingContact) {
     throw new ApiRequestError(
-      "Другой контакт уже использует этот email, телефон или идентификатор мессенджера.",
+      await duplicateOwnerMessage(conflictingContact, "Другой контакт уже использует этот email, телефон или идентификатор мессенджера."),
       409,
     );
   }
   const now = new Date().toISOString();
   const [row] = await db
     .update(contacts)
-    .set({ ...contactValues(input, id, now, existing), updatedAt: now })
+    .set({ ...contactValues(input, id, now, existing, actor.participant.id), updatedAt: now })
     .where(eq(contacts.id, id))
     .returning();
   return { contact: toContact(row) };
@@ -1443,7 +1478,7 @@ export async function updateWorkspace(
   request: Request,
   payload: unknown,
 ): Promise<WorkspacePatchResponse> {
-  await ensureDatabase(request);
+  const actor = await ensureDatabase(request);
   const input = parseWorkspacePatch(payload);
   const db = getDb();
   const now = new Date().toISOString();
@@ -1466,11 +1501,11 @@ export async function updateWorkspace(
         ...(participantEmail !== undefined ? { email: participantEmail } : {}),
         updatedAt: now,
       })
-      .where(eq(participants.id, PARTICIPANT_ID));
+      .where(eq(participants.id, actor.participant.id));
   }
   const [workspaceRow, participantRow] = await Promise.all([
     db.select().from(workspaces).where(eq(workspaces.id, WORKSPACE_ID)).limit(1),
-    db.select().from(participants).where(eq(participants.id, PARTICIPANT_ID)).limit(1),
+    db.select().from(participants).where(eq(participants.id, actor.participant.id)).limit(1),
   ]);
   return {
     workspace: toWorkspace(workspaceRow[0]),
@@ -1965,7 +2000,7 @@ export async function createCampaign(
   request: Request,
   payload: unknown,
 ): Promise<CampaignMutationResponse> {
-  await ensureDatabase(request);
+  const actor = await ensureDatabase(request);
   const workspace = await workspaceRecord();
   const input = parseCampaign(payload, { workspace });
   const audienceLabel = await validateAudience(input);
@@ -1978,7 +2013,7 @@ export async function createCampaign(
   await db.insert(campaigns).values({
     id,
     workspaceId: WORKSPACE_ID,
-    participantId: PARTICIPANT_ID,
+    participantId: actor.participant.id,
     name: input.name,
     audienceType: input.audienceType,
     audienceLabel,

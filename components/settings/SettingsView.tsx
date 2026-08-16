@@ -6,6 +6,7 @@ import {
   CircleAlert,
   Download,
   KeyRound,
+  Copy,
   LoaderCircle,
   Mail,
   Save,
@@ -13,6 +14,7 @@ import {
   Settings2,
   ShieldCheck,
   UserRound,
+  UserPlus,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -38,6 +40,8 @@ type WorkspaceSnapshot = {
   participant?: { name?: string; displayName?: string; email?: string };
 };
 
+type TeamMember = { id: string; displayName: string; login: string; email: string; color: string; status: "active" | "disabled"; lastLoginAt: string | null };
+
 const initialForm: WorkspaceForm = {
   name: workspaceConfig.name,
   companyName: "",
@@ -59,8 +63,8 @@ const sections: Array<{
 }> = [
   {
     id: "account",
-    label: "Аккаунт",
-    description: "Один участник с полным доступом",
+    label: "Команда",
+    description: "Участники и приглашения",
     Icon: UserRound,
   },
   {
@@ -101,6 +105,8 @@ export function SettingsView() {
   const [participant, setParticipant] = useState<{ name: string; email: string }>({ name: demoUser.name, email: demoUser.email });
   const [state, setState] = useState<"loading" | "idle" | "saving" | "saved" | "error">("loading");
   const [error, setError] = useState("");
+  const [members, setMembers] = useState<TeamMember[]>([]);
+  const [invite, setInvite] = useState<{ code: string; expiresAt: string } | null>(null);
 
   const load = useCallback(async () => {
     setState("loading");
@@ -114,6 +120,11 @@ export function SettingsView() {
         name: snapshot.participant?.displayName ?? snapshot.participant?.name ?? current.name,
         email: snapshot.participant?.email ?? current.email,
       }));
+      const teamResponse = await fetch("/api/team", { cache: "no-store" });
+      if (teamResponse.ok) {
+        const teamPayload = await teamResponse.json() as { members?: TeamMember[] };
+        setMembers(teamPayload.members ?? []);
+      }
       setState("idle");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Не удалось загрузить настройки");
@@ -179,6 +190,17 @@ export function SettingsView() {
 
   const current = useMemo(() => sections.find((item) => item.id === section) ?? sections[0], [section]);
 
+  const createInvite = async () => {
+    setError("");
+    const response = await fetch("/api/team", { method: "POST" });
+    const payload = await response.json() as { code?: string; expiresAt?: string; error?: string };
+    if (!response.ok || !payload.code || !payload.expiresAt) {
+      setError(payload.error ?? "Не удалось создать приглашение");
+      return;
+    }
+    setInvite({ code: payload.code, expiresAt: payload.expiresAt });
+  };
+
   return (
     <div className="space-y-6">
       <header className="max-w-3xl">
@@ -230,7 +252,7 @@ export function SettingsView() {
           )}
 
           <div className="p-5 sm:p-6">
-            {section === "account" && <AccountSection form={form} participant={participant} update={update} />}
+            {section === "account" && <AccountSection form={form} participant={participant} members={members} invite={invite} onInvite={() => void createInvite()} update={update} />}
             {section === "sending" && <SendingSection form={form} update={update} />}
             {section === "data" && <DataSection participantEmail={participant.email} onExport={() => void exportData()} />}
           </div>
@@ -242,7 +264,7 @@ export function SettingsView() {
 
 type UpdateForm = <Key extends keyof WorkspaceForm>(key: Key, value: WorkspaceForm[Key]) => void;
 
-function AccountSection({ form, participant, update }: { form: WorkspaceForm; participant: { name: string; email: string }; update: UpdateForm }) {
+function AccountSection({ form, participant, members, invite, onInvite, update }: { form: WorkspaceForm; participant: { name: string; email: string }; members: TeamMember[]; invite: { code: string; expiresAt: string } | null; onInvite: () => void; update: UpdateForm }) {
   return (
     <div className="space-y-7">
       <div className="rounded-2xl border border-[var(--primary)]/15 bg-[var(--primary-subtle)]/55 p-4 sm:p-5">
@@ -254,10 +276,18 @@ function AccountSection({ form, participant, update }: { form: WorkspaceForm; pa
           </div>
           <span className="badge badge-accent">Участник · полный доступ</span>
         </div>
-        <p className="mt-4 text-[12px] leading-5 text-[var(--text-muted)]">
-          Это единственный аккаунт продукта. Вход защищает платформа, а внутри Поток нет ролей и приглашений.
-        </p>
+        <p className="mt-4 text-[12px] leading-5 text-[var(--text-muted)]">У каждого участника свой логин и цвет. Все работают с общей базой и имеют одинаковый полный доступ.</p>
       </div>
+
+      <FormBlock title={`Участники · ${members.length}`} description="Цвет участника отображается у добавленных им контактов.">
+        <div className="divide-y divide-[var(--border)] rounded-xl border border-[var(--border)]">
+          {members.map((member) => <div key={member.id} className="flex items-center gap-3 p-3"><span className="grid size-9 place-items-center rounded-full text-xs font-bold text-white" style={{ backgroundColor: member.color }}>{member.displayName.slice(0, 2).toUpperCase()}</span><span className="min-w-0 flex-1"><span className="block truncate text-[12px] font-semibold">{member.displayName}</span><span className="block truncate text-[10px] text-[var(--text-muted)]">@{member.login}{member.lastLoginAt ? ` · вход ${new Date(member.lastLoginAt).toLocaleDateString("ru-RU")}` : ""}</span></span><span className="badge badge-success">Активен</span></div>)}
+        </div>
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)] p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center"><div className="min-w-0 flex-1"><p className="text-[12px] font-semibold">Пригласить коллегу</p><p className="mt-1 text-[11px] text-[var(--text-muted)]">Одноразовый код действует 7 дней. Коллега вводит его на странице регистрации.</p></div><button type="button" onClick={onInvite} className="btn btn-primary gap-2"><UserPlus aria-hidden className="size-4" />Создать код</button></div>
+          {invite && <div className="mt-4 flex items-center gap-2 rounded-lg border border-[var(--primary)]/20 bg-white p-2"><code className="min-w-0 flex-1 truncate px-2 text-[12px] font-semibold text-[var(--primary)]">{invite.code}</code><button type="button" onClick={() => void navigator.clipboard.writeText(invite.code)} className="btn btn-secondary btn-sm gap-2"><Copy aria-hidden className="size-3.5" />Копировать</button></div>}
+        </div>
+      </FormBlock>
 
       <FormBlock title="Рабочее пространство" description="Название видно в навигации и в выгрузке данных.">
         <Field label="Название пространства" value={form.name} onChange={(value) => update("name", value)} />
@@ -303,7 +333,7 @@ function SendingSection({ form, update }: { form: WorkspaceForm; update: UpdateF
 function DataSection({ participantEmail, onExport }: { participantEmail: string; onExport: () => void }) {
   return (
     <div className="space-y-6">
-      <SettingRow Icon={KeyRound} title="Вход в аккаунт" copy={`Доступ подтверждает защищённая учётная запись ${participantEmail}. Пароли внутри Поток не хранятся.`}>
+      <SettingRow Icon={KeyRound} title="Вход в аккаунт" copy={`Аккаунт ${participantEmail} использует отдельный логин и защищённый хеш пароля. Исходный пароль не хранится.`}>
         <span className="badge badge-success">Защищён</span>
       </SettingRow>
       <SettingRow Icon={Download} title="Экспорт данных" copy="Скачать снимок контактов, сегментов, email-шаблонов, кампаний и настроек в формате JSON.">

@@ -4,5 +4,5 @@ import { AuthScreen } from "@/components/auth/AuthScreen";
 export const metadata: Metadata = { title: "Регистрация" };
 
 export default function RegisterPage() {
-  return <AuthScreen />;
+  return <AuthScreen mode="register" />;
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { Command, Menu, Plus, Search } from "lucide-react";
+import { Command, LogOut, Menu, Plus, Search } from "lucide-react";
 
 import { Avatar } from "@/components/ui/avatar";
 import { IconButton, buttonVariants } from "@/components/ui/button";
@@ -24,15 +24,17 @@ export function Topbar({
   action,
 }: TopbarProps) {
   const [participantName, setParticipantName] = useState<string>(demoUser.name);
+  const [participantColor, setParticipantColor] = useState("#6558E8");
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       void fetch("/api/workspace", { cache: "no-store" })
         .then((response) => response.ok
-          ? response.json() as Promise<{ participant?: { displayName?: string } }>
+          ? response.json() as Promise<{ participant?: { displayName?: string; color?: string } }>
           : null)
         .then((payload) => {
           if (payload?.participant?.displayName) setParticipantName(payload.participant.displayName);
+          if (payload?.participant?.color) setParticipantColor(payload.participant.color);
         })
         .catch(() => undefined);
     });
@@ -113,8 +115,20 @@ export function Topbar({
           aria-label={`${participantName}: профиль участника и настройки`}
           className="ml-0.5 hidden rounded-full outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 focus-visible:ring-offset-surface sm:inline-flex"
         >
-          <Avatar name={participantName} size="sm" status="online" />
+          <Avatar name={participantName} size="sm" status="online" style={{ backgroundColor: `${participantColor}18`, color: participantColor }} />
         </Link>
+        <IconButton
+          label="Выйти из аккаунта"
+          variant="ghost"
+          className="hidden sm:inline-flex"
+          onClick={() => {
+            void fetch("/api/auth/logout", { method: "POST" }).finally(() => {
+              window.location.assign("/");
+            });
+          }}
+        >
+          <LogOut aria-hidden className="size-[17px]" />
+        </IconButton>
       </div>
     </header>
   );

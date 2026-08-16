@@ -35,7 +35,7 @@ test("server-renders the finished «Поток» landing page", async () => {
   assert.doesNotMatch(html, /codex-preview|SkeletonPreview|Your site is taking shape|react-loading-skeleton/i);
 });
 
-test("all key product routes render without a dead end", async () => {
+test("public auth routes render and protected product routes require a team session", async () => {
   const paths = [
     "/login",
     "/register",
@@ -56,29 +56,33 @@ test("all key product routes render without a dead end", async () => {
 
   for (const pathname of paths) {
     const response = await render(pathname);
-    assert.equal(response.status, 200, `${pathname} should render`);
-    const html = await response.text();
-    assert.doesNotMatch(html, /page not found|internal server error/i, pathname);
+    if (pathname === "/login" || pathname === "/register") {
+      assert.equal(response.status, 200, `${pathname} should render`);
+      const html = await response.text();
+      assert.doesNotMatch(html, /page not found|internal server error/i, pathname);
+    } else {
+      assert.ok([307, 308].includes(response.status), `${pathname} should require login`);
+      const location = new URL(response.headers.get("location"), "http://mailflow.test");
+      assert.equal(location.pathname, "/login");
+      assert.equal(location.searchParams.get("next"), pathname);
+    }
   }
 });
 
-test("retired mock-only companies route returns users to contacts", async () => {
+test("retired mock-only companies route is protected before its contacts redirect", async () => {
   const response = await render("/companies");
   assert.ok([307, 308].includes(response.status));
-  assert.equal(new URL(response.headers.get("location"), "http://mailflow.test").pathname, "/contacts");
+  const location = new URL(response.headers.get("location"), "http://mailflow.test");
+  assert.equal(location.pathname, "/login");
+  assert.equal(location.searchParams.get("next"), "/companies");
 });
 
-test("multichannel integrations render with an explicit connection boundary", async () => {
+test("multichannel integrations are not exposed before team login", async () => {
   const response = await render("/integrations");
-  assert.equal(response.status, 200);
-
-  const html = await response.text();
-  assert.match(html, /VK WorkSpace/);
-  assert.match(html, /Telegram/);
-  assert.match(html, /ВКонтакте/);
-  assert.match(html, /Статус подтверждается провайдером/);
-  assert.match(html, /секреты читаются только из серверного окружения/);
-  assert.doesNotMatch(html, /Безопасный деморежим/);
+  assert.ok([307, 308].includes(response.status));
+  const location = new URL(response.headers.get("location"), "http://mailflow.test");
+  assert.equal(location.pathname, "/login");
+  assert.equal(location.searchParams.get("next"), "/integrations");
 });
 
 test("starter artifacts are replaced with project metadata and assets", async () => {

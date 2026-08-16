@@ -28,7 +28,7 @@ const footerGroups = [
   {
     title: "Начало работы",
     links: [
-      ["Обзор", "/dashboard"],
+      ["Возможности", "#product"],
       ["Новая кампания", "/campaigns/new"],
       ["Войти", "/login"],
       ["Открыть аккаунт", "/register"],
@@ -55,9 +55,9 @@ export function LandingPage() {
           </p>
           <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link href="/email-builder?new=1" className="btn btn-primary min-h-12 w-full justify-center gap-2 px-5 text-[14px] sm:w-auto">Создать первое письмо <ArrowRight size={16} /></Link>
-            <Link href="/dashboard" className="btn btn-secondary min-h-12 w-full justify-center gap-2 px-5 text-[14px] sm:w-auto"><Play size={14} fill="currentColor" /> Посмотреть платформу</Link>
+            <Link href="/login" className="btn btn-secondary min-h-12 w-full justify-center gap-2 px-5 text-[14px] sm:w-auto"><Play size={14} fill="currentColor" /> Войти в команду</Link>
           </div>
-          <p className="mt-4 text-[11px] text-[#9a9ca8]">Один участник · Полный доступ ко всем функциям</p>
+          <p className="mt-4 text-[11px] text-[#9a9ca8]">Одна командная база · Отдельный аккаунт каждого участника · Без дублей</p>
         </div>
         <ProductPreview />
       </section>
@@ -82,7 +82,7 @@ export function LandingPage() {
             <h2 className="mx-auto mt-5 max-w-3xl text-[clamp(2.4rem,5vw,4.8rem)] font-medium leading-[1] tracking-[-.055em]">Превращайте базу контактов в живые диалоги.</h2>
             <p className="mx-auto mt-6 max-w-lg text-[15px] leading-7 text-[#b7b8c2]">Начните с тех, кого уже знаете. {BRAND_NAME} даст вам нужный контекст и уберёт лишние шаги.</p>
             <Link href="/register" className="mt-9 inline-flex min-h-12 items-center justify-center gap-2 rounded-[10px] bg-white px-5 text-[14px] font-semibold text-[#242530] shadow-lg transition-transform hover:-translate-y-0.5">Начать работу <ArrowRight size={16} /></Link>
-            <div className="mx-auto mt-8 flex max-w-md flex-wrap justify-center gap-x-5 gap-y-2 text-[11px] text-[#b7b8c2]">{["Единое рабочее пространство","Все разделы платформы","Один участник с полным доступом"].map(item=><span key={item} className="flex items-center gap-1.5"><Check size={12} className="text-[#a9a5ff]" />{item}</span>)}</div>
+            <div className="mx-auto mt-8 flex max-w-md flex-wrap justify-center gap-x-5 gap-y-2 text-[11px] text-[#b7b8c2]">{["Общая база команды","Цвет автора у контакта","Одинаковый полный доступ"].map(item=><span key={item} className="flex items-center gap-1.5"><Check size={12} className="text-[#a9a5ff]" />{item}</span>)}</div>
           </div>
         </div>
       </section>

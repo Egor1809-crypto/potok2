@@ -27,6 +27,7 @@ import type {
   ContactMutationResponse,
   ContactRecord,
   ContactsListResponse,
+  ParticipantRecord,
 } from "@/types/api";
 import { ContactDrawer } from "./ContactDrawer";
 
@@ -106,6 +107,7 @@ function campaignHref(ids: string[]) {
 
 export function ContactsView() {
   const [contacts, setContacts] = useState<ContactRecord[]>([]);
+  const [members, setMembers] = useState<ParticipantRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
@@ -114,6 +116,7 @@ export function ContactsView() {
   const [city, setCity] = useState("all");
   const [team, setTeam] = useState("all");
   const [channel, setChannel] = useState("all");
+  const [owner, setOwner] = useState("all");
   const [teamName, setTeamName] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [drawerContact, setDrawerContact] = useState<ContactRecord | null>(null);
@@ -130,6 +133,7 @@ export function ContactsView() {
       const payload: ContactsListResponse | ApiError = await response.json();
       if (!response.ok || !("contacts" in payload)) throw new Error(messageFrom(payload, "Не удалось загрузить контакты"));
       setContacts(payload.contacts);
+      setMembers(payload.members);
       setTimezone(payload.timezone);
       setSelected(new Set());
     } catch (reason) {
@@ -154,13 +158,14 @@ export function ContactsView() {
       if (channel === "email" && !(contact.status === "active" && contact.email && contact.emailConsent)) return false;
       if (channel === "telegram" && !(contact.status === "active" && contact.telegramChatId && contact.telegramConsent)) return false;
       if (channel === "vk" && !(contact.status === "active" && contact.vkUserId && contact.vkConsent)) return false;
+      if (owner !== "all" && contact.createdByParticipantId !== owner) return false;
       if (!needle) return true;
       return [contact.fullName, contact.email, contact.phone, contact.companyName, contact.jobTitle, contact.city, contact.tags.join(" ")]
         .join(" ")
         .toLocaleLowerCase("ru-RU")
         .includes(needle);
     });
-  }, [channel, city, company, contacts, search, status, team]);
+  }, [channel, city, company, contacts, owner, search, status, team]);
 
   const filterOptions = useMemo(() => ({
     companies: [...new Set(contacts.map((contact) => contact.companyName).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ru")),
@@ -188,6 +193,7 @@ export function ContactsView() {
   }, [timezone]);
   const allVisibleSelected = visible.length > 0 && visible.every((contact) => selected.has(contact.id));
   const activeCount = contacts.filter((contact) => contact.status === "active").length;
+  const membersById = useMemo(() => new Map(members.map((member) => [member.id, member])), [members]);
   const coverage = [
     { label: "Email", count: contacts.filter((contact) => contact.status === "active" && contact.emailConsent && contact.email).length, Icon: Mail },
     { label: "Telegram", count: contacts.filter((contact) => contact.status === "active" && contact.telegramChatId && contact.telegramConsent).length, Icon: SendHorizontal },
@@ -384,17 +390,18 @@ export function ContactsView() {
       {error && <div role="alert" className="flex items-start gap-3 rounded-xl border border-[var(--danger)]/20 bg-[var(--danger-subtle)] p-4 text-[12px] text-[var(--danger)]"><CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" /><span className="flex-1">{error}</span><button type="button" onClick={() => void load()} className="font-semibold underline underline-offset-2">Повторить</button></div>}
 
       <section className="card overflow-hidden">
-        <div className="grid gap-3 border-b border-[var(--border)] p-3 lg:grid-cols-[minmax(220px,1fr)_repeat(4,minmax(140px,190px))_auto]">
+        <div className="grid gap-3 border-b border-[var(--border)] p-3 lg:grid-cols-[minmax(220px,1fr)_repeat(5,minmax(135px,180px))_auto]">
           <label className="relative min-w-0 flex-1"><span className="sr-only">Поиск контактов</span><Search aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--text-subtle)]" /><input className="input pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Имя, email, компания или тег" /></label>
           <label><span className="sr-only">Фильтр по компании</span><select className="input" value={company} onChange={(event) => setCompany(event.target.value)}><option value="all">Все компании</option>{filterOptions.companies.map((value) => <option key={value}>{value}</option>)}</select></label>
           <label><span className="sr-only">Фильтр по городу</span><select className="input" value={city} onChange={(event) => setCity(event.target.value)}><option value="all">Все города</option>{filterOptions.cities.map((value) => <option key={value}>{value}</option>)}</select></label>
           <label><span className="sr-only">Фильтр по команде</span><select className="input" value={team} onChange={(event) => setTeam(event.target.value)}><option value="all">Все команды</option>{filterOptions.teams.map((value) => <option key={value}>{value}</option>)}</select></label>
           <label><span className="sr-only">Фильтр по каналу</span><select className="input" value={channel} onChange={(event) => setChannel(event.target.value)}><option value="all">Все каналы</option><option value="email">Доступен Email</option><option value="telegram">Доступен Telegram</option><option value="vk">Доступен ВКонтакте</option></select></label>
+          <label><span className="sr-only">Фильтр по автору</span><select className="input" value={owner} onChange={(event) => setOwner(event.target.value)}><option value="all">Добавили все</option>{members.map((member) => <option key={member.id} value={member.id}>{member.displayName}</option>)}</select></label>
           <button type="button" onClick={exportCsv} disabled={!selectedIds.length && !visible.length} className="btn btn-secondary gap-2"><Download aria-hidden="true" className="size-4" />Экспорт</button>
         </div>
         <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border)] bg-[var(--surface-subtle)]/65 px-3 py-2.5">
           <button type="button" onClick={toggleAll} disabled={!visible.length} className="btn btn-secondary btn-sm gap-2"><Check aria-hidden="true" className="size-3.5" />{allVisibleSelected ? "Снять выбор найденных" : `Выбрать всех найденных · ${visible.length}`}</button>
-          {(company !== "all" || city !== "all" || team !== "all" || channel !== "all" || status !== "all" || search) ? <button type="button" onClick={() => { setSearch(""); setStatus("all"); setCompany("all"); setCity("all"); setTeam("all"); setChannel("all"); }} className="btn btn-ghost btn-sm">Сбросить фильтры</button> : null}
+          {(company !== "all" || city !== "all" || team !== "all" || channel !== "all" || owner !== "all" || status !== "all" || search) ? <button type="button" onClick={() => { setSearch(""); setStatus("all"); setCompany("all"); setCity("all"); setTeam("all"); setChannel("all"); setOwner("all"); }} className="btn btn-ghost btn-sm">Сбросить фильтры</button> : null}
           <span className="ml-auto text-[10px] text-[var(--text-muted)]">Фильтры формируют аудиторию без ручных галочек</span>
         </div>
 
@@ -406,9 +413,10 @@ export function ContactsView() {
               <thead><tr><th className="w-12"><button type="button" onClick={toggleAll} aria-label="Выбрать все найденные контакты" className={`grid size-4 place-items-center rounded border ${allVisibleSelected ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-[var(--border-strong)] bg-white"}`}>{allVisibleSelected && <Check aria-hidden="true" className="size-3" />}</button></th><th>Контакт</th><th>Компания</th><th>Каналы</th><th>Статус</th><th>Обновлён</th><th className="w-12"><span className="sr-only">Действия</span></th></tr></thead>
               <tbody>{visible.map((contact) => {
                 const checked = selected.has(contact.id);
+                const creator = contact.createdByParticipantId ? membersById.get(contact.createdByParticipantId) : undefined;
                 const readyChannels = [contact.email && contact.emailConsent && contact.status === "active", contact.status === "active" && contact.telegramChatId && contact.telegramConsent, contact.status === "active" && contact.vkUserId && contact.vkConsent].filter(Boolean).length;
                 const primaryEndpoint = contact.email || (contact.telegramChatId ? `Telegram: ${contact.telegramChatId}` : contact.vkUserId ? `ВК: ${contact.vkUserId}` : "Канал не указан");
-                return <tr key={contact.id} data-selected={checked}><td><button type="button" onClick={() => setSelected((current) => { const next = new Set(current); if (next.has(contact.id)) next.delete(contact.id); else next.add(contact.id); return next; })} aria-label={`Выбрать ${contact.fullName}`} className={`grid size-4 place-items-center rounded border ${checked ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-[var(--border-strong)] bg-white"}`}>{checked && <Check aria-hidden="true" className="size-3" />}</button></td><td><button type="button" onClick={() => setDrawerContact(contact)} className="flex items-center gap-3 text-left"><span className="grid size-9 shrink-0 place-items-center rounded-full text-[10px] font-semibold text-white" style={{ backgroundColor: contact.avatarColor }}>{contact.firstName[0]}{contact.lastName[0]}</span><span><span className="block text-[12px] font-semibold hover:text-[var(--primary)]">{contact.fullName}</span><span className="mt-0.5 block text-[10px] text-[var(--text-subtle)]">{primaryEndpoint}</span></span></button></td><td><p className="text-[11px] font-medium">{contact.companyName || "—"}</p><p className="mt-0.5 text-[10px] text-[var(--text-subtle)]">{contact.jobTitle || "Должность не указана"}</p></td><td><span className={`badge ${readyChannels ? "badge-info" : "badge-warning"}`}>{readyChannels ? `${readyChannels} из 3` : "Нет доступных"}</span></td><td><span className={`badge ${statusTone[contact.status]}`}>{statusLabel[contact.status]}</span></td><td className="text-[11px] text-[var(--text-muted)]">{dateFormatter.format(new Date(contact.updatedAt))}</td><td><button type="button" onClick={() => setEditing(contact)} className="grid size-8 place-items-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface-subtle)]" aria-label={`Изменить ${contact.fullName}`}><Pencil aria-hidden="true" className="size-4" /></button></td></tr>;
+                return <tr key={contact.id} data-selected={checked} style={{ boxShadow: `inset 4px 0 0 ${creator?.color ?? "#CBD5E1"}` }}><td><button type="button" onClick={() => setSelected((current) => { const next = new Set(current); if (next.has(contact.id)) next.delete(contact.id); else next.add(contact.id); return next; })} aria-label={`Выбрать ${contact.fullName}`} className={`grid size-4 place-items-center rounded border ${checked ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-[var(--border-strong)] bg-white"}`}>{checked && <Check aria-hidden="true" className="size-3" />}</button></td><td><button type="button" onClick={() => setDrawerContact(contact)} className="flex items-center gap-3 text-left"><span className="grid size-9 shrink-0 place-items-center rounded-full text-[10px] font-semibold text-white" style={{ backgroundColor: creator?.color ?? contact.avatarColor }}>{contact.firstName[0]}{contact.lastName[0]}</span><span><span className="block text-[12px] font-semibold hover:text-[var(--primary)]">{contact.fullName}</span><span className="mt-0.5 block text-[10px] text-[var(--text-subtle)]">{primaryEndpoint}</span>{creator && <span className="mt-1 inline-flex items-center gap-1 text-[9px] font-semibold" style={{ color: creator.color }}><i className="size-1.5 rounded-full" style={{ backgroundColor: creator.color }} />Добавил: {creator.displayName}</span>}</span></button></td><td><p className="text-[11px] font-medium">{contact.companyName || "—"}</p><p className="mt-0.5 text-[10px] text-[var(--text-subtle)]">{contact.jobTitle || "Должность не указана"}</p></td><td><span className={`badge ${readyChannels ? "badge-info" : "badge-warning"}`}>{readyChannels ? `${readyChannels} из 3` : "Нет доступных"}</span></td><td><span className={`badge ${statusTone[contact.status]}`}>{statusLabel[contact.status]}</span></td><td className="text-[11px] text-[var(--text-muted)]">{dateFormatter.format(new Date(contact.updatedAt))}</td><td><button type="button" onClick={() => setEditing(contact)} className="grid size-8 place-items-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface-subtle)]" aria-label={`Изменить ${contact.fullName}`}><Pencil aria-hidden="true" className="size-4" /></button></td></tr>;
               })}</tbody>
             </table>
           </div>

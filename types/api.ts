@@ -25,12 +25,16 @@ export type WorkspaceRecord = {
   updatedAt: string;
 };
 
-/** MAILFLOW has one participant with full product access and no role model. */
+/** Every participant has the same full product access inside one shared team. */
 export type ParticipantRecord = {
   id: string;
   workspaceId: string;
+  login: string;
   displayName: string;
   email: string;
+  color: string;
+  status: "active" | "disabled";
+  lastLoginAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -61,6 +65,8 @@ export type ContactRecord = {
   vkUserId: string | null;
   vkConsent: boolean;
   lastContactedAt: string | null;
+  createdByParticipantId: string | null;
+  updatedByParticipantId: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -680,6 +686,7 @@ export type WorkspaceHistoryWindow = {
 export type WorkspaceSnapshot = {
   workspace: WorkspaceRecord;
   participant: ParticipantRecord;
+  members: ParticipantRecord[];
   contacts: ContactRecord[];
   segments: SegmentRecord[];
   integrations: IntegrationRecord[];
@@ -736,6 +743,7 @@ export type ContactPatchInput = Partial<ContactCreateInput> & { id: string };
 
 export type ContactsListResponse = {
   contacts: ContactRecord[];
+  members: ParticipantRecord[];
   timezone: string;
 };
 export type ContactMutationResponse = { contact: ContactRecord };

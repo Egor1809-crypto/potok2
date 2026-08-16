@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getD1, getDb } from "@/db";
 import {
   emailTemplates,
@@ -11,6 +11,7 @@ import { integrationProviders } from "@/config/integrations";
 import { BRAND_NAME } from "@/config/brand";
 import { ApiRequestError } from "./api-utils";
 import { starterEmailTemplateValues } from "./starter-template-library";
+import { requireTeamSession, toTeamParticipant, type TeamSession } from "./team-auth";
 
 export const WORKSPACE_ID = "workspace-main";
 export const PARTICIPANT_ID = "participant-main";
@@ -37,10 +38,34 @@ const schemaStatements = [
     id TEXT PRIMARY KEY NOT NULL,
     workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
     auth_user_id TEXT,
+    login TEXT,
+    password_hash TEXT,
+    password_salt TEXT,
     display_name TEXT NOT NULL,
     email TEXT NOT NULL,
+    color TEXT NOT NULL DEFAULT '#6558E8',
+    status TEXT NOT NULL DEFAULT 'active',
+    last_login_at TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS auth_sessions (
+    id TEXT PRIMARY KEY NOT NULL,
+    participant_id TEXT NOT NULL REFERENCES participants(id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE IF NOT EXISTS team_invites (
+    id TEXT PRIMARY KEY NOT NULL,
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    code_hash TEXT NOT NULL,
+    created_by_participant_id TEXT NOT NULL REFERENCES participants(id) ON DELETE CASCADE,
+    expires_at TEXT NOT NULL,
+    max_uses INTEGER NOT NULL DEFAULT 1,
+    use_count INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
   `CREATE TABLE IF NOT EXISTS contacts (
     id TEXT PRIMARY KEY NOT NULL,
@@ -66,6 +91,8 @@ const schemaStatements = [
     vk_user_id TEXT,
     vk_consent INTEGER NOT NULL DEFAULT 0,
     last_contacted_at TEXT,
+    created_by_participant_id TEXT REFERENCES participants(id) ON DELETE SET NULL,
+    updated_by_participant_id TEXT REFERENCES participants(id) ON DELETE SET NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
@@ -248,7 +275,12 @@ const schemaStatements = [
     value TEXT NOT NULL,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
-  `CREATE UNIQUE INDEX IF NOT EXISTS idx_participants_workspace_singleton ON participants(workspace_id)`,
+  `DROP INDEX IF EXISTS idx_participants_workspace_singleton`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_auth_sessions_token_hash ON auth_sessions(token_hash)`,
+  `CREATE INDEX IF NOT EXISTS idx_auth_sessions_participant ON auth_sessions(participant_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_auth_sessions_expires ON auth_sessions(expires_at)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_team_invites_code_hash ON team_invites(code_hash)`,
+  `CREATE INDEX IF NOT EXISTS idx_team_invites_workspace_expires ON team_invites(workspace_id, expires_at)`,
   `DROP INDEX IF EXISTS idx_contacts_workspace_email`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_contacts_workspace_email ON contacts(workspace_id, email) WHERE email <> ''`,
   `CREATE INDEX IF NOT EXISTS idx_contacts_workspace_phone ON contacts(workspace_id, phone)`,
@@ -322,54 +354,18 @@ function isLocalDevelopmentRequest(request: Request): boolean {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
 }
 
-export async function requireWorkspaceParticipant(request: Request) {
-  const identity = identityFromRequest(request);
-  if (!identity.authUserId) {
-    if (isLocalDevelopmentRequest(request)) return;
-    throw new ApiRequestError(
-      "Для доступа к рабочему пространству необходимо войти в аккаунт.",
-      401,
-    );
-  }
-
-  const db = getDb();
-  let [participant] = await db
-    .select()
-    .from(participants)
-    .where(eq(participants.id, PARTICIPANT_ID))
-    .limit(1);
-  if (!participant) {
-    throw new ApiRequestError("Участник рабочего пространства не найден.", 403);
-  }
-
-  if (!participant.authUserId) {
-    const now = new Date().toISOString();
-    await db
-      .update(participants)
-      .set({
-        authUserId: identity.authUserId,
-        displayName: identity.displayName,
-        email: identity.email,
-        updatedAt: now,
-      })
-      .where(
-        and(
-          eq(participants.id, PARTICIPANT_ID),
-          isNull(participants.authUserId),
-        ),
-      );
-    [participant] = await db
+export async function requireWorkspaceParticipant(request: Request): Promise<TeamSession> {
+  try {
+    return await requireTeamSession(request);
+  } catch (error) {
+    if (!isLocalDevelopmentRequest(request)) throw error;
+    const [participant] = await getDb()
       .select()
       .from(participants)
       .where(eq(participants.id, PARTICIPANT_ID))
       .limit(1);
-  }
-
-  if (participant?.authUserId !== identity.authUserId) {
-    throw new ApiRequestError(
-      "Это рабочее пространство уже принадлежит другому аккаунту.",
-      403,
-    );
+    if (!participant) throw new ApiRequestError("Участник рабочего пространства не найден.", 403);
+    return { participant: toTeamParticipant(participant), sessionId: "local-development" };
   }
 }
 
@@ -384,6 +380,36 @@ async function createSchema() {
       .prepare("ALTER TABLE ai_idempotency ADD COLUMN result_json TEXT")
       .run();
   }
+  const participantColumns = await d1
+    .prepare("PRAGMA table_info(participants)")
+    .all<{ name: string }>();
+  const participantAdditions = [
+    ["login", "ALTER TABLE participants ADD COLUMN login TEXT"],
+    ["password_hash", "ALTER TABLE participants ADD COLUMN password_hash TEXT"],
+    ["password_salt", "ALTER TABLE participants ADD COLUMN password_salt TEXT"],
+    ["color", "ALTER TABLE participants ADD COLUMN color TEXT NOT NULL DEFAULT '#6558E8'"],
+    ["status", "ALTER TABLE participants ADD COLUMN status TEXT NOT NULL DEFAULT 'active'"],
+    ["last_login_at", "ALTER TABLE participants ADD COLUMN last_login_at TEXT"],
+  ] as const;
+  for (const [name, statement] of participantAdditions) {
+    if (!participantColumns.results.some((column) => column.name === name)) {
+      await d1.prepare(statement).run();
+    }
+  }
+  const contactColumns = await d1
+    .prepare("PRAGMA table_info(contacts)")
+    .all<{ name: string }>();
+  if (!contactColumns.results.some((column) => column.name === "created_by_participant_id")) {
+    await d1.prepare("ALTER TABLE contacts ADD COLUMN created_by_participant_id TEXT REFERENCES participants(id) ON DELETE SET NULL").run();
+  }
+  if (!contactColumns.results.some((column) => column.name === "updated_by_participant_id")) {
+    await d1.prepare("ALTER TABLE contacts ADD COLUMN updated_by_participant_id TEXT REFERENCES participants(id) ON DELETE SET NULL").run();
+  }
+  await d1.batch([
+    d1.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_participants_workspace_login ON participants(workspace_id, login) WHERE login IS NOT NULL"),
+    d1.prepare("CREATE INDEX IF NOT EXISTS idx_participants_workspace_status ON participants(workspace_id, status)"),
+    d1.prepare("CREATE INDEX IF NOT EXISTS idx_contacts_workspace_creator ON contacts(workspace_id, created_by_participant_id)"),
+  ]);
   const campaignColumns = await d1
     .prepare("PRAGMA table_info(campaigns)")
     .all<{ name: string }>();
@@ -776,9 +802,9 @@ async function seedDatabase(request: Request) {
   }
 }
 
-export async function ensureDatabase(request: Request): Promise<void> {
+export async function ensureDatabase(request: Request): Promise<TeamSession> {
   await ensureSystemDatabase();
-  await requireWorkspaceParticipant(request);
+  return requireWorkspaceParticipant(request);
 }
 
 export async function ensureSystemDatabase(): Promise<void> {
