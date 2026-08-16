@@ -159,6 +159,10 @@ export const contacts = sqliteTable(
       .notNull()
       .default(false),
     lastContactedAt: text("last_contacted_at"),
+    responsibleParticipantId: text("responsible_participant_id").references(
+      () => participants.id,
+      { onDelete: "set null" },
+    ),
     createdByParticipantId: text("created_by_participant_id").references(
       () => participants.id,
       { onDelete: "set null" },
@@ -188,6 +192,10 @@ export const contacts = sqliteTable(
     index("idx_contacts_workspace_creator").on(
       table.workspaceId,
       table.createdByParticipantId,
+    ),
+    index("idx_contacts_workspace_responsible").on(
+      table.workspaceId,
+      table.responsibleParticipantId,
     ),
     uniqueIndex("idx_contacts_workspace_telegram")
       .on(table.workspaceId, table.telegramChatId)

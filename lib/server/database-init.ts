@@ -17,12 +17,25 @@ import { requireTeamSession, toTeamParticipant, type TeamSession } from "./team-
 export const WORKSPACE_ID = "workspace-main";
 export const PARTICIPANT_ID = "participant-main";
 
+/** Справочник ответственных для общей базы. Учётные записи они создают сами. */
+const TEAM_DIRECTORY = [
+  ["team-alla-artina", "Алла Артина", "#6558E8"],
+  ["team-dmitry-putin", "Путин Дмитрий", "#0E7490"],
+  ["team-egor-shabalin", "Шабалин Егор", "#C2410C"],
+  ["team-egor-isakov", "Исаков Егор", "#047857"],
+  ["team-dmitry-sizov", "Сизов Дмитрий", "#BE185D"],
+  ["team-darya-samailova", "Дарья Самайлова", "#1D4ED8"],
+  ["team-alexander-cherepanov", "Александр Черепанов", "#7E22CE"],
+  ["team-vagan-oganesovich", "Ваган Оганесович", "#B45309"],
+  ["team-darya-drygval", "Дарья Дрыгваль", "#0F766E"],
+] as const;
+
 let initialization: Promise<void> | null = null;
 // A Worker isolate is short-lived in production. Running the entire DDL and
 // template-seeding routine in every new isolate made even a simple page load
 // wait several seconds for D1. Keep a durable completion marker instead.
 // Bump this value whenever a runtime-only schema migration is added here.
-const RUNTIME_SCHEMA_VERSION = "runtime-schema-v2-conference-html";
+const RUNTIME_SCHEMA_VERSION = "runtime-schema-v3-team-contacts";
 
 const schemaStatements = [
   `CREATE TABLE IF NOT EXISTS workspaces (
@@ -97,6 +110,7 @@ const schemaStatements = [
     vk_user_id TEXT,
     vk_consent INTEGER NOT NULL DEFAULT 0,
     last_contacted_at TEXT,
+    responsible_participant_id TEXT REFERENCES participants(id) ON DELETE SET NULL,
     created_by_participant_id TEXT REFERENCES participants(id) ON DELETE SET NULL,
     updated_by_participant_id TEXT REFERENCES participants(id) ON DELETE SET NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -411,10 +425,14 @@ async function createSchema() {
   if (!contactColumns.results.some((column) => column.name === "updated_by_participant_id")) {
     await d1.prepare("ALTER TABLE contacts ADD COLUMN updated_by_participant_id TEXT REFERENCES participants(id) ON DELETE SET NULL").run();
   }
+  if (!contactColumns.results.some((column) => column.name === "responsible_participant_id")) {
+    await d1.prepare("ALTER TABLE contacts ADD COLUMN responsible_participant_id TEXT REFERENCES participants(id) ON DELETE SET NULL").run();
+  }
   await d1.batch([
     d1.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_participants_workspace_login ON participants(workspace_id, login) WHERE login IS NOT NULL"),
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_participants_workspace_status ON participants(workspace_id, status)"),
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_contacts_workspace_creator ON contacts(workspace_id, created_by_participant_id)"),
+    d1.prepare("CREATE INDEX IF NOT EXISTS idx_contacts_workspace_responsible ON contacts(workspace_id, responsible_participant_id)"),
   ]);
   const campaignColumns = await d1
     .prepare("PRAGMA table_info(campaigns)")
@@ -514,6 +532,19 @@ async function seedDatabase(request: Request) {
       .update(participants)
       .set({ authUserId: identity.authUserId, updatedAt: now })
       .where(eq(participants.id, PARTICIPANT_ID));
+  }
+
+  for (const [id, displayName, color] of TEAM_DIRECTORY) {
+    await db.insert(participants).values({
+      id,
+      workspaceId: WORKSPACE_ID,
+      displayName,
+      email: "",
+      color,
+      status: "active",
+      createdAt: now,
+      updatedAt: now,
+    }).onConflictDoNothing();
   }
 
   const [initializationState] = await db

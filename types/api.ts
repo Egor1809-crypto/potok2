@@ -65,6 +65,8 @@ export type ContactRecord = {
   vkUserId: string | null;
   vkConsent: boolean;
   lastContactedAt: string | null;
+  /** Участник, который ведёт контакт. Может отличаться от автора импорта. */
+  responsibleParticipantId: string | null;
   createdByParticipantId: string | null;
   updatedByParticipantId: string | null;
   createdAt: string;
@@ -196,7 +198,12 @@ export type EmailBuilderDocumentInput = {
   templateId: string;
   subject: string;
   previewText: string;
-  /** Complete trusted email document imported from HTML. */
+  /**
+   * A complete, trusted email document imported from HTML. When present the
+   * server sends this document verbatim instead of rebuilding it from blocks.
+   * Blocks remain as lightweight metadata so imported letters can live beside
+   * visual-builder templates in the same library.
+   */
   rawHtml?: string;
   accentColor: string;
   bodyBackground: string;
@@ -739,6 +746,7 @@ export type ContactCreateInput = {
   telegramConsent?: boolean;
   vkUserId?: string | null;
   vkConsent?: boolean;
+  responsibleParticipantId?: string | null;
 };
 
 export type ContactPatchInput = Partial<ContactCreateInput> & { id: string };

@@ -9,11 +9,12 @@ async function source(path) {
 }
 
 test("calendar connects scheduled campaigns, audience filters and the due queue", async () => {
-  const [calendar, wizard, store, worker, navigation] = await Promise.all([
+  const [calendar, wizard, store, worker, topbar, navigation] = await Promise.all([
     source("components/calendar/CalendarView.tsx"),
     source("components/campaigns/CampaignWizard.tsx"),
     source("lib/server/mailflow-store.ts"),
     source("worker/index.ts"),
+    source("components/layout/topbar.tsx"),
     source("components/layout/navigation.ts"),
   ]);
 
@@ -30,7 +31,8 @@ test("calendar connects scheduled campaigns, audience filters and the due queue"
   assert.match(store, /eq\(campaigns\.status, "scheduled"\)/);
   assert.match(store, /lte\(campaigns\.scheduledAt, now\)/);
   assert.match(worker, /scheduled\(_controller/);
-  assert.match(navigation, /href: "\/calendar"/);
+  assert.match(topbar, /href="\/calendar"/);
+  assert.doesNotMatch(navigation, /href: "\/calendar"/);
 });
 
 test("VK WorkSpace sends inline HTML through authenticated SMTP", async () => {

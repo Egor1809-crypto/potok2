@@ -368,7 +368,7 @@ export async function listTeamMembers() {
   const rows = await getDb()
     .select()
     .from(participants)
-    .where(and(eq(participants.workspaceId, TEAM_WORKSPACE_ID), isNotNull(participants.passwordHash)))
+    .where(eq(participants.workspaceId, TEAM_WORKSPACE_ID))
     .orderBy(participants.createdAt);
   return rows.map(toTeamParticipant);
 }

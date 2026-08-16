@@ -16,7 +16,7 @@ test("ten conference HTML letters are seeded as editable user templates", async 
   assert.match(generated, /https:\/\/tech-pravo\.ru\/conference/);
   assert.match(generated, /https:\/\/t\.me\/NeuroPravo_Bot/);
   assert.match(database, /conference-production-html-v1/);
-  assert.match(database, /runtime-schema-v2-conference-html/);
+  assert.match(database, /runtime-schema-v3-team-contacts/);
   assert.match(compiler, /if \(document\.rawHtml\) return document\.rawHtml/);
   assert.match(preview, /srcDoc=\{template\.emailBodyHtml\}/);
 });

@@ -1,0 +1,2 @@
+ALTER TABLE `contacts` ADD `responsible_participant_id` text REFERENCES participants(id);--> statement-breakpoint
+CREATE INDEX `idx_contacts_workspace_responsible` ON `contacts` (`workspace_id`,`responsible_participant_id`);

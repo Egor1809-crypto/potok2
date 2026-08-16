@@ -209,6 +209,7 @@ function toContact(row: ContactRow): ContactRecord {
     vkUserId: row.vkUserId,
     vkConsent: row.vkConsent,
     lastContactedAt: row.lastContactedAt,
+    responsibleParticipantId: row.responsibleParticipantId,
     createdByParticipantId: row.createdByParticipantId,
     updatedByParticipantId: row.updatedByParticipantId,
     createdAt: row.createdAt,
@@ -670,6 +671,14 @@ function parseContact(
   const emailConsent = email
     ? emailConsentInput ?? existing?.emailConsent ?? false
     : false;
+  const parsedResponsibleParticipantId = nullableText(
+    object.responsibleParticipantId,
+    "Ответственный",
+    120,
+  );
+  const responsibleParticipantId = parsedResponsibleParticipantId === undefined
+    ? (existing?.responsibleParticipantId ?? null)
+    : parsedResponsibleParticipantId;
 
   return {
     firstName,
@@ -708,6 +717,7 @@ function parseContact(
     telegramConsent,
     vkUserId,
     vkConsent,
+    responsibleParticipantId,
   };
 }
 
@@ -742,6 +752,7 @@ function contactValues(
     vkUserId: input.vkUserId ?? null,
     vkConsent: input.vkConsent ?? false,
     lastContactedAt: existing?.lastContactedAt ?? null,
+    responsibleParticipantId: input.responsibleParticipantId ?? existing?.responsibleParticipantId ?? actorId ?? null,
     createdByParticipantId: existing?.createdByParticipantId ?? actorId ?? null,
     updatedByParticipantId: actorId ?? existing?.updatedByParticipantId ?? null,
     createdAt: existing?.createdAt ?? now,
@@ -841,7 +852,7 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
   ]);
   return {
     contacts: rows.map(toContact),
-    members: memberRows.filter((member) => member.passwordHash).map(toParticipant),
+    members: memberRows.map(toParticipant),
     timezone: workspaceRows[0]?.timezone ?? "Europe/Moscow",
   };
 }

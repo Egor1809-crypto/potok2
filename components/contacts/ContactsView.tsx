@@ -18,7 +18,9 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
+import { ImportWizard } from "@/components/imports/ImportWizard";
 import { useDrawerAccessibility } from "@/components/shared/useDrawerAccessibility";
 import { Switch } from "@/components/ui";
 import type {
@@ -106,6 +108,9 @@ function campaignHref(ids: string[]) {
 }
 
 export function ContactsView() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [contacts, setContacts] = useState<ContactRecord[]>([]);
   const [members, setMembers] = useState<ParticipantRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -118,12 +123,21 @@ export function ContactsView() {
   const [channel, setChannel] = useState("all");
   const [owner, setOwner] = useState("all");
   const [teamName, setTeamName] = useState("");
+  const [responsibleId, setResponsibleId] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [drawerContact, setDrawerContact] = useState<ContactRecord | null>(null);
   const [editing, setEditing] = useState<ContactRecord | "new" | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [timezone, setTimezone] = useState("Europe/Moscow");
+  const activeView = searchParams.get("view") === "import" ? "import" : "contacts";
+
+  const setView = (view: "contacts" | "import") => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (view === "import") params.set("view", "import");
+    else params.delete("view");
+    router.replace(params.size ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -158,7 +172,7 @@ export function ContactsView() {
       if (channel === "email" && !(contact.status === "active" && contact.email && contact.emailConsent)) return false;
       if (channel === "telegram" && !(contact.status === "active" && contact.telegramChatId && contact.telegramConsent)) return false;
       if (channel === "vk" && !(contact.status === "active" && contact.vkUserId && contact.vkConsent)) return false;
-      if (owner !== "all" && contact.createdByParticipantId !== owner) return false;
+      if (owner !== "all" && (contact.responsibleParticipantId ?? contact.createdByParticipantId) !== owner) return false;
       if (!needle) return true;
       return [contact.fullName, contact.email, contact.phone, contact.companyName, contact.jobTitle, contact.city, contact.tags.join(" ")]
         .join(" ")
@@ -301,6 +315,30 @@ export function ContactsView() {
     } finally { setBusy(false); }
   };
 
+  const assignResponsible = async () => {
+    if (!selectedIds.length || !responsibleId) return;
+    setBusy(true);
+    setError("");
+    try {
+      const updated = new Map<string, ContactRecord>();
+      for (let start = 0; start < selectedIds.length; start += 10) {
+        const ids = selectedIds.slice(start, start + 10);
+        const records = await Promise.all(ids.map(async (id) => {
+          const response = await fetch("/api/contacts", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, responsibleParticipantId: responsibleId }) });
+          const payload = await response.json() as ContactMutationResponse | ApiError;
+          if (!response.ok || !("contact" in payload)) throw new Error(messageFrom(payload, "Не удалось назначить ответственного"));
+          return payload.contact;
+        }));
+        records.forEach((record) => updated.set(record.id, record));
+      }
+      setContacts((current) => current.map((contact) => updated.get(contact.id) ?? contact));
+      const member = members.find((item) => item.id === responsibleId);
+      notify(`Ответственный «${member?.displayName ?? "участник"}» назначен: ${updated.size}`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Не удалось назначить ответственного");
+    } finally { setBusy(false); }
+  };
+
   const exportCsv = () => {
     const source = selectedIds.length ? contacts.filter((contact) => selected.has(contact.id)) : visible;
     const escape = (value: string) => {
@@ -372,14 +410,34 @@ export function ContactsView() {
         <div>
           <p className="section-eyebrow">База и доступность каналов</p>
           <h1 className="text-[28px] font-semibold tracking-[-.04em]">Контакты</h1>
-          <p className="mt-2 text-sm text-[var(--text-muted)]">{loading ? "Загружаем базу…" : `${contacts.length} контактов · ${activeCount} активных`}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <p className="text-sm text-[var(--text-muted)]">{loading ? "Загружаем базу…" : `${contacts.length} контактов · ${activeCount} активных`}</p>
+            <a href="https://tech-pravo.ru/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[#12BFE5]/30 bg-[#12BFE5]/10 px-2.5 py-1 text-[10px] font-bold text-[#075F76] transition hover:bg-[#12BFE5]/15">
+              <span className="rounded bg-[#11131D] px-1 py-0.5 text-[8px] tracking-[.06em] text-white">ТП</span>
+              Команда «ТехнологИИ Права»
+            </a>
+          </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link href="/import" className="btn btn-secondary gap-2"><Upload aria-hidden="true" className="size-4" />Импорт таблицы</Link>
+          <button type="button" onClick={() => setView("import")} className="btn btn-secondary gap-2"><Upload aria-hidden="true" className="size-4" />Импорт таблицы</button>
           <button type="button" onClick={() => setEditing("new")} className="btn btn-secondary gap-2"><Plus aria-hidden="true" className="size-4" />Добавить контакт</button>
           <Link href={campaignHref(selectedIds)} className="btn btn-primary gap-2"><SendHorizontal aria-hidden="true" className="size-4" />{selectedIds.length ? `Кампания · ${selectedIds.length}` : "Новая кампания"}</Link>
         </div>
       </header>
+
+      <nav aria-label="Режим работы с контактами" className="inline-flex rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)] p-1">
+        <button type="button" onClick={() => setView("contacts")} aria-pressed={activeView === "contacts"} className={`rounded-lg px-3 py-2 text-[12px] font-semibold transition ${activeView === "contacts" ? "bg-white text-[var(--primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-strong)]"}`}>База команды</button>
+        <button type="button" onClick={() => setView("import")} aria-pressed={activeView === "import"} className={`rounded-lg px-3 py-2 text-[12px] font-semibold transition ${activeView === "import" ? "bg-white text-[var(--primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-strong)]"}`}>Импорт таблицы</button>
+      </nav>
+
+      {activeView === "import" ? (
+        <section className="card p-4 sm:p-6">
+          <div className="mb-5 rounded-xl border border-primary/15 bg-primary/5 px-4 py-3 text-[12px] leading-5 text-[var(--text-muted)]">
+            Импорт работает внутри общей базы: после проверки вы увидите, какие строки добавлены, обновлены или требуют внимания. Исходный файл остаётся у вас, а новые контакты автоматически помечаются цветом текущего участника.
+          </div>
+          <ImportWizard />
+        </section>
+      ) : <>
 
       <section className="grid gap-3 sm:grid-cols-3" aria-label="Точный охват по каналам">
         {coverage.map(({ label, count, Icon }) => (
@@ -396,7 +454,7 @@ export function ContactsView() {
           <label><span className="sr-only">Фильтр по городу</span><select className="input" value={city} onChange={(event) => setCity(event.target.value)}><option value="all">Все города</option>{filterOptions.cities.map((value) => <option key={value}>{value}</option>)}</select></label>
           <label><span className="sr-only">Фильтр по команде</span><select className="input" value={team} onChange={(event) => setTeam(event.target.value)}><option value="all">Все команды</option>{filterOptions.teams.map((value) => <option key={value}>{value}</option>)}</select></label>
           <label><span className="sr-only">Фильтр по каналу</span><select className="input" value={channel} onChange={(event) => setChannel(event.target.value)}><option value="all">Все каналы</option><option value="email">Доступен Email</option><option value="telegram">Доступен Telegram</option><option value="vk">Доступен ВКонтакте</option></select></label>
-          <label><span className="sr-only">Фильтр по автору</span><select className="input" value={owner} onChange={(event) => setOwner(event.target.value)}><option value="all">Добавили все</option>{members.map((member) => <option key={member.id} value={member.id}>{member.displayName}</option>)}</select></label>
+          <label><span className="sr-only">Фильтр по ответственному</span><select className="input" value={owner} onChange={(event) => setOwner(event.target.value)}><option value="all">Все ответственные</option>{members.map((member) => <option key={member.id} value={member.id}>{member.displayName}</option>)}</select></label>
           <button type="button" onClick={exportCsv} disabled={!selectedIds.length && !visible.length} className="btn btn-secondary gap-2"><Download aria-hidden="true" className="size-4" />Экспорт</button>
         </div>
         <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border)] bg-[var(--surface-subtle)]/65 px-3 py-2.5">
@@ -414,9 +472,10 @@ export function ContactsView() {
               <tbody>{visible.map((contact) => {
                 const checked = selected.has(contact.id);
                 const creator = contact.createdByParticipantId ? membersById.get(contact.createdByParticipantId) : undefined;
+                const responsible = membersById.get(contact.responsibleParticipantId ?? contact.createdByParticipantId ?? "");
                 const readyChannels = [contact.email && contact.emailConsent && contact.status === "active", contact.status === "active" && contact.telegramChatId && contact.telegramConsent, contact.status === "active" && contact.vkUserId && contact.vkConsent].filter(Boolean).length;
                 const primaryEndpoint = contact.email || (contact.telegramChatId ? `Telegram: ${contact.telegramChatId}` : contact.vkUserId ? `ВК: ${contact.vkUserId}` : "Канал не указан");
-                return <tr key={contact.id} data-selected={checked} style={{ boxShadow: `inset 4px 0 0 ${creator?.color ?? "#CBD5E1"}` }}><td><button type="button" onClick={() => setSelected((current) => { const next = new Set(current); if (next.has(contact.id)) next.delete(contact.id); else next.add(contact.id); return next; })} aria-label={`Выбрать ${contact.fullName}`} className={`grid size-4 place-items-center rounded border ${checked ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-[var(--border-strong)] bg-white"}`}>{checked && <Check aria-hidden="true" className="size-3" />}</button></td><td><button type="button" onClick={() => setDrawerContact(contact)} className="flex items-center gap-3 text-left"><span className="grid size-9 shrink-0 place-items-center rounded-full text-[10px] font-semibold text-white" style={{ backgroundColor: creator?.color ?? contact.avatarColor }}>{contact.firstName[0]}{contact.lastName[0]}</span><span><span className="block text-[12px] font-semibold hover:text-[var(--primary)]">{contact.fullName}</span><span className="mt-0.5 block text-[10px] text-[var(--text-subtle)]">{primaryEndpoint}</span>{creator && <span className="mt-1 inline-flex items-center gap-1 text-[9px] font-semibold" style={{ color: creator.color }}><i className="size-1.5 rounded-full" style={{ backgroundColor: creator.color }} />Добавил: {creator.displayName}</span>}</span></button></td><td><p className="text-[11px] font-medium">{contact.companyName || "—"}</p><p className="mt-0.5 text-[10px] text-[var(--text-subtle)]">{contact.jobTitle || "Должность не указана"}</p></td><td><span className={`badge ${readyChannels ? "badge-info" : "badge-warning"}`}>{readyChannels ? `${readyChannels} из 3` : "Нет доступных"}</span></td><td><span className={`badge ${statusTone[contact.status]}`}>{statusLabel[contact.status]}</span></td><td className="text-[11px] text-[var(--text-muted)]">{dateFormatter.format(new Date(contact.updatedAt))}</td><td><button type="button" onClick={() => setEditing(contact)} className="grid size-8 place-items-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface-subtle)]" aria-label={`Изменить ${contact.fullName}`}><Pencil aria-hidden="true" className="size-4" /></button></td></tr>;
+                return <tr key={contact.id} data-selected={checked} style={{ boxShadow: `inset 4px 0 0 ${responsible?.color ?? creator?.color ?? "#CBD5E1"}` }}><td><button type="button" onClick={() => setSelected((current) => { const next = new Set(current); if (next.has(contact.id)) next.delete(contact.id); else next.add(contact.id); return next; })} aria-label={`Выбрать ${contact.fullName}`} className={`grid size-4 place-items-center rounded border ${checked ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-[var(--border-strong)] bg-white"}`}>{checked && <Check aria-hidden="true" className="size-3" />}</button></td><td><button type="button" onClick={() => setDrawerContact(contact)} className="flex items-center gap-3 text-left"><span className="grid size-9 shrink-0 place-items-center rounded-full text-[10px] font-semibold text-white" style={{ backgroundColor: responsible?.color ?? creator?.color ?? contact.avatarColor }}>{contact.firstName[0]}{contact.lastName[0]}</span><span><span className="block text-[12px] font-semibold hover:text-[var(--primary)]">{contact.fullName}</span><span className="mt-0.5 block text-[10px] text-[var(--text-subtle)]">{primaryEndpoint}</span>{responsible && <span className="mt-1 inline-flex items-center gap-1 text-[9px] font-semibold" style={{ color: responsible.color }}><i className="size-1.5 rounded-full" style={{ backgroundColor: responsible.color }} />Ответственный: {responsible.displayName}</span>}</span></button></td><td><p className="text-[11px] font-medium">{contact.companyName || "—"}</p><p className="mt-0.5 text-[10px] text-[var(--text-subtle)]">{contact.jobTitle || "Должность не указана"}</p></td><td><span className={`badge ${readyChannels ? "badge-info" : "badge-warning"}`}>{readyChannels ? `${readyChannels} из 3` : "Нет доступных"}</span></td><td><span className={`badge ${statusTone[contact.status]}`}>{statusLabel[contact.status]}</span></td><td className="text-[11px] text-[var(--text-muted)]">{dateFormatter.format(new Date(contact.updatedAt))}</td><td><button type="button" onClick={() => setEditing(contact)} className="grid size-8 place-items-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface-subtle)]" aria-label={`Изменить ${contact.fullName}`}><Pencil aria-hidden="true" className="size-4" /></button></td></tr>;
               })}</tbody>
             </table>
           </div>
@@ -424,11 +483,12 @@ export function ContactsView() {
           <div className="px-6 py-12 text-center"><Search aria-hidden="true" className="mx-auto size-7 text-[var(--text-subtle)]" /><p className="mt-3 text-[13px] font-semibold">Контакты не найдены</p><p className="mt-1 text-[11px] text-[var(--text-muted)]">Измените поиск или добавьте новый контакт.</p><button type="button" onClick={() => setEditing("new")} className="btn btn-primary mt-4">Добавить контакт</button></div>
         )}
 
-        <div className="flex flex-col gap-2 border-t border-[var(--border)] px-4 py-3 text-[11px] text-[var(--text-muted)] xl:flex-row xl:items-center xl:justify-between"><span>Найдено: {visible.length}</span>{selectedIds.length > 0 && <div className="flex flex-wrap items-center gap-2"><span className="font-semibold text-[var(--text-strong)]">Выбрано: {selectedIds.length}</span><div className="flex items-center gap-1 rounded-lg border border-[var(--border)] bg-white p-1"><UsersRound aria-hidden="true" className="ml-1 size-3.5 text-[var(--primary)]" /><input value={teamName} onChange={(event) => setTeamName(event.target.value)} className="h-7 w-36 border-0 bg-transparent px-1 text-[11px] outline-none" placeholder="Название команды" /><button type="button" onClick={() => void assignTeam()} disabled={busy || !teamName.trim()} className="btn btn-primary btn-sm">Добавить</button></div><button type="button" onClick={() => void removeSelected()} disabled={busy} className="btn btn-danger btn-sm gap-2"><Trash2 aria-hidden="true" className="size-3.5" />Удалить</button><button type="button" onClick={() => setSelected(new Set())} className="btn btn-ghost btn-sm gap-2"><X aria-hidden="true" className="size-3.5" />Снять выбор</button></div>}</div>
+        <div className="flex flex-col gap-2 border-t border-[var(--border)] px-4 py-3 text-[11px] text-[var(--text-muted)] xl:flex-row xl:items-center xl:justify-between"><span>Найдено: {visible.length}</span>{selectedIds.length > 0 && <div className="flex flex-wrap items-center gap-2"><span className="font-semibold text-[var(--text-strong)]">Выбрано: {selectedIds.length}</span><div className="flex items-center gap-1 rounded-lg border border-[var(--border)] bg-white p-1"><select value={responsibleId} onChange={(event) => setResponsibleId(event.target.value)} className="h-7 max-w-44 border-0 bg-transparent px-1 text-[11px] outline-none"><option value="">Назначить ответственного</option>{members.map((member) => <option key={member.id} value={member.id}>{member.displayName}</option>)}</select><button type="button" onClick={() => void assignResponsible()} disabled={busy || !responsibleId} className="btn btn-primary btn-sm">Назначить</button></div><div className="flex items-center gap-1 rounded-lg border border-[var(--border)] bg-white p-1"><UsersRound aria-hidden="true" className="ml-1 size-3.5 text-[var(--primary)]" /><input value={teamName} onChange={(event) => setTeamName(event.target.value)} className="h-7 w-36 border-0 bg-transparent px-1 text-[11px] outline-none" placeholder="Название команды" /><button type="button" onClick={() => void assignTeam()} disabled={busy || !teamName.trim()} className="btn btn-primary btn-sm">Добавить</button></div><button type="button" onClick={() => void removeSelected()} disabled={busy} className="btn btn-danger btn-sm gap-2"><Trash2 aria-hidden="true" className="size-3.5" />Удалить</button><button type="button" onClick={() => setSelected(new Set())} className="btn btn-ghost btn-sm gap-2"><X aria-hidden="true" className="size-3.5" />Снять выбор</button></div>}</div>
       </section>
 
       {drawerContact && <ContactDrawer contact={drawerContact} timezone={timezone} onClose={() => setDrawerContact(null)} onEdit={(contact) => { setDrawerContact(null); setEditing(contact); }} />}
       {editing && <ContactFormDialog contact={editing === "new" ? null : editing} busy={busy} onClose={() => setEditing(null)} onSave={saveContact} />}
+      </>}
       {notice && <div role="status" aria-live="polite" className="fixed bottom-6 right-6 z-[100] flex items-center gap-2 rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-[12px] font-semibold shadow-[var(--shadow-floating)]"><span className="grid size-5 place-items-center rounded-full bg-[var(--success-subtle)] text-[var(--success)]"><Check aria-hidden="true" className="size-3" /></span>{notice}</div>}
     </div>
   );

@@ -1,10 +1,7 @@
 import {
   BarChart3,
-  CalendarDays,
-  Cable,
   ContactRound,
   FolderOpen,
-  FileUp,
   Images,
   LayoutDashboard,
   LayoutTemplate,
@@ -95,14 +92,6 @@ export const productNavigation: ProductNavGroup[] = [
         keywords: ["парсинг", "сайт", "номер", "телефон", "email", "поиск"],
       },
       {
-        label: "Импорт",
-        description: "Загрузить CSV, XLSX, XLS или TSV",
-        href: "/import",
-        icon: FileUp,
-        exact: true,
-        keywords: ["таблица", "загрузка", "добавить контакты"],
-      },
-      {
         label: "Сегменты",
         description: "Динамические аудитории по правилам",
         href: "/segments",
@@ -115,26 +104,11 @@ export const productNavigation: ProductNavGroup[] = [
     label: "Проверка и отправка",
     items: [
       {
-        label: "Календарь рассылок",
-        description: "Темы, группы и время отправки",
-        href: "/calendar",
-        icon: CalendarDays,
-        exact: true,
-        keywords: ["расписание", "дата", "группа", "тема", "планировщик"],
-      },
-      {
-        label: "Тест и отправка",
-        description: "Проверить письмо и передать провайдеру",
+        label: "Рассылка писем",
+        description: "Кампании, тесты и история отправки",
         href: "/campaigns",
         icon: Megaphone,
-        keywords: ["рассылка", "email", "telegram", "вконтакте"],
-      },
-      {
-        label: "Подключения",
-        description: "Настроить реальных провайдеров доставки",
-        href: "/integrations",
-        icon: Cable,
-        keywords: ["vk workspace", "telegram", "вконтакте", "smtp", "api", "интеграции"],
+        keywords: ["рассылка", "отправка", "тест", "email", "telegram", "вконтакте"],
       },
       {
         label: "История",
@@ -234,7 +208,7 @@ export function isProductRouteActive(location: string, item: ProductNavItem) {
 export function getProductSection(pathname: string) {
   if (pathname === "/campaigns/new") return "Новая кампания";
   if (pathname.startsWith("/settings")) return "Настройки";
-  if (pathname.startsWith("/import")) return "Импорт контактов";
+  if (pathname.startsWith("/import")) return "Контакты";
   if (pathname.startsWith("/templates")) return "Шаблоны";
   if (pathname.startsWith("/email-builder")) return "Редактор писем";
   if (pathname.startsWith("/presentations")) return "Презентации";

@@ -64,6 +64,13 @@
       "when": 1786869281564,
       "tag": "0008_massive_silver_samurai",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1786887682213,
+      "tag": "0009_worried_talisman",
+      "breakpoints": true
     }
   ]
 }

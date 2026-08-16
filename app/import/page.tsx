@@ -1,6 +1,6 @@
-import type { Metadata } from "next";
-import { AppShell } from "@/components/layout/AppShell";
-import { ImportWizard } from "@/components/imports/ImportWizard";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Импорт контактов" };
-export default function ImportPage() { return <AppShell title="Импорт"><ImportWizard /></AppShell>; }
+/** Импорт теперь является режимом общей базы контактов. */
+export default function ImportPage() {
+  redirect("/contacts?view=import");
+}
