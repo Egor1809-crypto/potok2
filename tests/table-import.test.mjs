@@ -62,6 +62,7 @@ for (const [extension, bookType, expectedFormat] of [
     const mapping = suggestMapping(parsed.headers);
     const validation = validateRows(parsed.rows, mapping, {
       emails: new Set(),
+      phones: new Set(),
       telegramChatIds: new Set(),
       vkUserIds: new Set(),
     });
@@ -113,6 +114,7 @@ test("XLSX imports all 60 contacts from every workbook sheet", async () => {
   const mapping = suggestMapping(parsed.headers);
   const validation = validateRows(parsed.rows, mapping, {
     emails: new Set(),
+    phones: new Set(),
     telegramChatIds: new Set(),
     vkUserIds: new Set(),
   });
@@ -123,4 +125,66 @@ test("XLSX imports all 60 contacts from every workbook sheet", async () => {
   assert.equal(validation.rows.at(17)?.sheetName, "Команда 1");
   assert.equal(validation.rows.at(18)?.sheetName, "Команда 2");
   assert.equal(validation.rows.at(-1)?.input?.email, "contact60@example.test");
+});
+
+test("XLSX detects a service header row and imports only aggregate contact queues", async () => {
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.aoa_to_sheet([
+      ["Распределение контактов"],
+      ["Обновлено: сегодня"],
+      [],
+      ["№", "Telegram ID", "Кому писать", "Ответственный", "Статус"],
+      [1, "10001", "ООО Альфа", "Шабалин Егор", "Не начато"],
+      [2, "10002", "ООО Бета", "Алла Артина", "В работе"],
+    ]),
+    "Все назначения",
+  );
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.aoa_to_sheet([
+      ["Служебный лист"],
+      ["№", "Telegram ID", "Кому писать"],
+      [1, "10001", "ООО Альфа"],
+    ]),
+    "Шабалин Егор",
+  );
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.aoa_to_sheet([
+      ["Телефоны"],
+      [],
+      [],
+      ["№", "Контакт / организация", "Мобильные номера", "Ответственный", "Статус"],
+      [1, "ООО Гамма", "+7 900 000 00 01", "Путин Дмитрий", "Готово"],
+    ]),
+    "Все мобильные",
+  );
+  const file = new File(
+    [XLSX.write(workbook, { type: "buffer", bookType: "xlsx" })],
+    "распределение.xlsx",
+  );
+
+  const parsed = await parseCsvFile(file);
+  const mapping = suggestMapping(parsed.headers);
+  const validation = validateRows(parsed.rows, mapping, {
+    emails: new Set(),
+    phones: new Set(),
+    telegramChatIds: new Set(),
+    vkUserIds: new Set(),
+    members: [
+      { id: "egor", displayName: "Шабалин Егор" },
+      { id: "alla", displayName: "Алла Артина" },
+      { id: "putin", displayName: "Путин Дмитрий" },
+    ],
+  }, parsed.headers);
+
+  assert.deepEqual(parsed.sheetNames, ["Все назначения", "Все мобильные"]);
+  assert.equal(parsed.rows.length, 3);
+  assert.equal(validation.summary.ready, 3);
+  assert.equal(validation.rows[0]?.input?.responsibleParticipantId, "egor");
+  assert.equal(validation.rows[2]?.input?.phone, "+7 900 000 00 01");
+  assert.equal(validation.rows[2]?.input?.lastName, "Гамма");
+  assert.equal(validation.rows[2]?.input?.customFields?.Статус, "Готово");
 });

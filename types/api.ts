@@ -65,6 +65,8 @@ export type ContactRecord = {
   vkUserId: string | null;
   vkConsent: boolean;
   lastContactedAt: string | null;
+  /** Исходные столбцы, которые не входят в стандартную карточку контакта. */
+  customFields: Record<string, string>;
   /** Участник, который ведёт контакт. Может отличаться от автора импорта. */
   responsibleParticipantId: string | null;
   createdByParticipantId: string | null;
@@ -746,6 +748,7 @@ export type ContactCreateInput = {
   telegramConsent?: boolean;
   vkUserId?: string | null;
   vkConsent?: boolean;
+  customFields?: Record<string, string>;
   responsibleParticipantId?: string | null;
 };
 

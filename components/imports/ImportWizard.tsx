@@ -55,7 +55,7 @@ const emptyImportRun: ImportRun = {
 };
 
 function emptyEndpoints(): ExistingContactEndpoints {
-  return { emails: new Set(), telegramChatIds: new Set(), vkUserIds: new Set() };
+  return { emails: new Set(), phones: new Set(), telegramChatIds: new Set(), vkUserIds: new Set(), members: [] };
 }
 
 const issueLabels: Record<RowIssue, string> = {
@@ -169,7 +169,7 @@ export function ImportWizard() {
   const validation = useMemo(
     () =>
       parsed && !mappingProblem
-        ? validateRows(parsed.rows, mapping, existingEndpoints)
+        ? validateRows(parsed.rows, mapping, existingEndpoints, parsed.headers)
         : null,
     [existingEndpoints, mapping, mappingProblem, parsed],
   );

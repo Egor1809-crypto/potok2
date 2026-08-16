@@ -1,0 +1,1 @@
+ALTER TABLE `contacts` ADD `custom_fields` text DEFAULT '{}' NOT NULL;

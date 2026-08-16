@@ -95,6 +95,22 @@ function normalizeLogin(value: unknown): string {
   return login;
 }
 
+function normalizeDisplayName(value: unknown): string {
+  return cleanText(value, "Имя", 100);
+}
+
+function participantNameKey(value: string): string {
+  return value
+    .toLocaleLowerCase("ru-RU")
+    .replaceAll("ё", "е")
+    .replace(/[^а-яa-z0-9]+/giu, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .sort()
+    .join(" ");
+}
+
 function validatePassword(value: unknown): string {
   if (typeof value !== "string" || value.length < 10 || value.length > 128) {
     throw new ApiRequestError("Пароль должен содержать от 10 до 128 символов.");
@@ -226,6 +242,7 @@ export async function registerTeamMember(request: Request, payload: unknown) {
     throw new ApiRequestError("Команда не найдена. Проверьте название или приглашение.", 404);
   }
   const login = normalizeLogin(object.login);
+  const displayName = normalizeDisplayName(object.displayName);
   const password = validatePassword(object.password);
   await applyRateLimit(request, login);
   const db = getDb();
@@ -278,7 +295,30 @@ export async function registerTeamMember(request: Request, payload: unknown) {
   const now = new Date().toISOString();
   const colorIndex = Number(accountCount) % TEAM_COLORS.length;
   let participantId = newId("participant");
-  if (isFirst) {
+  const rosterRows = await db
+    .select()
+    .from(participants)
+    .where(and(
+      eq(participants.workspaceId, TEAM_WORKSPACE_ID),
+      isNull(participants.login),
+      isNull(participants.passwordHash),
+    ));
+  const rosterProfile = rosterRows.find(
+    (row) => participantNameKey(row.displayName) === participantNameKey(displayName),
+  );
+  if (rosterProfile) {
+    participantId = rosterProfile.id;
+    await db.update(participants).set({
+      login,
+      passwordHash,
+      passwordSalt: salt,
+      displayName: rosterProfile.displayName,
+      email: `${login}@team.potok.local`,
+      status: "active",
+      lastLoginAt: now,
+      updatedAt: now,
+    }).where(eq(participants.id, rosterProfile.id));
+  } else if (isFirst) {
     const [legacy] = await db
       .select()
       .from(participants)
@@ -290,7 +330,7 @@ export async function registerTeamMember(request: Request, payload: unknown) {
         login,
         passwordHash,
         passwordSalt: salt,
-        displayName: login,
+        displayName,
         email: `${login}@team.potok.local`,
         color: TEAM_COLORS[colorIndex],
         status: "active",
@@ -311,14 +351,14 @@ export async function registerTeamMember(request: Request, payload: unknown) {
         );
     }
   }
-  if (participantId !== "participant-main") {
+  if (participantId !== "participant-main" && !rosterProfile) {
     await db.insert(participants).values({
       id: participantId,
       workspaceId: TEAM_WORKSPACE_ID,
       login,
       passwordHash,
       passwordSalt: salt,
-      displayName: login,
+      displayName,
       email: `${login}@team.potok.local`,
       color: TEAM_COLORS[colorIndex],
       status: "active",

@@ -110,6 +110,7 @@ const schemaStatements = [
     vk_user_id TEXT,
     vk_consent INTEGER NOT NULL DEFAULT 0,
     last_contacted_at TEXT,
+    custom_fields TEXT NOT NULL DEFAULT '{}',
     responsible_participant_id TEXT REFERENCES participants(id) ON DELETE SET NULL,
     created_by_participant_id TEXT REFERENCES participants(id) ON DELETE SET NULL,
     updated_by_participant_id TEXT REFERENCES participants(id) ON DELETE SET NULL,
@@ -427,6 +428,9 @@ async function createSchema() {
   }
   if (!contactColumns.results.some((column) => column.name === "responsible_participant_id")) {
     await d1.prepare("ALTER TABLE contacts ADD COLUMN responsible_participant_id TEXT REFERENCES participants(id) ON DELETE SET NULL").run();
+  }
+  if (!contactColumns.results.some((column) => column.name === "custom_fields")) {
+    await d1.prepare("ALTER TABLE contacts ADD COLUMN custom_fields TEXT NOT NULL DEFAULT '{}'").run();
   }
   await d1.batch([
     d1.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_participants_workspace_login ON participants(workspace_id, login) WHERE login IS NOT NULL"),

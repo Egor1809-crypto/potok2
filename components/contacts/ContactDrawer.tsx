@@ -150,6 +150,23 @@ export function ContactDrawer({
             </div>
           </section>
 
+          {stored && Object.keys(contact.customFields ?? {}).length > 0 && (
+            <section className="mt-8">
+              <div>
+                <h2 className="text-[12px] font-semibold">Данные из таблицы</h2>
+                <p className="mt-1 text-[10px] leading-4 text-[var(--text-subtle)]">Исходные столбцы сохранены без преобразования — их можно сверить с загруженной таблицей.</p>
+              </div>
+              <div className="mt-3 overflow-hidden rounded-xl border border-[var(--border)]">
+                {Object.entries(contact.customFields).map(([label, value]) => (
+                  <div key={label} className="grid grid-cols-[minmax(100px,38%)_minmax(0,1fr)] gap-3 border-b border-[var(--border)] px-4 py-3 last:border-0">
+                    <span className="text-[10px] text-[var(--text-subtle)]">{label}</span>
+                    <span className="break-words text-[11px] font-medium">{value}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
           <section className="mt-8">
             <div className="flex items-start justify-between gap-4">
               <div><h2 className="text-[12px] font-semibold">Доступность каналов</h2><p className="mt-1 text-[10px] leading-4 text-[var(--text-subtle)]">Идентификатор и согласие проверяются отдельно.</p></div>

@@ -23,6 +23,7 @@ export const targetFieldOptions = [
   { value: "telegramConsent", label: "Согласие Telegram" },
   { value: "vkUserId", label: "Идентификатор пользователя ВКонтакте" },
   { value: "vkConsent", label: "Согласие ВКонтакте" },
+  { value: "responsibleName", label: "Ответственный в команде" },
 ] as const;
 
 export type TargetField = (typeof targetFieldOptions)[number]["value"];
@@ -100,10 +101,13 @@ const aliases: Record<Exclude<TargetField, "ignore">, string[]> = {
     "согласиепочта",
     "согласиеэлектроннаяпочта",
   ],
-  fullName: ["fullname", "name", "фио", "полноеимя", "имяконтакта"],
+  fullName: [
+    "fullname", "name", "фио", "полноеимя", "имяконтакта",
+    "комуписать", "контакторганизация",
+  ],
   firstName: ["firstname", "givenname", "имя"],
   lastName: ["lastname", "surname", "familyname", "фамилия"],
-  phone: ["phone", "phonenumber", "mobile", "телефон", "мобильный"],
+  phone: ["phone", "phonenumber", "mobile", "телефон", "мобильный", "мобильныеномера"],
   companyName: [
     "company",
     "companyname",
@@ -152,6 +156,7 @@ const aliases: Record<Exclude<TargetField, "ignore">, string[]> = {
     "согласиевк",
     "согласиевконтакте",
   ],
+  responsibleName: ["ответственный", "менеджер", "владелец", "куратор"],
 };
 
 function normalizeHeader(value: string): string {
@@ -320,13 +325,33 @@ function parsedWorkbook(
 ): ParsedCsv {
   const headerKeys = new Map<string, number>();
   const headers: string[] = [];
-  const sheetHeaders = sheets.map(({ sheetName, records }) => {
-    const localHeaders = uniqueHeaders(records[0]);
-    if (localHeaders.length < 2) {
-      throw new Error(`На листе «${sheetName}» должно быть не менее двух столбцов.`);
-    }
+  const targetForHeader = (header: string): Exclude<TargetField, "ignore"> | null => {
+    const normalized = normalizeHeader(header.replace(/ \(\d+\)$/, ""));
+    return (Object.entries(aliases).find(([, values]) =>
+      values.some((value) => normalizeHeader(value) === normalized),
+    )?.[0] as Exclude<TargetField, "ignore"> | undefined) ?? null;
+  };
+  const detectedSheets = sheets.flatMap(({ sheetName, records }) => {
+    const headerRow = records.findIndex((values) => {
+      const mapped = values.map((value) => targetForHeader(value)).filter(Boolean);
+      return mapped.length >= 2 && mapped.some((field) => field === "email" || field === "phone" || field === "telegramChatId" || field === "vkUserId");
+    });
+    return headerRow < 0 ? [] : [{ sheetName, records, headerRow }];
+  });
+  if (!detectedSheets.length) {
+    throw new Error("Не нашли строку заголовков с именем и каналом связи. Укажите лист со сводной таблицей контактов.");
+  }
+  // In workbooks with individual sheets and an aggregate queue, import only the
+  // aggregate sheets. This prevents the same people appearing twice in the review.
+  const aggregateSheets = detectedSheets.filter(({ sheetName }) => /^(все\s|общ)/iu.test(sheetName.trim()));
+  const selectedSheets = aggregateSheets.length ? aggregateSheets : detectedSheets;
+  const sheetHeaders = selectedSheets.map(({ sheetName, records, headerRow }) => {
+    const localHeaders = uniqueHeaders(records[headerRow]);
     const indexes = localHeaders.map((header) => {
-      const key = normalizeHeader(header.replace(/ \(\d+\)$/, ""));
+      const target = targetForHeader(header);
+      // Equivalent headers from different sheets (for example, “Кому писать”
+      // and “Контакт / организация”) form one import field.
+      const key = target ? `target:${target}` : normalizeHeader(header.replace(/ \(\d+\)$/, ""));
       const existing = headerKeys.get(key);
       if (existing !== undefined) return existing;
       const next = headers.length;
@@ -334,13 +359,13 @@ function parsedWorkbook(
       headerKeys.set(key, next);
       return next;
     });
-    return { sheetName, records, indexes };
+    return { sheetName, records, indexes, headerRow };
   });
 
-  const rows = sheetHeaders.flatMap(({ sheetName, records, indexes }) =>
+  const rows = sheetHeaders.flatMap(({ sheetName, records, indexes, headerRow }) =>
     records
-      .slice(1)
-      .map((values, index) => ({ values, rowNumber: index + 2 }))
+      .slice(headerRow + 1)
+      .map((values, index) => ({ values, rowNumber: headerRow + index + 2 }))
       .filter(({ values }) => values.some((value) => value.trim().length > 0))
       .map(({ values, rowNumber }) => {
         const aligned = Array.from({ length: headers.length }, () => "");
@@ -364,8 +389,8 @@ function parsedWorkbook(
     delimiter: "\t",
     encoding: "UTF-8",
     format,
-    sheetName: sheets.length === 1 ? sheets[0].sheetName : undefined,
-    sheetNames: sheets.map((sheet) => sheet.sheetName),
+    sheetName: selectedSheets.length === 1 ? selectedSheets[0].sheetName : undefined,
+    sheetNames: selectedSheets.map((sheet) => sheet.sheetName),
   };
 }
 
@@ -425,10 +450,11 @@ export function suggestMapping(headers: string[]): FieldMapping {
 export function mappingError(mapping: FieldMapping): string | null {
   if (
     !mapping.includes("email") &&
+    !mapping.includes("phone") &&
     !mapping.includes("telegramChatId") &&
     !mapping.includes("vkUserId")
   ) {
-    return "Сопоставьте хотя бы один канал: адрес электронной почты, идентификатор чата Telegram или идентификатор пользователя ВКонтакте.";
+    return "Сопоставьте хотя бы один канал: адрес электронной почты, телефон, идентификатор чата Telegram или идентификатор пользователя ВКонтакте.";
   }
   const hasFullName = mapping.includes("fullName");
   const hasSeparateName =
@@ -459,6 +485,9 @@ function normalizedStatus(value: string): ContactStatus | null {
     active: "active",
     "активен": "active",
     "активный": "active",
+    "не начато": "active",
+    "в работе": "active",
+    "готово": "active",
     unsubscribed: "unsubscribed",
     "отписан": "unsubscribed",
     "отписался": "unsubscribed",
@@ -489,9 +518,26 @@ function normalizedBoolean(value: string): {
   return { value: false, invalid: true };
 }
 
+function participantKey(value: string): string {
+  return value
+    .toLocaleLowerCase("ru-RU")
+    .replaceAll("ё", "е")
+    .replaceAll("самойлова", "самайлова")
+    .replaceAll("александар", "александр")
+    .replaceAll("аганесович", "оганесович")
+    .replace(/[^а-яa-z0-9]+/giu, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .sort()
+    .join(" ");
+}
+
 function mappedContact(
   row: CsvRow,
   mapping: FieldMapping,
+  existing: ExistingContactEndpoints,
+  headers: string[],
 ): {
   input: ContactCreateInput;
   displayName: string;
@@ -561,6 +607,23 @@ function mappedContact(
   if (vkUserId) input.vkUserId = vkUserId;
   input.vkConsent = vkConsent.value;
 
+  const responsibleName = valueFor(row, mapping, "responsibleName");
+  if (responsibleName) {
+    const responsible = (existing.members ?? []).find(
+      (member) => participantKey(member.displayName) === participantKey(responsibleName),
+    );
+    input.responsibleParticipantId = responsible?.id ?? null;
+  }
+
+  const customFields: Record<string, string> = {};
+  row.values.forEach((value, index) => {
+    if (!value.trim()) return;
+    const header = (headers[index] ?? `Столбец ${index + 1}`).trim();
+    if (header && header.length <= 120) customFields[header] = value.trim().slice(0, 1_000);
+  });
+  if (responsibleName) customFields["Ответственный из таблицы"] = responsibleName;
+  if (Object.keys(customFields).length) input.customFields = customFields;
+
   const invalidChannel =
     emailConsent.invalid ||
     telegramConsent.invalid ||
@@ -602,22 +665,27 @@ export function validateRows(
   rows: CsvRow[],
   mapping: FieldMapping,
   existing: ExistingContactEndpoints,
+  headers: string[] = [],
 ): { rows: ValidatedRow[]; summary: ValidationSummary } {
   const seenEmails = new Set<string>();
+  const seenPhones = new Set<string>();
   const seenTelegram = new Set<string>();
   const seenVk = new Set<string>();
   const validated = rows.map<ValidatedRow>((row) => {
-    const mapped = mappedContact(row, mapping);
+    const mapped = mappedContact(row, mapping, existing, headers);
     const email = mapped.input.email ?? "";
+    const phone = mapped.input.phone?.replace(/\D/g, "") ?? "";
     const telegramChatId = mapped.input.telegramChatId ?? "";
     const vkUserId = mapped.input.vkUserId ?? "";
-    const hasEndpoint = Boolean(email || telegramChatId || vkUserId);
+    const hasEndpoint = Boolean(email || phone || telegramChatId || vkUserId);
     const exists =
       Boolean(email && existing.emails.has(email)) ||
+      Boolean(phone && existing.phones.has(phone)) ||
       Boolean(telegramChatId && existing.telegramChatIds.has(telegramChatId)) ||
       Boolean(vkUserId && existing.vkUserIds.has(vkUserId));
     const seen =
       Boolean(email && seenEmails.has(email)) ||
+      Boolean(phone && seenPhones.has(phone)) ||
       Boolean(telegramChatId && seenTelegram.has(telegramChatId)) ||
       Boolean(vkUserId && seenVk.has(vkUserId));
     let issue: RowIssue = "ready";
@@ -626,7 +694,7 @@ export function validateRows(
     else if (!hasEndpoint) issue = "missing-endpoint";
     else if (email && !emailPattern.test(email)) issue = "invalid-email";
     else if (exists) issue = "duplicate-existing";
-    else if (!mapped.input.firstName.trim() || !mapped.input.lastName.trim()) {
+    else if (!mapped.input.firstName.trim()) {
       issue = "missing-name";
     } else if (mapped.invalidStatus) issue = "invalid-status";
     else if (mapped.invalidScore) issue = "invalid-score";
@@ -636,6 +704,7 @@ export function validateRows(
 
     if (issue === "ready") {
       if (email) seenEmails.add(email);
+      if (phone) seenPhones.add(phone);
       if (telegramChatId) seenTelegram.add(telegramChatId);
       if (vkUserId) seenVk.add(vkUserId);
     }

@@ -209,6 +209,7 @@ function toContact(row: ContactRow): ContactRecord {
     vkUserId: row.vkUserId,
     vkConsent: row.vkConsent,
     lastContactedAt: row.lastContactedAt,
+    customFields: row.customFields ?? {},
     responsibleParticipantId: row.responsibleParticipantId,
     createdByParticipantId: row.createdByParticipantId,
     updatedByParticipantId: row.updatedByParticipantId,
@@ -590,6 +591,25 @@ function contactPhone(value: unknown, existing?: ContactRecord): string {
   return `+${digits}`;
 }
 
+function contactCustomFields(
+  value: unknown,
+  existing?: ContactRecord,
+): Record<string, string> {
+  if (value === undefined) return existing?.customFields ?? {};
+  const object = asObject(value);
+  const entries = Object.entries(object);
+  if (entries.length > 40) {
+    throw new ApiRequestError("Дополнительных полей контакта может быть не больше 40.");
+  }
+  const result: Record<string, string> = {};
+  for (const [key, raw] of entries) {
+    const field = cleanText(key, "Название дополнительного поля", 120);
+    if (!field) continue;
+    result[field] = cleanText(raw, `Дополнительное поле «${field}»`, 1_000);
+  }
+  return result;
+}
+
 function parseContact(
   payload: unknown,
   existing?: ContactRecord,
@@ -601,8 +621,8 @@ function parseContact(
     optionalText(object.lastName, "Фамилия", 100) ?? existing?.lastName ?? "";
   const email = contactEmail(object.email, existing);
   const phone = contactPhone(object.phone, existing);
+  const customFields = contactCustomFields(object.customFields, existing);
   if (!firstName) throw new ApiRequestError("Укажите имя контакта.");
-  if (!lastName) throw new ApiRequestError("Укажите фамилию контакта.");
 
   const parsedTelegramChatId = nullableText(
     object.telegramChatId,
@@ -717,6 +737,7 @@ function parseContact(
     telegramConsent,
     vkUserId,
     vkConsent,
+    customFields,
     responsibleParticipantId,
   };
 }
@@ -752,7 +773,10 @@ function contactValues(
     vkUserId: input.vkUserId ?? null,
     vkConsent: input.vkConsent ?? false,
     lastContactedAt: existing?.lastContactedAt ?? null,
-    responsibleParticipantId: input.responsibleParticipantId ?? existing?.responsibleParticipantId ?? actorId ?? null,
+    customFields: input.customFields ?? existing?.customFields ?? {},
+    responsibleParticipantId: input.responsibleParticipantId !== undefined
+      ? input.responsibleParticipantId
+      : (existing?.responsibleParticipantId ?? actorId ?? null),
     createdByParticipantId: existing?.createdByParticipantId ?? actorId ?? null,
     updatedByParticipantId: actorId ?? existing?.updatedByParticipantId ?? null,
     createdAt: existing?.createdAt ?? now,

@@ -2,6 +2,7 @@ import type {
   ContactCreateInput,
   ContactsBatchCreateResponse,
   ContactsListResponse,
+  ParticipantRecord,
 } from "@/types/api";
 
 async function readResponse<T>(response: Response): Promise<T> {
@@ -22,8 +23,10 @@ async function readResponse<T>(response: Response): Promise<T> {
 
 export type ExistingContactEndpoints = {
   emails: Set<string>;
+  phones: Set<string>;
   telegramChatIds: Set<string>;
   vkUserIds: Set<string>;
+  members: ParticipantRecord[];
 };
 
 export async function getExistingContactEndpoints(
@@ -44,6 +47,11 @@ export async function getExistingContactEndpoints(
         .map((contact) => contact.email.trim().toLocaleLowerCase("ru-RU"))
         .filter(Boolean),
     ),
+    phones: new Set(
+      payload.contacts
+        .map((contact) => contact.phone.replace(/\D/g, ""))
+        .filter(Boolean),
+    ),
     telegramChatIds: new Set(
       payload.contacts
         .map((contact) => contact.telegramChatId?.trim() ?? "")
@@ -54,6 +62,7 @@ export async function getExistingContactEndpoints(
         .map((contact) => contact.vkUserId?.trim() ?? "")
         .filter(Boolean),
     ),
+    members: payload.members ?? [],
   };
 }
 

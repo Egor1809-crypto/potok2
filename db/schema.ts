@@ -159,6 +159,10 @@ export const contacts = sqliteTable(
       .notNull()
       .default(false),
     lastContactedAt: text("last_contacted_at"),
+    customFields: text("custom_fields", { mode: "json" })
+      .$type<Record<string, string>>()
+      .notNull()
+      .default(sql`'{}'`),
     responsibleParticipantId: text("responsible_participant_id").references(
       () => participants.id,
       { onDelete: "set null" },

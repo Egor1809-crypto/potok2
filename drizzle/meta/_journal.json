@@ -71,6 +71,13 @@
       "when": 1786887682213,
       "tag": "0009_worried_talisman",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1786898182861,
+      "tag": "0010_parched_zarek",
+      "breakpoints": true
     }
   ]
 }
