@@ -17,6 +17,11 @@ export const WORKSPACE_ID = "workspace-main";
 export const PARTICIPANT_ID = "participant-main";
 
 let initialization: Promise<void> | null = null;
+// A Worker isolate is short-lived in production. Running the entire DDL and
+// template-seeding routine in every new isolate made even a simple page load
+// wait several seconds for D1. Keep a durable completion marker instead.
+// Bump this value whenever a runtime-only schema migration is added here.
+const RUNTIME_SCHEMA_VERSION = "runtime-schema-v1";
 
 const schemaStatements = [
   `CREATE TABLE IF NOT EXISTS workspaces (
@@ -810,8 +815,32 @@ export async function ensureDatabase(request: Request): Promise<TeamSession> {
 export async function ensureSystemDatabase(): Promise<void> {
   if (!initialization) {
     initialization = (async () => {
+      const d1 = getD1();
+      // This tiny table is safe to create before the full schema and lets a
+      // warm or newly-created Worker skip the expensive initialization path.
+      await d1
+        .prepare(
+          `CREATE TABLE IF NOT EXISTS system_state (
+            key TEXT PRIMARY KEY NOT NULL,
+            value TEXT NOT NULL,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+          )`,
+        )
+        .run();
+      const marker = await d1
+        .prepare("SELECT value FROM system_state WHERE key = ?")
+        .bind("runtime-schema-version")
+        .first<{ value: string }>();
+      if (marker?.value === RUNTIME_SCHEMA_VERSION) return;
       await createSchema();
       await seedDatabase(new Request("http://potok.internal/system"));
+      await d1
+        .prepare(
+          `INSERT INTO system_state (key, value, updated_at) VALUES (?, ?, ?)
+           ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+        )
+        .bind("runtime-schema-version", RUNTIME_SCHEMA_VERSION, new Date().toISOString())
+        .run();
     })().catch((error) => {
       initialization = null;
       throw error;
