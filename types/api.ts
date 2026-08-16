@@ -196,6 +196,8 @@ export type EmailBuilderDocumentInput = {
   templateId: string;
   subject: string;
   previewText: string;
+  /** Complete trusted email document imported from HTML. */
+  rawHtml?: string;
   accentColor: string;
   bodyBackground: string;
   backgroundImageUrl?: string;

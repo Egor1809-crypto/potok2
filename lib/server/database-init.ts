@@ -11,6 +11,7 @@ import { integrationProviders } from "@/config/integrations";
 import { BRAND_NAME } from "@/config/brand";
 import { ApiRequestError } from "./api-utils";
 import { starterEmailTemplateValues } from "./starter-template-library";
+import { conferenceProductionTemplateValues } from "@/data/conference-production-templates.generated";
 import { requireTeamSession, toTeamParticipant, type TeamSession } from "./team-auth";
 
 export const WORKSPACE_ID = "workspace-main";
@@ -21,7 +22,7 @@ let initialization: Promise<void> | null = null;
 // template-seeding routine in every new isolate made even a simple page load
 // wait several seconds for D1. Keep a durable completion marker instead.
 // Bump this value whenever a runtime-only schema migration is added here.
-const RUNTIME_SCHEMA_VERSION = "runtime-schema-v1";
+const RUNTIME_SCHEMA_VERSION = "runtime-schema-v2-conference-html";
 
 const schemaStatements = [
   `CREATE TABLE IF NOT EXISTS workspaces (
@@ -795,6 +796,28 @@ async function seedDatabase(request: Request) {
     }).onConflictDoUpdate({
       target: systemState.key,
       set: { value: "renamed", updatedAt: now },
+    });
+  }
+
+  const [productionConferenceState] = await db
+    .select({ key: systemState.key })
+    .from(systemState)
+    .where(eq(systemState.key, "conference-production-html-v1"))
+    .limit(1);
+  if (!productionConferenceState) {
+    for (const template of conferenceProductionTemplateValues) {
+      await db
+        .insert(emailTemplates)
+        .values({ ...template, workspaceId: WORKSPACE_ID })
+        .onConflictDoNothing();
+    }
+    await db.insert(systemState).values({
+      key: "conference-production-html-v1",
+      value: "seeded",
+      updatedAt: now,
+    }).onConflictDoUpdate({
+      target: systemState.key,
+      set: { value: "seeded", updatedAt: now },
     });
   }
 

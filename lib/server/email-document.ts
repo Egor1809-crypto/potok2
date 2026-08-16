@@ -133,10 +133,17 @@ export function parseEmailBuilderDocument(
   });
   const frameStyles = new Set<EmailFrameStyle>(["none", "hairline", "accent", "double", "dashed", "top-bottom", "left-band", "soft", "capsule", "stamp", "offset", "inset", "top-accent", "bottom-accent", "right-band", "editorial", "ticket", "window", "railway", "archive", "corner-cut", "top-ribbon", "side-lines", "luxury", "blueprint", "poster", "postcard", "focus"]);
   const frameStyle = frameStyles.has(source.frameStyle as EmailFrameStyle) ? source.frameStyle as EmailFrameStyle : "none";
+  const rawHtml = source.rawHtml === undefined
+    ? undefined
+    : text(source.rawHtml, "HTML письма", 500_000);
+  if (rawHtml && !/^\s*<!doctype html|^\s*<html[\s>]/i.test(rawHtml)) {
+    throw new ApiRequestError("Импортированный HTML должен содержать полный документ письма.");
+  }
   return {
     templateId: text(source.templateId, "ID шаблона", 160),
     subject: text(source.subject, "Тема", 300),
     previewText: text(source.previewText, "Прехедер", 500),
+    ...(rawHtml ? { rawHtml } : {}),
     accentColor: color(source.accentColor, "Акцент"),
     bodyBackground: color(source.bodyBackground, "Фон письма"),
     ...(source.backgroundImageUrl === undefined || source.backgroundImageUrl === ""
@@ -252,6 +259,7 @@ function blockHtml(block: EmailBuilderBlockInput, accent: string) {
 }
 
 export function compileEmailDocument(document: EmailBuilderDocumentInput) {
+  if (document.rawHtml) return document.rawHtml;
   const blocks = document.blocks.map((block) => blockHtml(block, document.accentColor)).join("");
   const frameCss = emailFrameInlineCss(document.frameStyle ?? "none", document.frameColor ?? document.accentColor, document.frameRadius ?? 0);
   const backgroundImage = document.backgroundImageUrl
@@ -267,6 +275,20 @@ export function compileEmailDocument(document: EmailBuilderDocumentInput) {
 export function emailDocumentPlainText(
   document: EmailBuilderDocumentInput,
 ): string {
+  if (document.rawHtml) {
+    const text = document.rawHtml
+      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
+      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&nbsp;|&#160;/gi, " ")
+      .replace(/&amp;/gi, "&")
+      .replace(/&quot;|&#34;/gi, '"')
+      .replace(/&#39;|&apos;/gi, "'")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!text) throw new ApiRequestError("Импортированный HTML не содержит текста.");
+    return text.slice(0, 200_000);
+  }
   const sections = document.blocks.flatMap((block) => {
     if (block.type === "divider" || block.type === "spacer" || block.type === "pattern") return [];
     if (block.type === "button") return [block.label || block.content];

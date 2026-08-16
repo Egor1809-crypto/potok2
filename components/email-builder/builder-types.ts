@@ -34,6 +34,7 @@ export type BuilderDocument = {
   templateId: string;
   subject: string;
   previewText: string;
+  rawHtml?: string;
   accentColor: string;
   bodyBackground: string;
   backgroundImageUrl?: string;

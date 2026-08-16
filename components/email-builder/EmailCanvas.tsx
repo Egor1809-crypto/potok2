@@ -126,7 +126,21 @@ export function EmailCanvas({
               ),
             }}
           >
-            {document.blocks.length === 0 ? (
+            {document.rawHtml ? (
+              <div className="bg-surface">
+                <div className="border-b border-border bg-primary-subtle/45 px-4 py-2 text-[10px] leading-4 text-text-muted">
+                  Готовый HTML-макет сохранён без пересборки. Его изображения,
+                  адаптивная верстка и ссылки используются в исходном виде.
+                </div>
+                <iframe
+                  title="Предпросмотр готового HTML-письма"
+                  srcDoc={document.rawHtml}
+                  sandbox="allow-popups allow-popups-to-escape-sandbox"
+                  className={cn("block w-full border-0 bg-white", isMobile ? "h-[720px]" : "h-[900px]")}
+                />
+              </div>
+            ) : null}
+            {!document.rawHtml && document.blocks.length === 0 ? (
               <div className="grid min-h-[420px] place-items-center px-8 py-14 text-center">
                 <div className="max-w-[320px]">
                   <span className="mx-auto grid size-12 place-items-center rounded-2xl border border-dashed border-primary/40 bg-primary-subtle text-primary">
@@ -150,7 +164,7 @@ export function EmailCanvas({
                 </div>
               </div>
             ) : null}
-            {document.blocks.map((block, index) => (
+            {!document.rawHtml ? document.blocks.map((block, index) => (
               <CanvasBlock
                 key={block.id}
                 block={block}
@@ -165,9 +179,9 @@ export function EmailCanvas({
                 onDelete={() => onDelete(block.id)}
                 onInlineEdit={(content) => onInlineEdit(block.id, content)}
               />
-            ))}
+            )) : null}
 
-            <div
+            {!document.rawHtml ? <div
               className="px-6 py-5 text-center"
               style={{ backgroundColor: document.bodyBackground }}
             >
@@ -179,7 +193,7 @@ export function EmailCanvas({
                 <Plus aria-hidden="true" className="size-3.5" />
                 Добавить блок контента
               </button>
-            </div>
+            </div> : null}
           </div>
 
           <p className="m-0 px-4 pb-2 pt-4 text-center text-[9px] leading-4 text-text-subtle">

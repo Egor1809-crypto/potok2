@@ -163,11 +163,22 @@ export function TemplateThumbnail({ template }: { template: EmailTemplateRecord 
           ...emailFrameCss(frameStyle, frameColor, Math.min(frameRadius, 14)),
         }}
       >
-        <div className="absolute left-1/2 top-0 w-[340px] origin-top -translate-x-1/2 scale-[0.6] sm:scale-[0.64]">
-          {blocks.slice(0, 9).map((block) => (
-            <TemplateMiniBlock key={block.id} block={block} accentColor={accentColor} />
-          ))}
-        </div>
+        {template.builderDocument.rawHtml ? (
+          <iframe
+            title={`Предпросмотр шаблона «${template.name}»`}
+            srcDoc={template.emailBodyHtml}
+            sandbox=""
+            tabIndex={-1}
+            aria-hidden="true"
+            className="pointer-events-none absolute left-1/2 top-0 h-[470px] w-[640px] origin-top -translate-x-1/2 scale-[0.42] border-0 sm:scale-[0.45]"
+          />
+        ) : (
+          <div className="absolute left-1/2 top-0 w-[340px] origin-top -translate-x-1/2 scale-[0.6] sm:scale-[0.64]">
+            {blocks.slice(0, 9).map((block) => (
+              <TemplateMiniBlock key={block.id} block={block} accentColor={accentColor} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
