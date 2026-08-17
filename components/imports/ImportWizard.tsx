@@ -253,8 +253,9 @@ export function ImportWizard() {
         tags: Array.from(new Set([...(input.tags ?? []), importSheetTag])),
         emailConsent:
           Boolean(input.email) &&
-          emailConsentConfirmed &&
-          (!hasMappedEmailConsent || Boolean(input.emailConsent)),
+          (hasMappedEmailConsent
+            ? Boolean(input.emailConsent)
+            : emailConsentConfirmed),
       }));
     if (contacts.length === 0) return;
 
@@ -659,7 +660,7 @@ export function ImportWizard() {
                 </table>
               </div>
 
-              {readyEmailCount > 0 && (
+              {readyEmailCount > 0 && !hasMappedEmailConsent && (
               <div className="border-t border-[var(--border)] p-5 sm:px-6">
                 <div className="flex items-start gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)] p-4">
                   <input
@@ -678,21 +679,27 @@ export function ImportWizard() {
                       htmlFor="import-email-consent"
                       className="block cursor-pointer text-[10px] font-semibold"
                     >
-                      {hasMappedEmailConsent
-                        ? "Подтверждаю достоверность email-согласий из таблицы"
-                        : "У всех импортируемых контактов с email есть согласие на email-рассылку"}
+                      У всех импортируемых контактов с email есть согласие на email-рассылку
                     </label>
                     <span
                       id="import-email-consent-help"
                       className="mt-1 block text-[9px] leading-4 text-[var(--text-tertiary)]"
                     >
-                      {hasMappedEmailConsent
-                        ? "Согласие будет записано только у строк со значением «да» или «1». Без подтверждения все контакты сохранятся без email-согласия."
-                        : "Отмечайте только если согласие уже получено. Без отметки контакты сохранятся без email-согласия."}
+                      Отмечайте только если согласие уже получено. Без отметки контакты сохранятся без email-согласия.
                     </span>
                   </span>
                 </div>
               </div>
+              )}
+              {readyEmailCount > 0 && hasMappedEmailConsent && (
+                <div className="border-t border-[var(--border)] p-5 sm:px-6">
+                  <div className="flex items-start gap-3 rounded-xl border border-[#bce8d2] bg-[#f2fbf6] p-4">
+                    <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-[#21855a]" />
+                    <p className="text-[10px] leading-5 text-[var(--text-secondary)]">
+                      Найден столбец «Согласие Email». Галочки вручную ставить не нужно: для каждой строки будет использовано её значение «да/нет» или «1/0».
+                    </p>
+                  </div>
+                </div>
               )}
             </section>
           )}
@@ -800,10 +807,10 @@ export function ImportWizard() {
 
             {readyEmailCount > 0 && (
             <p className="mt-3 text-left text-[9px] leading-4 text-[var(--text-tertiary)]">
-              {emailConsentConfirmed
-                ? hasMappedEmailConsent
-                  ? "Email-согласие записано только для подтверждённых строк таблицы."
-                  : "Email-согласие записано для созданных контактов с email."
+              {hasMappedEmailConsent
+                ? "Email-согласие записано только у строк, где в таблице указано «да» или «1»."
+                : emailConsentConfirmed
+                  ? "Email-согласие записано для созданных контактов с email."
                 : "Контакты с email созданы без email-согласия."}
             </p>
             )}
