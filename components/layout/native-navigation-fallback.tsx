@@ -14,6 +14,7 @@ export function NativeNavigationFallback() {
       const source = event.target;
       if (!(source instanceof Element)) return;
       const anchor = source.closest("a[href]");
+      if (!(anchor instanceof HTMLAnchorElement)) return;
       if (!anchor || anchor.target && anchor.target !== "_self" || anchor.hasAttribute("download")) return;
 
       const href = anchor.getAttribute("href");

@@ -289,6 +289,8 @@ function AccountSection({ form, participant, members, invite, onInvite, update }
         </div>
       </FormBlock>
 
+      <PasswordPanel />
+
       <FormBlock title="Рабочее пространство" description="Название видно в навигации и в выгрузке данных.">
         <Field label="Название пространства" value={form.name} onChange={(value) => update("name", value)} />
         <label className="block">
@@ -303,6 +305,42 @@ function AccountSection({ form, participant, members, invite, onInvite, update }
       </FormBlock>
     </div>
   );
+}
+
+function PasswordPanel() {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [nextPassword, setNextPassword] = useState("");
+  const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [message, setMessage] = useState("");
+
+  const save = async () => {
+    setState("saving");
+    setMessage("");
+    try {
+      const response = await fetch("/api/auth/password", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ currentPassword, nextPassword }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(messageFrom(payload, "Не удалось изменить пароль"));
+      setCurrentPassword("");
+      setNextPassword("");
+      setMessage("Пароль изменён. Следующий вход выполняйте уже с новым паролем.");
+      setState("saved");
+    } catch (reason) {
+      setMessage(reason instanceof Error ? reason.message : "Не удалось изменить пароль");
+      setState("error");
+    }
+  };
+
+  return <FormBlock title="Пароль" description="После первого входа замените временный пароль на личный.">
+    <div className="grid gap-3 sm:grid-cols-2">
+      <Field label="Текущий пароль" value={currentPassword} onChange={setCurrentPassword} type="password" />
+      <Field label="Новый пароль" value={nextPassword} onChange={setNextPassword} type="password" />
+    </div>
+    <div className="mt-3 flex flex-wrap items-center gap-3"><button type="button" disabled={state === "saving" || !currentPassword || !nextPassword} onClick={() => void save()} className="btn btn-primary gap-2"><KeyRound aria-hidden className="size-4" />{state === "saving" ? "Сохраняем…" : "Изменить пароль"}</button>{message && <p className={state === "error" ? "text-xs text-red-700" : "text-xs text-emerald-700"}>{message}</p>}</div>
+  </FormBlock>;
 }
 
 function SendingSection({ form, update }: { form: WorkspaceForm; update: UpdateForm }) {
@@ -352,7 +390,7 @@ function DataSection({ participantEmail, onExport }: { participantEmail: string;
   );
 }
 
-function Field({ label, value, onChange, placeholder, type = "text" }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string; type?: "text" | "email" }) {
+function Field({ label, value, onChange, placeholder, type = "text" }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string; type?: "text" | "email" | "password" }) {
   return (
     <label className="block">
       <span className="mb-1.5 block text-[12px] font-semibold">{label}</span>

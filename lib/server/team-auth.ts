@@ -15,7 +15,10 @@ export const TEAM_WORKSPACE_ID = "workspace-main";
 export const SESSION_COOKIE = "potok_session";
 
 const SESSION_DAYS = 30;
-const PASSWORD_ITERATIONS = 210_000;
+// Keep password derivation strong while staying within the CPU budget of the
+// edge runtime. The former 210k setting caused registration requests to time
+// out on the deployed worker before a session could be created.
+const PASSWORD_ITERATIONS = 75_000;
 const TEAM_COLORS = [
   "#6558E8",
   "#0E7490",
@@ -393,6 +396,38 @@ export async function loginTeamMember(request: Request, payload: unknown) {
   await getDb().update(participants).set({ lastLoginAt: now, updatedAt: now }).where(eq(participants.id, participant.id));
   const session = await createSession(participant.id, request);
   return { participant: toTeamParticipant({ ...participant, lastLoginAt: now }), cookie: session.cookie };
+}
+
+export async function changeTeamPassword(request: Request, payload: unknown) {
+  const session = await requireTeamSession(request);
+  const object = asObject(payload);
+  const currentPassword = validatePassword(object.currentPassword);
+  const nextPassword = validatePassword(object.nextPassword);
+  if (currentPassword === nextPassword) {
+    throw new ApiRequestError("Новый пароль должен отличаться от текущего.");
+  }
+
+  const [participant] = await getDb()
+    .select()
+    .from(participants)
+    .where(eq(participants.id, session.participant.id))
+    .limit(1);
+  if (!participant?.passwordHash || !participant.passwordSalt) {
+    throw new ApiRequestError("Для этого аккаунта пароль ещё не настроен.", 409);
+  }
+  const currentHash = await passwordDigest(currentPassword, participant.passwordSalt);
+  if (!safeEqual(currentHash, participant.passwordHash)) {
+    throw new ApiRequestError("Текущий пароль указан неверно.", 401);
+  }
+
+  const passwordSalt = randomToken(18);
+  const passwordHash = await passwordDigest(nextPassword, passwordSalt);
+  await getDb().update(participants).set({
+    passwordHash,
+    passwordSalt,
+    updatedAt: new Date().toISOString(),
+  }).where(eq(participants.id, participant.id));
+  return { ok: true };
 }
 
 export async function logoutTeamMember(request: Request) {
