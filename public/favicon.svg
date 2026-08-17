@@ -1,10 +1,14 @@
 <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="64" height="64" rx="17" fill="#0D1524"/>
-  <rect x="1" y="1" width="62" height="62" rx="16" stroke="#27DDE9" stroke-opacity=".26" stroke-width="2"/>
-  <path d="M12 17H35V24H28V47H19V24H12V17Z" fill="#25DDE8"/>
-  <path d="M37 17H44V47H37V17Z" fill="#F33CAF"/>
-  <path d="M47 17H54V47H47V17Z" fill="#25DDE8"/>
-  <rect x="12" y="52" width="27" height="3" rx="1.5" fill="#25DDE8"/>
-  <rect x="39" y="52" width="8" height="3" rx="1.5" fill="#F33CAF"/>
-  <rect x="47" y="52" width="7" height="3" rx="1.5" fill="#25DDE8"/>
+  <defs>
+    <linearGradient id="violet" x1="5" y1="4" x2="60" y2="62" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8956FF"/>
+      <stop offset="1" stop-color="#5225D8"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#violet)"/>
+  <rect x="2.75" y="2.75" width="58.5" height="58.5" rx="15.25" stroke="white" stroke-opacity=".34" stroke-width="1.5"/>
+  <path d="M13 29.2L49.6 14.1C51.5 13.3 52.7 15.2 51.2 16.8L33.5 48.8C32.4 50.8 29.4 50.4 28.8 48.2L25.2 36.2L13.2 32.3C11.1 31.6 11 30 13 29.2Z" fill="white"/>
+  <path d="M25.2 36.2L49.2 16.1L30.3 40.3L29.1 47.3L25.2 36.2Z" fill="#E9E0FF"/>
+  <path d="M10 48L19 39" stroke="#D8C7FF" stroke-width="3" stroke-linecap="round"/>
+  <path d="M16 54L22 48" stroke="#D8C7FF" stroke-width="3" stroke-linecap="round"/>
 </svg>
