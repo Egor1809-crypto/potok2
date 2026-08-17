@@ -240,13 +240,17 @@ export function ImportWizard() {
   };
 
   const startImport = async () => {
-    if (!validation || importingRef.current) return;
+    if (!validation || !file || importingRef.current) return;
     const hasMappedEmailConsent = mapping.includes("emailConsent");
+    const importSheetTag = `Импорт: ${file.name.trim().slice(0, 140)}`;
     const contacts = validation.rows
       .map((row) => row.input)
       .filter((input): input is ContactCreateInput => input !== null)
       .map((input) => ({
         ...input,
+        // Одна загрузка всегда получает собственный ярлык, чтобы её можно было
+        // открыть отдельным листом в базе контактов.
+        tags: Array.from(new Set([...(input.tags ?? []), importSheetTag])),
         emailConsent:
           Boolean(input.email) &&
           emailConsentConfirmed &&
@@ -374,13 +378,14 @@ export function ImportWizard() {
       {step === 0 && (
         <section className="card p-5 sm:p-8" aria-labelledby="upload-title">
           <div className="mx-auto max-w-[760px] text-center">
-            <h2 id="upload-title" className="text-lg font-semibold">
-              Выберите таблицу с контактами
-            </h2>
-            <p className="mt-2 text-[10px] leading-5 text-[var(--text-tertiary)]">
-              Первая строка — заголовки. Нужны ФИО и хотя бы один канал:
-              адрес электронной почты, идентификатор чата Telegram или идентификатор пользователя ВКонтакте.
-            </p>
+                <h2 id="upload-title" className="text-lg font-semibold">
+                  Выберите таблицу с контактами
+                </h2>
+                <p className="mt-2 text-[10px] leading-5 text-[var(--text-tertiary)]">
+                  Первая строка — заголовки. Нужны ФИО и хотя бы один канал:
+                  адрес электронной почты, идентификатор чата Telegram или идентификатор пользователя ВКонтакте.
+                  После импорта эта таблица появится в контактах отдельным листом с её названием.
+                </p>
           </div>
 
           <label

@@ -61,6 +61,25 @@ function bytesToBase64(bytes: Uint8Array) {
   return btoa(binary);
 }
 
+function inlineImageDataUrl(value: string): { bytes: Uint8Array; mimeType: AllowedMime } {
+  const match = /^data:(image\/(?:jpeg|png|gif|webp));base64,([a-z0-9+/=\s]+)$/i.exec(value);
+  if (!match) {
+    throw new ApiRequestError("В письмо можно встроить только PNG, JPEG, GIF или WebP-изображение.");
+  }
+  let binary = "";
+  try {
+    binary = atob(match[2].replace(/\s/g, ""));
+  } catch {
+    throw new ApiRequestError("Встроенное изображение письма повреждено.");
+  }
+  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  const mimeType = match[1].toLocaleLowerCase("en") as AllowedMime;
+  if (bytes.byteLength < 1 || bytes.byteLength > MAX_GENERATED_IMAGE_BYTES || !validSignature(bytes, mimeType)) {
+    throw new ApiRequestError("Встроенное изображение письма повреждено или слишком велико.");
+  }
+  return { bytes, mimeType };
+}
+
 async function persistEmailAsset(request: Request, bytes: Uint8Array, mimeType: AllowedMime, filename: string, kind: "photo" | "logo") {
   const id = newId("asset");
   const extension = mimeType === "image/png" ? "png" : mimeType === "image/gif" ? "gif" : mimeType === "image/webp" ? "webp" : "jpg";
@@ -160,6 +179,26 @@ export async function storeGeneratedEmailAssetBytes(
     cleanText(filename, "Название изображения", 180),
     kind,
   );
+}
+
+/**
+ * Почтовые клиенты, включая Gmail, не показывают data: URI внутри HTML-писем.
+ * Перед отправкой переносим такую картинку в медиатеку и используем HTTPS-адрес.
+ */
+export async function storeInlineEmailAsset(
+  request: Request,
+  dataUrl: string,
+): Promise<string> {
+  await ensureDatabase(request);
+  const { bytes, mimeType } = inlineImageDataUrl(dataUrl);
+  const asset = await persistEmailAsset(
+    request,
+    bytes,
+    mimeType,
+    "email-inline-image",
+    "photo",
+  );
+  return asset.url;
 }
 
 export async function getEmailAsset(request: Request, idValue: unknown): Promise<Response> {

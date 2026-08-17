@@ -122,6 +122,7 @@ export function ContactsView() {
   const [team, setTeam] = useState("all");
   const [channel, setChannel] = useState("all");
   const [owner, setOwner] = useState("all");
+  const [sheet, setSheet] = useState("all");
   const [teamName, setTeamName] = useState("");
   const [responsibleId, setResponsibleId] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -173,13 +174,26 @@ export function ContactsView() {
       if (channel === "telegram" && !(contact.status === "active" && contact.telegramChatId && contact.telegramConsent)) return false;
       if (channel === "vk" && !(contact.status === "active" && contact.vkUserId && contact.vkConsent)) return false;
       if (owner !== "all" && (contact.responsibleParticipantId ?? contact.createdByParticipantId) !== owner) return false;
+      if (sheet !== "all" && !contact.tags.includes(sheet)) return false;
       if (!needle) return true;
       return [contact.fullName, contact.email, contact.phone, contact.companyName, contact.jobTitle, contact.city, contact.tags.join(" ")]
         .join(" ")
         .toLocaleLowerCase("ru-RU")
         .includes(needle);
     });
-  }, [channel, city, company, contacts, owner, search, status, team]);
+  }, [channel, city, company, contacts, owner, search, sheet, status, team]);
+
+  const sheets = useMemo(() => {
+    const counts = new Map<string, number>();
+    contacts.forEach((contact) => {
+      contact.tags
+        .filter((tag) => tag.startsWith("Импорт: ") || /^База №\d+$/u.test(tag))
+        .forEach((tag) => counts.set(tag, (counts.get(tag) ?? 0) + 1));
+    });
+    return [...counts.entries()]
+      .map(([label, count]) => ({ label, count }))
+      .sort((left, right) => left.label.localeCompare(right.label, "ru"));
+  }, [contacts]);
 
   const filterOptions = useMemo(() => ({
     companies: [...new Set(contacts.map((contact) => contact.companyName).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ru")),
@@ -442,6 +456,19 @@ export function ContactsView() {
         </section>
       ) : <>
 
+      {sheets.length > 0 && (
+        <section className="card overflow-hidden" aria-labelledby="contact-sheets-title">
+          <div className="flex flex-col gap-1 border-b border-[var(--border)] px-4 py-3 sm:px-5">
+            <h2 id="contact-sheets-title" className="text-[13px] font-semibold">Листы баз</h2>
+            <p className="text-[10px] text-[var(--text-muted)]">Каждая загруженная таблица сохраняется отдельным листом. Контакт остаётся в общей базе и может входить в кампании.</p>
+          </div>
+          <div className="flex gap-2 overflow-x-auto px-4 py-3 sm:px-5">
+            <button type="button" onClick={() => setSheet("all")} aria-pressed={sheet === "all"} className={`shrink-0 rounded-lg border px-3 py-2 text-[11px] font-semibold transition ${sheet === "all" ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-[var(--border)] bg-white text-[var(--text-muted)] hover:border-[var(--primary)]/35"}`}>Все контакты · {contacts.length}</button>
+            {sheets.map((item) => <button key={item.label} type="button" onClick={() => setSheet(item.label)} aria-pressed={sheet === item.label} className={`shrink-0 rounded-lg border px-3 py-2 text-[11px] font-semibold transition ${sheet === item.label ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-[var(--border)] bg-white text-[var(--text-muted)] hover:border-[var(--primary)]/35"}`}>{item.label.replace(/^Импорт: /, "")} · {item.count}</button>)}
+          </div>
+        </section>
+      )}
+
       {(primaryBaseCount > 0 || secondaryBaseCount > 0) && <section className="flex flex-col gap-3 rounded-2xl border border-[#16E7EE]/20 bg-[linear-gradient(105deg,#101118_0%,#142430_64%,#16121D_100%)] px-4 py-3 text-white shadow-[0_12px_28px_rgba(10,17,29,.12)] sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-white/10 text-[#16E7EE]"><UsersRound aria-hidden="true" className="size-4" /></span>
@@ -470,7 +497,7 @@ export function ContactsView() {
         </div>
         <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border)] bg-[var(--surface-subtle)]/65 px-3 py-2.5">
           <button type="button" onClick={toggleAll} disabled={!visible.length} className="btn btn-secondary btn-sm gap-2"><Check aria-hidden="true" className="size-3.5" />{allVisibleSelected ? "Снять выбор найденных" : `Выбрать всех найденных · ${visible.length}`}</button>
-          {(company !== "all" || city !== "all" || team !== "all" || channel !== "all" || owner !== "all" || status !== "all" || search) ? <button type="button" onClick={() => { setSearch(""); setStatus("all"); setCompany("all"); setCity("all"); setTeam("all"); setChannel("all"); setOwner("all"); }} className="btn btn-ghost btn-sm">Сбросить фильтры</button> : null}
+          {(company !== "all" || city !== "all" || team !== "all" || channel !== "all" || owner !== "all" || sheet !== "all" || status !== "all" || search) ? <button type="button" onClick={() => { setSearch(""); setStatus("all"); setCompany("all"); setCity("all"); setTeam("all"); setChannel("all"); setOwner("all"); setSheet("all"); }} className="btn btn-ghost btn-sm">Сбросить фильтры</button> : null}
           <span className="ml-auto text-[10px] text-[var(--text-muted)]">Фильтры формируют аудиторию без ручных галочек</span>
         </div>
 

@@ -35,7 +35,9 @@ let initialization: Promise<void> | null = null;
 // template-seeding routine in every new isolate made even a simple page load
 // wait several seconds for D1. Keep a durable completion marker instead.
 // Bump this value whenever a runtime-only schema migration is added here.
-const RUNTIME_SCHEMA_VERSION = "runtime-schema-v3-team-contacts";
+const RUNTIME_SCHEMA_VERSION = "runtime-schema-v4-branded-sender";
+const DEFAULT_SENDER_NAME = "ТехнологИИ Права";
+const DEFAULT_SENDER_EMAIL = "info@tech-pravo.ru";
 
 const schemaStatements = [
   `CREATE TABLE IF NOT EXISTS workspaces (
@@ -501,10 +503,10 @@ async function seedDatabase(request: Request) {
       name: `Рабочее пространство «${BRAND_NAME}»`,
       companyName: BRAND_NAME,
       timezone: "Europe/Moscow",
-      defaultSenderName: identity.displayName,
-      defaultSenderEmail: identity.email,
-      replyToEmail: identity.email,
-      signature: `С уважением,\n${identity.displayName}`,
+      defaultSenderName: DEFAULT_SENDER_NAME,
+      defaultSenderEmail: DEFAULT_SENDER_EMAIL,
+      replyToEmail: DEFAULT_SENDER_EMAIL,
+      signature: `С уважением,\n${DEFAULT_SENDER_NAME}`,
       requireConsent: true,
       notifyCampaignComplete: true,
       notifyBlockedCampaign: true,
@@ -572,6 +574,29 @@ async function seedDatabase(request: Request) {
       })),
     )
     .onConflictDoNothing();
+
+  const [senderDefaultsState] = await db
+    .select()
+    .from(systemState)
+    .where(eq(systemState.key, "workspace-default-sender-tech-pravo-v1"))
+    .limit(1);
+  if (!senderDefaultsState) {
+    await db
+      .update(workspaces)
+      .set({
+        defaultSenderName: DEFAULT_SENDER_NAME,
+        defaultSenderEmail: DEFAULT_SENDER_EMAIL,
+        replyToEmail: DEFAULT_SENDER_EMAIL,
+        signature: `С уважением,\n${DEFAULT_SENDER_NAME}`,
+        updatedAt: now,
+      })
+      .where(eq(workspaces.id, WORKSPACE_ID));
+    await db.insert(systemState).values({
+      key: "workspace-default-sender-tech-pravo-v1",
+      value: "applied",
+      updatedAt: now,
+    }).onConflictDoNothing();
+  }
 
   const [templateLibraryState] = await db
     .select()

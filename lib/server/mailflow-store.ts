@@ -75,6 +75,7 @@ import {
   toIntegrationRecord,
 } from "./runtime-integrations";
 import { checkProviderConnection, automaticProviderSecrets } from "./provider-checks";
+import { storeInlineEmailAsset } from "./email-asset-store";
 import {
   createUniSenderCampaign,
   renderMergeTemplate,
@@ -2296,6 +2297,23 @@ function localEmailAssetUrls(campaign: CampaignRecord) {
     });
 }
 
+async function prepareEmailHtmlForDelivery(request: Request, html: string) {
+  const sources = new Set<string>();
+  const pattern = /\bsrc=(['"])(data:image\/(?:jpeg|png|gif|webp);base64,[^'"]+)\1/gi;
+  for (const match of html.matchAll(pattern)) {
+    sources.add(match[2]);
+  }
+  if (!sources.size) return html;
+
+  const replacementBySource = new Map<string, string>();
+  for (const source of sources) {
+    replacementBySource.set(source, await storeInlineEmailAsset(request, source));
+  }
+  return html.replace(pattern, (_match, quote: string, source: string) =>
+    `src=${quote}${replacementBySource.get(source) ?? source}${quote}`,
+  );
+}
+
 async function evaluateLaunch(
   request: Request,
   campaignId: string,
@@ -2642,6 +2660,7 @@ async function processUniSenderOutbox(
         return { filename: safePresentationFilename(presentation.name), bytes };
       })()
     : null;
+  const htmlBody = await prepareEmailHtmlForDelivery(request, version.snapshot.emailBodyHtml);
   const result = await createUniSenderCampaign({
     apiKey: credentials.apiKey ?? "",
     listId: integration.publicConfig.listId ?? "",
@@ -2649,7 +2668,7 @@ async function processUniSenderOutbox(
     senderEmail: version.snapshot.senderEmail,
     subject: version.snapshot.subject,
     textBody: version.snapshot.emailBodyText,
-    htmlBody: version.snapshot.emailBodyHtml,
+    htmlBody,
     attachments: attachment ? [attachment] : undefined,
     recipients: rows.map((row) => ({
       email: row.recipientEndpoint,
@@ -2700,6 +2719,7 @@ async function processUniSenderOutbox(
 }
 
 async function processVkWorkspaceSmtpOutbox(
+  request: Request,
   rows: DeliveryOutboxRecord[],
   integration: IntegrationRecord,
   version: CampaignVersionRecord,
@@ -2717,6 +2737,7 @@ async function processVkWorkspaceSmtpOutbox(
     updatedAt: new Date().toISOString(),
   }).where(inArray(deliveryOutbox.id, rows.map((row) => row.id)));
   const credentials = automaticProviderSecrets("vk-workspace") as { password?: string };
+  const htmlBody = await prepareEmailHtmlForDelivery(request, version.snapshot.emailBodyHtml);
   const senderEmail = integration.publicConfig.senderEmail?.trim() || version.snapshot.senderEmail;
   const results = await sendVkWorkspaceSmtpBatch({
     host: "smtp.mail.ru",
@@ -2734,7 +2755,7 @@ async function processVkWorkspaceSmtpOutbox(
       to: row.recipientEndpoint,
       subject: renderContactTemplate(version.snapshot.subject, contact),
       text: renderContactTemplate(version.snapshot.emailBodyText, contact),
-      html: renderContactTemplate(version.snapshot.emailBodyHtml, contact),
+      html: renderContactTemplate(htmlBody, contact),
     }];
   }));
   const byId = new Map(results.map((result) => [result.outboxId, result]));
@@ -3032,7 +3053,7 @@ async function dispatchCampaign(
       if (!integration) throw new Error("Интеграция VK WorkSpace недоступна");
       providerExternalIds = {
         ...providerExternalIds,
-        "vk-workspace": await processVkWorkspaceSmtpOutbox(smtpRows, integration, version),
+        "vk-workspace": await processVkWorkspaceSmtpOutbox(request, smtpRows, integration, version),
       };
     }
   } catch (error) {
