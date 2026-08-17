@@ -121,6 +121,7 @@ export function AppSidebar({
                   <li key={`${item.href}:${item.label}`}>
                     {item.children?.length ? <button
                       type="button"
+                      data-guide-id={item.href === "/templates" ? "templates" : undefined}
                       aria-expanded={expanded}
                       onClick={() => setExpandedItems((current) => {
                         const next = new Set(current);
@@ -147,6 +148,7 @@ export function AppSidebar({
                       <ChevronRight aria-hidden="true" className={cn("size-3.5 shrink-0 text-text-subtle transition-transform", expanded && "rotate-90", active && "text-primary/70")} />
                     </button> : <Link
                       href={item.href}
+                      data-guide-id={item.href === "/templates" ? "templates" : item.href === "/contacts" ? "contacts" : item.href === "/campaigns" ? "campaigns" : undefined}
                       aria-current={active ? "page" : undefined}
                       onClick={onNavigate}
                       className={cn(
@@ -197,6 +199,14 @@ export function AppSidebar({
       </nav>
 
       <div className="shrink-0 border-t border-border/70 p-3">
+        <Link
+          href="/integrations"
+          onClick={onNavigate}
+          data-guide-id="integrations"
+          className="mb-2 flex min-h-9 items-center rounded-lg px-2 text-[11px] font-medium text-text-muted outline-none transition hover:bg-surface-subtle hover:text-text-strong focus-visible:ring-2 focus-visible:ring-primary/30"
+        >
+          Подключения каналов
+        </Link>
         <Link
           href="/dashboard#creative-studio"
           onClick={onNavigate}

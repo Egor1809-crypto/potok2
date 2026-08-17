@@ -180,6 +180,12 @@ select {
   font: inherit;
 }
 
+[data-guide-active="true"] {
+  position: relative;
+  z-index: 55;
+  box-shadow: 0 0 0 3px var(--primary), 0 0 0 8px rgb(124 53 242 / 0.24), var(--shadow-md);
+}
+
 button,
 [role="button"],
 summary,

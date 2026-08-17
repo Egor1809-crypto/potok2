@@ -10,6 +10,7 @@ import { CommandMenu } from "./command-menu";
 import { MobileNavigation } from "./mobile-navigation";
 import { getProductSection } from "./navigation";
 import { Topbar } from "./topbar";
+import { ProductGuide } from "../onboarding/ProductGuide";
 
 type ContentWidth = "default" | "wide" | "full";
 
@@ -104,6 +105,7 @@ export function AppShell({
         onOpenChange={setMobileNavigationOpen}
       />
       <CommandMenu open={commandMenuOpen} onOpenChange={setCommandMenuOpen} />
+      <ProductGuide />
     </div>
   );
 }
