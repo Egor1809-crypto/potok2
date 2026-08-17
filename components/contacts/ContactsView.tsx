@@ -207,6 +207,9 @@ export function ContactsView() {
   }, [timezone]);
   const allVisibleSelected = visible.length > 0 && visible.every((contact) => selected.has(contact.id));
   const activeCount = contacts.filter((contact) => contact.status === "active").length;
+  const primaryBaseCount = contacts.filter((contact) => contact.tags.includes("База №1")).length;
+  const secondaryBaseCount = contacts.filter((contact) => contact.tags.includes("База №2")).length;
+  const assignedCount = contacts.filter((contact) => Boolean(contact.responsibleParticipantId)).length;
   const membersById = useMemo(() => new Map(members.map((member) => [member.id, member])), [members]);
   const coverage = [
     { label: "Email", count: contacts.filter((contact) => contact.status === "active" && contact.emailConsent && contact.email).length, Icon: Mail },
@@ -412,9 +415,9 @@ export function ContactsView() {
           <h1 className="text-[28px] font-semibold tracking-[-.04em]">Контакты</h1>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <p className="text-sm text-[var(--text-muted)]">{loading ? "Загружаем базу…" : `${contacts.length} контактов · ${activeCount} активных`}</p>
-            <a href="https://tech-pravo.ru/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[#12BFE5]/30 bg-[#12BFE5]/10 px-2.5 py-1 text-[10px] font-bold text-[#075F76] transition hover:bg-[#12BFE5]/15">
-              <span className="rounded bg-[#11131D] px-1 py-0.5 text-[8px] tracking-[.06em] text-white">ТП</span>
-              Команда «ТехнологИИ Права»
+            <a href="https://tech-pravo.ru/" target="_blank" rel="noreferrer" aria-label="Команда ТехнологИИ Права — открыть сайт" className="inline-flex items-center gap-2 rounded-xl border border-[#16E7EE]/30 bg-[#101118] px-2.5 py-1.5 text-[10px] font-extrabold tracking-[-.02em] text-white shadow-[0_6px_18px_rgba(8,15,29,.18)] transition hover:-translate-y-px hover:border-[#F43CB8]/55 hover:shadow-[0_10px_22px_rgba(8,15,29,.28)]">
+              <span className="grid size-5 place-items-center rounded-md bg-white/10 text-[8px] tracking-[-.08em]" aria-hidden="true"><b className="text-[#12E8EF]">Т</b><b className="text-[#F43CB8]">П</b></span>
+              <span>Команда <span className="text-[#16E7EE]">Технолог</span><span className="text-[#F43CB8]">ИИ</span><span className="text-[#16E7EE]"> Права</span></span>
             </a>
           </div>
         </div>
@@ -438,6 +441,14 @@ export function ContactsView() {
           <ImportWizard />
         </section>
       ) : <>
+
+      {(primaryBaseCount > 0 || secondaryBaseCount > 0) && <section className="flex flex-col gap-3 rounded-2xl border border-[#16E7EE]/20 bg-[linear-gradient(105deg,#101118_0%,#142430_64%,#16121D_100%)] px-4 py-3 text-white shadow-[0_12px_28px_rgba(10,17,29,.12)] sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-white/10 text-[#16E7EE]"><UsersRound aria-hidden="true" className="size-4" /></span>
+          <div><p className="text-[12px] font-bold">База команды подключена</p><p className="mt-0.5 text-[10px] text-white/70">{primaryBaseCount > 0 ? `База №1: ${primaryBaseCount} контактов Telegram` : ""}{primaryBaseCount > 0 && secondaryBaseCount > 0 ? " · " : ""}{secondaryBaseCount > 0 ? `База №2: ${secondaryBaseCount} компания` : ""}</p></div>
+        </div>
+        <p className="text-[10px] font-medium text-[#A9F9FC]">{assignedCount} закреплены за участниками — цветная линия слева показывает ответственного</p>
+      </section>}
 
       <section className="grid gap-3 sm:grid-cols-3" aria-label="Точный охват по каналам">
         {coverage.map(({ label, count, Icon }) => (
