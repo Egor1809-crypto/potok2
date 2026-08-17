@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { brandConfig } from "@/config/brand";
+import { NativeNavigationFallback } from "@/components/layout/native-navigation-fallback";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -59,6 +60,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <NativeNavigationFallback />
         {children}
       </body>
     </html>
