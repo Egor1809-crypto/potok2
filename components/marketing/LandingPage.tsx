@@ -40,26 +40,11 @@ export function LandingPage() {
   return (
     <main className="mailflow-marketing min-h-screen overflow-hidden bg-background text-text-strong">
       <MarketingHeader />
-      <section className="relative pb-20 pt-36 sm:pb-28 sm:pt-44">
-        <div className="pointer-events-none absolute left-1/2 top-10 h-[560px] w-[900px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(124,53,242,.12),transparent_68%)]" />
-        <div className="container-shell relative text-center">
-          <div className="mx-auto mb-7 flex w-fit items-center gap-2 rounded-full border border-border bg-primary-subtle px-3 py-1.5 text-[11px] font-semibold text-primary shadow-sm">
-            <span className="size-1.5 rounded-full bg-primary shadow-[0_0_0_3px_rgba(124,53,242,.14)]" />
-            Визуальная студия деловых писем
-          </div>
-          <h1 className="mx-auto max-w-[930px] text-[clamp(3.4rem,8.2vw,7.3rem)] font-medium leading-[.91] tracking-[-.065em] text-text-strong">
-            Красивые письма.<br /><span className="text-primary">Без дизайнера и кода.</span>
-          </h1>
-          <p className="mx-auto mt-8 max-w-[650px] text-[17px] leading-7 text-[#686a78] sm:text-[19px] sm:leading-8">
-            Создавайте фирменные письма из блоков, логотипов и фотографий, подключайте ИИ, скачивайте макеты и при необходимости отправляйте через VK WorkSpace.
-          </p>
-          <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Link href="/email-builder?new=1" className="btn btn-primary min-h-12 w-full justify-center gap-2 px-5 text-[14px] sm:w-auto">Создать первое письмо <ArrowRight size={16} /></Link>
-            <Link href="/login" className="btn btn-secondary min-h-12 w-full justify-center gap-2 px-5 text-[14px] sm:w-auto"><Play size={14} fill="currentColor" /> Войти в команду</Link>
-          </div>
-          <p className="mt-4 text-[11px] text-[#9a9ca8]">Одна командная база · Отдельный аккаунт каждого участника · Без дублей</p>
+      <section className="relative overflow-hidden bg-[#11111b] pb-16 pt-32 text-white sm:pb-24 sm:pt-40">
+        <div className="container-shell relative grid items-center gap-12 lg:grid-cols-[.92fr_1.08fr]">
+          <div className="relative z-10"><p className="text-[11px] font-semibold uppercase tracking-[.18em] text-[#bba6ff]">Поток · платформа деловой коммуникации</p><h1 className="mt-6 max-w-xl text-[clamp(3.2rem,6vw,6.1rem)] font-medium leading-[.92] tracking-[-.065em]">Письма, которые <span className="text-[#9b72ff]">ведут к действию.</span></h1><p className="mt-7 max-w-lg text-[17px] leading-8 text-white/65">Соберите письмо, выберите аудиторию и запустите рассылку в одном рабочем пространстве — с контролем каждого шага команды.</p><div className="mt-9 flex flex-col gap-3 sm:flex-row"><Link href="/register" className="btn min-h-12 bg-[#8a4cff] px-6 text-white hover:bg-[#9b64ff]">Открыть рабочее пространство <ArrowRight size={16}/></Link><Link href="/login" className="btn min-h-12 border-white/20 bg-white/5 px-6 text-white hover:bg-white/10"><Play size={13} fill="currentColor"/> Войти</Link></div><div className="mt-11 grid max-w-md grid-cols-3 border-t border-white/12 pt-5 text-[11px] text-white/50"><span>Письма и шаблоны</span><span>Единая база</span><span>Контроль отправок</span></div></div>
+          <div className="relative"><div className="absolute -inset-8 rounded-full bg-[#7544ff]/25 blur-3xl"/><Image src="/landing/potok-executive-hero.png" alt="Рабочее пространство Поток для подготовки деловых писем" width={1536} height={1024} priority className="relative rounded-[28px] border border-white/15 shadow-2xl"/></div>
         </div>
-        <ProductPreview />
       </section>
 
       <section className="border-y border-border bg-surface-subtle/55 py-10">
