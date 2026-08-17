@@ -2247,6 +2247,29 @@ function contactEligible(
   return Boolean(contact.vkUserId) && contact.vkConsent;
 }
 
+function noEligibleAudienceBlocker(
+  channel: DeliveryChannelId,
+  audience: ContactRecord[],
+  requireConsent: boolean,
+) {
+  if (channel !== "email") {
+    return `${channel}: нет контактов с адресом и подтверждённым согласием.`;
+  }
+
+  const activeContacts = audience.filter((contact) => contact.status === "active");
+  const contactsWithEmail = activeContacts.filter((contact) => Boolean(contact.email));
+  if (contactsWithEmail.length === 0) {
+    return `Email: в выбранной аудитории ${audience.length} контактов, но ни у одного не указан email. Добавьте email к контакту или выберите аудиторию с email-адресами.`;
+  }
+  if (requireConsent && !contactsWithEmail.some((contact) => contact.emailConsent)) {
+    return `Email: адреса есть у ${contactsWithEmail.length} контактов, но ни для одного не подтверждено согласие на email-рассылку. Отметьте согласие только для контактов, которые его дали.`;
+  }
+  if (activeContacts.length === 0) {
+    return "Email: в выбранной аудитории нет активных контактов. Проверьте статус получателей.";
+  }
+  return "Email: нет контактов, подходящих для отправки. Проверьте email, согласие и статус получателей.";
+}
+
 function renderContactTemplate(value: string, contact: ContactRecord) {
   return renderMergeTemplate(value, {
     first_name: contact.firstName,
@@ -2350,7 +2373,7 @@ async function evaluateLaunch(
     }
     if (eligibleCount === 0) {
       channelBlockers.push(
-        `${plan.channel}: нет контактов с адресом и подтверждённым согласием.`,
+        noEligibleAudienceBlocker(plan.channel, audience, workspace.requireConsent),
       );
     }
     if (
