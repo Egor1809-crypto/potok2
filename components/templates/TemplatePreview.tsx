@@ -8,6 +8,7 @@ import {
   Image as ImageIcon,
   PencilLine,
   Sparkles,
+  Star,
   Trash2,
 } from "lucide-react";
 
@@ -25,6 +26,7 @@ export function TemplateCard({
   applyHref,
   onClone,
   onDelete,
+  onFavorite,
   busyAction,
 }: {
   template: EmailTemplateRecord;
@@ -33,12 +35,16 @@ export function TemplateCard({
   applyHref: string;
   onClone: () => void;
   onDelete: () => void;
-  busyAction?: "clone" | "delete";
+  onFavorite: () => void;
+  busyAction?: "clone" | "delete" | "favorite";
 }) {
   const isStudioPick = template.id.startsWith("template-v7-studio-") || template.id.startsWith("template-v8-creative-");
   const isDesignerCollection = isStudioPick || template.id.startsWith("template-v3-");
   return (
-    <article className="group min-w-0 overflow-hidden rounded-[14px] border border-border bg-surface shadow-[var(--shadow-xs)] transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-1 hover:border-border-strong hover:shadow-[var(--shadow-md)]">
+    <article className="group relative min-w-0 overflow-hidden rounded-[14px] border border-border bg-surface shadow-[var(--shadow-xs)] transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-1 hover:border-border-strong hover:shadow-[var(--shadow-md)]">
+      <button type="button" onClick={onFavorite} aria-pressed={template.isFavorite} aria-label={`${template.isFavorite ? "Убрать из избранного" : "Добавить в избранное"}: ${template.name}`} className={`absolute right-3 top-3 z-30 grid size-9 place-items-center rounded-full border shadow-sm backdrop-blur transition ${template.isFavorite ? "border-[#F43CB8]/40 bg-[#10141d] text-[#F43CB8]" : "border-white/70 bg-white/85 text-[#667085] hover:text-[#F43CB8]"}`}>
+        <Star aria-hidden="true" className={`size-4 ${template.isFavorite ? "fill-current" : ""}`} />
+      </button>
       <Link
         href={editHref}
         aria-label={`${editLabel} шаблон «${template.name}»`}

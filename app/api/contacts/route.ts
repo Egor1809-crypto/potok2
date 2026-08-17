@@ -5,6 +5,7 @@ import {
   deleteContact,
   listContacts,
   updateContact,
+  updateContactsBatch,
 } from "@/lib/server/mailflow-store";
 
 export const dynamic = "force-dynamic";
@@ -39,7 +40,8 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const payload = await readJsonBody(request);
-    return Response.json(await updateContact(request, payload));
+    const isBatch = Boolean(payload) && typeof payload === "object" && !Array.isArray(payload) && Array.isArray((payload as { ids?: unknown }).ids);
+    return Response.json(isBatch ? await updateContactsBatch(request, payload) : await updateContact(request, payload));
   } catch (error) {
     return jsonError(error);
   }

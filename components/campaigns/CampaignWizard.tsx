@@ -451,7 +451,7 @@ function CampaignWizardState({
   const [notice, setNotice] = React.useState<string | null>(null);
   const [evaluation, setEvaluation] = React.useState<Evaluation | null>(null);
   const [setupDialogOpen, setSetupDialogOpen] = React.useState(false);
-  const [finishedCampaign, setFinishedCampaign] = React.useState<{ id: string; status: string; scheduledAt: string | null } | null>(null);
+  const [finishedCampaign, setFinishedCampaign] = React.useState<{ id: string; status: string; scheduledAt: string | null; dispatched: boolean } | null>(null);
   const scheduleSaveTimer = React.useRef<number | null>(null);
   const hydratedCampaignId = React.useRef<string | null>(null);
   const hydratedQueryTemplateId = React.useRef<string | null>(null);
@@ -841,15 +841,31 @@ function CampaignWizardState({
         setError("План не готов: устраните причины, затем повторите проверку.");
         setSetupDialogOpen(true);
       } else {
+        let completedCampaign = body.campaign;
+        let dispatched = false;
+        if (!body.campaign.scheduledAt && body.campaign.readyVersionId) {
+          const dispatchResponse = await fetch("/api/campaigns", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify({ id: body.campaign.id, action: "dispatch", idempotencyKey: `dispatch:${body.campaign.readyVersionId}` }),
+          });
+          const dispatchBody = await dispatchResponse.json() as CampaignMutationResponse | ApiError;
+          if (!dispatchResponse.ok || !("campaign" in dispatchBody)) {
+            throw new Error("error" in dispatchBody ? dispatchBody.error : "Провайдер не принял задание на отправку.");
+          }
+          completedCampaign = dispatchBody.campaign;
+          dispatched = true;
+        }
         try {
           window.sessionStorage.removeItem(handoffStorageKey);
         } catch {
           // The durable API already contains the ready campaign.
         }
         setFinishedCampaign({
-          id: body.campaign.id,
-          status: body.campaign.status ?? serverEvaluation.status ?? "ready",
-          scheduledAt: body.campaign.scheduledAt,
+          id: completedCampaign.id,
+          status: completedCampaign.status ?? serverEvaluation.status ?? "ready",
+          scheduledAt: completedCampaign.scheduledAt,
+          dispatched,
         });
       }
     } catch (mutationError) {
@@ -888,13 +904,14 @@ function CampaignWizardState({
           <span className="mx-auto grid size-14 place-items-center rounded-full bg-success-subtle text-success">
             <CheckCircle2 aria-hidden="true" className="size-7" />
           </span>
-          <Badge variant="success" className="mt-5">Готовность подтверждена</Badge>
+          <Badge variant="success" className="mt-5">{finishedCampaign.dispatched ? "Передано провайдеру" : "Готовность подтверждена"}</Badge>
           <h1 className="mt-4 text-[26px] font-semibold tracking-[-0.035em] text-text-strong">
-            План кампании сохранён
+            {finishedCampaign.dispatched ? "Отправка запущена" : "План кампании сохранён"}
           </h1>
           <p className="mx-auto mt-2 max-w-lg text-[14px] leading-6 text-text-muted">
-            Сервер сохранил аудиторию, сообщения, маршруты и результат проверки.
-            Внешняя отправка не выполнялась.
+            {finishedCampaign.dispatched
+              ? "Провайдер принял задание. В карточке кампании доступны точные статусы принятых, отклонённых и неопределённых сообщений."
+              : "Сервер сохранил аудиторию, сообщения, маршруты и расписание. Внешняя отправка начнётся по календарю."}
           </p>
           <div className="mt-7 flex flex-col justify-center gap-2 sm:flex-row">
             <Link href="/campaigns" className={buttonVariants({ variant: "secondary" })}>Все рассылки</Link>
@@ -1135,7 +1152,7 @@ function CampaignWizardState({
                   ? "Проверить повторно"
                   : channels.includes("email") && providers.email === "vk-workspace"
                     ? scheduledAt ? "Поставить в календарь" : "Проверить SMTP-отправку"
-                    : "Проверить готовность"}
+                    : scheduledAt ? "Поставить в календарь" : "Проверить и отправить"}
               </Button>
             )}
           </footer>
@@ -1483,7 +1500,9 @@ function MessageStep({
               onChange={(event) => onTemplateChange(event.target.value)}
               options={[
                 { value: "", label: "Без шаблона · сохранить текущий текст" },
-                ...templates.map((template) => ({ value: template.id, label: template.name })),
+                ...[...templates]
+                  .sort((first, second) => Number(second.isFavorite) - Number(first.isFavorite) || first.name.localeCompare(second.name, "ru-RU"))
+                  .map((template) => ({ value: template.id, label: `${template.isFavorite ? "★ " : ""}${template.name}` })),
               ]}
             />
           </FormField>

@@ -47,6 +47,7 @@ const CREATE_KEYS = new Set([
   "subject",
   "previewText",
   "builderDocument",
+  "isFavorite",
 ]);
 const PATCH_KEYS = new Set([...CREATE_KEYS, "id", "expectedUpdatedAt"]);
 const CLONE_KEYS = new Set(["action", "id", "name"]);
@@ -148,6 +149,7 @@ type ParsedTemplate = {
   builderDocument: EmailBuilderDocumentInput;
   emailBodyHtml: string;
   emailBodyText: string;
+  isFavorite: boolean;
 };
 
 function parseTemplate(
@@ -189,6 +191,12 @@ function parseTemplate(
   );
   const emailBodyText = emailDocumentPlainText(builderDocument);
   const emailBodyHtml = compileEmailDocument(builderDocument);
+  const isFavorite = object.isFavorite === undefined
+    ? existing?.isFavorite ?? false
+    : object.isFavorite;
+  if (typeof isFavorite !== "boolean") {
+    throw new ApiRequestError("Поле «Избранное» должно быть логическим значением.");
+  }
   return {
     name,
     nameKey: templateNameKey(name),
@@ -199,6 +207,7 @@ function parseTemplate(
     builderDocument,
     emailBodyHtml,
     emailBodyText,
+    isFavorite,
   };
 }
 
@@ -209,6 +218,7 @@ export function toEmailTemplateRecord(
     id: row.id,
     workspaceId: row.workspaceId,
     isStarter: isStarterEmailTemplateId(row.id),
+    isFavorite: row.isFavorite,
     name: row.name,
     description: row.description,
     category: row.category,

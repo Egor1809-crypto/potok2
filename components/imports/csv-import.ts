@@ -107,7 +107,7 @@ const aliases: Record<Exclude<TargetField, "ignore">, string[]> = {
   ],
   firstName: ["firstname", "givenname", "имя"],
   lastName: ["lastname", "surname", "familyname", "фамилия"],
-  phone: ["phone", "phonenumber", "mobile", "телефон", "мобильный", "мобильныеномера"],
+  phone: ["phone", "phonenumber", "mobile", "телефон", "телефонизпрофиля", "мобильный", "мобильныеномера"],
   companyName: [
     "company",
     "companyname",
@@ -131,6 +131,9 @@ const aliases: Record<Exclude<TargetField, "ignore">, string[]> = {
   telegramChatId: [
     "telegramchatid",
     "telegramid",
+    "idпользователя",
+    "идентификаторпользователя",
+    "userid",
     "tgchatid",
     "tgid",
     "телеграмid",
@@ -331,7 +334,24 @@ function parsedWorkbook(
       values.some((value) => normalizeHeader(value) === normalized),
     )?.[0] as Exclude<TargetField, "ignore"> | undefined) ?? null;
   };
-  const detectedSheets = sheets.flatMap(({ sheetName, records }) => {
+  const preparedSheets = sheets.map(({ sheetName, records }) => {
+    const hasRecognizedHeader = records.some((values) => {
+      const mapped = values.map((value) => targetForHeader(value)).filter(Boolean);
+      return mapped.length >= 2 && mapped.some((field) => field === "email" || field === "phone" || field === "telegramChatId" || field === "vkUserId");
+    });
+    if (hasRecognizedHeader) return { sheetName, records };
+    const phoneRows = records.flatMap((values, index) => {
+      const phones = values.flatMap((value) => value.match(/(?:\+?7|8)[\s()-]*\d{3}[\s()-]*\d{3}[\s-]*\d{2}[\s-]*\d{2}/g) ?? []);
+      if (!phones.length) return [];
+      const city = values[0]?.trim() ?? "";
+      const company = values.find((value, valueIndex) => valueIndex > 0 && value.trim() && !/\d{7,}/.test(value.replace(/\D/g, "")))?.trim() ?? "";
+      return phones.map((phone, phoneIndex) => [city, company, company || `Контакт ${index + 1}.${phoneIndex + 1}`, phone]);
+    });
+    return phoneRows.length >= 3
+      ? { sheetName, records: [["Город", "Компания", "Полное имя", "Телефон"], ...phoneRows] }
+      : { sheetName, records };
+  });
+  const detectedSheets = preparedSheets.flatMap(({ sheetName, records }) => {
     const headerRow = records.findIndex((values) => {
       const mapped = values.map((value) => targetForHeader(value)).filter(Boolean);
       return mapped.length >= 2 && mapped.some((field) => field === "email" || field === "phone" || field === "telegramChatId" || field === "vkUserId");
@@ -343,7 +363,7 @@ function parsedWorkbook(
   }
   // In workbooks with individual sheets and an aggregate queue, import only the
   // aggregate sheets. This prevents the same people appearing twice in the review.
-  const aggregateSheets = detectedSheets.filter(({ sheetName }) => /^(все\s|общ)/iu.test(sheetName.trim()));
+  const aggregateSheets = detectedSheets.filter(({ sheetName }) => /^(?:все|вся|общ)\s/iu.test(sheetName.trim()));
   const selectedSheets = aggregateSheets.length ? aggregateSheets : detectedSheets;
   const sheetHeaders = selectedSheets.map(({ sheetName, records, headerRow }) => {
     const localHeaders = uniqueHeaders(records[headerRow]);
@@ -547,9 +567,10 @@ function mappedContact(
 } {
   const fullName = valueFor(row, mapping, "fullName");
   const nameParts = fullName.split(/\s+/).filter(Boolean);
-  const firstName = valueFor(row, mapping, "firstName") || nameParts[0] || "";
-  const lastName =
-    valueFor(row, mapping, "lastName") || nameParts.slice(1).join(" ");
+  const usernameIndex = headers.findIndex((header) => ["username", "юзернейм"].includes(normalizeHeader(header)));
+  const usernameFallback = usernameIndex >= 0 ? row.values[usernameIndex]?.trim() ?? "" : "";
+  const firstName = (valueFor(row, mapping, "firstName") || nameParts[0] || usernameFallback || `Контакт ${row.rowNumber}`).slice(0, 100);
+  const lastName = (valueFor(row, mapping, "lastName") || nameParts.slice(1).join(" ")).slice(0, 100);
   const email = valueFor(row, mapping, "email").toLocaleLowerCase("ru-RU");
   const emailConsent = normalizedBoolean(
     valueFor(row, mapping, "emailConsent"),
@@ -717,7 +738,7 @@ export function validateRows(
         (vkUserId ? `VK: ${vkUserId}` : ""),
       displayName: mapped.displayName,
       issue,
-      input: issue === "ready" ? mapped.input : null,
+      input: issue === "ready" || issue === "duplicate-existing" || issue === "duplicate-file" ? mapped.input : null,
     };
   });
 

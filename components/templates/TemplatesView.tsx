@@ -40,7 +40,7 @@ const categories = [
 
 type CategoryFilter = (typeof categories)[number];
 type ScopeFilter = "all" | "mine";
-type CollectionFilter = "studio" | "all";
+type CollectionFilter = "studio" | "all" | "favorites";
 type SortMode = "recent" | "name" | "blocks";
 type StyleFilter = "all" | "minimal" | "editorial" | "bold";
 type DensityFilter = "all" | "compact" | "balanced" | "rich";
@@ -158,7 +158,7 @@ export function TemplatesView() {
   const [style, setStyle] = useState<StyleFilter>("all");
   const [density, setDensity] = useState<DensityFilter>("all");
   const [palette, setPalette] = useState<PaletteFilter>("all");
-  const [busy, setBusy] = useState<{ id: string; action: "clone" | "delete" } | null>(null);
+  const [busy, setBusy] = useState<{ id: string; action: "clone" | "delete" | "favorite" } | null>(null);
   const [importing, setImporting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -198,7 +198,8 @@ export function TemplatesView() {
     const normalized = query.trim().toLocaleLowerCase("ru-RU");
     return templates
       .filter((template) => scope === "all" || !template.isStarter)
-      .filter((template) => scope === "mine" || collection === "all" || isStudioTemplate(template))
+      .filter((template) => scope === "mine" || collection !== "studio" || isStudioTemplate(template))
+      .filter((template) => collection !== "favorites" || template.isFavorite)
       .filter((template) => category === "All" || template.category === category)
       .filter((template) => {
         if (style === "all") return true;
@@ -223,6 +224,7 @@ export function TemplatesView() {
         template.subject,
       ].join(" ").toLocaleLowerCase("ru-RU").includes(normalized))
       .sort((first, second) => {
+        if (first.isFavorite !== second.isFavorite) return first.isFavorite ? -1 : 1;
         if (sort === "name") return first.name.localeCompare(second.name, "ru-RU");
         if (sort === "blocks") {
           return second.builderDocument.blocks.length - first.builderDocument.blocks.length || first.name.localeCompare(second.name, "ru-RU");
@@ -234,7 +236,8 @@ export function TemplatesView() {
   const scopedTemplates = useMemo(
     () => templates
       .filter((template) => scope === "all" || !template.isStarter)
-      .filter((template) => scope === "mine" || collection === "all" || isStudioTemplate(template)),
+      .filter((template) => scope === "mine" || collection !== "studio" || isStudioTemplate(template))
+      .filter((template) => collection !== "favorites" || template.isFavorite),
     [collection, scope, templates],
   );
 
@@ -282,6 +285,26 @@ export function TemplatesView() {
         : `Шаблон «${template.name}» удалён.`);
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : "Шаблон не удалён.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const toggleFavorite = async (template: EmailTemplateRecord) => {
+    setBusy({ id: template.id, action: "favorite" });
+    setError(null);
+    try {
+      const response = await fetch("/api/templates", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ id: template.id, expectedUpdatedAt: template.updatedAt, isFavorite: !template.isFavorite }),
+      });
+      const body = await responseBody(response);
+      if (!response.ok || !("template" in body)) throw new Error(mutationError(body, "Не удалось изменить избранное."));
+      setTemplates((current) => current.map((item) => item.id === body.template.id ? body.template : item));
+      setNotice(body.template.isFavorite ? `Шаблон «${body.template.name}» добавлен в избранное.` : `Шаблон «${body.template.name}» убран из избранного.`);
+    } catch (favoriteError) {
+      setError(favoriteError instanceof Error ? favoriteError.message : "Не удалось изменить избранное.");
     } finally {
       setBusy(null);
     }
@@ -383,6 +406,9 @@ export function TemplatesView() {
       ) : (
         <div className="space-y-4">
           <div className="inline-flex flex-wrap rounded-xl border border-border bg-surface p-1" role="group" aria-label="Раздел шаблонов">
+            <button type="button" aria-pressed={collection === "favorites"} onClick={() => { setScope("all"); setCollection("favorites"); }} className="rounded-lg px-4 py-2 text-[12px] font-semibold text-text-muted outline-none transition hover:text-text-strong aria-pressed:bg-primary aria-pressed:text-white focus-visible:ring-2 focus-visible:ring-primary/30">
+              ★ Избранное <span className="ml-1 opacity-70">{templates.filter((template) => template.isFavorite).length}</span>
+            </button>
             <button type="button" aria-pressed={scope === "all" && collection === "studio"} onClick={() => { setScope("all"); setCollection("studio"); }} className="rounded-lg px-4 py-2 text-[12px] font-semibold text-text-muted outline-none transition hover:text-text-strong aria-pressed:bg-primary aria-pressed:text-white focus-visible:ring-2 focus-visible:ring-primary/30">
               <Sparkles aria-hidden="true" className="mr-1.5 inline size-3.5" />Подборка студии <span className="ml-1 opacity-70">{templates.filter(isStudioTemplate).length}</span>
             </button>
@@ -457,6 +483,7 @@ export function TemplatesView() {
                     applyHref={addTemplateToReturnPath(returnPath, template.id)}
                     onClone={() => void cloneTemplate(template)}
                     onDelete={() => void deleteTemplate(template)}
+                    onFavorite={() => void toggleFavorite(template)}
                     busyAction={busy?.id === template.id ? busy.action : undefined}
                   />
                 ))}

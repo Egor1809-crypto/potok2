@@ -33,6 +33,7 @@ import type {
   ContactMutationResponse,
   ContactRecord,
   ContactsBatchCreateResponse,
+  ContactsBulkMutationResponse,
   ContactsListResponse,
   ContactStatus,
   DeleteResponse,
@@ -957,6 +958,8 @@ export async function createContactsBatch(
         uniqueInputs[duplicateIndex] = {
           ...uniqueInputs[duplicateIndex],
           ...input,
+          tags: Array.from(new Set([...(uniqueInputs[duplicateIndex].tags ?? []), ...(input.tags ?? [])])),
+          customFields: { ...(uniqueInputs[duplicateIndex].customFields ?? {}), ...(input.customFields ?? {}) },
         };
       }
     }
@@ -1043,7 +1046,12 @@ export async function createContactsBatch(
       continue;
     }
     if (existing) {
-      const merged = parseContact(input, toContact(existing));
+      const existingContact = toContact(existing);
+      const merged = parseContact({
+        ...input,
+        tags: Array.from(new Set([...existingContact.tags, ...(input.tags ?? [])])),
+        customFields: { ...existingContact.customFields, ...(input.customFields ?? {}) },
+      }, existingContact);
       await db
         .update(contacts)
         .set({ ...contactValues(merged, existing.id, now, toContact(existing), actor.participant.id), updatedAt: now })
@@ -1105,6 +1113,54 @@ export async function updateContact(
     .where(eq(contacts.id, id))
     .returning();
   return { contact: toContact(row) };
+}
+
+export async function updateContactsBatch(
+  request: Request,
+  payload: unknown,
+): Promise<ContactsBulkMutationResponse> {
+  const actor = await ensureDatabase(request);
+  const object = asObject(payload);
+  if (!Array.isArray(object.ids)) throw new ApiRequestError("Передайте список контактов.");
+  const ids = Array.from(new Set(object.ids.map((id) => cleanText(id, "Идентификатор контакта", 120))));
+  if (!ids.length) throw new ApiRequestError("Выберите хотя бы один контакт.");
+  if (ids.length > 20_000) throw new ApiRequestError("За одну операцию можно изменить не более 20 000 контактов.");
+  const responsibleParticipantId = object.responsibleParticipantId === undefined
+    ? undefined
+    : nullableText(object.responsibleParticipantId, "Ответственный", 120);
+  const addTags = object.addTags === undefined ? [] : optionalStringArray(object.addTags, "Теги") ?? [];
+  if (responsibleParticipantId === undefined && !addTags.length) throw new ApiRequestError("Нет изменений для контактов.");
+  if (responsibleParticipantId) {
+    const [member] = await getDb().select({ id: participants.id }).from(participants).where(and(
+      eq(participants.workspaceId, WORKSPACE_ID), eq(participants.id, responsibleParticipantId), eq(participants.status, "active"),
+    )).limit(1);
+    if (!member) throw new ApiRequestError("Ответственный не найден в активной команде.", 404);
+  }
+  const now = new Date().toISOString();
+  const affected: ContactRow[] = [];
+  for (const idChunk of chunksOf(ids, 80)) {
+    const rows = await getDb().select().from(contacts).where(and(
+      eq(contacts.workspaceId, WORKSPACE_ID), inArray(contacts.id, idChunk),
+    ));
+    if (!addTags.length) {
+      affected.push(...await getDb().update(contacts).set({
+        ...(responsibleParticipantId !== undefined ? { responsibleParticipantId } : {}),
+        updatedByParticipantId: actor.participant.id,
+        updatedAt: now,
+      }).where(and(eq(contacts.workspaceId, WORKSPACE_ID), inArray(contacts.id, idChunk))).returning());
+      continue;
+    }
+    for (const row of rows) {
+      const [updated] = await getDb().update(contacts).set({
+        tags: Array.from(new Set([...row.tags, ...addTags])),
+        ...(responsibleParticipantId !== undefined ? { responsibleParticipantId } : {}),
+        updatedByParticipantId: actor.participant.id,
+        updatedAt: now,
+      }).where(eq(contacts.id, row.id)).returning();
+      if (updated) affected.push(updated);
+    }
+  }
+  return { contacts: affected.map(toContact), updatedCount: affected.length };
 }
 
 export async function deleteContact(

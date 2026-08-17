@@ -3,7 +3,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { FeatureShowcase } from "./FeatureShowcase";
 import { MarketingHeader } from "./MarketingHeader";
-import { ProductPreview } from "./ProductPreview";
 import { BRAND_NAME, brandConfig } from "@/config/brand";
 
 const footerGroups = [

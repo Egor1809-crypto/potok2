@@ -68,6 +68,7 @@ export async function getExistingContactEndpoints(
 
 export async function postContactsBatch(
   contacts: ContactCreateInput[],
+  duplicateStrategy: "skip" | "update" = "skip",
 ): Promise<ContactsBatchCreateResponse> {
   const response = await fetch("/api/contacts", {
     method: "POST",
@@ -75,7 +76,7 @@ export async function postContactsBatch(
       Accept: "application/json",
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ contacts, duplicateStrategy: "skip" }),
+    body: JSON.stringify({ contacts, duplicateStrategy }),
   });
   const payload = await readResponse<ContactsBatchCreateResponse>(response);
   if (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { CircleHelp, Sparkles, X } from "lucide-react";
 
@@ -56,15 +56,15 @@ export function ProductGuide() {
 
   useEffect(() => {
     const dismissed = window.localStorage.getItem(GUIDE_KEY) === "true";
-    if (!dismissed) setOpen(true);
-    setSeenInitialState(true);
+    const frame = window.requestAnimationFrame(() => {
+      if (!dismissed) setOpen(true);
+      setSeenInitialState(true);
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, []);
 
   const currentStep = steps[stepIndex] ?? steps[0];
-  const targetExists = useMemo(() => {
-    if (!open || !seenInitialState) return false;
-    return Boolean(document.querySelector(currentStep.target));
-  }, [currentStep.target, open, pathname, seenInitialState]);
+  const targetExists = Boolean(pathname && open && seenInitialState && document.querySelector(currentStep.target));
 
   useEffect(() => {
     if (!open || !targetExists) return;

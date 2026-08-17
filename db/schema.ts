@@ -294,6 +294,9 @@ export const emailTemplates = sqliteTable(
       .notNull(),
     emailBodyHtml: text("email_body_html").notNull(),
     emailBodyText: text("email_body_text").notNull(),
+    isFavorite: integer("is_favorite", { mode: "boolean" })
+      .notNull()
+      .default(false),
     ...timestamps,
   },
   (table) => [

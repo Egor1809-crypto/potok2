@@ -75,6 +75,17 @@ export type ContactRecord = {
   updatedAt: string;
 };
 
+export type ContactBulkPatchInput = {
+  ids: string[];
+  responsibleParticipantId?: string | null;
+  addTags?: string[];
+};
+
+export type ContactsBulkMutationResponse = {
+  contacts: ContactRecord[];
+  updatedCount: number;
+};
+
 export type SegmentRuleField =
   | "jobTitle"
   | "city"
@@ -250,6 +261,7 @@ export type EmailTemplateRecord = {
   id: string;
   workspaceId: string;
   isStarter: boolean;
+  isFavorite: boolean;
   name: string;
   description: string;
   category: TemplateCategory;
@@ -795,6 +807,7 @@ export type EmailTemplateCreateInput = {
   subject: string;
   previewText?: string;
   builderDocument: EmailBuilderDocumentInput;
+  isFavorite?: boolean;
 };
 
 export type EmailTemplatePatchInput = Partial<EmailTemplateCreateInput> & {

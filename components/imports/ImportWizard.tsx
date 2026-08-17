@@ -242,21 +242,30 @@ export function ImportWizard() {
   const startImport = async () => {
     if (!validation || !file || importingRef.current) return;
     const hasMappedEmailConsent = mapping.includes("emailConsent");
-    const importSheetTag = `Импорт: ${file.name.trim().slice(0, 140)}`;
+    const importSheetTag = `Импорт: ${file.name.trim().replace(/\.(xlsx?|csv|tsv)$/iu, "").slice(0, 90)}`;
     const contacts = validation.rows
-      .map((row) => row.input)
-      .filter((input): input is ContactCreateInput => input !== null)
-      .map((input) => ({
+      .filter((row): row is typeof row & { input: ContactCreateInput } => row.input !== null)
+      .map((row) => {
+        const input = row.input;
+        const sourceTags = [
+          input.email ? "Источник: Email" : "",
+          input.telegramChatId ? "Источник: Telegram" : "",
+          input.vkUserId ? "Источник: ВКонтакте" : "",
+          input.phone ? "Источник: Телефон" : "",
+          row.sheetName ? `Лист: ${row.sheetName.slice(0, 90)}` : "",
+        ].filter(Boolean);
+        return ({
         ...input,
         // Одна загрузка всегда получает собственный ярлык, чтобы её можно было
         // открыть отдельным листом в базе контактов.
-        tags: Array.from(new Set([...(input.tags ?? []), importSheetTag])),
+        tags: Array.from(new Set([...(input.tags ?? []), importSheetTag, ...sourceTags])),
         emailConsent:
           Boolean(input.email) &&
           (hasMappedEmailConsent
             ? Boolean(input.emailConsent)
             : emailConsentConfirmed),
-      }));
+        });
+      });
     if (contacts.length === 0) return;
 
     const resumeAt = importRun.status === "error" ? importRun.processed : 0;
@@ -281,7 +290,7 @@ export function ImportWizard() {
     );
     try {
       for (const batch of remainingBatches) {
-        const result = await postContactsBatch(batch);
+        const result = await postContactsBatch(batch, "update");
         processed += batch.length;
         created += result.createdCount;
         skipped += result.skippedCount;
@@ -320,7 +329,9 @@ export function ImportWizard() {
     }
   };
 
-  const readyCount = validation?.summary.ready ?? 0;
+  const readyCount = validation
+    ? validation.summary.ready + validation.summary.duplicateExisting + validation.summary.duplicateFile
+    : 0;
   const readyEmailCount =
     validation?.rows.filter((row) => row.input?.email).length ?? 0;
   const duplicateCount = validation
@@ -579,8 +590,8 @@ export function ImportWizard() {
               <div className="grid grid-cols-2 gap-3 p-5 sm:grid-cols-3 sm:px-6 lg:grid-cols-6">
                 {[
                   [validation.summary.total, "Всего строк", "text-[var(--text-primary)]"],
-                  [validation.summary.ready, "К импорту", "text-[#3f805b]"],
-                  [duplicateCount, "Дубликаты", "text-[#7b65a5]"],
+                  [validation.summary.ready, "Новые", "text-[#3f805b]"],
+                  [duplicateCount, "Будут объединены", "text-[#7b65a5]"],
                   [validation.summary.invalidEmail, "Неверный email", "text-[#a94b43]"],
                   [validation.summary.missingEndpoint, "Без канала", "text-[#a36a2d]"],
                   [

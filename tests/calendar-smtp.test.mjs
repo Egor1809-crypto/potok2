@@ -49,7 +49,8 @@ test("VK WorkSpace sends inline HTML through authenticated SMTP", async () => {
   assert.match(smtp, /smtp|multipart\/alternative/i);
   assert.match(smtp, /Content-Type: text\/html/);
   assert.match(store, /processVkWorkspaceSmtpOutbox/);
-  assert.match(store, /renderContactTemplate\(version\.snapshot\.emailBodyHtml/);
+  assert.match(store, /prepareEmailHtmlForDelivery\(request, version\.snapshot\.emailBodyHtml\)/);
+  assert.match(store, /renderContactTemplate\(htmlBody/);
 });
 
 test("email images and buttons compile as clickable HTML instead of attachments", async () => {

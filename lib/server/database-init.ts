@@ -35,7 +35,7 @@ let initialization: Promise<void> | null = null;
 // template-seeding routine in every new isolate made even a simple page load
 // wait several seconds for D1. Keep a durable completion marker instead.
 // Bump this value whenever a runtime-only schema migration is added here.
-const RUNTIME_SCHEMA_VERSION = "runtime-schema-v4-branded-sender";
+const RUNTIME_SCHEMA_VERSION = "runtime-schema-v5-team-mailing";
 const DEFAULT_SENDER_NAME = "ТехнологИИ Права";
 const DEFAULT_SENDER_EMAIL = "info@tech-pravo.ru";
 
@@ -154,6 +154,7 @@ const schemaStatements = [
     builder_document TEXT NOT NULL,
     email_body_html TEXT NOT NULL,
     email_body_text TEXT NOT NULL,
+    is_favorite INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
@@ -434,6 +435,23 @@ async function createSchema() {
   if (!contactColumns.results.some((column) => column.name === "custom_fields")) {
     await d1.prepare("ALTER TABLE contacts ADD COLUMN custom_fields TEXT NOT NULL DEFAULT '{}'").run();
   }
+  const templateColumns = await d1
+    .prepare("PRAGMA table_info(email_templates)")
+    .all<{ name: string }>();
+  if (!templateColumns.results.some((column) => column.name === "is_favorite")) {
+    await d1.prepare("ALTER TABLE email_templates ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0").run();
+  }
+  const canonicalHandle = (column: string) =>
+    `${column} = REPLACE(REPLACE(${column}, '@TechPravoAI', 'TechPravoAI'), 'TechPravoAI', '@TechPravoAI')`;
+  await d1.batch([
+    d1.prepare(`UPDATE email_templates SET ${[
+      "name", "description", "subject", "preview_text", "builder_document", "email_body_html", "email_body_text",
+    ].map(canonicalHandle).join(", ")} WHERE name LIKE '%TechPravoAI%' OR description LIKE '%TechPravoAI%' OR subject LIKE '%TechPravoAI%' OR preview_text LIKE '%TechPravoAI%' OR builder_document LIKE '%TechPravoAI%' OR email_body_html LIKE '%TechPravoAI%' OR email_body_text LIKE '%TechPravoAI%'`),
+    d1.prepare(`UPDATE campaigns SET ${[
+      "name", "subject", "preview_text", "email_body_text", "email_body_html", "email_builder_document", "messenger_message",
+    ].map(canonicalHandle).join(", ")} WHERE name LIKE '%TechPravoAI%' OR subject LIKE '%TechPravoAI%' OR preview_text LIKE '%TechPravoAI%' OR email_body_text LIKE '%TechPravoAI%' OR email_body_html LIKE '%TechPravoAI%' OR email_builder_document LIKE '%TechPravoAI%' OR messenger_message LIKE '%TechPravoAI%'`),
+    d1.prepare(`UPDATE presentation_projects SET ${["name", "description", "slides"].map(canonicalHandle).join(", ")} WHERE name LIKE '%TechPravoAI%' OR description LIKE '%TechPravoAI%' OR slides LIKE '%TechPravoAI%'`),
+  ]);
   await d1.batch([
     d1.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_participants_workspace_login ON participants(workspace_id, login) WHERE login IS NOT NULL"),
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_participants_workspace_status ON participants(workspace_id, status)"),

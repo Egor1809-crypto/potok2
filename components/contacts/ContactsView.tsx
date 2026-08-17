@@ -10,6 +10,7 @@ import {
   MessageCircle,
   Pencil,
   Plus,
+  Phone,
   Search,
   SendHorizontal,
   Trash2,
@@ -170,9 +171,10 @@ export function ContactsView() {
       if (company !== "all" && contact.companyName !== company) return false;
       if (city !== "all" && contact.city !== city) return false;
       if (team !== "all" && !contact.tags.includes(`Команда: ${team}`)) return false;
-      if (channel === "email" && !(contact.status === "active" && contact.email && contact.emailConsent)) return false;
-      if (channel === "telegram" && !(contact.status === "active" && contact.telegramChatId && contact.telegramConsent)) return false;
-      if (channel === "vk" && !(contact.status === "active" && contact.vkUserId && contact.vkConsent)) return false;
+      if (channel === "email" && !contact.email) return false;
+      if (channel === "telegram" && !contact.telegramChatId) return false;
+      if (channel === "vk" && !contact.vkUserId) return false;
+      if (channel === "phone" && !contact.phone) return false;
       if (owner !== "all" && (contact.responsibleParticipantId ?? contact.createdByParticipantId) !== owner) return false;
       if (sheet !== "all" && !contact.tags.includes(sheet)) return false;
       if (!needle) return true;
@@ -226,9 +228,10 @@ export function ContactsView() {
   const assignedCount = contacts.filter((contact) => Boolean(contact.responsibleParticipantId)).length;
   const membersById = useMemo(() => new Map(members.map((member) => [member.id, member])), [members]);
   const coverage = [
-    { label: "Email", count: contacts.filter((contact) => contact.status === "active" && contact.emailConsent && contact.email).length, Icon: Mail },
-    { label: "Telegram", count: contacts.filter((contact) => contact.status === "active" && contact.telegramChatId && contact.telegramConsent).length, Icon: SendHorizontal },
-    { label: "ВКонтакте", count: contacts.filter((contact) => contact.status === "active" && contact.vkUserId && contact.vkConsent).length, Icon: MessageCircle },
+    { label: "Email", found: contacts.filter((contact) => contact.email).length, ready: contacts.filter((contact) => contact.status === "active" && contact.emailConsent && contact.email).length, Icon: Mail, color: "#F43CB8" },
+    { label: "Telegram", found: contacts.filter((contact) => contact.telegramChatId).length, ready: contacts.filter((contact) => contact.status === "active" && contact.telegramChatId && contact.telegramConsent).length, Icon: SendHorizontal, color: "#229ED9" },
+    { label: "ВКонтакте", found: contacts.filter((contact) => contact.vkUserId).length, ready: contacts.filter((contact) => contact.status === "active" && contact.vkUserId && contact.vkConsent).length, Icon: MessageCircle, color: "#0077FF" },
+    { label: "Телефон", found: contacts.filter((contact) => contact.phone).length, ready: 0, Icon: Phone, color: "#16E7EE" },
   ];
 
   const notify = (message: string) => {
@@ -310,20 +313,10 @@ export function ContactsView() {
     setBusy(true);
     setError("");
     try {
-      const updated = new Map<string, ContactRecord>();
-      for (let start = 0; start < selectedIds.length; start += 10) {
-        const ids = selectedIds.slice(start, start + 10);
-        const records = await Promise.all(ids.map(async (id) => {
-          const contact = contacts.find((item) => item.id === id);
-          if (!contact) return null;
-          const tags = [...new Set([...contact.tags, `Команда: ${normalized}`])];
-          const response = await fetch("/api/contacts", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, tags }) });
-          const payload = await response.json() as ContactMutationResponse | ApiError;
-          if (!response.ok || !("contact" in payload)) throw new Error(messageFrom(payload, "Не удалось добавить контакты в команду"));
-          return payload.contact;
-        }));
-        records.forEach((record) => { if (record) updated.set(record.id, record); });
-      }
+      const response = await fetch("/api/contacts", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: selectedIds, addTags: [`Команда: ${normalized}`] }) });
+      const payload = await response.json() as { contacts?: ContactRecord[]; updatedCount?: number } | ApiError;
+      if (!response.ok || !("contacts" in payload) || !payload.contacts) throw new Error(messageFrom(payload, "Не удалось добавить контакты в команду"));
+      const updated = new Map(payload.contacts.map((contact) => [contact.id, contact]));
       setContacts((current) => current.map((contact) => updated.get(contact.id) ?? contact));
       setTeamName("");
       notify(`В команду «${normalized}» добавлено: ${updated.size}`);
@@ -337,17 +330,10 @@ export function ContactsView() {
     setBusy(true);
     setError("");
     try {
-      const updated = new Map<string, ContactRecord>();
-      for (let start = 0; start < selectedIds.length; start += 10) {
-        const ids = selectedIds.slice(start, start + 10);
-        const records = await Promise.all(ids.map(async (id) => {
-          const response = await fetch("/api/contacts", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, responsibleParticipantId: responsibleId }) });
-          const payload = await response.json() as ContactMutationResponse | ApiError;
-          if (!response.ok || !("contact" in payload)) throw new Error(messageFrom(payload, "Не удалось назначить ответственного"));
-          return payload.contact;
-        }));
-        records.forEach((record) => updated.set(record.id, record));
-      }
+      const response = await fetch("/api/contacts", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: selectedIds, responsibleParticipantId: responsibleId }) });
+      const payload = await response.json() as { contacts?: ContactRecord[]; updatedCount?: number } | ApiError;
+      if (!response.ok || !("contacts" in payload) || !payload.contacts) throw new Error(messageFrom(payload, "Не удалось назначить ответственного"));
+      const updated = new Map(payload.contacts.map((contact) => [contact.id, contact]));
       setContacts((current) => current.map((contact) => updated.get(contact.id) ?? contact));
       const member = members.find((item) => item.id === responsibleId);
       notify(`Ответственный «${member?.displayName ?? "участник"}» назначен: ${updated.size}`);
@@ -477,9 +463,9 @@ export function ContactsView() {
         <p className="text-[10px] font-medium text-[#A9F9FC]">{assignedCount} закреплены за участниками — цветная линия слева показывает ответственного</p>
       </section>}
 
-      <section className="grid gap-3 sm:grid-cols-3" aria-label="Точный охват по каналам">
-        {coverage.map(({ label, count, Icon }) => (
-          <div key={label} className="card flex items-center gap-3 p-4"><span className="grid size-9 place-items-center rounded-xl bg-[var(--primary-subtle)] text-[var(--primary)]"><Icon aria-hidden="true" className="size-4" /></span><div><p className="text-[12px] font-semibold">{label}</p><p className="mt-0.5 text-[11px] text-[var(--text-muted)]">Доступно: {count}</p></div></div>
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Контакты и разрешения по каналам">
+        {coverage.map(({ label, found, ready, Icon, color }) => (
+          <div key={label} className="card flex items-center gap-3 p-4"><span className="grid size-9 place-items-center rounded-xl" style={{ backgroundColor: `${color}18`, color }}><Icon aria-hidden="true" className="size-4" /></span><div><p className="text-[12px] font-semibold">{label}</p><p className="mt-0.5 text-[11px] text-[var(--text-muted)]">Найдено: {found.toLocaleString("ru-RU")}{label !== "Телефон" ? ` · можно писать: ${ready.toLocaleString("ru-RU")}` : ""}</p></div></div>
         ))}
       </section>
 
@@ -491,7 +477,7 @@ export function ContactsView() {
           <label><span className="sr-only">Фильтр по компании</span><select className="input" value={company} onChange={(event) => setCompany(event.target.value)}><option value="all">Все компании</option>{filterOptions.companies.map((value) => <option key={value}>{value}</option>)}</select></label>
           <label><span className="sr-only">Фильтр по городу</span><select className="input" value={city} onChange={(event) => setCity(event.target.value)}><option value="all">Все города</option>{filterOptions.cities.map((value) => <option key={value}>{value}</option>)}</select></label>
           <label><span className="sr-only">Фильтр по команде</span><select className="input" value={team} onChange={(event) => setTeam(event.target.value)}><option value="all">Все команды</option>{filterOptions.teams.map((value) => <option key={value}>{value}</option>)}</select></label>
-          <label><span className="sr-only">Фильтр по каналу</span><select className="input" value={channel} onChange={(event) => setChannel(event.target.value)}><option value="all">Все каналы</option><option value="email">Доступен Email</option><option value="telegram">Доступен Telegram</option><option value="vk">Доступен ВКонтакте</option></select></label>
+          <label><span className="sr-only">Фильтр по каналу</span><select className="input" value={channel} onChange={(event) => setChannel(event.target.value)}><option value="all">Все каналы</option><option value="email">Есть Email</option><option value="telegram">Есть Telegram</option><option value="vk">Есть ВКонтакте</option><option value="phone">Есть телефон</option></select></label>
           <label><span className="sr-only">Фильтр по ответственному</span><select className="input" value={owner} onChange={(event) => setOwner(event.target.value)}><option value="all">Все ответственные</option>{members.map((member) => <option key={member.id} value={member.id}>{member.displayName}</option>)}</select></label>
           <button type="button" onClick={exportCsv} disabled={!selectedIds.length && !visible.length} className="btn btn-secondary gap-2"><Download aria-hidden="true" className="size-4" />Экспорт</button>
         </div>
@@ -505,15 +491,23 @@ export function ContactsView() {
           <div className="grid min-h-64 place-items-center"><LoaderCircle aria-hidden="true" className="size-6 animate-spin text-[var(--primary)]" /><span className="sr-only">Загрузка контактов</span></div>
         ) : visible.length ? (
           <div className="overflow-x-auto">
-            <table className="data-table min-w-[820px]">
-              <thead><tr><th className="w-12"><button type="button" onClick={toggleAll} aria-label="Выбрать все найденные контакты" className={`grid size-4 place-items-center rounded border ${allVisibleSelected ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-[var(--border-strong)] bg-white"}`}>{allVisibleSelected && <Check aria-hidden="true" className="size-3" />}</button></th><th>Контакт</th><th>Компания</th><th>Каналы</th><th>Статус</th><th>Обновлён</th><th className="w-12"><span className="sr-only">Действия</span></th></tr></thead>
+            <table className="data-table min-w-[980px]">
+              <thead><tr><th className="w-12"><button type="button" onClick={toggleAll} aria-label="Выбрать все найденные контакты" className={`grid size-4 place-items-center rounded border ${allVisibleSelected ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-[var(--border-strong)] bg-white"}`}>{allVisibleSelected && <Check aria-hidden="true" className="size-3" />}</button></th><th>Контакт</th><th>Компания</th><th>Источники</th><th>Отправка</th><th>Статус</th><th>Обновлён</th><th className="w-24"><span className="sr-only">Действия</span></th></tr></thead>
               <tbody>{visible.map((contact) => {
                 const checked = selected.has(contact.id);
                 const creator = contact.createdByParticipantId ? membersById.get(contact.createdByParticipantId) : undefined;
                 const responsible = membersById.get(contact.responsibleParticipantId ?? contact.createdByParticipantId ?? "");
-                const readyChannels = [contact.email && contact.emailConsent && contact.status === "active", contact.status === "active" && contact.telegramChatId && contact.telegramConsent, contact.status === "active" && contact.vkUserId && contact.vkConsent].filter(Boolean).length;
-                const primaryEndpoint = contact.email || (contact.telegramChatId ? `Telegram: ${contact.telegramChatId}` : contact.vkUserId ? `ВК: ${contact.vkUserId}` : "Канал не указан");
-                return <tr key={contact.id} data-selected={checked} style={{ boxShadow: `inset 4px 0 0 ${responsible?.color ?? creator?.color ?? "#CBD5E1"}` }}><td><button type="button" onClick={() => setSelected((current) => { const next = new Set(current); if (next.has(contact.id)) next.delete(contact.id); else next.add(contact.id); return next; })} aria-label={`Выбрать ${contact.fullName}`} className={`grid size-4 place-items-center rounded border ${checked ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-[var(--border-strong)] bg-white"}`}>{checked && <Check aria-hidden="true" className="size-3" />}</button></td><td><button type="button" onClick={() => setDrawerContact(contact)} className="flex items-center gap-3 text-left"><span className="grid size-9 shrink-0 place-items-center rounded-full text-[10px] font-semibold text-white" style={{ backgroundColor: responsible?.color ?? creator?.color ?? contact.avatarColor }}>{contact.firstName[0]}{contact.lastName[0]}</span><span><span className="block text-[12px] font-semibold hover:text-[var(--primary)]">{contact.fullName}</span><span className="mt-0.5 block text-[10px] text-[var(--text-subtle)]">{primaryEndpoint}</span>{responsible && <span className="mt-1 inline-flex items-center gap-1 text-[9px] font-semibold" style={{ color: responsible.color }}><i className="size-1.5 rounded-full" style={{ backgroundColor: responsible.color }} />Ответственный: {responsible.displayName}</span>}</span></button></td><td><p className="text-[11px] font-medium">{contact.companyName || "—"}</p><p className="mt-0.5 text-[10px] text-[var(--text-subtle)]">{contact.jobTitle || "Должность не указана"}</p></td><td><span className={`badge ${readyChannels ? "badge-info" : "badge-warning"}`}>{readyChannels ? `${readyChannels} из 3` : "Нет доступных"}</span></td><td><span className={`badge ${statusTone[contact.status]}`}>{statusLabel[contact.status]}</span></td><td className="text-[11px] text-[var(--text-muted)]">{dateFormatter.format(new Date(contact.updatedAt))}</td><td><button type="button" onClick={() => setEditing(contact)} className="grid size-8 place-items-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface-subtle)]" aria-label={`Изменить ${contact.fullName}`}><Pencil aria-hidden="true" className="size-4" /></button></td></tr>;
+                const primaryEndpoint = contact.email || contact.phone || (contact.telegramChatId ? `Telegram: ${contact.telegramChatId}` : contact.vkUserId ? `ВК: ${contact.vkUserId}` : "Канал не указан");
+                return <tr key={contact.id} data-selected={checked} style={{ boxShadow: `inset 4px 0 0 ${responsible?.color ?? creator?.color ?? "#CBD5E1"}` }}>
+                  <td><button type="button" onClick={() => setSelected((current) => { const next = new Set(current); if (next.has(contact.id)) next.delete(contact.id); else next.add(contact.id); return next; })} aria-label={`Выбрать ${contact.fullName}`} className={`grid size-4 place-items-center rounded border ${checked ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-[var(--border-strong)] bg-white"}`}>{checked && <Check aria-hidden="true" className="size-3" />}</button></td>
+                  <td><button type="button" onClick={() => setDrawerContact(contact)} className="flex items-center gap-3 text-left"><span className="grid size-9 shrink-0 place-items-center rounded-full text-[10px] font-semibold text-white" style={{ backgroundColor: responsible?.color ?? creator?.color ?? contact.avatarColor }}>{contact.firstName[0]}{contact.lastName[0]}</span><span><span className="block text-[12px] font-semibold hover:text-[var(--primary)]">{contact.fullName}</span><span className="mt-0.5 block text-[10px] text-[var(--text-subtle)]">{primaryEndpoint}</span>{responsible && <span className="mt-1 inline-flex items-center gap-1 text-[9px] font-semibold" style={{ color: responsible.color }}><i className="size-1.5 rounded-full" style={{ backgroundColor: responsible.color }} />Ответственный: {responsible.displayName}</span>}</span></button></td>
+                  <td><p className="text-[11px] font-medium">{contact.companyName || "—"}</p><p className="mt-0.5 text-[10px] text-[var(--text-subtle)]">{contact.jobTitle || "Должность не указана"}</p></td>
+                  <td><div className="flex max-w-44 flex-wrap gap-1">{contact.email && <SourcePill label="Email" color="#F43CB8" ready={contact.emailConsent} />}{contact.telegramChatId && <SourcePill label="TG" color="#229ED9" ready={contact.telegramConsent} />}{contact.vkUserId && <SourcePill label="VK" color="#0077FF" ready={contact.vkConsent} />}{contact.phone && <SourcePill label="Телефон" color="#0E7490" />}</div></td>
+                  <td>{contact.lastContactedAt ? <span className="badge badge-success">✓ Отправлено</span> : <span className="badge badge-neutral">Не отправляли</span>}</td>
+                  <td><span className={`badge ${statusTone[contact.status]}`}>{statusLabel[contact.status]}</span></td>
+                  <td className="text-[11px] text-[var(--text-muted)]">{dateFormatter.format(new Date(contact.updatedAt))}</td>
+                  <td><div className="flex"><Link href={campaignHref([contact.id])} className="grid size-8 place-items-center rounded-lg text-[var(--primary)] hover:bg-[var(--primary-subtle)]" aria-label={`Написать ${contact.fullName}`}><SendHorizontal aria-hidden="true" className="size-4" /></Link><button type="button" onClick={() => setEditing(contact)} className="grid size-8 place-items-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface-subtle)]" aria-label={`Изменить ${contact.fullName}`}><Pencil aria-hidden="true" className="size-4" /></button></div></td>
+                </tr>;
               })}</tbody>
             </table>
           </div>
@@ -585,6 +579,10 @@ export function ContactFormDialog({ contact, busy, onClose, onSave }: { contact:
       </section>
     </div>
   );
+}
+
+function SourcePill({ label, color, ready }: { label: string; color: string; ready?: boolean }) {
+  return <span title={ready === undefined ? "Контакт найден" : ready ? "Контакт найден, отправка разрешена" : "Контакт найден, согласие на отправку не подтверждено"} className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[9px] font-semibold" style={{ borderColor: `${color}45`, backgroundColor: `${color}12`, color }}><i className="size-1.5 rounded-full" style={{ backgroundColor: color }} />{label}{ready ? " ✓" : ""}</span>;
 }
 
 function FormGroup({ title, children }: { title: string; children: ReactNode }) {
