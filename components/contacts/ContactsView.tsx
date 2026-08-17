@@ -429,9 +429,9 @@ export function ContactsView() {
           <h1 className="text-[28px] font-semibold tracking-[-.04em]">Контакты</h1>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <p className="text-sm text-[var(--text-muted)]">{loading ? "Загружаем базу…" : `${contacts.length} контактов · ${activeCount} активных`}</p>
-            <a href="https://tech-pravo.ru/" target="_blank" rel="noreferrer" aria-label="Команда ТехнологИИ Права — открыть сайт" className="inline-flex items-center gap-2 rounded-xl border border-[#16E7EE]/30 bg-[#101118] px-2.5 py-1.5 text-[10px] font-extrabold tracking-[-.02em] text-white shadow-[0_6px_18px_rgba(8,15,29,.18)] transition hover:-translate-y-px hover:border-[#F43CB8]/55 hover:shadow-[0_10px_22px_rgba(8,15,29,.28)]">
-              <span className="grid size-5 place-items-center rounded-md bg-white/10 text-[8px] tracking-[-.08em]" aria-hidden="true"><b className="text-[#12E8EF]">Т</b><b className="text-[#F43CB8]">П</b></span>
-              <span>Команда <span className="text-[#16E7EE]">Технолог</span><span className="text-[#F43CB8]">ИИ</span><span className="text-[#16E7EE]"> Права</span></span>
+            <a href="https://tech-pravo.ru/" target="_blank" rel="noreferrer" aria-label="Команда ТехнологИИ Права — открыть сайт" className="group inline-flex items-center gap-2 rounded-full border border-white/10 bg-[#11141E] px-3 py-1.5 text-[11px] font-semibold tracking-[-.02em] text-white shadow-[0_8px_20px_rgba(17,20,30,.16)] transition hover:-translate-y-px hover:border-[#F43CB8]/60 hover:shadow-[0_12px_24px_rgba(17,20,30,.25)]">
+              <span className="grid size-5 place-items-center rounded-full bg-white/10 text-[8px] tracking-[-.08em] ring-1 ring-[#16E7EE]/30" aria-hidden="true"><b className="text-[#12E8EF]">Т</b><b className="text-[#F43CB8]">П</b></span>
+              <span className="whitespace-nowrap"><span className="text-white">Команда</span>{" "}<span className="font-extrabold text-[#16E7EE]">Технолог</span><span className="font-extrabold text-[#F43CB8]">ИИ</span><span className="font-extrabold text-[#16E7EE]"> Права</span></span>
             </a>
           </div>
         </div>

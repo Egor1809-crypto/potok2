@@ -24,7 +24,7 @@ const TEAM_DIRECTORY = [
   ["team-egor-shabalin", "Шабалин Егор", "#C2410C"],
   ["team-egor-isakov", "Исаков Егор", "#047857"],
   ["team-dmitry-sizov", "Сизов Дмитрий", "#BE185D"],
-  ["team-darya-samailova", "Дарья Самайлова", "#1D4ED8"],
+  ["team-darya-samailova", "Дарья Самойлова", "#1D4ED8"],
   ["team-alexander-cherepanov", "Александр Черепанов", "#7E22CE"],
   ["team-vagan-oganesovich", "Ваган Оганесович", "#B45309"],
   ["team-darya-drygval", "Дарья Дрыгваль", "#0F766E"],
@@ -895,6 +895,21 @@ export async function ensureDatabase(request: Request): Promise<TeamSession> {
   return requireWorkspaceParticipant(request);
 }
 
+async function applyTeamDirectoryCorrections() {
+  const now = new Date().toISOString();
+  await getD1().prepare(
+    `UPDATE participants
+     SET display_name = ?, login = ?, email = ?, updated_at = ?
+     WHERE id = ?`,
+  ).bind(
+    "Дарья Самойлова",
+    "darya.samoylova",
+    "darya.samoylova@team.potok.local",
+    now,
+    "team-darya-samailova",
+  ).run();
+}
+
 export async function ensureSystemDatabase(): Promise<void> {
   if (!initialization) {
     initialization = (async () => {
@@ -914,9 +929,13 @@ export async function ensureSystemDatabase(): Promise<void> {
         .prepare("SELECT value FROM system_state WHERE key = ?")
         .bind("runtime-schema-version")
         .first<{ value: string }>();
-      if (marker?.value === RUNTIME_SCHEMA_VERSION) return;
+      if (marker?.value === RUNTIME_SCHEMA_VERSION) {
+        await applyTeamDirectoryCorrections();
+        return;
+      }
       await createSchema();
       await seedDatabase(new Request("http://potok.internal/system"));
+      await applyTeamDirectoryCorrections();
       await d1
         .prepare(
           `INSERT INTO system_state (key, value, updated_at) VALUES (?, ?, ?)
