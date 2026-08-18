@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, lte, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, lte, or, sql, type SQL } from "drizzle-orm";
 import { getD1, getDb } from "@/db";
 import {
   campaignEvents,
@@ -1015,12 +1015,13 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
           sum(CASE WHEN phone <> '' THEN 1 ELSE 0 END) AS phone,
           sum(CASE WHEN status = 'active' AND email <> '' AND email_consent = 1 THEN 1 ELSE 0 END) AS readyEmail,
           sum(CASE WHEN status = 'active' AND telegram_chat_id IS NOT NULL AND telegram_chat_id <> '' AND telegram_consent = 1 THEN 1 ELSE 0 END) AS readyTelegram
+          ,sum(CASE WHEN last_contacted_at IS NOT NULL THEN 1 ELSE 0 END) AS sent
         FROM contacts
         WHERE workspace_id = ? AND coalesce(responsible_participant_id, created_by_participant_id) IS NOT NULL
         GROUP BY coalesce(responsible_participant_id, created_by_participant_id)
       `)
       .bind(WORKSPACE_ID)
-      .all<{ participantId: string; total: number; email: number; telegram: number; vk: number; phone: number; readyEmail: number; readyTelegram: number }>() : Promise.resolve({ results: [] }),
+      .all<{ participantId: string; total: number; email: number; telegram: number; vk: number; phone: number; readyEmail: number; readyTelegram: number; sent: number }>() : Promise.resolve({ results: [] }),
     includeMeta ? getD1()
       .prepare(`
         SELECT
@@ -1070,6 +1071,7 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
       phone: Number(row.phone),
       readyEmail: Number(row.readyEmail),
       readyTelegram: Number(row.readyTelegram),
+      sent: Number(row.sent),
       sheets: ownerSheets.get(row.participantId) ?? [],
     };
   }).sort((left, right) => Number(right.participantId === actor.participant.id) - Number(left.participantId === actor.participant.id) || right.total - left.total);
@@ -1248,7 +1250,22 @@ export async function createContactsBatch(
     rows.forEach((row) => existingById.set(row.id, row));
   }
   const existingRows = [...existingById.values()];
-  const operations = uniqueInputs.map((input) => {
+  const teamMembers = await db.select({ id: participants.id }).from(participants).where(and(
+    eq(participants.workspaceId, WORKSPACE_ID),
+    eq(participants.status, "active"),
+    isNotNull(participants.login),
+  )).orderBy(asc(participants.login));
+  const maskSequences = new Map<number, number>();
+  const operations = uniqueInputs.map((originalInput) => {
+    const channelMask = Number(Boolean(originalInput.email))
+      + Number(Boolean(originalInput.telegramChatId)) * 2
+      + Number(Boolean(originalInput.vkUserId)) * 4
+      + Number(Boolean(originalInput.phone)) * 8;
+    const sequence = maskSequences.get(channelMask) ?? 0;
+    maskSequences.set(channelMask, sequence + 1);
+    const input = originalInput.responsibleParticipantId !== undefined || teamMembers.length === 0
+      ? originalInput
+      : { ...originalInput, responsibleParticipantId: teamMembers[(sequence + channelMask) % teamMembers.length].id };
     const matches = existingRows.filter((row) => rowMatchesContactInput(row, input));
     const matchIds = new Set(matches.map((row) => row.id));
     if (matchIds.size > 1) {
@@ -1353,7 +1370,8 @@ export async function updateContactsBatch(
     ? undefined
     : nullableText(object.responsibleParticipantId, "Ответственный", 120);
   const addTags = object.addTags === undefined ? [] : optionalStringArray(object.addTags, "Теги") ?? [];
-  if (responsibleParticipantId === undefined && !addTags.length) throw new ApiRequestError("Нет изменений для контактов.");
+  const markContacted = object.markContacted === true;
+  if (responsibleParticipantId === undefined && !addTags.length && !markContacted) throw new ApiRequestError("Нет изменений для контактов.");
   if (responsibleParticipantId) {
     const [member] = await getDb().select({ id: participants.id }).from(participants).where(and(
       eq(participants.workspaceId, WORKSPACE_ID), eq(participants.id, responsibleParticipantId), eq(participants.status, "active"),
@@ -1369,6 +1387,7 @@ export async function updateContactsBatch(
     if (!addTags.length) {
       affected.push(...await getDb().update(contacts).set({
         ...(responsibleParticipantId !== undefined ? { responsibleParticipantId } : {}),
+        ...(markContacted ? { lastContactedAt: now } : {}),
         updatedByParticipantId: actor.participant.id,
         updatedAt: now,
       }).where(and(eq(contacts.workspaceId, WORKSPACE_ID), inArray(contacts.id, idChunk))).returning());
@@ -1378,6 +1397,7 @@ export async function updateContactsBatch(
       const [updated] = await getDb().update(contacts).set({
         tags: Array.from(new Set([...row.tags, ...addTags])),
         ...(responsibleParticipantId !== undefined ? { responsibleParticipantId } : {}),
+        ...(markContacted ? { lastContactedAt: now } : {}),
         updatedByParticipantId: actor.participant.id,
         updatedAt: now,
       }).where(eq(contacts.id, row.id)).returning();

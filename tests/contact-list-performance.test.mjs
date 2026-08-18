@@ -23,6 +23,24 @@ test("contacts page uses server pagination and database-side filtering", async (
   assert.match(route, /scope === "endpoints"/);
 });
 
+test("contacts page exposes four deduplicated channel databases and balanced ownership", async () => {
+  const [view, store, databaseInit] = await Promise.all([
+    readFile(new URL("../components/contacts/ContactsView.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/server/mailflow-store.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/server/database-init.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(view, /База №1 · Email/);
+  assert.match(view, /База №2 · Telegram/);
+  assert.match(view, /База №3 · ВКонтакте/);
+  assert.match(view, /База №4 · Телефоны/);
+  assert.match(view, /одной объединённой базы/);
+  assert.match(view, /Открыть TG/);
+  assert.match(store, /markContacted/);
+  assert.match(databaseInit, /PARTITION BY channel_mask/);
+  assert.match(databaseInit, /balanced-team-distribution-v1/);
+});
+
 test("large contact payloads are loaded only by workflows that require them", async () => {
   const [store, wizard, importer] = await Promise.all([
     readFile(new URL("../lib/server/mailflow-store.ts", import.meta.url), "utf8"),

@@ -798,6 +798,7 @@ export type ContactOwnerSummary = {
   phone: number;
   readyEmail: number;
   readyTelegram: number;
+  sent: number;
   sheets: ContactListFacet[];
 };
 

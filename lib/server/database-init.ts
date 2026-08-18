@@ -30,12 +30,22 @@ const TEAM_DIRECTORY = [
   ["team-darya-drygval", "Дарья Дрыгваль", "#0F766E"],
 ] as const;
 
+const GEORGIY_ACCOUNT = {
+  id: "team-georgiy-kondratyev",
+  login: "georgiy.kondratyev",
+  displayName: "Георгий Кондратьев",
+  email: "georgiy.kondratyev@team.potok.local",
+  color: "#DB2777",
+  passwordSalt: "caesYYQFqFLYunWWW_ZegEHw",
+  passwordHash: "O_BOOK6MzwR8IF_QYoE_jsmUjxxTOuCR41us-jWer4E",
+} as const;
+
 let initialization: Promise<void> | null = null;
 // A Worker isolate is short-lived in production. Running the entire DDL and
 // template-seeding routine in every new isolate made even a simple page load
 // wait several seconds for D1. Keep a durable completion marker instead.
 // Bump this value whenever a runtime-only schema migration is added here.
-const RUNTIME_SCHEMA_VERSION = "runtime-schema-v7-delivery-purpose";
+const RUNTIME_SCHEMA_VERSION = "runtime-schema-v8-team-distribution";
 const DEFAULT_SENDER_NAME = "ТехнологИИ Права";
 const DEFAULT_SENDER_EMAIL = "info@tech-pravo.ru";
 
@@ -580,6 +590,58 @@ async function seedDatabase(request: Request) {
       color,
       status: "active",
       createdAt: now,
+      updatedAt: now,
+    }).onConflictDoNothing();
+  }
+
+  await db.insert(participants).values({
+    id: GEORGIY_ACCOUNT.id,
+    workspaceId: WORKSPACE_ID,
+    login: GEORGIY_ACCOUNT.login,
+    passwordHash: GEORGIY_ACCOUNT.passwordHash,
+    passwordSalt: GEORGIY_ACCOUNT.passwordSalt,
+    displayName: GEORGIY_ACCOUNT.displayName,
+    email: GEORGIY_ACCOUNT.email,
+    color: GEORGIY_ACCOUNT.color,
+    status: "active",
+    createdAt: now,
+    updatedAt: now,
+  }).onConflictDoNothing();
+
+  const [distributionState] = await db
+    .select({ key: systemState.key })
+    .from(systemState)
+    .where(eq(systemState.key, "balanced-team-distribution-v1"))
+    .limit(1);
+  if (!distributionState) {
+    const teamRows = await getD1().prepare(
+      `SELECT id FROM participants
+       WHERE workspace_id = ? AND status = 'active' AND login IS NOT NULL AND login <> ''
+       ORDER BY login`,
+    ).bind(WORKSPACE_ID).all<{ id: string }>();
+    const memberIds = (teamRows.results ?? []).map((row) => row.id);
+    if (memberIds.length > 0) {
+      const cases = memberIds.map((_, index) => `WHEN ${index} THEN ?`).join(" ");
+      await getD1().prepare(
+        `WITH classified AS (
+           SELECT id,
+             (CASE WHEN email <> '' THEN 1 ELSE 0 END
+              + CASE WHEN telegram_chat_id IS NOT NULL AND telegram_chat_id <> '' THEN 2 ELSE 0 END
+              + CASE WHEN vk_user_id IS NOT NULL AND vk_user_id <> '' THEN 4 ELSE 0 END
+              + CASE WHEN phone <> '' THEN 8 ELSE 0 END) AS channel_mask
+           FROM contacts WHERE workspace_id = ?
+         ), ranked AS (
+           SELECT id, ((row_number() OVER (PARTITION BY channel_mask ORDER BY id) - 1 + channel_mask) % ${memberIds.length}) AS slot
+           FROM classified
+         )
+         UPDATE contacts
+         SET responsible_participant_id = CASE (SELECT slot FROM ranked WHERE ranked.id = contacts.id) ${cases} END
+         WHERE workspace_id = ?`,
+      ).bind(WORKSPACE_ID, ...memberIds, WORKSPACE_ID).run();
+    }
+    await db.insert(systemState).values({
+      key: "balanced-team-distribution-v1",
+      value: `members:${memberIds.length}`,
       updatedAt: now,
     }).onConflictDoNothing();
   }

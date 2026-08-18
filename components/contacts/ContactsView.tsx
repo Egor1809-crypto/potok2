@@ -126,6 +126,15 @@ function campaignHref(ids: string[]) {
   return `/campaigns/new?${params.toString()}`;
 }
 
+function personalTelegramHref(value: string | null): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  const urlMatch = trimmed.match(/^(?:https?:\/\/)?t\.me\/([a-z][a-z0-9_]{4,31})\/?$/iu);
+  const handleMatch = trimmed.match(/^@?([a-z][a-z0-9_]{4,31})$/iu);
+  const handle = urlMatch?.[1] ?? handleMatch?.[1];
+  return handle ? `https://t.me/${handle}` : null;
+}
+
 export function ContactsView() {
   const router = useRouter();
   const pathname = usePathname();
@@ -257,10 +266,10 @@ export function ContactsView() {
   const assignedCount = summary.assigned;
   const membersById = useMemo(() => new Map(members.map((member) => [member.id, member])), [members]);
   const coverage = [
-    { label: "Email", ...summary.coverage.email, Icon: Mail, color: "#F43CB8" },
-    { label: "Telegram", ...summary.coverage.telegram, Icon: SendHorizontal, color: "#229ED9" },
-    { label: "ВКонтакте", ...summary.coverage.vk, Icon: MessageCircle, color: "#0077FF" },
-    { label: "Телефон", ...summary.coverage.phone, Icon: Phone, color: "#16E7EE" },
+    { id: "email", label: "База №1 · Email", ...summary.coverage.email, Icon: Mail, color: "#F43CB8" },
+    { id: "telegram", label: "База №2 · Telegram", ...summary.coverage.telegram, Icon: SendHorizontal, color: "#229ED9" },
+    { id: "vk", label: "База №3 · ВКонтакте", ...summary.coverage.vk, Icon: MessageCircle, color: "#0077FF" },
+    { id: "phone", label: "База №4 · Телефоны", ...summary.coverage.phone, Icon: Phone, color: "#16E7EE" },
   ];
 
   const notify = (message: string) => {
@@ -369,6 +378,19 @@ export function ContactsView() {
       notify(`Ответственный «${member?.displayName ?? "участник"}» назначен: ${updated.size}`);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Не удалось назначить ответственного");
+    } finally { setBusy(false); }
+  };
+
+  const markContacted = async (contact: ContactRecord) => {
+    setBusy(true);
+    try {
+      const response = await fetch("/api/contacts", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: [contact.id], markContacted: true }) });
+      const payload = await response.json() as { contacts?: ContactRecord[] } | ApiError;
+      if (!response.ok || !("contacts" in payload)) throw new Error(messageFrom(payload, "Не удалось отметить отправку"));
+      await load(true);
+      notify(`Отправка для «${contact.fullName}» учтена`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Не удалось отметить отправку");
     } finally { setBusy(false); }
   };
 
@@ -493,11 +515,12 @@ export function ContactsView() {
         <p className="text-[10px] font-medium text-[#A9F9FC]">{assignedCount} закреплены за участниками — цветная линия слева показывает ответственного</p>
       </section>}
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Контакты и разрешения по каналам">
-        {coverage.map(({ label, found, ready, Icon, color }) => (
-          <div key={label} className="card flex items-center gap-3 p-4"><span className="grid size-9 place-items-center rounded-xl" style={{ backgroundColor: `${color}18`, color }}><Icon aria-hidden="true" className="size-4" /></span><div><p className="text-[12px] font-semibold">{label}</p><p className="mt-0.5 text-[11px] text-[var(--text-muted)]">Найдено: {found.toLocaleString("ru-RU")}{label !== "Телефон" ? ` · можно писать: ${ready.toLocaleString("ru-RU")}` : ""}</p></div></div>
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Четыре канальные базы">
+        {coverage.map(({ id, label, found, ready, Icon, color }) => (
+          <button type="button" key={id} onClick={() => { setPage(1); setChannel(channel === id ? "all" : id); }} aria-pressed={channel === id} className={`card flex items-center gap-3 p-4 text-left transition hover:-translate-y-px hover:shadow-sm ${channel === id ? "ring-2 ring-[var(--primary)]/45" : ""}`}><span className="grid size-9 place-items-center rounded-xl" style={{ backgroundColor: `${color}18`, color }}><Icon aria-hidden="true" className="size-4" /></span><div><p className="text-[12px] font-semibold">{label}</p><p className="mt-0.5 text-[11px] text-[var(--text-muted)]">Уникальных контактов: {found.toLocaleString("ru-RU")}{id !== "phone" ? ` · разрешено: ${ready.toLocaleString("ru-RU")}` : ""}</p></div></button>
         ))}
       </section>
+      <p className="-mt-3 text-[10px] text-[var(--text-muted)]">Это четыре представления одной объединённой базы: контакт не дублируется, даже если у него несколько каналов.</p>
 
       {owners.length > 0 && (
         <section className="card overflow-hidden" aria-labelledby="owner-statistics-title">
@@ -519,6 +542,7 @@ export function ContactsView() {
                     <span><b className="block text-[12px] text-[var(--text-strong)]">{item.phone.toLocaleString("ru-RU")}</b>Тел.</span>
                   </span>
                   <span className="mt-2 block text-[9px] text-[var(--text-muted)]">Можно писать: Email {item.readyEmail.toLocaleString("ru-RU")} · Telegram {item.readyTelegram.toLocaleString("ru-RU")}</span>
+                  <span className="mt-1 block text-[9px] font-semibold text-[var(--success)]">Уже обработано: {item.sent.toLocaleString("ru-RU")}</span>
                   {item.sheets.length > 0 && <span className="mt-2 flex flex-wrap gap-1">{item.sheets.map((entry) => <span key={entry.label} className="rounded-md bg-[var(--surface-subtle)] px-1.5 py-1 text-[8px] text-[var(--text-muted)]">{entry.label.replace(/^Импорт: /, "")} · {entry.count.toLocaleString("ru-RU")}</span>)}</span>}
                 </button>
               );
@@ -557,12 +581,13 @@ export function ContactsView() {
                 const creator = contact.createdByParticipantId ? membersById.get(contact.createdByParticipantId) : undefined;
                 const responsible = membersById.get(contact.responsibleParticipantId ?? contact.createdByParticipantId ?? "");
                 const primaryEndpoint = contact.email || contact.phone || (contact.telegramChatId ? `Telegram: ${contact.telegramChatId}` : contact.vkUserId ? `ВК: ${contact.vkUserId}` : "Канал не указан");
+                const telegramHref = personalTelegramHref(contact.telegramChatId);
                 return <tr key={contact.id} data-selected={checked} style={{ boxShadow: `inset 4px 0 0 ${responsible?.color ?? creator?.color ?? "#CBD5E1"}` }}>
                   <td><button type="button" onClick={() => setSelected((current) => { const next = new Set(current); if (next.has(contact.id)) next.delete(contact.id); else next.add(contact.id); return next; })} aria-label={`Выбрать ${contact.fullName}`} className={`grid size-4 place-items-center rounded border ${checked ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-[var(--border-strong)] bg-white"}`}>{checked && <Check aria-hidden="true" className="size-3" />}</button></td>
                   <td><button type="button" onClick={() => setDrawerContact(contact)} className="flex items-center gap-3 text-left"><span className="grid size-9 shrink-0 place-items-center rounded-full text-[10px] font-semibold text-white" style={{ backgroundColor: responsible?.color ?? creator?.color ?? contact.avatarColor }}>{contact.firstName[0]}{contact.lastName[0]}</span><span><span className="block text-[12px] font-semibold hover:text-[var(--primary)]">{contact.fullName}</span><span className="mt-0.5 block text-[10px] text-[var(--text-subtle)]">{primaryEndpoint}</span>{responsible && <span className="mt-1 inline-flex items-center gap-1 text-[9px] font-semibold" style={{ color: responsible.color }}><i className="size-1.5 rounded-full" style={{ backgroundColor: responsible.color }} />Ответственный: {responsible.displayName}</span>}</span></button></td>
                   <td><p className="text-[11px] font-medium">{contact.companyName || "—"}</p><p className="mt-0.5 text-[10px] text-[var(--text-subtle)]">{contact.jobTitle || "Должность не указана"}</p></td>
                   <td><div className="flex max-w-44 flex-wrap gap-1">{contact.email && <SourcePill label="Email" color="#F43CB8" ready={contact.emailConsent} />}{contact.telegramChatId && <SourcePill label="TG" color="#229ED9" ready={contact.telegramConsent} />}{contact.vkUserId && <SourcePill label="VK" color="#0077FF" ready={contact.vkConsent} />}{contact.phone && <SourcePill label="Телефон" color="#0E7490" />}</div></td>
-                  <td>{contact.lastContactedAt ? <span className="badge badge-success">✓ Отправлено</span> : <span className="badge badge-neutral">Не отправляли</span>}</td>
+                  <td>{contact.lastContactedAt ? <span className="badge badge-success">✓ Отправлено</span> : telegramHref ? <span className="flex flex-wrap gap-1"><a href={telegramHref} target="_blank" rel="noreferrer" className="badge badge-primary">Открыть TG</a><button type="button" disabled={busy} onClick={() => void markContacted(contact)} className="badge badge-neutral">Отметить</button></span> : <span className="badge badge-neutral">Не отправляли</span>}</td>
                   <td><span className={`badge ${statusTone[contact.status]}`}>{statusLabel[contact.status]}</span></td>
                   <td className="text-[11px] text-[var(--text-muted)]">{dateFormatter.format(new Date(contact.updatedAt))}</td>
                   <td><div className="flex"><Link href={campaignHref([contact.id])} className="grid size-8 place-items-center rounded-lg text-[var(--primary)] hover:bg-[var(--primary-subtle)]" aria-label={`Написать ${contact.fullName}`}><SendHorizontal aria-hidden="true" className="size-4" /></Link><button type="button" onClick={() => setEditing(contact)} className="grid size-8 place-items-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface-subtle)]" aria-label={`Изменить ${contact.fullName}`}><Pencil aria-hidden="true" className="size-4" /></button></div></td>
