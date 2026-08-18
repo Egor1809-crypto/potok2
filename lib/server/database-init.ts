@@ -45,7 +45,7 @@ let initialization: Promise<void> | null = null;
 // template-seeding routine in every new isolate made even a simple page load
 // wait several seconds for D1. Keep a durable completion marker instead.
 // Bump this value whenever a runtime-only schema migration is added here.
-const RUNTIME_SCHEMA_VERSION = "runtime-schema-v18-inbox-friendly-personal-invitation";
+const RUNTIME_SCHEMA_VERSION = "runtime-schema-v19-restore-personal-invitation-design";
 const DEFAULT_SENDER_NAME = "ТехнологИИ Права";
 const DEFAULT_SENDER_EMAIL = "info@tech-pravo.ru";
 
@@ -1272,6 +1272,41 @@ async function seedDatabase(request: Request) {
     }).onConflictDoUpdate({
       target: systemState.key,
       set: { value: "corrected", updatedAt: now },
+    });
+  }
+
+  const [restoredPersonalInvitationDesignState] = await db
+    .select({ key: systemState.key })
+    .from(systemState)
+    .where(eq(systemState.key, "conference-production-html-v11-restore-personal-invitation-design"))
+    .limit(1);
+  if (!restoredPersonalInvitationDesignState) {
+    const template = conferenceProductionTemplateValues.find(
+      (item) => item.id === "template-user-conference-01-personal-invitation",
+    );
+    if (template) {
+      await db
+        .update(emailTemplates)
+        .set({
+          subject: template.subject,
+          previewText: template.previewText,
+          builderDocument: template.builderDocument,
+          emailBodyHtml: template.emailBodyHtml,
+          emailBodyText: template.emailBodyText,
+          updatedAt: now,
+        })
+        .where(and(
+          eq(emailTemplates.id, template.id),
+          eq(emailTemplates.workspaceId, WORKSPACE_ID),
+        ));
+    }
+    await db.insert(systemState).values({
+      key: "conference-production-html-v11-restore-personal-invitation-design",
+      value: "restored",
+      updatedAt: now,
+    }).onConflictDoUpdate({
+      target: systemState.key,
+      set: { value: "restored", updatedAt: now },
     });
   }
 
