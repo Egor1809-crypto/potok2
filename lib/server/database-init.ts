@@ -45,7 +45,7 @@ let initialization: Promise<void> | null = null;
 // template-seeding routine in every new isolate made even a simple page load
 // wait several seconds for D1. Keep a durable completion marker instead.
 // Bump this value whenever a runtime-only schema migration is added here.
-const RUNTIME_SCHEMA_VERSION = "runtime-schema-v21-cost-template-hero-image";
+const RUNTIME_SCHEMA_VERSION = "runtime-schema-v22-cost-template-hero-replacement";
 const DEFAULT_SENDER_NAME = "ТехнологИИ Права";
 const DEFAULT_SENDER_EMAIL = "info@tech-pravo.ru";
 
@@ -1392,6 +1392,40 @@ async function seedDatabase(request: Request) {
     }
     await db.insert(systemState).values({
       key: "conference-production-html-v13-cost-template-hero-image",
+      value: "updated",
+      updatedAt: now,
+    }).onConflictDoUpdate({
+      target: systemState.key,
+      set: { value: "updated", updatedAt: now },
+    });
+  }
+
+  const [costTemplateHeroReplacementState] = await db
+    .select({ key: systemState.key })
+    .from(systemState)
+    .where(eq(systemState.key, "conference-production-html-v14-cost-template-hero-replacement"))
+    .limit(1);
+  if (!costTemplateHeroReplacementState) {
+    const template = conferenceProductionTemplateValues.find(
+      (item) => item.id === "template-user-conference-11-cost-reduction",
+    );
+    if (template) {
+      await db
+        .update(emailTemplates)
+        .set({
+          builderDocument: template.builderDocument,
+          emailBodyHtml: template.emailBodyHtml,
+          emailBodyText: template.emailBodyText,
+          isFavorite: true,
+          updatedAt: now,
+        })
+        .where(and(
+          eq(emailTemplates.id, template.id),
+          eq(emailTemplates.workspaceId, WORKSPACE_ID),
+        ));
+    }
+    await db.insert(systemState).values({
+      key: "conference-production-html-v14-cost-template-hero-replacement",
       value: "updated",
       updatedAt: now,
     }).onConflictDoUpdate({
