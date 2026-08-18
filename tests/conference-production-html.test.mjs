@@ -3,11 +3,12 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("ten conference HTML letters are seeded as editable user templates", async () => {
-  const [generated, database, compiler, preview] = await Promise.all([
+  const [generated, database, compiler, preview, personalInvitation] = await Promise.all([
     readFile(new URL("../data/conference-production-templates.generated.ts", import.meta.url), "utf8"),
     readFile(new URL("../lib/server/database-init.ts", import.meta.url), "utf8"),
     readFile(new URL("../lib/server/email-document.ts", import.meta.url), "utf8"),
     readFile(new URL("../components/templates/TemplatePreview.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../email-templates/conference/conference-01-personal-invitation.html", import.meta.url), "utf8"),
   ]);
   assert.equal((generated.match(/"name": "ТП Конференция /g) ?? []).length, 10);
   assert.equal((generated.match(/"rawHtml":/g) ?? []).length, 10);
@@ -22,10 +23,11 @@ test("ten conference HTML letters are seeded as editable user templates", async 
   assert.doesNotMatch(generated, /ООО «АСПБ»/);
   assert.equal((generated.match(/© 2026 ООО «ТехнологИИ Права»/g) ?? []).length, 30);
   assert.match(generated, /На втором дне конференции «ТехнологИИ Права»/);
-  assert.match(generated, /Маняша — AI-ассистент конференции/);
-  assert.match(generated, /— для руководителей юридического бизнеса, практикующих юристов, юристов в сфере БФЛ/);
+  assert.match(generated, /Мы собираем руководителей юридического бизнеса, практикующих юристов, специалистов по БФЛ/);
   assert.match(generated, /арбитражных управляющих и представителей СРО\./);
-  assert.match(generated, /Автоматизация БФЛ, ИИ в юридическом бизнесе, LegalTech, данные и безопасность\./);
+  assert.match(generated, /автоматизация БФЛ, ИИ в юридическом бизнесе, LegalTech, данные и безопасность\./);
+  assert.match(generated, /Если захотите обсудить формат участия, просто ответьте на это письмо\./);
+  assert.match(generated, /Если приглашение Вам неактуально, ответьте на письмо словом «Стоп»\./);
   assert.match(generated, /© 2026 ООО «ТехнологИИ Права»/);
   assert.match(generated, /Здравствуйте, \{\{first_name\}\}! Конференция «ТехнологИИ Права» собирает лучших экспертов ИИ-индустрии/);
   assert.match(generated, /объединяет их с представителями юридического сообщества: юристами-практиками/);
@@ -44,8 +46,12 @@ test("ten conference HTML letters are seeded as editable user templates", async 
   assert.match(database, /conference-production-html-v7-company-name/);
   assert.match(database, /conference-production-html-v8-practice-market-copy/);
   assert.match(database, /conference-production-html-v9-personal-invitation-copy/);
-  assert.match(database, /runtime-schema-v17-personal-invitation-copy-correction/);
+  assert.match(database, /conference-production-html-v10-inbox-friendly-personal-invitation/);
+  assert.match(database, /runtime-schema-v18-inbox-friendly-personal-invitation/);
   assert.match(database, /https:\/\/t\.me\/TechPravoAI/);
   assert.match(compiler, /if \(document\.rawHtml\) return document\.rawHtml/);
   assert.match(preview, /srcDoc=\{template\.emailBodyHtml\}/);
+  assert.doesNotMatch(personalInvitation, /<img\b/i);
+  assert.doesNotMatch(personalInvitation, /Telegram|25 000|Выбрать билет|тариф/i);
+  assert.equal((personalInvitation.match(/<a\b/gi) ?? []).length, 1);
 });
