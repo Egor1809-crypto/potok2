@@ -963,6 +963,41 @@ async function seedDatabase(request: Request) {
     });
   }
 
+  const [practiceLabCorrectionState] = await db
+    .select({ key: systemState.key })
+    .from(systemState)
+    .where(eq(systemState.key, "conference-production-html-v2-practice-lab"))
+    .limit(1);
+  if (!practiceLabCorrectionState) {
+    const template = conferenceProductionTemplateValues.find(
+      (item) => item.id === "template-user-conference-08-practice-lab",
+    );
+    if (template) {
+      await db
+        .update(emailTemplates)
+        .set({
+          subject: template.subject,
+          previewText: template.previewText,
+          builderDocument: template.builderDocument,
+          emailBodyHtml: template.emailBodyHtml,
+          emailBodyText: template.emailBodyText,
+          updatedAt: now,
+        })
+        .where(and(
+          eq(emailTemplates.id, template.id),
+          eq(emailTemplates.workspaceId, WORKSPACE_ID),
+        ));
+    }
+    await db.insert(systemState).values({
+      key: "conference-production-html-v2-practice-lab",
+      value: "corrected",
+      updatedAt: now,
+    }).onConflictDoUpdate({
+      target: systemState.key,
+      set: { value: "corrected", updatedAt: now },
+    });
+  }
+
   if (!initializationState) {
     await db.insert(systemState).values({
       key: "initial-data-version",
