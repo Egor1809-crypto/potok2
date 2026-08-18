@@ -667,7 +667,9 @@ export async function createUniSenderCampaign(input: {
         ["text_body", translateTokens(input.textBody)],
         ["list_id", input.listId],
         ["lang", "ru"],
-        ["images_as", "attachments"],
+        // `images_as` belongs to UniSender's transactional sendEmail API,
+        // not to createEmailMessage. Passing it here makes the whole mass
+        // campaign request fail with "undefined parameters".
       ],
       binaryParameters: input.attachments?.map((attachment) => [
         `attachments[${attachment.filename.replace(/[^a-zA-Z0-9а-яА-ЯёЁ._ -]/g, "_")}]`,
@@ -687,7 +689,7 @@ export async function createUniSenderCampaign(input: {
     if (!message.response.ok || message.body?.error || !message.body?.result?.message_id) {
       return {
         status: "rejected",
-        message: providerMessage(message.body, "UniSender не создал email-сообщение."),
+        message: `UniSender не создал email-сообщение: ${providerMessage(message.body, "неизвестная ошибка")}`,
         acceptedOutboxIds: [],
         rejectedOutboxIds: allOutboxIds,
       };
@@ -721,7 +723,7 @@ export async function createUniSenderCampaign(input: {
     if (!campaign.response.ok || campaign.body?.error || !campaign.body?.result?.campaign_id) {
       return {
         status: "rejected",
-        message: providerMessage(campaign.body, `UniSender не запустил письмо message_id=${messageId}.`),
+        message: `UniSender не запустил письмо message_id=${messageId}: ${providerMessage(campaign.body, "неизвестная ошибка")}`,
         messageId,
         acceptedOutboxIds: [],
         rejectedOutboxIds: allOutboxIds,
