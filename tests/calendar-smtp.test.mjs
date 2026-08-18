@@ -61,10 +61,13 @@ test("VK WorkSpace sends inline HTML through authenticated SMTP", async () => {
   assert.match(runtime, /VK_WORKSPACE_SMTP_PASSWORD/);
   assert.match(smtp, /AUTH LOGIN/);
   assert.match(smtp, /smtp|multipart\/alternative/i);
+  assert.match(smtp, /multipart\/related/);
+  assert.match(smtp, /Content-ID:/);
+  assert.match(smtp, /Content-Disposition: inline/);
   assert.match(smtp, /Content-Type: text\/html/);
   assert.match(store, /processVkWorkspaceSmtpOutbox/);
-  assert.match(store, /prepareEmailHtmlForDelivery\(request, version\.snapshot\.emailBodyHtml\)/);
-  assert.match(store, /renderContactTemplate\(htmlBody/);
+  assert.match(store, /prepareEmailHtmlForDelivery\(version\.snapshot\.emailBodyHtml, "cid"\)/);
+  assert.match(store, /inlineImages: preparedEmail\.images/);
 });
 
 test("email images and buttons compile as clickable HTML instead of attachments", async () => {

@@ -10,6 +10,12 @@ export type SmtpRecipientMessage = {
   subject: string;
   text: string;
   html: string;
+  inlineImages?: Array<{
+    filename: string;
+    contentId: string;
+    mimeType: "image/jpeg" | "image/png" | "image/gif" | "image/webp";
+    bytes: Uint8Array;
+  }>;
 };
 
 export type SmtpRecipientResult = {
@@ -48,6 +54,18 @@ function base64(value: string) {
   return btoa(binary);
 }
 
+function binaryBase64(bytes: Uint8Array) {
+  let binary = "";
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+  }
+  return btoa(binary);
+}
+
+function mimeBase64(value: string) {
+  return value.match(/.{1,76}/g)?.join("\r\n") ?? "";
+}
+
 function header(value: string) {
   return `=?UTF-8?B?${base64(value.replace(/[\r\n]+/g, " "))}?=`;
 }
@@ -68,7 +86,8 @@ function buildMimeMessage(
   senderEmail: string,
   message: SmtpRecipientMessage,
 ) {
-  const boundary = `potok-${crypto.randomUUID()}`;
+  const alternativeBoundary = `potok-alt-${crypto.randomUUID()}`;
+  const relatedBoundary = `potok-related-${crypto.randomUUID()}`;
   const domain = senderEmail.split("@")[1] || "potok.local";
   const id = messageId(domain);
   const lines = [
@@ -78,21 +97,35 @@ function buildMimeMessage(
     `Date: ${new Date().toUTCString()}`,
     `Message-ID: ${id}`,
     "MIME-Version: 1.0",
-    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    `Content-Type: multipart/related; boundary="${relatedBoundary}"`,
     "",
-    `--${boundary}`,
+    `--${relatedBoundary}`,
+    `Content-Type: multipart/alternative; boundary="${alternativeBoundary}"`,
+    "",
+    `--${alternativeBoundary}`,
     "Content-Type: text/plain; charset=UTF-8",
     "Content-Transfer-Encoding: base64",
     "",
-    base64(message.text),
-    `--${boundary}`,
+    mimeBase64(base64(message.text)),
+    `--${alternativeBoundary}`,
     "Content-Type: text/html; charset=UTF-8",
     "Content-Transfer-Encoding: base64",
     "",
-    base64(message.html),
-    `--${boundary}--`,
-    "",
+    mimeBase64(base64(message.html)),
+    `--${alternativeBoundary}--`,
   ];
+  for (const image of message.inlineImages ?? []) {
+    lines.push(
+      `--${relatedBoundary}`,
+      `Content-Type: ${image.mimeType}; name="${image.filename}"`,
+      "Content-Transfer-Encoding: base64",
+      `Content-ID: <${image.contentId}>`,
+      `Content-Disposition: inline; filename="${image.filename}"`,
+      "",
+      mimeBase64(binaryBase64(image.bytes)),
+    );
+  }
+  lines.push(`--${relatedBoundary}--`, "");
   return { data: dotStuff(lines.join("\r\n")), id };
 }
 

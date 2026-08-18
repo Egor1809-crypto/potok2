@@ -133,6 +133,7 @@ test("UniSender maps MAILFLOW merge fields into imported provider fields", async
         return jsonResponse({ result: { invalid: 0, log: [] } });
       }
       if (method === "createEmailMessage") {
+        assert.equal(body.get("images_as"), "attachments");
         assert.equal(
           body.get("subject"),
           "Для {{mailflow_first_name}} из {{mailflow_company}}",

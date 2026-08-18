@@ -656,6 +656,7 @@ export async function createUniSenderCampaign(input: {
         ["text_body", translateTokens(input.textBody)],
         ["list_id", input.listId],
         ["lang", "ru"],
+        ["images_as", "attachments"],
       ],
       binaryParameters: input.attachments?.map((attachment) => [
         `attachments[${attachment.filename.replace(/[^a-zA-Z0-9а-яА-ЯёЁ._ -]/g, "_")}]`,
@@ -763,6 +764,7 @@ export async function sendUniSenderTransactionalEmail(input: {
         ["body", body],
         ["list_id", input.listId],
         ["lang", "ru"],
+        ["images_as", "attachments"],
         ["track_read", 0],
         ["track_links", 0],
       ],

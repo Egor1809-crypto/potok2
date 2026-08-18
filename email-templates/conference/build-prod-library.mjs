@@ -4,7 +4,8 @@ import { fileURLToPath } from "node:url";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const target = resolve(root, "../../data/conference-production-templates.generated.ts");
-const updatedAt = "2026-08-16T13:00:00.000Z";
+const updatedAt = "2026-08-18T19:45:00.000Z";
+const conferenceUrl = "https://tech-pravo.ru/conference";
 
 const templates = [
   ["01-personal-invitation", "Личное приглашение", "Личное приглашение на «ТехнологИИ Права»", "Ваша профессиональная практика уже меняется — предлагаем увидеть рабочие решения в Москве."],
@@ -17,6 +18,7 @@ const templates = [
   ["08-practice-lab", "Практическая лаборатория", "ИИ без демо: попробуйте инструменты руками", "На втором дне конференции Вы тестируете подходы и собираете рабочую схему."],
   ["09-professional-circle", "Профессиональный круг", "Ваши следующие партнёры будут в этом зале", "Сильные связи с юристами, управляющими и руководителями практик."],
   ["10-market-race", "Гонка рынка", "До повышения цен: войдите в гонку сейчас", "Практика лидеров, ИИ-инструменты и связи, которые помогают двигаться быстрее."],
+  ["11-cost-reduction", "Сокращение расходов на 50%", "Как сократить расходы на почтовые отправления на 50%", "Практический кейс: экономия более 5 млн рублей в год для арбитражных управляющих."],
 ];
 
 function plainText(html) {
@@ -35,7 +37,10 @@ function plainText(html) {
 const values = [];
 for (const [slug, name, subject, previewText] of templates) {
   const source = await readFile(resolve(root, `conference-${slug}.html`), "utf8");
-  const html = source.replaceAll("{{Имя}}", "{{first_name}}");
+  const html = source
+    .replaceAll("{{Имя}}", "{{first_name}}")
+    .replace(/https:\/\/tech-pravo\.ru\/conference\/uchastnik(?:\?[^\"']*)?/g, conferenceUrl)
+    .replaceAll("https://tech-pravo.ru/programma-tehnologii-prava-2026.pdf", conferenceUrl);
   const id = `template-user-conference-${slug}`;
   values.push({
     id,

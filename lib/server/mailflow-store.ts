@@ -77,7 +77,7 @@ import {
   toIntegrationRecord,
 } from "./runtime-integrations";
 import { checkProviderConnection, automaticProviderSecrets } from "./provider-checks";
-import { storeInlineEmailAsset } from "./email-asset-store";
+import { extractInlineEmailImages } from "./inline-email-images";
 import {
   createUniSenderCampaign,
   checkUniSenderEmail,
@@ -2658,21 +2658,8 @@ function localEmailAssetUrls(campaign: CampaignRecord) {
     });
 }
 
-async function prepareEmailHtmlForDelivery(request: Request, html: string) {
-  const sources = new Set<string>();
-  const pattern = /\bsrc=(['"])(data:image\/(?:jpeg|png|gif|webp);base64,[^'"]+)\1/gi;
-  for (const match of html.matchAll(pattern)) {
-    sources.add(match[2]);
-  }
-  if (!sources.size) return html;
-
-  const replacementBySource = new Map<string, string>();
-  for (const source of sources) {
-    replacementBySource.set(source, await storeInlineEmailAsset(request, source));
-  }
-  return html.replace(pattern, (_match, quote: string, source: string) =>
-    `src=${quote}${replacementBySource.get(source) ?? source}${quote}`,
-  );
+function prepareEmailHtmlForDelivery(html: string, reference: "filename" | "cid") {
+  return extractInlineEmailImages(html, reference);
 }
 
 async function evaluateLaunch(
@@ -3026,7 +3013,11 @@ async function processUniSenderOutbox(
         return { filename: safePresentationFilename(presentation.name), bytes };
       })()
     : null;
-  const htmlBody = await prepareEmailHtmlForDelivery(request, version.snapshot.emailBodyHtml);
+  const preparedEmail = prepareEmailHtmlForDelivery(version.snapshot.emailBodyHtml, "filename");
+  const emailAttachments = [
+    ...preparedEmail.images.map((image) => ({ filename: image.filename, bytes: image.bytes })),
+    ...(attachment ? [attachment] : []),
+  ];
   if (version.snapshot.purpose === "transactional") {
     const [row] = rows;
     if (rows.length !== 1 || !row) {
@@ -3048,8 +3039,8 @@ async function processUniSenderOutbox(
       recipientEmail: row.recipientEndpoint,
       recipientName: contact?.fullName,
       subject: renderMergeTemplate(version.snapshot.subject, mergeFields),
-      htmlBody: renderMergeTemplate(htmlBody, mergeFields),
-      attachments: attachment ? [attachment] : undefined,
+      htmlBody: renderMergeTemplate(preparedEmail.html, mergeFields),
+      attachments: emailAttachments.length ? emailAttachments : undefined,
       signal: AbortSignal.timeout(30_000),
     });
     await updateOutboxResult(row, result);
@@ -3062,8 +3053,8 @@ async function processUniSenderOutbox(
     senderEmail: version.snapshot.senderEmail,
     subject: version.snapshot.subject,
     textBody: version.snapshot.emailBodyText,
-    htmlBody,
-    attachments: attachment ? [attachment] : undefined,
+    htmlBody: preparedEmail.html,
+    attachments: emailAttachments.length ? emailAttachments : undefined,
     recipients: rows.map((row) => ({
       email: row.recipientEndpoint,
       name: contactsById.get(row.contactId)?.fullName ?? "",
@@ -3131,7 +3122,7 @@ async function processVkWorkspaceSmtpOutbox(
     updatedAt: new Date().toISOString(),
   }).where(inArray(deliveryOutbox.id, rows.map((row) => row.id)));
   const credentials = automaticProviderSecrets("vk-workspace") as { password?: string };
-  const htmlBody = await prepareEmailHtmlForDelivery(request, version.snapshot.emailBodyHtml);
+  const preparedEmail = prepareEmailHtmlForDelivery(version.snapshot.emailBodyHtml, "cid");
   const senderEmail = integration.publicConfig.senderEmail?.trim() || version.snapshot.senderEmail;
   const results = await sendVkWorkspaceSmtpBatch({
     host: "smtp.mail.ru",
@@ -3149,7 +3140,8 @@ async function processVkWorkspaceSmtpOutbox(
       to: row.recipientEndpoint,
       subject: renderContactTemplate(version.snapshot.subject, contact),
       text: renderContactTemplate(version.snapshot.emailBodyText, contact),
-      html: renderContactTemplate(htmlBody, contact),
+      html: renderContactTemplate(preparedEmail.html, contact),
+      inlineImages: preparedEmail.images,
     }];
   }));
   const byId = new Map(results.map((result) => [result.outboxId, result]));

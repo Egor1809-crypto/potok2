@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-test("ten conference HTML letters are seeded as editable user templates", async () => {
+test("conference HTML letters are seeded as editable user templates", async () => {
   const [generated, database, compiler, preview, personalInvitation] = await Promise.all([
     readFile(new URL("../data/conference-production-templates.generated.ts", import.meta.url), "utf8"),
     readFile(new URL("../lib/server/database-init.ts", import.meta.url), "utf8"),
@@ -10,8 +10,8 @@ test("ten conference HTML letters are seeded as editable user templates", async 
     readFile(new URL("../components/templates/TemplatePreview.tsx", import.meta.url), "utf8"),
     readFile(new URL("../email-templates/conference/conference-01-personal-invitation.html", import.meta.url), "utf8"),
   ]);
-  assert.equal((generated.match(/"name": "ТП Конференция /g) ?? []).length, 10);
-  assert.equal((generated.match(/"rawHtml":/g) ?? []).length, 10);
+  assert.equal((generated.match(/"name": "ТП Конференция /g) ?? []).length, 11);
+  assert.equal((generated.match(/"rawHtml":/g) ?? []).length, 11);
   assert.doesNotMatch(generated, /\{\{Имя\}\}/);
   assert.match(generated, /\{\{first_name\}\}/);
   assert.match(generated, /https:\/\/tech-pravo\.ru\/conference/);
@@ -21,7 +21,9 @@ test("ten conference HTML letters are seeded as editable user templates", async 
   assert.match(generated, /Конференция руководителей в большом зале/);
   assert.match(generated, /background:#dffbfc;color:#10213b/);
   assert.doesNotMatch(generated, /ООО «АСПБ»/);
-  assert.equal((generated.match(/© 2026 ООО «ТехнологИИ Права»/g) ?? []).length, 30);
+  assert.equal((generated.match(/© 2026 ООО «ТехнологИИ Права»/g) ?? []).length, 33);
+  assert.doesNotMatch(generated, /https:\/\/tech-pravo\.ru\/conference\/uchastnik/);
+  assert.doesNotMatch(generated, /https:\/\/tech-pravo\.ru\/programma-tehnologii-prava-2026\.pdf/);
   assert.match(generated, /На втором дне конференции «ТехнологИИ Права»/);
   assert.match(generated, /Маняша — AI-ассистент конференции/);
   assert.match(generated, /— для руководителей юридического бизнеса, практикующих юристов, юристов в сфере БФЛ/);
@@ -36,6 +38,10 @@ test("ten conference HTML letters are seeded as editable user templates", async 
   assert.match(generated, /Вы первыми увидите, что делает лидеров первыми\./);
   assert.match(generated, /Здравствуйте, \{\{first_name\}\}! Пока одни обсуждают ИИ, другие уже перестраивают процессы, продукт и команду\./);
   assert.match(generated, /На конференции «ТехнологИИ Права» Вы увидите, как это делают лидеры БФЛ и юридического бизнеса\./);
+  assert.match(generated, /ТП Конференция 11 — Сокращение расходов на 50%/);
+  assert.match(generated, /Как сократить расходы на почтовые отправления на 50%/);
+  assert.match(generated, /более чем на 5 млн рублей в год/);
+  assert.match(generated, /25–26 сентября 2026 года/);
   assert.match(database, /conference-production-html-v1/);
   assert.match(database, /conference-production-html-v2-practice-lab/);
   assert.match(database, /conference-production-html-v3-executive-memo/);
@@ -47,7 +53,10 @@ test("ten conference HTML letters are seeded as editable user templates", async 
   assert.match(database, /conference-production-html-v9-personal-invitation-copy/);
   assert.match(database, /conference-production-html-v10-inbox-friendly-personal-invitation/);
   assert.match(database, /conference-production-html-v11-restore-personal-invitation-design/);
-  assert.match(database, /runtime-schema-v19-restore-personal-invitation-design/);
+  assert.match(database, /conference-production-html-v12-links-and-cost-template/);
+  assert.match(database, /runtime-schema-v20-conference-links-cost-template-inline-images/);
+  assert.match(database, /template-user-conference-11-cost-reduction/);
+  assert.match(database, /isFavorite: true/);
   assert.match(database, /https:\/\/t\.me\/TechPravoAI/);
   assert.match(compiler, /if \(document\.rawHtml\) return document\.rawHtml/);
   assert.match(preview, /srcDoc=\{template\.emailBodyHtml\}/);
