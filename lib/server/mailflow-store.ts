@@ -3086,7 +3086,10 @@ async function processUniSenderOutbox(
     } else if (rejectedIds.has(row.id)) {
       await updateOutboxResult(row, {
         status: "rejected",
-        message: "UniSender не включил этот адрес в принятую кампанию.",
+        // Keep the provider's sanitized reason. Without it a failed wave was
+        // indistinguishable from an invalid address, even when UniSender
+        // rejected the message, sender, or account-level campaign instead.
+        message: result.message || "UniSender не включил этот адрес в принятую кампанию.",
       });
     } else {
       await updateOutboxResult(row, {

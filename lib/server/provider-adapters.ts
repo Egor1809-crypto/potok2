@@ -569,6 +569,7 @@ export async function createUniSenderCampaign(input: {
     );
     const validRecipients: UniSenderRecipient[] = [];
     const rejectedOutboxIds: string[] = [];
+    const importErrorCodes = new Map<string, number>();
     for (let offset = 0; offset < input.recipients.length; offset += 500) {
       const batch = input.recipients.slice(offset, offset + 500);
       const importParameters: Array<[string, string | number]> = [
@@ -628,15 +629,25 @@ export async function createUniSenderCampaign(input: {
           .map((entry) => Number(entry.index))
           .filter(Number.isInteger),
       );
+      for (const entry of imported.body.result.log ?? []) {
+        const code = String(entry.code ?? "");
+        if (!code.startsWith("e_")) continue;
+        importErrorCodes.set(code, (importErrorCodes.get(code) ?? 0) + 1);
+      }
       batch.forEach((recipient, index) => {
         if (invalidIndexes.has(index)) rejectedOutboxIds.push(recipient.outboxId);
         else validRecipients.push(recipient);
       });
     }
     if (!validRecipients.length) {
+      const details = Array.from(importErrorCodes.entries())
+        .map(([code, count]) => `${code} (${count})`)
+        .join(", ");
       return {
         status: "rejected",
-        message: "UniSender не принял ни одного email-адреса из аудитории.",
+        message: details
+          ? `UniSender не принял ни одного email-адреса из аудитории: ${details}.`
+          : "UniSender не принял ни одного email-адреса из аудитории.",
         acceptedOutboxIds: [],
         rejectedOutboxIds: allOutboxIds,
       };

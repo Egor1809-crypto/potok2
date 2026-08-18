@@ -269,6 +269,33 @@ test("UniSender campaign contacts exclude addresses rejected during import", asy
   assert.deepEqual(result.rejectedOutboxIds, ["outbox-invalid"]);
 });
 
+test("UniSender exposes sanitized import error codes when an entire audience is rejected", async () => {
+  const result = await createUniSenderCampaign({
+    apiKey: "api-key",
+    listId: "88",
+    senderName: "MAILFLOW",
+    senderEmail: "sender@example.test",
+    subject: "Тема",
+    textBody: "Текст",
+    recipients: [
+      { email: "one@example.test", name: "Один", outboxId: "outbox-1" },
+      { email: "two@example.test", name: "Два", outboxId: "outbox-2" },
+    ],
+    fetchFn: async () => jsonResponse({
+      result: {
+        invalid: 2,
+        log: [
+          { index: 0, code: "e_address_is_role_based", message: "contains an email" },
+          { index: 1, code: "e_address_is_role_based", message: "contains an email" },
+        ],
+      },
+    }),
+  });
+  assert.equal(result.status, "rejected");
+  assert.match(result.message, /e_address_is_role_based \(2\)/);
+  assert.doesNotMatch(result.message, /example\.test/);
+});
+
 test("UniSender does not mark recipients accepted when createCampaign is ambiguous", async () => {
   let calls = 0;
   const result = await createUniSenderCampaign({
