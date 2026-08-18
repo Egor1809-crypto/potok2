@@ -32,8 +32,15 @@ test("calendar connects scheduled campaigns, audience filters and the due queue"
   assert.doesNotMatch(calendar, /fetch\("\/api\/scheduler"/);
   assert.doesNotMatch(calendar, /items\.slice\(0, 3\)/);
   assert.match(wizard, /scheduledAt/);
-  assert.match(wizard, /Поставить в календарь/);
-  assert.match(wizard, /Дата сохранена — рассылка отмечена в календаре как черновик/);
+  assert.match(wizard, /scheduledTimes/);
+  assert.match(wizard, /Добавить время/);
+  assert.match(wizard, /волна \$\{index \+ 1\}\/\$\{launchTimes\.length\}/);
+  assert.match(wizard, /recipientCount \* waveCount/);
+  assert.match(wizard, /Каждый получатель получит это письмо во все выбранные периоды/);
+  assert.match(wizard, /createdWaveIds/);
+  assert.match(wizard, /Незавершённые дополнительные волны удалены/);
+  assert.match(wizard, /formatWaveCount\(scheduledTimes\.length\).*в календарь/);
+  assert.match(wizard, /Времена волн.*сохранены/);
   assert.match(wizard, /Показать в календаре/);
   assert.match(store, /eq\(campaigns\.status, "scheduled"\)/);
   assert.match(store, /lte\(campaigns\.scheduledAt, now\)/);
@@ -44,7 +51,7 @@ test("calendar connects scheduled campaigns, audience filters and the due queue"
   assert.match(timezone, /resolvedOptions\(\)\.timeZone/);
   assert.match(calendar, /formatTime\(campaign\.scheduledAt!, timeZone\)/);
   assert.match(calendar, /Часовой пояс определён автоматически/);
-  assert.match(wizard, /Календарь покажет то же локальное время/);
+  assert.match(wizard, /Часовой пояс:/);
   assert.match(topbar, /href="\/calendar"/);
   assert.doesNotMatch(navigation, /href: "\/calendar"/);
 });

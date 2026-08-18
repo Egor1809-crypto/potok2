@@ -12,6 +12,7 @@ import {
   Mail,
   MessageCircle,
   PencilLine,
+  Plus,
   RefreshCw,
   Save,
   Send,
@@ -21,6 +22,7 @@ import {
   Search,
   UserRound,
   UsersRound,
+  Trash2,
 } from "lucide-react";
 
 import {
@@ -127,6 +129,7 @@ type WizardDraft = {
   senderName: string;
   senderEmail: string;
   scheduledAt: string | null;
+  scheduledTimes?: string[];
 };
 
 export type CampaignWizardSearchParams = Record<string, string | string[] | undefined>;
@@ -192,6 +195,22 @@ function initialScheduledAt(params: URLSearchParams, draft: Partial<WizardDraft>
   if (!day || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
   const date = new Date(`${day}T10:00:00`);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function initialScheduledTimes(params: URLSearchParams, draft: Partial<WizardDraft> | null) {
+  const restored = Array.isArray(draft?.scheduledTimes)
+    ? draft.scheduledTimes.filter((value): value is string => typeof value === "string" && !Number.isNaN(Date.parse(value)))
+    : [];
+  if (restored.length > 0) return Array.from(new Set(restored));
+  const first = initialScheduledAt(params, draft);
+  return first ? [first] : [];
+}
+
+function nextWaveTime(times: string[]) {
+  const latest = times.reduce((result, value) => Math.max(result, Date.parse(value)), Date.now());
+  const date = new Date(latest + 60 * 60 * 1000);
+  date.setMinutes(Math.ceil(date.getMinutes() / 10) * 10, 0, 0);
+  return date.toISOString();
 }
 
 function serializeParams(params?: CampaignWizardSearchParams | URLSearchParams) {
@@ -263,6 +282,19 @@ function formatRecipientCount(value: number) {
       : lastDigit >= 2 && lastDigit <= 4
         ? "получателя"
         : "получателей";
+  return `${formatNumber(value)} ${noun}`;
+}
+
+function formatWaveCount(value: number) {
+  const lastTwoDigits = value % 100;
+  const lastDigit = value % 10;
+  const noun = lastTwoDigits >= 11 && lastTwoDigits <= 14
+    ? "волн"
+    : lastDigit === 1
+      ? "волна"
+      : lastDigit >= 2 && lastDigit <= 4
+        ? "волны"
+        : "волн";
   return `${formatNumber(value)} ${noun}`;
 }
 
@@ -448,14 +480,25 @@ function CampaignWizardState({
   const [senderEmail, setSenderEmail] = React.useState(
     seedDraft?.senderEmail ?? "",
   );
-  const [scheduledAt, setScheduledAt] = React.useState<string | null>(() => initialScheduledAt(params, seedDraft));
+  const [scheduledTimes, setScheduledTimes] = React.useState<string[]>(() => initialScheduledTimes(params, seedDraft));
+  const scheduledAt = scheduledTimes[0] ?? null;
+  const setScheduledAt = React.useCallback((value: string | null) => {
+    setScheduledTimes(value ? [value] : []);
+  }, [setScheduledTimes]);
   const [minimumScheduledAt] = React.useState(() => new Date(Date.now() + 5 * 60_000).toISOString());
   const [busyAction, setBusyAction] = React.useState<"save" | "launch" | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [notice, setNotice] = React.useState<string | null>(null);
   const [evaluation, setEvaluation] = React.useState<Evaluation | null>(null);
   const [setupDialogOpen, setSetupDialogOpen] = React.useState(false);
-  const [finishedCampaign, setFinishedCampaign] = React.useState<{ id: string; status: string; scheduledAt: string | null; dispatched: boolean } | null>(null);
+  const [finishedCampaign, setFinishedCampaign] = React.useState<{
+    id: string;
+    status: string;
+    scheduledAt: string | null;
+    dispatched: boolean;
+    waveCount: number;
+    totalMessages: number;
+  } | null>(null);
   const scheduleSaveTimer = React.useRef<number | null>(null);
   const hydratedCampaignId = React.useRef<string | null>(null);
   const hydratedQueryTemplateId = React.useRef<string | null>(null);
@@ -558,7 +601,7 @@ function CampaignWizardState({
       setTemplateLoadState("error");
       setApiMode("offline");
     }
-  }, [duplicate, purpose, recoveredCampaignId, sourceId]);
+  }, [duplicate, purpose, recoveredCampaignId, setScheduledAt, sourceId]);
 
   React.useEffect(() => {
     const frame = window.requestAnimationFrame(() => void loadWorkspace());
@@ -642,7 +685,12 @@ function CampaignWizardState({
     if (presentationId && (!channels.includes("email") || providers.email !== "unisender")) {
       blockers.push("Презентацию во вложении можно отправить только по Email через UniSender.");
     }
-    if (scheduledAt && Date.parse(scheduledAt) <= Date.parse(minimumScheduledAt)) blockers.push("Выберите будущие дату и время отправки.");
+    if (scheduledTimes.some((value) => Date.parse(value) <= Date.parse(minimumScheduledAt))) {
+      blockers.push("Все волны должны быть запланированы на будущее.");
+    }
+    if (new Set(scheduledTimes).size !== scheduledTimes.length) {
+      blockers.push("У каждой волны должно быть своё время отправки.");
+    }
     channels.forEach((channel) => {
       const providerId = providers[channel];
       if (!providerId) blockers.push(`Выберите провайдера для канала ${getCampaignChannelDefinition(channel).shortLabel}.`);
@@ -651,7 +699,7 @@ function CampaignWizardState({
       }
     });
     return Array.from(new Set(blockers));
-  }, [audienceType, campaignName, channels, emailBodyText, integrationByProvider, messengerMessage, minimumScheduledAt, presentationId, providers, purpose, recipientCount, scheduledAt, senderEmail, senderName, subject]);
+  }, [audienceType, campaignName, channels, emailBodyText, integrationByProvider, messengerMessage, minimumScheduledAt, presentationId, providers, purpose, recipientCount, scheduledTimes, senderEmail, senderName, subject]);
 
   const draft: WizardDraft = {
     campaignId,
@@ -674,6 +722,7 @@ function CampaignWizardState({
     senderName,
     senderEmail,
     scheduledAt,
+    scheduledTimes,
   };
   const draftJson = JSON.stringify(draft);
   const editorReturnParams = new URLSearchParams({
@@ -754,8 +803,11 @@ function CampaignWizardState({
     setEvaluation(null);
   };
 
-  const campaignPayload = (): CampaignCreateInput => ({
-    name: campaignName.trim(),
+  const campaignPayload = (
+    waveScheduledAt: string | null = scheduledAt,
+    waveName = campaignName.trim(),
+  ): CampaignCreateInput => ({
+    name: waveName,
     purpose,
     audienceType,
     ...(audienceType === "segment"
@@ -776,7 +828,7 @@ function CampaignWizardState({
       channel,
       providerId: providers[channel],
     })),
-    scheduledAt,
+    scheduledAt: waveScheduledAt,
   });
 
   const mutateCampaign = async (
@@ -794,29 +846,38 @@ function CampaignWizardState({
     setBusyAction(action);
     setError(null);
     setNotice(null);
+    const createdWaveIds: string[] = [];
     try {
-      const payload = payloadOverride ?? campaignPayload();
+      const launchTimes = action === "launch"
+        ? [...scheduledTimes].sort((left, right) => Date.parse(left) - Date.parse(right))
+        : [];
+      const isWaveLaunch = !payloadOverride && launchTimes.length > 1;
+      const waveName = (index: number) => `${campaignName.trim()} · волна ${index + 1}/${launchTimes.length}`;
+      const payload = payloadOverride ?? campaignPayload(
+        launchTimes[0] ?? scheduledAt,
+        isWaveLaunch ? waveName(0) : campaignName.trim(),
+      );
       let id = campaignId;
-      const createDraft = async () => {
+      const createDraft = async (draftPayload = payload, rememberCampaign = true) => {
         const createResponse = await fetch("/api/campaigns", {
           method: "POST",
           headers: { "Content-Type": "application/json", Accept: "application/json" },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(draftPayload),
         });
         const createBody = await createResponse.json() as CampaignMutationResponse | ApiError;
         if (!createResponse.ok || !("campaign" in createBody)) {
           throw new Error("error" in createBody ? createBody.error : "Не удалось создать черновик кампании.");
         }
-        setCampaignId(createBody.campaign.id);
+        if (rememberCampaign) setCampaignId(createBody.campaign.id);
         return createBody.campaign.id;
       };
       if (!id) id = await createDraft();
 
-      const updateDraft = async (campaignDraftId: string) => {
+      const updateDraft = async (campaignDraftId: string, draftPayload = payload) => {
         const response = await fetch("/api/campaigns", {
           method: "PATCH",
           headers: { "Content-Type": "application/json", Accept: "application/json" },
-          body: JSON.stringify({ id: campaignDraftId, ...payload, action }),
+          body: JSON.stringify({ id: campaignDraftId, ...draftPayload, action }),
         });
         const body = await response.json() as CampaignMutationResponse | ApiError;
         return { response, body };
@@ -855,6 +916,23 @@ function CampaignWizardState({
       } else {
         let completedCampaign = body.campaign;
         let dispatched = false;
+        let waveCount = 1;
+        if (isWaveLaunch) {
+          for (let index = 1; index < launchTimes.length; index += 1) {
+            const wavePayload = campaignPayload(launchTimes[index], waveName(index));
+            const waveId = await createDraft(wavePayload, false);
+            createdWaveIds.push(waveId);
+            const { response: waveResponse, body: waveBody } = await updateDraft(waveId, wavePayload);
+            if (!waveResponse.ok || !("campaign" in waveBody)) {
+              throw new Error("error" in waveBody ? waveBody.error : `Не удалось сохранить волну ${index + 1}.`);
+            }
+            const waveBlockers = normalizeBlockers(waveBody.evaluation?.blockers);
+            if (waveBlockers.length > 0 || waveBody.campaign.status === "blocked") {
+              throw new Error(`Волна ${index + 1} не прошла проверку: ${waveBlockers.join(" ")}`);
+            }
+            waveCount += 1;
+          }
+        }
         if (!body.campaign.scheduledAt && body.campaign.readyVersionId) {
           const dispatchResponse = await fetch("/api/campaigns", {
             method: "PATCH",
@@ -878,28 +956,43 @@ function CampaignWizardState({
           status: completedCampaign.status ?? serverEvaluation.status ?? "ready",
           scheduledAt: completedCampaign.scheduledAt,
           dispatched,
+          waveCount,
+          totalMessages: recipientCount * waveCount,
         });
       }
     } catch (mutationError) {
-      setError(mutationError instanceof Error
+      const baseMessage = mutationError instanceof Error
         ? mutationError.message
-        : "Не удалось связаться с сервером рабочего пространства.");
+        : "Не удалось связаться с сервером рабочего пространства.";
+      if (createdWaveIds.length > 0) {
+        const cleanup = await Promise.allSettled(createdWaveIds.map((waveId) => fetch(
+          `/api/campaigns?id=${encodeURIComponent(waveId)}`,
+          { method: "DELETE", headers: { Accept: "application/json" } },
+        )));
+        const cleanupFailed = cleanup.some((result) => result.status === "rejected" || !result.value.ok);
+        setError(cleanupFailed
+          ? `${baseMessage} Часть созданных волн не удалось убрать; проверьте календарь перед повтором.`
+          : `${baseMessage} Незавершённые дополнительные волны удалены, повтор можно запустить безопасно.`);
+      } else {
+        setError(baseMessage);
+      }
     } finally {
       setBusyAction(null);
     }
   };
 
-  const changeSchedule = (next: string | null) => {
-    setScheduledAt(next);
+  const changeScheduledTimes = (next: string[]) => {
+    const validTimes = next.filter((value) => !Number.isNaN(Date.parse(value))).slice(0, 20);
+    setScheduledTimes(validTimes);
     setEvaluation(null);
     if (scheduleSaveTimer.current !== null) window.clearTimeout(scheduleSaveTimer.current);
     scheduleSaveTimer.current = window.setTimeout(() => {
       scheduleSaveTimer.current = null;
       void mutateCampaign(
         "save",
-        { name: campaignName.trim() || "Новая рассылка", scheduledAt: next },
-        next
-          ? "Дата сохранена — рассылка отмечена в календаре как черновик."
+        { name: campaignName.trim() || "Новая рассылка", scheduledAt: validTimes[0] ?? null },
+        validTimes.length
+          ? `${validTimes.length === 1 ? "Дата" : "Времена волн"} сохранены. После проверки все волны появятся в календаре.`
           : "Расписание убрано из календаря.",
       );
     }, 500);
@@ -923,7 +1016,9 @@ function CampaignWizardState({
           <p className="mx-auto mt-2 max-w-lg text-[14px] leading-6 text-text-muted">
             {finishedCampaign.dispatched
               ? "Провайдер принял задание. В карточке кампании доступны точные статусы принятых, отклонённых и неопределённых сообщений."
-              : "Сервер сохранил аудиторию, сообщения, маршруты и расписание. Внешняя отправка начнётся по календарю."}
+              : finishedCampaign.waveCount > 1
+                ? `Сохранено волн: ${finishedCampaign.waveCount}. Каждый получатель получит письмо в каждой волне — всего запланировано ${formatNumber(finishedCampaign.totalMessages)} писем.`
+                : "Сервер сохранил аудиторию, сообщения, маршруты и расписание. Внешняя отправка начнётся по календарю."}
           </p>
           <div className="mt-7 flex flex-col justify-center gap-2 sm:flex-row">
             <Link href="/campaigns" className={buttonVariants({ variant: "secondary" })}>Все рассылки</Link>
@@ -1142,8 +1237,8 @@ function CampaignWizardState({
               clientBlockers={clientBlockers}
               evaluation={evaluation}
               manualVkWorkspace={channels.includes("email") && providers.email === "vk-workspace"}
-              scheduledAt={scheduledAt}
-              onScheduledAtChange={changeSchedule}
+              scheduledTimes={scheduledTimes}
+              onScheduledTimesChange={changeScheduledTimes}
               minimumScheduledAt={minimumScheduledAt}
             />
           ) : null}
@@ -1173,8 +1268,8 @@ function CampaignWizardState({
                 {evaluation?.blockers.length
                   ? "Проверить повторно"
                   : channels.includes("email") && providers.email === "vk-workspace"
-                    ? scheduledAt ? "Поставить в календарь" : "Проверить SMTP-отправку"
-                    : scheduledAt ? "Поставить в календарь" : "Проверить и отправить"}
+                    ? scheduledAt ? `Поставить ${scheduledTimes.length > 1 ? `${formatWaveCount(scheduledTimes.length)} в календарь` : "в календарь"}` : "Проверить SMTP-отправку"
+                    : scheduledAt ? `Поставить ${scheduledTimes.length > 1 ? `${formatWaveCount(scheduledTimes.length)} в календарь` : "в календарь"}` : "Проверить и отправить"}
               </Button>
             )}
           </footer>
@@ -1749,8 +1844,8 @@ function ReviewStep({
   clientBlockers,
   evaluation,
   manualVkWorkspace,
-  scheduledAt,
-  onScheduledAtChange,
+  scheduledTimes,
+  onScheduledTimesChange,
   minimumScheduledAt,
 }: {
   campaignName: string;
@@ -1763,12 +1858,14 @@ function ReviewStep({
   clientBlockers: string[];
   evaluation: Evaluation | null;
   manualVkWorkspace: boolean;
-  scheduledAt: string | null;
-  onScheduledAtChange: (value: string | null) => void;
+  scheduledTimes: string[];
+  onScheduledTimesChange: (value: string[]) => void;
   minimumScheduledAt: string;
 }) {
   const blockers = evaluation?.blockers.length ? evaluation.blockers : clientBlockers;
   const timeZone = useBrowserTimeZone();
+  const scheduledAt = scheduledTimes[0] ?? null;
+  const totalMessages = recipientCount * scheduledTimes.length;
   return (
     <div>
       <StepIntro number={4} title="Проверьте готовность" description="Сервер рассчитает точный охват, проверит согласия, подключения и сохранит план. Внешняя отправка на этом шаге не выполняется." />
@@ -1784,6 +1881,12 @@ function ReviewStep({
               : `${integrationProviderById[providers[channel]].name} · доступно ${formatNumber(coverage[channel] ?? 0)}`}
           />
         ))}
+        {scheduledTimes.length > 0 ? (
+          <ReviewRow
+            label="Волны отправки"
+            value={`${formatWaveCount(scheduledTimes.length)} · всего ${formatNumber(totalMessages)} ${totalMessages === 1 ? "письмо" : "писем"}`}
+          />
+        ) : null}
       </div>
 
       <section className="mt-6 rounded-xl border border-border p-5" aria-labelledby="schedule-title">
@@ -1793,38 +1896,78 @@ function ReviewStep({
             <p className="mt-1 text-[12px] leading-5 text-text-muted">«Сейчас» сохранит готовую кампанию для явного запуска. Дата добавит её в календарь и очередь Потока.</p>
           </div>
           <div className="flex gap-2">
-            <Button size="sm" variant={scheduledAt ? "secondary" : "primary"} onClick={() => onScheduledAtChange(null)}>Сейчас</Button>
+            <Button size="sm" variant={scheduledAt ? "secondary" : "primary"} onClick={() => onScheduledTimesChange([])}>Сейчас</Button>
             <Button size="sm" variant={scheduledAt ? "primary" : "secondary"} onClick={() => {
               if (scheduledAt) return;
               const date = new Date(Date.now() + 60 * 60 * 1000);
               date.setMinutes(Math.ceil(date.getMinutes() / 15) * 15, 0, 0);
-              onScheduledAtChange(date.toISOString());
+              onScheduledTimesChange([date.toISOString()]);
             }}>По расписанию</Button>
           </div>
         </div>
         {scheduledAt ? (
-          <FormField className="mt-4" label="Дата и время" htmlFor="campaign-scheduled-at" required hint={`Часовой пояс определён по вашему устройству: ${describeTimeZone(timeZone)}. Календарь покажет то же локальное время.`}>
-            <Input
-              id="campaign-scheduled-at"
-              type="datetime-local"
-              min={localInputValue(minimumScheduledAt)}
-              value={localInputValue(scheduledAt)}
-              onChange={(event) => {
-                const value = new Date(event.target.value);
-                onScheduledAtChange(Number.isNaN(value.getTime()) ? null : value.toISOString());
-              }}
-            />
-          </FormField>
+          <div className="mt-4 space-y-3">
+            {scheduledTimes.map((waveTime, index) => (
+              <div key={`${index}-${waveTime}`} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                <FormField
+                  label={`Волна ${index + 1}`}
+                  htmlFor={`campaign-scheduled-at-${index}`}
+                  required
+                  hint={index === 0 ? `Часовой пояс: ${describeTimeZone(timeZone)}. Все получатели получат письмо в каждой волне.` : undefined}
+                >
+                  <Input
+                    id={`campaign-scheduled-at-${index}`}
+                    type="datetime-local"
+                    min={localInputValue(minimumScheduledAt)}
+                    value={localInputValue(waveTime)}
+                    onChange={(event) => {
+                      const value = new Date(event.target.value);
+                      if (Number.isNaN(value.getTime())) return;
+                      const next = [...scheduledTimes];
+                      next[index] = value.toISOString();
+                      onScheduledTimesChange(next);
+                    }}
+                  />
+                </FormField>
+                {scheduledTimes.length > 1 ? (
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    aria-label={`Удалить волну ${index + 1}`}
+                    onClick={() => onScheduledTimesChange(scheduledTimes.filter((_, itemIndex) => itemIndex !== index))}
+                  >
+                    <Trash2 aria-hidden="true" className="size-4" />
+                  </Button>
+                ) : null}
+              </div>
+            ))}
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-surface-subtle p-3">
+              <p className="text-[12px] leading-5 text-text-muted">
+                {formatRecipientCount(recipientCount)} × {formatWaveCount(scheduledTimes.length)} = {formatNumber(totalMessages)} писем.
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                disabled={scheduledTimes.length >= 20}
+                leadingIcon={<Plus aria-hidden="true" className="size-4" />}
+                onClick={() => onScheduledTimesChange([...scheduledTimes, nextWaveTime(scheduledTimes)])}
+              >
+                Добавить время
+              </Button>
+            </div>
+          </div>
         ) : null}
       </section>
 
-      <Alert tone="info" title={scheduledAt ? "Рассылка запланирована" : "Запуск выполняется отдельно"} className="mt-6">
+      <Alert tone="info" title={scheduledTimes.length > 1 ? `Запланировано волн: ${scheduledTimes.length}` : scheduledAt ? "Рассылка запланирована" : "Запуск выполняется отдельно"} className="mt-6">
         {manualVkWorkspace
           ? scheduledAt
-            ? "В выбранное время серверная очередь передаст персонализированное HTML-письмо через VK WorkSpace SMTP. Кнопки останутся ссылками, письмо не прикрепляется файлом; статус можно проверить в Календаре."
+            ? "В каждое выбранное время серверная очередь передаст персонализированное HTML-письмо всем получателям через VK WorkSpace SMTP. Кнопки останутся ссылками; статус каждой волны будет виден в Календаре."
             : "Поток подготовит адресатов и HTML-письмо. После проверки откройте рассылку и нажмите «Начать отправку» — переходить в VK WorkSpace не нужно."
           : scheduledAt
-            ? "После успешной проверки «Поток» передаст рассылку в серверную очередь и запустит выбранного провайдера в указанное время. Статус можно проверить в Календаре."
+            ? "После успешной проверки «Поток» создаст отдельную карточку для каждой волны. Каждый получатель получит это письмо во все выбранные периоды."
             : "Проверка фиксирует готовую версию. После неё откройте рассылку и нажмите «Начать отправку»."}
       </Alert>
 
