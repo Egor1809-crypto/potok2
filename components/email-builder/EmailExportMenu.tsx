@@ -27,6 +27,39 @@ function saveBlob(content: BlobPart, type: string, filename: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
 }
 
+async function makePdfLinksViewerCompatible(pdfBlob: Blob) {
+  const { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber } = await import("pdf-lib");
+  const document = await PDFDocument.load(await pdfBlob.arrayBuffer());
+  const annotsName = PDFName.of("Annots");
+  const rectName = PDFName.of("Rect");
+  const actionName = PDFName.of("A");
+
+  for (const page of document.getPages()) {
+    const annotations = page.node.lookupMaybe(annotsName, PDFArray);
+    if (!annotations) continue;
+    for (let index = 0; index < annotations.size(); index += 1) {
+      const annotation = annotations.lookupMaybe(index, PDFDict);
+      if (!annotation || annotation.lookupMaybe(PDFName.of("Subtype"), PDFName)?.asString() !== "/Link") continue;
+      const rectangle = annotation.lookupMaybe(rectName, PDFArray);
+      if (rectangle?.size() === 4) {
+        const coordinates = Array.from({ length: 4 }, (_, coordinateIndex) => rectangle.lookup(coordinateIndex, PDFNumber).asNumber());
+        annotation.set(rectName, document.context.obj([
+          Math.min(coordinates[0], coordinates[2]),
+          Math.min(coordinates[1], coordinates[3]),
+          Math.max(coordinates[0], coordinates[2]),
+          Math.max(coordinates[1], coordinates[3]),
+        ]));
+      }
+      const action = annotation.lookupMaybe(actionName, PDFDict);
+      action?.set(PDFName.of("Type"), PDFName.of("Action"));
+      annotation.set(PDFName.of("F"), PDFNumber.of(4));
+      annotation.set(PDFName.of("H"), PDFName.of("I"));
+    }
+  }
+
+  return new Blob([await document.save({ useObjectStreams: false })], { type: "application/pdf" });
+}
+
 async function renderPdf(html: string) {
   const renderScale = 2;
   const frame = window.document.createElement("iframe");
@@ -104,7 +137,7 @@ async function renderPdf(html: string) {
       offset += pageHeight;
       page += 1;
     }
-    return pdf.output("blob");
+    return makePdfLinksViewerCompatible(pdf.output("blob"));
   } finally {
     frame.remove();
   }
