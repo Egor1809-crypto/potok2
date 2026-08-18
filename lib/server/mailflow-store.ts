@@ -210,6 +210,12 @@ function toContact(row: ContactRow): ContactRecord {
     engagementScore: row.engagementScore,
     avatarColor: row.avatarColor,
     emailConsent: row.emailConsent,
+    marketingConsentSource: row.customFields?.marketingConsentSource ?? "",
+    marketingConsentAt: row.customFields?.marketingConsentAt || null,
+    marketingConsentText: row.customFields?.marketingConsentText ?? "",
+    serviceEmailAllowed: row.customFields?.serviceEmailAllowed === "true",
+    serviceEmailBasis: row.customFields?.serviceEmailBasis ?? "",
+    serviceEmailAllowedAt: row.customFields?.serviceEmailAllowedAt || null,
     telegramChatId: row.telegramChatId,
     telegramConsent: row.telegramConsent,
     vkUserId: row.vkUserId,
@@ -714,6 +720,28 @@ function parseContact(
   const emailConsent = email
     ? emailConsentInput ?? existing?.emailConsent ?? false
     : false;
+  const marketingConsentSource = optionalText(object.marketingConsentSource, "Источник рекламного согласия", 300)
+    ?? existing?.marketingConsentSource ?? "";
+  const marketingConsentAtValue = object.marketingConsentAt === undefined
+    ? existing?.marketingConsentAt ?? null
+    : nullableText(object.marketingConsentAt, "Дата рекламного согласия", 60) ?? null;
+  const marketingConsentAt = marketingConsentAtValue ? parseIsoDate(marketingConsentAtValue, "Дата рекламного согласия") : null;
+  const marketingConsentText = optionalText(object.marketingConsentText, "Формулировка рекламного согласия", 2_000)
+    ?? existing?.marketingConsentText ?? "";
+  const serviceEmailAllowedInput = optionalBoolean(object.serviceEmailAllowed, "Разрешение сервисных сообщений");
+  const serviceEmailAllowed = email ? serviceEmailAllowedInput ?? existing?.serviceEmailAllowed ?? false : false;
+  const serviceEmailBasis = optionalText(object.serviceEmailBasis, "Основание сервисных сообщений", 300)
+    ?? existing?.serviceEmailBasis ?? "";
+  const serviceEmailAllowedAtValue = object.serviceEmailAllowedAt === undefined
+    ? existing?.serviceEmailAllowedAt ?? null
+    : nullableText(object.serviceEmailAllowedAt, "Дата основания сервисных сообщений", 60) ?? null;
+  const serviceEmailAllowedAt = serviceEmailAllowedAtValue ? parseIsoDate(serviceEmailAllowedAtValue, "Дата основания сервисных сообщений") : null;
+  if (emailConsent && (!marketingConsentSource || !marketingConsentAt || !marketingConsentText)) {
+    throw new ApiRequestError("Для рекламного согласия укажите источник, дату и сохранённую формулировку.");
+  }
+  if (serviceEmailAllowed && (!serviceEmailBasis || !serviceEmailAllowedAt)) {
+    throw new ApiRequestError("Для сервисных сообщений укажите основание и дату: например, покупка или регистрация.");
+  }
   const parsedResponsibleParticipantId = nullableText(
     object.responsibleParticipantId,
     "Ответственный",
@@ -760,7 +788,21 @@ function parseContact(
     telegramConsent,
     vkUserId,
     vkConsent,
-    customFields,
+    customFields: {
+      ...customFields,
+      marketingConsentSource,
+      marketingConsentAt: marketingConsentAt ?? "",
+      marketingConsentText,
+      serviceEmailAllowed: serviceEmailAllowed ? "true" : "false",
+      serviceEmailBasis,
+      serviceEmailAllowedAt: serviceEmailAllowedAt ?? "",
+    },
+    marketingConsentSource,
+    marketingConsentAt,
+    marketingConsentText,
+    serviceEmailAllowed,
+    serviceEmailBasis,
+    serviceEmailAllowedAt,
     responsibleParticipantId,
   };
 }
@@ -960,7 +1002,8 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
         active: sql<number>`coalesce(sum(case when ${contacts.status} = 'active' then 1 else 0 end), 0)`,
         assigned: sql<number>`coalesce(sum(case when ${contacts.responsibleParticipantId} is not null then 1 else 0 end), 0)`,
         emailFound: sql<number>`coalesce(sum(case when ${contacts.email} <> '' then 1 else 0 end), 0)`,
-        emailReady: sql<number>`coalesce(sum(case when ${contacts.status} = 'active' and ${contacts.email} <> '' and ${contacts.emailConsent} = 1 then 1 else 0 end), 0)`,
+        emailReady: sql<number>`coalesce(sum(case when ${contacts.status} = 'active' and ${contacts.email} <> '' and ${contacts.emailConsent} = 1 and coalesce(json_extract(${contacts.customFields}, '$.marketingConsentSource'), '') <> '' and coalesce(json_extract(${contacts.customFields}, '$.marketingConsentAt'), '') <> '' and coalesce(json_extract(${contacts.customFields}, '$.marketingConsentText'), '') <> '' then 1 else 0 end), 0)`,
+        serviceEmailReady: sql<number>`coalesce(sum(case when ${contacts.status} = 'active' and ${contacts.email} <> '' and json_extract(${contacts.customFields}, '$.serviceEmailAllowed') = 'true' and coalesce(json_extract(${contacts.customFields}, '$.serviceEmailBasis'), '') <> '' and coalesce(json_extract(${contacts.customFields}, '$.serviceEmailAllowedAt'), '') <> '' then 1 else 0 end), 0)`,
         telegramFound: sql<number>`coalesce(sum(case when ${contacts.telegramChatId} is not null and ${contacts.telegramChatId} <> '' then 1 else 0 end), 0)`,
         telegramReady: sql<number>`coalesce(sum(case when ${contacts.status} = 'active' and ${contacts.telegramChatId} is not null and ${contacts.telegramChatId} <> '' and ${contacts.telegramConsent} = 1 then 1 else 0 end), 0)`,
         vkFound: sql<number>`coalesce(sum(case when ${contacts.vkUserId} is not null and ${contacts.vkUserId} <> '' then 1 else 0 end), 0)`,
@@ -1013,7 +1056,8 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
           sum(CASE WHEN telegram_chat_id IS NOT NULL AND telegram_chat_id <> '' THEN 1 ELSE 0 END) AS telegram,
           sum(CASE WHEN vk_user_id IS NOT NULL AND vk_user_id <> '' THEN 1 ELSE 0 END) AS vk,
           sum(CASE WHEN phone <> '' THEN 1 ELSE 0 END) AS phone,
-          sum(CASE WHEN status = 'active' AND email <> '' AND email_consent = 1 THEN 1 ELSE 0 END) AS readyEmail,
+          sum(CASE WHEN status = 'active' AND email <> '' AND email_consent = 1 AND coalesce(json_extract(custom_fields, '$.marketingConsentSource'), '') <> '' AND coalesce(json_extract(custom_fields, '$.marketingConsentAt'), '') <> '' AND coalesce(json_extract(custom_fields, '$.marketingConsentText'), '') <> '' THEN 1 ELSE 0 END) AS readyEmail,
+          sum(CASE WHEN status = 'active' AND email <> '' AND json_extract(custom_fields, '$.serviceEmailAllowed') = 'true' AND coalesce(json_extract(custom_fields, '$.serviceEmailBasis'), '') <> '' AND coalesce(json_extract(custom_fields, '$.serviceEmailAllowedAt'), '') <> '' THEN 1 ELSE 0 END) AS serviceEmail,
           sum(CASE WHEN status = 'active' AND telegram_chat_id IS NOT NULL AND telegram_chat_id <> '' AND telegram_consent = 1 THEN 1 ELSE 0 END) AS readyTelegram
           ,sum(CASE WHEN last_contacted_at IS NOT NULL THEN 1 ELSE 0 END) AS sent
         FROM contacts
@@ -1021,7 +1065,7 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
         GROUP BY coalesce(responsible_participant_id, created_by_participant_id)
       `)
       .bind(WORKSPACE_ID)
-      .all<{ participantId: string; total: number; email: number; telegram: number; vk: number; phone: number; readyEmail: number; readyTelegram: number; sent: number }>() : Promise.resolve({ results: [] }),
+      .all<{ participantId: string; total: number; email: number; telegram: number; vk: number; phone: number; readyEmail: number; serviceEmail: number; readyTelegram: number; sent: number }>() : Promise.resolve({ results: [] }),
     includeMeta ? getD1()
       .prepare(`
         SELECT
@@ -1070,6 +1114,7 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
       vk: Number(row.vk),
       phone: Number(row.phone),
       readyEmail: Number(row.readyEmail),
+      serviceEmail: Number(row.serviceEmail),
       readyTelegram: Number(row.readyTelegram),
       sent: Number(row.sent),
       sheets: ownerSheets.get(row.participantId) ?? [],
@@ -1092,7 +1137,7 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
       primaryBase: Number(tagRows.find((row) => row.label === "База №1")?.count ?? 0),
       secondaryBase: Number(tagRows.find((row) => row.label === "База №2")?.count ?? 0),
       coverage: {
-        email: { found: Number(summary?.emailFound ?? 0), ready: Number(summary?.emailReady ?? 0) },
+        email: { found: Number(summary?.emailFound ?? 0), ready: Number(summary?.emailReady ?? 0), serviceReady: Number(summary?.serviceEmailReady ?? 0) },
         telegram: { found: Number(summary?.telegramFound ?? 0), ready: Number(summary?.telegramReady ?? 0) },
         vk: { found: Number(summary?.vkFound ?? 0), ready: Number(summary?.vkReady ?? 0) },
         phone: { found: Number(summary?.phoneFound ?? 0), ready: 0 },
@@ -2445,7 +2490,16 @@ function recipientFingerprints(
           endpointForContact(contact, plan.channel),
           contact.status,
           plan.channel === "email"
-            ? contact.emailConsent
+            ? [
+                purpose,
+                contact.emailConsent,
+                contact.marketingConsentSource,
+                contact.marketingConsentAt,
+                contact.marketingConsentText,
+                contact.serviceEmailAllowed,
+                contact.serviceEmailBasis,
+                contact.serviceEmailAllowedAt,
+              ]
             : plan.channel === "telegram"
               ? contact.telegramConsent
               : contact.vkConsent,
@@ -2551,7 +2605,11 @@ function contactEligible(
 ) {
   if (contact.status !== "active") return false;
   if (channel === "email") {
-    return Boolean(contact.email) && (purpose === "transactional" || !requireConsent || contact.emailConsent);
+    const marketingAllowed = contact.emailConsent
+      && Boolean(contact.marketingConsentSource && contact.marketingConsentAt && contact.marketingConsentText);
+    const serviceAllowed = contact.serviceEmailAllowed
+      && Boolean(contact.serviceEmailBasis && contact.serviceEmailAllowedAt);
+    return Boolean(contact.email) && (purpose === "transactional" ? serviceAllowed : !requireConsent || marketingAllowed);
   }
   if (channel === "telegram") {
     return Boolean(contact.telegramChatId) && contact.telegramConsent;
@@ -2574,8 +2632,11 @@ function noEligibleAudienceBlocker(
   if (contactsWithEmail.length === 0) {
     return `Email: в выбранной аудитории ${audience.length} контактов, но ни у одного не указан email. Добавьте email к контакту или выберите аудиторию с email-адресами.`;
   }
-  if (purpose !== "transactional" && requireConsent && !contactsWithEmail.some((contact) => contact.emailConsent)) {
-    return `Email: адреса есть у ${contactsWithEmail.length} контактов, но ни для одного не подтверждено согласие на email-рассылку. Отметьте согласие только для контактов, которые его дали.`;
+  if (purpose === "transactional" && !contactsWithEmail.some((contact) => contact.serviceEmailAllowed && contact.serviceEmailBasis && contact.serviceEmailAllowedAt)) {
+    return `Email: у получателя не зафиксировано основание для сервисного сообщения. Укажите покупку, регистрацию или другое документируемое основание и его дату.`;
+  }
+  if (purpose !== "transactional" && requireConsent && !contactsWithEmail.some((contact) => contact.emailConsent && contact.marketingConsentSource && contact.marketingConsentAt && contact.marketingConsentText)) {
+    return `Email: адреса есть у ${contactsWithEmail.length} контактов, но нет полного доказательства рекламного согласия. Укажите источник, дату и формулировку согласия.`;
   }
   if (activeContacts.length === 0) {
     return "Email: в выбранной аудитории нет активных контактов. Проверьте статус получателей.";

@@ -70,6 +70,12 @@ const emptyDraft: ContactDraft = {
   status: "active",
   engagementScore: 0,
   emailConsent: false,
+  marketingConsentSource: "",
+  marketingConsentAt: null,
+  marketingConsentText: "",
+  serviceEmailAllowed: false,
+  serviceEmailBasis: "",
+  serviceEmailAllowedAt: null,
   telegramChatId: null,
   telegramConsent: false,
   vkUserId: null,
@@ -83,7 +89,7 @@ const emptySummary: ContactListSummary = {
   primaryBase: 0,
   secondaryBase: 0,
   coverage: {
-    email: { found: 0, ready: 0 },
+    email: { found: 0, ready: 0, serviceReady: 0 },
     telegram: { found: 0, ready: 0 },
     vk: { found: 0, ready: 0 },
     phone: { found: 0, ready: 0 },
@@ -112,6 +118,12 @@ function toDraft(contact: ContactRecord): ContactDraft {
     status: contact.status,
     engagementScore: contact.engagementScore,
     emailConsent: contact.emailConsent,
+    marketingConsentSource: contact.marketingConsentSource,
+    marketingConsentAt: contact.marketingConsentAt,
+    marketingConsentText: contact.marketingConsentText,
+    serviceEmailAllowed: contact.serviceEmailAllowed,
+    serviceEmailBasis: contact.serviceEmailBasis,
+    serviceEmailAllowedAt: contact.serviceEmailAllowedAt,
     telegramChatId: contact.telegramChatId,
     telegramConsent: contact.telegramConsent,
     vkUserId: contact.vkUserId,
@@ -405,7 +417,13 @@ export function ContactsView() {
         "Имя",
         "Фамилия",
         "Email",
-        "Согласие Email",
+        "Согласие на рекламный Email",
+        "Источник рекламного согласия",
+        "Дата рекламного согласия",
+        "Формулировка рекламного согласия",
+        "Разрешены сервисные Email",
+        "Основание сервисного сообщения",
+        "Дата сервисного основания",
         "Телефон",
         "Компания",
         "Должность",
@@ -425,6 +443,12 @@ export function ContactsView() {
         contact.lastName,
         contact.email,
         contact.emailConsent ? "да" : "нет",
+        contact.marketingConsentSource,
+        contact.marketingConsentAt ?? "",
+        contact.marketingConsentText,
+        contact.serviceEmailAllowed ? "да" : "нет",
+        contact.serviceEmailBasis,
+        contact.serviceEmailAllowedAt ?? "",
         contact.phone,
         contact.companyName,
         contact.jobTitle,
@@ -517,7 +541,7 @@ export function ContactsView() {
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Четыре канальные базы">
         {coverage.map(({ id, label, found, ready, Icon, color }) => (
-          <button type="button" key={id} onClick={() => { setPage(1); setChannel(channel === id ? "all" : id); }} aria-pressed={channel === id} className={`card flex items-center gap-3 p-4 text-left transition hover:-translate-y-px hover:shadow-sm ${channel === id ? "ring-2 ring-[var(--primary)]/45" : ""}`}><span className="grid size-9 place-items-center rounded-xl" style={{ backgroundColor: `${color}18`, color }}><Icon aria-hidden="true" className="size-4" /></span><div><p className="text-[12px] font-semibold">{label}</p><p className="mt-0.5 text-[11px] text-[var(--text-muted)]">Уникальных контактов: {found.toLocaleString("ru-RU")}{id !== "phone" ? ` · разрешено: ${ready.toLocaleString("ru-RU")}` : ""}</p></div></button>
+          <button type="button" key={id} onClick={() => { setPage(1); setChannel(channel === id ? "all" : id); }} aria-pressed={channel === id} className={`card flex items-center gap-3 p-4 text-left transition hover:-translate-y-px hover:shadow-sm ${channel === id ? "ring-2 ring-[var(--primary)]/45" : ""}`}><span className="grid size-9 place-items-center rounded-xl" style={{ backgroundColor: `${color}18`, color }}><Icon aria-hidden="true" className="size-4" /></span><div><p className="text-[12px] font-semibold">{label}</p><p className="mt-0.5 text-[11px] text-[var(--text-muted)]">Уникальных контактов: {found.toLocaleString("ru-RU")}{id === "email" ? ` · реклама: ${ready.toLocaleString("ru-RU")} · сервисные: ${summary.coverage.email.serviceReady.toLocaleString("ru-RU")}` : id !== "phone" ? ` · разрешено: ${ready.toLocaleString("ru-RU")}` : ""}</p></div></button>
         ))}
       </section>
       <p className="-mt-3 text-[10px] text-[var(--text-muted)]">Это четыре представления одной объединённой базы: контакт не дублируется, даже если у него несколько каналов.</p>
@@ -541,7 +565,7 @@ export function ContactsView() {
                     <span><b className="block text-[12px] text-[var(--text-strong)]">{item.vk.toLocaleString("ru-RU")}</b>VK</span>
                     <span><b className="block text-[12px] text-[var(--text-strong)]">{item.phone.toLocaleString("ru-RU")}</b>Тел.</span>
                   </span>
-                  <span className="mt-2 block text-[9px] text-[var(--text-muted)]">Можно писать: Email {item.readyEmail.toLocaleString("ru-RU")} · Telegram {item.readyTelegram.toLocaleString("ru-RU")}</span>
+                  <span className="mt-2 block text-[9px] text-[var(--text-muted)]">Email: реклама {item.readyEmail.toLocaleString("ru-RU")} · сервисные {item.serviceEmail.toLocaleString("ru-RU")} · Telegram {item.readyTelegram.toLocaleString("ru-RU")}</span>
                   <span className="mt-1 block text-[9px] font-semibold text-[var(--success)]">Уже обработано: {item.sent.toLocaleString("ru-RU")}</span>
                   {item.sheets.length > 0 && <span className="mt-2 flex flex-wrap gap-1">{item.sheets.map((entry) => <span key={entry.label} className="rounded-md bg-[var(--surface-subtle)] px-1.5 py-1 text-[8px] text-[var(--text-muted)]">{entry.label.replace(/^Импорт: /, "")} · {entry.count.toLocaleString("ru-RU")}</span>)}</span>}
                 </button>
@@ -586,7 +610,7 @@ export function ContactsView() {
                   <td><button type="button" onClick={() => setSelected((current) => { const next = new Set(current); if (next.has(contact.id)) next.delete(contact.id); else next.add(contact.id); return next; })} aria-label={`Выбрать ${contact.fullName}`} className={`grid size-4 place-items-center rounded border ${checked ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-[var(--border-strong)] bg-white"}`}>{checked && <Check aria-hidden="true" className="size-3" />}</button></td>
                   <td><button type="button" onClick={() => setDrawerContact(contact)} className="flex items-center gap-3 text-left"><span className="grid size-9 shrink-0 place-items-center rounded-full text-[10px] font-semibold text-white" style={{ backgroundColor: responsible?.color ?? creator?.color ?? contact.avatarColor }}>{contact.firstName[0]}{contact.lastName[0]}</span><span><span className="block text-[12px] font-semibold hover:text-[var(--primary)]">{contact.fullName}</span><span className="mt-0.5 block text-[10px] text-[var(--text-subtle)]">{primaryEndpoint}</span>{responsible && <span className="mt-1 inline-flex items-center gap-1 text-[9px] font-semibold" style={{ color: responsible.color }}><i className="size-1.5 rounded-full" style={{ backgroundColor: responsible.color }} />Ответственный: {responsible.displayName}</span>}</span></button></td>
                   <td><p className="text-[11px] font-medium">{contact.companyName || "—"}</p><p className="mt-0.5 text-[10px] text-[var(--text-subtle)]">{contact.jobTitle || "Должность не указана"}</p></td>
-                  <td><div className="flex max-w-44 flex-wrap gap-1">{contact.email && <SourcePill label="Email" color="#F43CB8" ready={contact.emailConsent} />}{contact.telegramChatId && <SourcePill label="TG" color="#229ED9" ready={contact.telegramConsent} />}{contact.vkUserId && <SourcePill label="VK" color="#0077FF" ready={contact.vkConsent} />}{contact.phone && <SourcePill label="Телефон" color="#0E7490" />}</div></td>
+                  <td><div className="flex max-w-44 flex-wrap gap-1">{contact.email && <SourcePill label="Email" color="#F43CB8" ready={Boolean(contact.emailConsent && contact.marketingConsentSource && contact.marketingConsentAt && contact.marketingConsentText)} />}{contact.telegramChatId && <SourcePill label="TG" color="#229ED9" ready={contact.telegramConsent} />}{contact.vkUserId && <SourcePill label="VK" color="#0077FF" ready={contact.vkConsent} />}{contact.phone && <SourcePill label="Телефон" color="#0E7490" />}</div></td>
                   <td>{contact.lastContactedAt ? <span className="badge badge-success">✓ Отправлено</span> : telegramHref ? <span className="flex flex-wrap gap-1"><a href={telegramHref} target="_blank" rel="noreferrer" className="badge badge-primary">Открыть TG</a><button type="button" disabled={busy} onClick={() => void markContacted(contact)} className="badge badge-neutral">Отметить</button></span> : <span className="badge badge-neutral">Не отправляли</span>}</td>
                   <td><span className={`badge ${statusTone[contact.status]}`}>{statusLabel[contact.status]}</span></td>
                   <td className="text-[11px] text-[var(--text-muted)]">{dateFormatter.format(new Date(contact.updatedAt))}</td>
@@ -652,8 +676,17 @@ export function ContactFormDialog({ contact, busy, onClose, onSave }: { contact:
               <Field label="Теги через запятую" value={draft.tagsText} onChange={(value) => update("tagsText", value)} placeholder="Клиент, Москва, VIP" />
             </FormGroup>
 
-            <FormGroup title="Каналы и согласия">
-              <ChannelField Icon={Mail} label="Email" hint={draft.email || "Укажите email выше"}><Switch disabled={!draft.email.trim()} checked={Boolean(draft.email.trim() && draft.emailConsent)} onCheckedChange={(checked) => update("emailConsent", checked)} label="Есть согласие на email" /></ChannelField>
+            <FormGroup title="Каналы и основания отправки">
+              <ChannelField Icon={Mail} label="Рекламная email-рассылка" hint="Только предварительное доказуемое согласие адресата">
+                <div className="space-y-3"><Switch disabled={!draft.email.trim()} checked={Boolean(draft.email.trim() && draft.emailConsent)} onCheckedChange={(checked) => update("emailConsent", checked)} label="Согласие на рекламу подтверждено" />
+                {draft.emailConsent && <><Field label="Источник согласия" required value={draft.marketingConsentSource ?? ""} onChange={(value) => update("marketingConsentSource", value)} placeholder="Форма сайта, договор, регистрация на мероприятие" /><Field label="Дата и время согласия" required type="datetime-local" value={draft.marketingConsentAt?.slice(0, 16) ?? ""} onChange={(value) => update("marketingConsentAt", value ? new Date(value).toISOString() : null)} /><label><span className="mb-1.5 block text-[12px] font-semibold">Сохранённая формулировка согласия *</span><textarea required className="input min-h-24 py-2" value={draft.marketingConsentText ?? ""} onChange={(event) => update("marketingConsentText", event.target.value)} placeholder="Точный текст, который видел и подтвердил адресат" /></label></>}
+                </div>
+              </ChannelField>
+              <ChannelField Icon={Mail} label="Сервисные email-сообщения" hint="Чек, билет, статус заказа или аккаунта; без рекламных предложений">
+                <div className="space-y-3"><Switch disabled={!draft.email.trim()} checked={Boolean(draft.email.trim() && draft.serviceEmailAllowed)} onCheckedChange={(checked) => update("serviceEmailAllowed", checked)} label="Есть документируемое основание" />
+                {draft.serviceEmailAllowed && <><Field label="Основание" required value={draft.serviceEmailBasis ?? ""} onChange={(value) => update("serviceEmailBasis", value)} placeholder="Покупка №…, регистрация, обращение в поддержку" /><Field label="Дата основания" required type="datetime-local" value={draft.serviceEmailAllowedAt?.slice(0, 16) ?? ""} onChange={(value) => update("serviceEmailAllowedAt", value ? new Date(value).toISOString() : null)} /></>}
+                </div>
+              </ChannelField>
               <ChannelField Icon={SendHorizontal} label="Telegram" hint="Числовой идентификатор чата, полученный после диалога с ботом"><div className="flex items-center gap-3"><input className="input min-w-0 flex-1" value={draft.telegramChatId ?? ""} onChange={(event) => update("telegramChatId", event.target.value)} placeholder="Например, 123456789" /><Switch disabled={!draft.telegramChatId?.trim()} checked={Boolean(draft.telegramChatId?.trim() && draft.telegramConsent)} onCheckedChange={(checked) => update("telegramConsent", checked)} label="Есть согласие на Telegram" /></div></ChannelField>
               <ChannelField Icon={MessageCircle} label="ВКонтакте" hint="Идентификатор пользователя, которому сообщество может отправлять сообщения"><div className="flex items-center gap-3"><input className="input min-w-0 flex-1" value={draft.vkUserId ?? ""} onChange={(event) => update("vkUserId", event.target.value)} placeholder="Например, 987654321" /><Switch disabled={!draft.vkUserId?.trim()} checked={Boolean(draft.vkUserId?.trim() && draft.vkConsent)} onCheckedChange={(checked) => update("vkConsent", checked)} label="Есть согласие на ВКонтакте" /></div></ChannelField>
             </FormGroup>
@@ -673,7 +706,7 @@ function FormGroup({ title, children }: { title: string; children: ReactNode }) 
   return <fieldset className="space-y-4"><legend className="mb-3 text-[13px] font-semibold">{title}</legend>{children}</fieldset>;
 }
 
-function Field({ label, value, onChange, placeholder, required, type = "text" }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string; required?: boolean; type?: "text" | "email" }) {
+function Field({ label, value, onChange, placeholder, required, type = "text" }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string; required?: boolean; type?: "text" | "email" | "datetime-local" }) {
   return <label><span className="mb-1.5 block text-[12px] font-semibold">{label}{required && <span className="text-[var(--danger)]"> *</span>}</span><input type={type} required={required} className="input" value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} /></label>;
 }
 

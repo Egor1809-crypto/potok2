@@ -89,7 +89,7 @@ type AudienceContact = Pick<
   "id" | "fullName" | "email" | "companyName" | "jobTitle" | "city" | "tags" | "status"
 > & Partial<Pick<
   ContactRecord,
-  "emailConsent" | "telegramChatId" | "telegramConsent" | "vkUserId" | "vkConsent"
+  "emailConsent" | "marketingConsentSource" | "marketingConsentAt" | "marketingConsentText" | "serviceEmailAllowed" | "serviceEmailBasis" | "serviceEmailAllowedAt" | "telegramChatId" | "telegramConsent" | "vkUserId" | "vkConsent"
 >>;
 
 type AudienceSegment = Pick<
@@ -1198,7 +1198,9 @@ function countAudienceReachable(contacts: AudienceContact[], channel: CampaignCh
   return contacts.filter((contact) => {
     if (contact.status !== "active") return false;
     if (channel === "email") {
-      return Boolean(contact.email) && (purpose === "transactional" || contact.emailConsent !== false);
+      const marketingAllowed = contact.emailConsent !== false && Boolean(contact.marketingConsentSource && contact.marketingConsentAt && contact.marketingConsentText);
+      const serviceAllowed = contact.serviceEmailAllowed && Boolean(contact.serviceEmailBasis && contact.serviceEmailAllowedAt);
+      return Boolean(contact.email) && (purpose === "transactional" ? serviceAllowed : marketingAllowed);
     }
     if (channel === "telegram") {
       return Boolean(contact.telegramChatId && contact.telegramConsent);

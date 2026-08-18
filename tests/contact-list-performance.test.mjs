@@ -41,6 +41,21 @@ test("contacts page exposes four deduplicated channel databases and balanced own
   assert.match(databaseInit, /balanced-team-distribution-mask/);
 });
 
+test("service email basis and marketing consent evidence are independent", async () => {
+  const [view, store, wizard] = await Promise.all([
+    readFile(new URL("../components/contacts/ContactsView.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/server/mailflow-store.ts", import.meta.url), "utf8"),
+    readFile(new URL("../components/campaigns/CampaignWizard.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(view, /Рекламная email-рассылка/);
+  assert.match(view, /Сервисные email-сообщения/);
+  assert.match(store, /marketingConsentSource/);
+  assert.match(store, /serviceEmailBasis/);
+  assert.match(store, /полного доказательства рекламного согласия/);
+  assert.match(store, /основание для сервисного сообщения/);
+  assert.match(wizard, /purpose === "transactional" \? serviceAllowed : marketingAllowed/);
+});
+
 test("large contact payloads are loaded only by workflows that require them", async () => {
   const [store, wizard, importer] = await Promise.all([
     readFile(new URL("../lib/server/mailflow-store.ts", import.meta.url), "utf8"),

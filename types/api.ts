@@ -60,6 +60,12 @@ export type ContactRecord = {
   engagementScore: number;
   avatarColor: string;
   emailConsent: boolean;
+  marketingConsentSource: string;
+  marketingConsentAt: string | null;
+  marketingConsentText: string;
+  serviceEmailAllowed: boolean;
+  serviceEmailBasis: string;
+  serviceEmailAllowedAt: string | null;
   telegramChatId: string | null;
   telegramConsent: boolean;
   vkUserId: string | null;
@@ -759,6 +765,12 @@ export type ContactCreateInput = {
   status?: ContactStatus;
   engagementScore?: number;
   emailConsent?: boolean;
+  marketingConsentSource?: string;
+  marketingConsentAt?: string | null;
+  marketingConsentText?: string;
+  serviceEmailAllowed?: boolean;
+  serviceEmailBasis?: string;
+  serviceEmailAllowedAt?: string | null;
   telegramChatId?: string | null;
   telegramConsent?: boolean;
   vkUserId?: string | null;
@@ -770,7 +782,7 @@ export type ContactCreateInput = {
 export type ContactPatchInput = Partial<ContactCreateInput> & { id: string };
 
 export type ContactCoverageSummary = {
-  email: { found: number; ready: number };
+  email: { found: number; ready: number; serviceReady: number };
   telegram: { found: number; ready: number };
   vk: { found: number; ready: number };
   phone: { found: number; ready: number };
@@ -797,6 +809,7 @@ export type ContactOwnerSummary = {
   vk: number;
   phone: number;
   readyEmail: number;
+  serviceEmail: number;
   readyTelegram: number;
   sent: number;
   sheets: ContactListFacet[];

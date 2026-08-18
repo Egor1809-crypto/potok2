@@ -74,10 +74,18 @@ export function ContactDrawer({
     ? [
         {
           id: "email",
-          label: "Email",
+          label: "Рекламный Email",
           address: contact.email || "Адрес не указан",
-          ready: Boolean(contact.email && contact.emailConsent && contact.status === "active"),
-          reason: !contact.email ? "Email не указан" : contact.status !== "active" ? "Контакт недоступен" : !contact.emailConsent ? "Нет согласия" : "Готов к отправке",
+          ready: Boolean(contact.email && contact.emailConsent && contact.marketingConsentSource && contact.marketingConsentAt && contact.marketingConsentText && contact.status === "active"),
+          reason: !contact.email ? "Email не указан" : contact.status !== "active" ? "Контакт недоступен" : !contact.emailConsent ? "Нет согласия" : !contact.marketingConsentSource || !contact.marketingConsentAt || !contact.marketingConsentText ? "Нет полного доказательства согласия" : "Готов к рекламной отправке",
+          Icon: Mail,
+        },
+        {
+          id: "service-email",
+          label: "Сервисный Email",
+          address: contact.email || "Адрес не указан",
+          ready: Boolean(contact.email && contact.serviceEmailAllowed && contact.serviceEmailBasis && contact.serviceEmailAllowedAt && contact.status === "active"),
+          reason: !contact.email ? "Email не указан" : contact.status !== "active" ? "Контакт недоступен" : !contact.serviceEmailAllowed ? "Сервисные сообщения не разрешены" : !contact.serviceEmailBasis || !contact.serviceEmailAllowedAt ? "Нет основания или даты" : "Готов к сервисной отправке",
           Icon: Mail,
         },
         {
