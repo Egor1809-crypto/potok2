@@ -3,9 +3,11 @@ import test from "node:test";
 
 import {
   createUniSenderCampaign,
+  checkUniSenderEmail,
   deterministicVkRandomId,
   getUniSenderCampaignStats,
   renderMergeTemplate,
+  sendUniSenderTransactionalEmail,
   sendTelegramMessage,
   sendVkMessage,
   unknownMergeTokens,
@@ -318,4 +320,38 @@ test("UniSender delivery reconciliation uses the provider's final statistics", a
   assert.equal(result.sent, 3);
   assert.equal(result.delivered, 2);
   assert.deepEqual(methods.sort(), ["getCampaignCommonStats", "getCampaignStatus"]);
+});
+
+test("UniSender service email disables marketing tracking and includes unsubscribe", async () => {
+  const result = await sendUniSenderTransactionalEmail({
+    apiKey: "api-key",
+    listId: "88",
+    senderName: "ТехнологИИ Права",
+    senderEmail: "orders@example.test",
+    recipientEmail: "buyer@example.test",
+    recipientName: "Покупатель",
+    subject: "Оплата получена",
+    htmlBody: "<p>Ваш билет готов.</p>",
+    fetchFn: async (url, init) => {
+      assert.match(String(url), /\/sendEmail$/);
+      const body = new URLSearchParams(String(init.body));
+      assert.equal(body.get("track_read"), "0");
+      assert.equal(body.get("track_links"), "0");
+      assert.match(body.get("body"), /\{\{UnsubscribeUrl\}\}/);
+      return jsonResponse({ result: { email_id: 37930068326 } });
+    },
+  });
+  assert.equal(result.status, "accepted");
+  assert.equal(result.externalId, "37930068326");
+});
+
+test("UniSender service delivery uses checkEmail final status", async () => {
+  const result = await checkUniSenderEmail({
+    apiKey: "api-key",
+    emailId: "37930068326",
+    fetchFn: async () => jsonResponse({ result: { statuses: [{ id: 37930068326, status: "ok_read" }] } }),
+  });
+  assert.equal(result.status, "accepted");
+  assert.equal(result.delivered, true);
+  assert.equal(result.opened, true);
 });

@@ -443,6 +443,7 @@ export const campaigns = sqliteTable(
       .notNull()
       .references(() => participants.id),
     name: text("name").notNull(),
+    purpose: text("purpose").notNull().default("marketing"),
     audienceType: text("audience_type").notNull(),
     audienceLabel: text("audience_label").notNull().default(""),
     segmentId: text("segment_id").references(() => segments.id, {

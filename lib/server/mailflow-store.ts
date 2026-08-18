@@ -80,8 +80,10 @@ import { checkProviderConnection, automaticProviderSecrets } from "./provider-ch
 import { storeInlineEmailAsset } from "./email-asset-store";
 import {
   createUniSenderCampaign,
+  checkUniSenderEmail,
   getUniSenderCampaignStats,
   renderMergeTemplate,
+  sendUniSenderTransactionalEmail,
   sendTelegramMessage,
   sendVkMessage,
   unknownMergeTokens,
@@ -227,6 +229,7 @@ function toCampaign(row: CampaignRow): CampaignRecord {
     id: row.id,
     workspaceId: row.workspaceId,
     name: row.name,
+    purpose: row.purpose as CampaignRecord["purpose"],
     audienceType: row.audienceType as CampaignRecord["audienceType"],
     audienceLabel: row.audienceLabel,
     segmentId: row.segmentId,
@@ -1839,7 +1842,7 @@ const PUBLIC_CONFIG_FIELDS: Record<IntegrationProviderId, string[]> = {
   "vk-workspace": ["senderEmail"],
   "telegram-bot-api": ["botUsername"],
   "vk-api": ["communityId"],
-  unisender: ["senderEmail", "listId"],
+  unisender: ["senderEmail", "marketingSenderEmail", "transactionalSenderEmail", "listId"],
 };
 
 function parsePublicConfig(
@@ -2010,6 +2013,7 @@ function parseChannelInputs(value: unknown): CampaignChannelInput[] {
 
 type ParsedCampaign = {
   name: string;
+  purpose: CampaignRecord["purpose"];
   audienceType: CampaignRecord["audienceType"];
   segmentId: string | null;
   contactIds: string[];
@@ -2053,6 +2057,10 @@ function parseCampaign(
   const existing = defaults.campaign;
   const name = optionalText(object.name, "Название кампании", 200) ?? existing?.name ?? "";
   if (!name) throw new ApiRequestError("Укажите название кампании.");
+  const purpose = (object.purpose ?? existing?.purpose ?? "marketing") as CampaignRecord["purpose"];
+  if (purpose !== "marketing" && purpose !== "transactional") {
+    throw new ApiRequestError("Выбран неизвестный тип email-отправки.");
+  }
   const audienceType =
     (object.audienceType as ParsedCampaign["audienceType"] | undefined) ??
     existing?.audienceType ??
@@ -2112,6 +2120,7 @@ function parseCampaign(
     : plainTextEmailHtml(emailBodyText, previewText);
   return {
     name,
+    purpose,
     audienceType,
     segmentId: audienceType === "segment" ? segmentId : null,
     contactIds: audienceType === "contacts" ? contactIds : [],
@@ -2328,6 +2337,7 @@ export async function createCampaign(
     workspaceId: WORKSPACE_ID,
     participantId: actor.participant.id,
     name: input.name,
+    purpose: input.purpose,
     audienceType: input.audienceType,
     audienceLabel,
     segmentId: input.segmentId ?? null,
@@ -2402,10 +2412,11 @@ function recipientFingerprints(
   plans: DeliveryPlanRecord[],
   audience: ContactRecord[],
   requireConsent: boolean,
+  purpose: CampaignRecord["purpose"],
 ) {
   return plans.flatMap((plan) =>
     audience
-      .filter((contact) => contactEligible(contact, plan.channel, requireConsent))
+      .filter((contact) => contactEligible(contact, plan.channel, requireConsent, purpose))
       .map((contact) =>
         JSON.stringify([
           plan.channel,
@@ -2437,6 +2448,7 @@ async function ensureCampaignVersion(
   const snapshot: CampaignVersionSnapshot = {
     campaignId: campaign.id,
     name: campaign.name,
+    purpose: campaign.purpose,
     audienceType: campaign.audienceType,
     segmentId: campaign.segmentId,
     contactIds: campaign.contactIds,
@@ -2458,6 +2470,7 @@ async function ensureCampaignVersion(
       plans,
       audience,
       workspace.requireConsent,
+      campaign.purpose,
     ),
   };
   const contentHash = await versionHash(snapshot);
@@ -2514,10 +2527,11 @@ function contactEligible(
   contact: ContactRecord,
   channel: DeliveryChannelId,
   requireConsent: boolean,
+  purpose: CampaignRecord["purpose"] = "marketing",
 ) {
   if (contact.status !== "active") return false;
   if (channel === "email") {
-    return Boolean(contact.email) && (!requireConsent || contact.emailConsent);
+    return Boolean(contact.email) && (purpose === "transactional" || !requireConsent || contact.emailConsent);
   }
   if (channel === "telegram") {
     return Boolean(contact.telegramChatId) && contact.telegramConsent;
@@ -2529,6 +2543,7 @@ function noEligibleAudienceBlocker(
   channel: DeliveryChannelId,
   audience: ContactRecord[],
   requireConsent: boolean,
+  purpose: CampaignRecord["purpose"],
 ) {
   if (channel !== "email") {
     return `${channel}: нет контактов с адресом и подтверждённым согласием.`;
@@ -2539,7 +2554,7 @@ function noEligibleAudienceBlocker(
   if (contactsWithEmail.length === 0) {
     return `Email: в выбранной аудитории ${audience.length} контактов, но ни у одного не указан email. Добавьте email к контакту или выберите аудиторию с email-адресами.`;
   }
-  if (requireConsent && !contactsWithEmail.some((contact) => contact.emailConsent)) {
+  if (purpose !== "transactional" && requireConsent && !contactsWithEmail.some((contact) => contact.emailConsent)) {
     return `Email: адреса есть у ${contactsWithEmail.length} контактов, но ни для одного не подтверждено согласие на email-рассылку. Отметьте согласие только для контактов, которые его дали.`;
   }
   if (activeContacts.length === 0) {
@@ -2609,6 +2624,12 @@ async function evaluateLaunch(
   const audience = await audienceForCampaign(campaign);
   const blockers: string[] = [];
   const eligibleByChannel: CampaignEvaluation["eligibleByChannel"] = {};
+  if (campaign.purpose === "transactional" && audience.length !== 1) {
+    blockers.push("Сервисное письмо отправляется строго одному получателю. Для массовой аудитории выберите рекламную рассылку.");
+  }
+  if (campaign.purpose === "marketing" && audience.length > 5_000) {
+    blockers.push("Для защиты репутации Gmail одна рекламная отправка ограничена 5 000 контактами. Разделите базу на прогреваемые сегменты.");
+  }
   const unknownTokens = unknownMergeTokens(
     campaign.subject,
     campaign.emailBodyText,
@@ -2648,7 +2669,7 @@ async function evaluateLaunch(
   for (const plan of plans) {
     const channelBlockers: string[] = [];
     const eligibleCount = audience.filter((contact) =>
-      contactEligible(contact, plan.channel, workspace.requireConsent),
+      contactEligible(contact, plan.channel, workspace.requireConsent, campaign.purpose),
     ).length;
     eligibleByChannel[plan.channel] = eligibleCount;
     const provider = integrationRecords.find(
@@ -2668,7 +2689,7 @@ async function evaluateLaunch(
     }
     if (eligibleCount === 0) {
       channelBlockers.push(
-        noEligibleAudienceBlocker(plan.channel, audience, workspace.requireConsent),
+        noEligibleAudienceBlocker(plan.channel, audience, workspace.requireConsent, campaign.purpose),
       );
     }
     if (
@@ -2684,13 +2705,17 @@ async function evaluateLaunch(
       if (!campaign.senderName.trim()) channelBlockers.push("Укажите имя отправителя.");
       if (!campaign.senderEmail.trim()) channelBlockers.push("Укажите email отправителя.");
       if (!campaign.emailBodyText.trim()) channelBlockers.push("Добавьте текст email-письма.");
+      const configuredSender = plan.providerId === "unisender"
+        ? campaign.purpose === "transactional"
+          ? provider?.publicConfig.transactionalSenderEmail || provider?.publicConfig.senderEmail
+          : provider?.publicConfig.marketingSenderEmail || provider?.publicConfig.senderEmail
+        : provider?.publicConfig.senderEmail;
       if (
         (plan.providerId === "unisender" || plan.providerId === "vk-workspace") &&
-        provider?.publicConfig.senderEmail?.toLocaleLowerCase("en") !==
-          campaign.senderEmail.toLocaleLowerCase("en")
+        configuredSender?.toLocaleLowerCase("en") !== campaign.senderEmail.toLocaleLowerCase("en")
       ) {
         channelBlockers.push(
-          `Email отправителя кампании должен совпадать с адресом, настроенным для ${provider?.name ?? "провайдера"}.`,
+          `Email отправителя должен совпадать с ${campaign.purpose === "transactional" ? "сервисным" : "рекламным"} адресом, настроенным для ${provider?.name ?? "провайдера"}.`,
         );
       }
     } else if (!campaign.messengerMessage.trim()) {
@@ -2938,6 +2963,34 @@ async function processUniSenderOutbox(
       })()
     : null;
   const htmlBody = await prepareEmailHtmlForDelivery(request, version.snapshot.emailBodyHtml);
+  if (version.snapshot.purpose === "transactional") {
+    const [row] = rows;
+    if (rows.length !== 1 || !row) {
+      throw new ApiRequestError("Сервисная отправка допускает только одного получателя.", 422);
+    }
+    const contact = contactsById.get(row.contactId);
+    const mergeFields = contact ? {
+      first_name: contact.firstName,
+      last_name: contact.lastName,
+      company: contact.companyName,
+      position: contact.jobTitle,
+      city: contact.city,
+    } : {};
+    const result = await sendUniSenderTransactionalEmail({
+      apiKey: credentials.apiKey ?? "",
+      listId: integration.publicConfig.listId ?? "",
+      senderName: version.snapshot.senderName,
+      senderEmail: version.snapshot.senderEmail,
+      recipientEmail: row.recipientEndpoint,
+      recipientName: contact?.fullName,
+      subject: renderMergeTemplate(version.snapshot.subject, mergeFields),
+      htmlBody: renderMergeTemplate(htmlBody, mergeFields),
+      attachments: attachment ? [attachment] : undefined,
+      signal: AbortSignal.timeout(30_000),
+    });
+    await updateOutboxResult(row, result);
+    return result.externalId ? { emailId: result.externalId } : {};
+  }
   const result = await createUniSenderCampaign({
     apiKey: credentials.apiKey ?? "",
     listId: integration.publicConfig.listId ?? "",
@@ -3131,6 +3184,7 @@ async function dispatchCampaign(
     current.plans,
     freshAudience,
     workspace.requireConsent,
+    current.campaign.purpose,
   );
   if (
     JSON.stringify(freshFingerprints) !==
@@ -3162,7 +3216,7 @@ async function dispatchCampaign(
       );
     }
     const eligible = freshAudience.filter((contact) =>
-      contactEligible(contact, plan.channel, workspace.requireConsent),
+      contactEligible(contact, plan.channel, workspace.requireConsent, current.campaign.purpose),
     );
     if (eligible.length !== plan.eligibleCount || eligible.length === 0) {
       return blockDispatch(
@@ -3461,13 +3515,41 @@ export async function syncCampaignDelivery(
     .orderBy(desc(deliveryJobs.createdAt))
     .limit(1);
   const externalCampaignId = job?.providerExternalIds?.unisender?.campaignId;
-  if (!job || !externalCampaignId) {
+  const externalEmailId = job?.providerExternalIds?.unisender?.emailId;
+  if (!job || (!externalCampaignId && !externalEmailId)) {
     throw new ApiRequestError("У этой кампании нет отправки UniSender для проверки.", 409);
   }
   const credentials = automaticProviderSecrets("unisender") as { apiKey?: string };
+  if (externalEmailId) {
+    const checked = await checkUniSenderEmail({
+      apiKey: credentials.apiKey ?? "",
+      emailId: externalEmailId,
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (checked.status === "rejected") throw new ApiRequestError(checked.message, 502);
+    const now = new Date().toISOString();
+    const status = checked.delivered ? "completed" : "processing";
+    const [updatedJob] = await getDb().update(deliveryJobs).set({
+      status,
+      acceptedCount: checked.delivered ? 1 : job.acceptedCount,
+      statusMessage: checked.message,
+      completedAt: checked.delivered ? now : null,
+      updatedAt: now,
+    }).where(eq(deliveryJobs.id, job.id)).returning();
+    await getDb().update(deliveryOutbox).set({ statusMessage: checked.message, updatedAt: now }).where(eq(deliveryOutbox.jobId, job.id));
+    await getDb().update(campaigns).set({
+      status: checked.delivered ? "completed" : "sending",
+      statusReason: checked.message,
+      metrics: { ...current.campaign.metrics, sent: 1, delivered: checked.delivered ? 1 : 0, opened: checked.opened ? 1 : 0 },
+      updatedAt: now,
+    }).where(eq(campaigns.id, campaignId));
+    const event = await appendEvent(campaignId, "delivery_synced", checked.message, { provider: "unisender", emailId: externalEmailId, delivered: checked.delivered, opened: checked.opened });
+    const updated = await campaignBundle(campaignId);
+    return { campaign: updated.campaign, deliveryPlans: updated.plans, deliveryJob: toDeliveryJob(updatedJob), event };
+  }
   const report = await getUniSenderCampaignStats({
     apiKey: credentials.apiKey ?? "",
-    campaignId: externalCampaignId,
+    campaignId: externalCampaignId!,
     signal: AbortSignal.timeout(12_000),
   });
   if (report.status !== "accepted") {
@@ -3625,7 +3707,7 @@ export async function exportCampaignManualCsv(
     );
   }
   const eligible = audience.filter((contact) =>
-    contactEligible(contact, "email", workspace.requireConsent),
+    contactEligible(contact, "email", workspace.requireConsent, bundle.campaign.purpose),
   );
   if (eligible.length !== manualPlan.eligibleCount) {
     throw new ApiRequestError(
@@ -3637,6 +3719,7 @@ export async function exportCampaignManualCsv(
     [manualPlan],
     audience,
     workspace.requireConsent,
+    bundle.campaign.purpose,
   );
   const versionFingerprints = (version.snapshot.recipientFingerprints ?? [])
     .filter((fingerprint) => {
@@ -3737,6 +3820,7 @@ export async function updateCampaign(
     .update(campaigns)
     .set({
       name: input.name,
+      purpose: input.purpose,
       audienceType: input.audienceType,
       audienceLabel,
       segmentId: input.segmentId ?? null,

@@ -35,7 +35,7 @@ let initialization: Promise<void> | null = null;
 // template-seeding routine in every new isolate made even a simple page load
 // wait several seconds for D1. Keep a durable completion marker instead.
 // Bump this value whenever a runtime-only schema migration is added here.
-const RUNTIME_SCHEMA_VERSION = "runtime-schema-v6-contacts-and-techpravo-link";
+const RUNTIME_SCHEMA_VERSION = "runtime-schema-v7-delivery-purpose";
 const DEFAULT_SENDER_NAME = "ТехнологИИ Права";
 const DEFAULT_SENDER_EMAIL = "info@tech-pravo.ru";
 
@@ -207,6 +207,7 @@ const schemaStatements = [
     workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
     participant_id TEXT NOT NULL REFERENCES participants(id),
     name TEXT NOT NULL,
+    purpose TEXT NOT NULL DEFAULT 'marketing',
     audience_type TEXT NOT NULL,
     audience_label TEXT NOT NULL DEFAULT '',
     segment_id TEXT REFERENCES segments(id) ON DELETE SET NULL,
@@ -470,6 +471,9 @@ async function createSchema() {
   const campaignColumns = await d1
     .prepare("PRAGMA table_info(campaigns)")
     .all<{ name: string }>();
+  if (!campaignColumns.results.some((column) => column.name === "purpose")) {
+    await d1.prepare("ALTER TABLE campaigns ADD COLUMN purpose TEXT NOT NULL DEFAULT 'marketing'").run();
+  }
   if (!campaignColumns.results.some((column) => column.name === "email_body_text")) {
     await d1
       .prepare(

@@ -733,3 +733,92 @@ export async function createUniSenderCampaign(input: {
     };
   }
 }
+
+export async function sendUniSenderTransactionalEmail(input: {
+  apiKey: string;
+  listId: string;
+  senderName: string;
+  senderEmail: string;
+  recipientEmail: string;
+  recipientName?: string;
+  subject: string;
+  htmlBody: string;
+  attachments?: Array<{ filename: string; bytes: Uint8Array }>;
+  fetchFn?: FetchLike;
+  signal?: AbortSignal;
+}): Promise<ProviderCallResult> {
+  const fetchFn = input.fetchFn ?? fetch;
+  const body = input.htmlBody.includes("{{UnsubscribeUrl}}")
+    ? input.htmlBody
+    : `${input.htmlBody}<div style="margin-top:24px;font-size:11px;color:#718096"><a href="{{UnsubscribeUrl}}" style="color:#718096">Отписаться от уведомлений</a></div>`;
+  try {
+    const sent = await callUniSender<{ email_id?: number | string }>({
+      method: "sendEmail",
+      apiKey: input.apiKey,
+      parameters: [
+        ["email", input.recipientName?.trim() ? `${input.recipientName.trim()} <${input.recipientEmail}>` : input.recipientEmail],
+        ["sender_name", input.senderName],
+        ["sender_email", input.senderEmail],
+        ["subject", input.subject],
+        ["body", body],
+        ["list_id", input.listId],
+        ["lang", "ru"],
+        ["track_read", 0],
+        ["track_links", 0],
+      ],
+      binaryParameters: input.attachments?.map((attachment) => [
+        `attachments[${attachment.filename.replace(/[^a-zA-Z0-9а-яА-ЯёЁ._ -]/g, "_")}]`,
+        attachment.bytes,
+      ]),
+      fetchFn,
+      signal: input.signal,
+    });
+    if (sent.response.status >= 500) {
+      return { status: "ambiguous", message: `UniSender вернул HTTP ${sent.response.status}; перед повтором проверьте статус письма.` };
+    }
+    if (!sent.response.ok || sent.body?.error || !sent.body?.result?.email_id) {
+      return { status: "rejected", message: providerMessage(sent.body, "UniSender не принял сервисное письмо.") };
+    }
+    return {
+      status: "accepted",
+      externalId: String(sent.body.result.email_id),
+      message: "UniSender принял персональное сервисное письмо. Доставка проверяется отдельно.",
+    };
+  } catch (error) {
+    return ambiguousFailure(error, "UniSender");
+  }
+}
+
+export async function checkUniSenderEmail(input: {
+  apiKey: string;
+  emailId: string;
+  fetchFn?: FetchLike;
+  signal?: AbortSignal;
+}): Promise<ProviderCallResult & { delivered?: boolean; opened?: boolean; pending?: boolean }> {
+  const fetchFn = input.fetchFn ?? fetch;
+  try {
+    const checked = await callUniSender<{ statuses?: Array<{ id?: number | string; status?: string }> }>({
+      method: "checkEmail",
+      apiKey: input.apiKey,
+      parameters: [["email_id", input.emailId]],
+      fetchFn,
+      signal: input.signal,
+    });
+    const status = checked.body?.result?.statuses?.[0]?.status ?? "";
+    if (checked.response.status >= 500) return { status: "ambiguous", pending: true, message: `UniSender вернул HTTP ${checked.response.status}.` };
+    if (!checked.response.ok || checked.body?.error || !status) return { status: "rejected", message: providerMessage(checked.body, "UniSender не вернул статус сервисного письма.") };
+    if (status.startsWith("err_")) return { status: "rejected", delivered: false, message: `UniSender: ${status}.` };
+    const opened = status === "ok_read" || status === "ok_link_visited";
+    const delivered = opened || status === "ok_delivered";
+    return {
+      status: "accepted",
+      externalId: input.emailId,
+      delivered,
+      opened,
+      pending: !delivered,
+      message: delivered ? `UniSender подтвердил доставку сервисного письма (${status}).` : `UniSender ещё обрабатывает сервисное письмо (${status}).`,
+    };
+  } catch (error) {
+    return { ...ambiguousFailure(error, "UniSender"), pending: true };
+  }
+}

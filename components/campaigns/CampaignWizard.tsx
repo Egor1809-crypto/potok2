@@ -100,6 +100,7 @@ type AudienceSegment = Pick<
 type IntegrationSnapshot = {
   providerId: IntegrationProviderId;
   status: ConnectionStatus;
+  publicConfig: Record<string, string>;
 };
 
 type Evaluation = CampaignEvaluation;
@@ -107,6 +108,7 @@ type Evaluation = CampaignEvaluation;
 type WizardDraft = {
   campaignId?: string | null;
   campaignName: string;
+  purpose: CampaignRecord["purpose"];
   name?: string;
   audienceType: "none" | "segment" | "contacts";
   segmentId: string;
@@ -391,6 +393,7 @@ function CampaignWizardState({
     builderResult?.campaignName ??
       params.get("name") ?? seedDraft?.campaignName ?? "Новая рассылка",
   );
+  const [purpose, setPurpose] = React.useState<CampaignRecord["purpose"]>(seedDraft?.purpose ?? "marketing");
   const [audienceType, setAudienceType] = React.useState<"none" | "segment" | "contacts">(
     queryContactIds.length > 0 || params.get("audienceType") === "contacts"
       ? "contacts"
@@ -488,12 +491,16 @@ function CampaignWizardState({
       setIntegrations((body.integrations ?? []).flatMap((record) => {
         if (!isProviderId(record.providerId)) return [];
         if (record.status !== "connected" && record.status !== "needs_attention" && record.status !== "disconnected") return [];
-        return [{ providerId: record.providerId, status: record.status }];
+        return [{ providerId: record.providerId, status: record.status, publicConfig: record.publicConfig ?? {} }];
       }));
 
       if (!sourceId) {
         setSenderName((current) => current || body.workspace.defaultSenderName);
-        setSenderEmail((current) => current || body.workspace.defaultSenderEmail);
+        const unisender = body.integrations?.find((record) => record.providerId === "unisender");
+        const configuredSender = purpose === "transactional"
+          ? unisender?.publicConfig.transactionalSenderEmail || unisender?.publicConfig.senderEmail
+          : unisender?.publicConfig.marketingSenderEmail || unisender?.publicConfig.senderEmail;
+        setSenderEmail((current) => current || configuredSender || body.workspace.defaultSenderEmail);
         if (
           recoveredCampaignId &&
           !body.campaigns?.some((campaign) => campaign.id === recoveredCampaignId)
@@ -513,6 +520,7 @@ function CampaignWizardState({
             {
             setCampaignId,
             setCampaignName,
+            setPurpose,
             setAudienceType,
             setSegmentId,
             setContactIds,
@@ -549,7 +557,7 @@ function CampaignWizardState({
       setTemplateLoadState("error");
       setApiMode("offline");
     }
-  }, [duplicate, recoveredCampaignId, sourceId]);
+  }, [duplicate, purpose, recoveredCampaignId, sourceId]);
 
   React.useEffect(() => {
     const frame = window.requestAnimationFrame(() => void loadWorkspace());
@@ -597,10 +605,10 @@ function CampaignWizardState({
     campaignChannelDefinitions.map((channel) => [
       channel.id,
       audienceType === "contacts"
-        ? countAudienceReachable(selectedContacts, channel.id)
+        ? countAudienceReachable(selectedContacts, channel.id, purpose)
         : 0,
     ]),
-  ) as Record<CampaignChannel, number>, [audienceType, selectedContacts]);
+  ) as Record<CampaignChannel, number>, [audienceType, purpose, selectedContacts]);
 
   const integrationByProvider = React.useMemo(
     () => Object.fromEntries(integrations.map((item) => [item.providerId, item])) as
@@ -620,6 +628,8 @@ function CampaignWizardState({
       );
     }
     if (!campaignName.trim()) blockers.push("Укажите внутреннее название рассылки.");
+    if (purpose === "transactional" && recipientCount !== 1) blockers.push("Сервисное письмо можно отправить только одному получателю.");
+    if (purpose === "marketing" && recipientCount > 5_000) blockers.push("Разделите массовую рассылку на сегменты до 5 000 контактов для безопасного прогрева домена.");
     if (channels.length === 0) blockers.push("Выберите хотя бы один канал доставки.");
     if (channels.includes("email") && !subject.trim()) blockers.push("Добавьте тему email-письма.");
     if (channels.includes("email") && !emailBodyText.trim()) blockers.push("Добавьте текст email-письма.");
@@ -641,12 +651,13 @@ function CampaignWizardState({
       }
     });
     return Array.from(new Set(blockers));
-  }, [audienceType, campaignName, channels, emailBodyText, integrationByProvider, messengerMessage, minimumScheduledAt, presentationId, providers, recipientCount, scheduledAt, senderEmail, senderName, subject]);
+  }, [audienceType, campaignName, channels, emailBodyText, integrationByProvider, messengerMessage, minimumScheduledAt, presentationId, providers, purpose, recipientCount, scheduledAt, senderEmail, senderName, subject]);
 
   const draft: WizardDraft = {
     campaignId,
     campaignName,
     name: campaignName,
+    purpose,
     audienceType,
     segmentId,
     contactIds,
@@ -745,6 +756,7 @@ function CampaignWizardState({
 
   const campaignPayload = (): CampaignCreateInput => ({
     name: campaignName.trim(),
+    purpose,
     audienceType,
     ...(audienceType === "segment"
       ? { segmentId }
@@ -1102,6 +1114,16 @@ function CampaignWizardState({
               recipientCount={recipientCount}
               senderName={senderName}
               senderEmail={senderEmail}
+              purpose={purpose}
+              onPurposeChange={(value) => {
+                setPurpose(value);
+                const config = integrationByProvider.unisender?.publicConfig;
+                const selected = value === "transactional"
+                  ? config?.transactionalSenderEmail || config?.senderEmail
+                  : config?.marketingSenderEmail || config?.senderEmail;
+                if (selected) setSenderEmail(selected);
+                setEvaluation(null);
+              }}
               onSenderNameChange={setSenderName}
               onSenderEmailChange={setSenderEmail}
               audienceType={audienceType}
@@ -1172,11 +1194,11 @@ function CampaignWizardState({
   );
 }
 
-function countAudienceReachable(contacts: AudienceContact[], channel: CampaignChannel) {
+function countAudienceReachable(contacts: AudienceContact[], channel: CampaignChannel, purpose: CampaignRecord["purpose"]) {
   return contacts.filter((contact) => {
     if (contact.status !== "active") return false;
     if (channel === "email") {
-      return contact.emailConsent !== false && Boolean(contact.email);
+      return Boolean(contact.email) && (purpose === "transactional" || contact.emailConsent !== false);
     }
     if (channel === "telegram") {
       return Boolean(contact.telegramChatId && contact.telegramConsent);
@@ -1191,6 +1213,7 @@ function hydrateFromApiCampaign(
   setters: {
     setCampaignId: (value: string | null) => void;
     setCampaignName: (value: string) => void;
+    setPurpose: (value: CampaignRecord["purpose"]) => void;
     setAudienceType: (value: "none" | "segment" | "contacts") => void;
     setSegmentId: (value: string) => void;
     setContactIds: (value: string[]) => void;
@@ -1210,6 +1233,7 @@ function hydrateFromApiCampaign(
 ) {
   setters.setCampaignId(item.id);
   setters.setCampaignName(item.name);
+  setters.setPurpose(item.purpose);
   setters.setAudienceType(item.audienceType);
   if (item.segmentId) setters.setSegmentId(item.segmentId);
   setters.setContactIds(item.contactIds);
@@ -1590,6 +1614,8 @@ function ChannelsStep({
   recipientCount,
   senderName,
   senderEmail,
+  purpose,
+  onPurposeChange,
   onSenderNameChange,
   onSenderEmailChange,
   audienceType,
@@ -1603,6 +1629,8 @@ function ChannelsStep({
   recipientCount: number;
   senderName: string;
   senderEmail: string;
+  purpose: CampaignRecord["purpose"];
+  onPurposeChange: (value: CampaignRecord["purpose"]) => void;
   onSenderNameChange: (value: string) => void;
   onSenderEmailChange: (value: string) => void;
   audienceType: "none" | "segment" | "contacts";
@@ -1610,6 +1638,13 @@ function ChannelsStep({
   return (
     <div>
       <StepIntro number={3} title="Настройте маршруты доставки" description="Для каждого канала выберите провайдера. Точный охват и причины, мешающие запуску, рассчитает сервер на шаге готовности." />
+      <section className="mt-6 rounded-xl border border-border p-5" aria-labelledby="delivery-purpose-title">
+        <h3 id="delivery-purpose-title" className="text-[15px] font-semibold text-text-strong">Назначение email</h3>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <button type="button" onClick={() => onPurposeChange("marketing")} aria-pressed={purpose === "marketing"} className={cn("rounded-xl border p-4 text-left", purpose === "marketing" ? "border-primary bg-primary-subtle/35" : "border-border")}><b className="text-[13px]">Массовая рассылка</b><span className="mt-1 block text-[11px] text-text-muted">Новости, программа, цены и предложения. Только по подтверждённому согласию.</span></button>
+          <button type="button" onClick={() => onPurposeChange("transactional")} aria-pressed={purpose === "transactional"} className={cn("rounded-xl border p-4 text-left", purpose === "transactional" ? "border-primary bg-primary-subtle/35" : "border-border")}><b className="text-[13px]">Сервисное письмо</b><span className="mt-1 block text-[11px] text-text-muted">Оплата, билет или индивидуальное уведомление одному получателю — без рекламного трекинга.</span></button>
+        </div>
+      </section>
       <div className="mt-6 space-y-3">
         {campaignChannelDefinitions.map((channel) => {
           const selected = channels.includes(channel.id);

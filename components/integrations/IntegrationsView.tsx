@@ -91,10 +91,24 @@ const setupFields: Record<IntegrationProviderId, SetupField[]> = {
   unisender: [
     {
       key: "senderEmail",
-      label: "Проверенный адрес отправителя",
+      label: "Резервный проверенный адрес",
       placeholder: "mailing@company.ru",
       type: "email",
       hint: "Секретный ключ подключения задаётся только на сервере.",
+    },
+    {
+      key: "marketingSenderEmail",
+      label: "Адрес рекламных рассылок",
+      placeholder: "conference@news.tech-pravo.ru",
+      type: "email",
+      hint: "Используется только для массовых кампаний и должен быть подтверждён в UniSender.",
+    },
+    {
+      key: "transactionalSenderEmail",
+      label: "Адрес сервисных писем",
+      placeholder: "orders@tech-pravo.ru",
+      type: "email",
+      hint: "Используется для билетов, оплаты и индивидуальных уведомлений.",
     },
     {
       key: "listId",

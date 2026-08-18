@@ -536,6 +536,7 @@ export type CampaignRecord = {
   id: string;
   workspaceId: string;
   name: string;
+  purpose: "marketing" | "transactional";
   audienceType: "none" | "segment" | "contacts";
   audienceLabel: string;
   segmentId: string | null;
@@ -611,6 +612,7 @@ export type CampaignEventRecord = {
 export type CampaignVersionSnapshot = {
   campaignId: string;
   name: string;
+  purpose: CampaignRecord["purpose"];
   audienceType: CampaignRecord["audienceType"];
   segmentId: string | null;
   contactIds: string[];
@@ -892,6 +894,7 @@ export type CampaignChannelInput = {
 
 export type CampaignCreateInput = {
   name: string;
+  purpose?: CampaignRecord["purpose"];
   audienceType?: "none" | "segment" | "contacts";
   segmentId?: string | null;
   contactIds?: string[];
