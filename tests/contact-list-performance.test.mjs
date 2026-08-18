@@ -37,8 +37,8 @@ test("contacts page exposes four deduplicated channel databases and balanced own
   assert.match(view, /одной объединённой базы/);
   assert.match(view, /Открыть TG/);
   assert.match(store, /markContacted/);
-  assert.match(databaseInit, /PARTITION BY channel_mask/);
-  assert.match(databaseInit, /balanced-team-distribution-v1/);
+  assert.match(databaseInit, /UPDATE contacts AS target/);
+  assert.match(databaseInit, /balanced-team-distribution-mask/);
 });
 
 test("large contact payloads are loaded only by workflows that require them", async () => {

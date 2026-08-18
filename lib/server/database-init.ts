@@ -45,7 +45,7 @@ let initialization: Promise<void> | null = null;
 // template-seeding routine in every new isolate made even a simple page load
 // wait several seconds for D1. Keep a durable completion marker instead.
 // Bump this value whenever a runtime-only schema migration is added here.
-const RUNTIME_SCHEMA_VERSION = "runtime-schema-v8-team-distribution";
+const RUNTIME_SCHEMA_VERSION = "runtime-schema-v9-team-distribution";
 const DEFAULT_SENDER_NAME = "ТехнологИИ Права";
 const DEFAULT_SENDER_EMAIL = "info@tech-pravo.ru";
 
@@ -608,44 +608,6 @@ async function seedDatabase(request: Request) {
     updatedAt: now,
   }).onConflictDoNothing();
 
-  const [distributionState] = await db
-    .select({ key: systemState.key })
-    .from(systemState)
-    .where(eq(systemState.key, "balanced-team-distribution-v1"))
-    .limit(1);
-  if (!distributionState) {
-    const teamRows = await getD1().prepare(
-      `SELECT id FROM participants
-       WHERE workspace_id = ? AND status = 'active' AND login IS NOT NULL AND login <> ''
-       ORDER BY login`,
-    ).bind(WORKSPACE_ID).all<{ id: string }>();
-    const memberIds = (teamRows.results ?? []).map((row) => row.id);
-    if (memberIds.length > 0) {
-      const cases = memberIds.map((_, index) => `WHEN ${index} THEN ?`).join(" ");
-      await getD1().prepare(
-        `WITH classified AS (
-           SELECT id,
-             (CASE WHEN email <> '' THEN 1 ELSE 0 END
-              + CASE WHEN telegram_chat_id IS NOT NULL AND telegram_chat_id <> '' THEN 2 ELSE 0 END
-              + CASE WHEN vk_user_id IS NOT NULL AND vk_user_id <> '' THEN 4 ELSE 0 END
-              + CASE WHEN phone <> '' THEN 8 ELSE 0 END) AS channel_mask
-           FROM contacts WHERE workspace_id = ?
-         ), ranked AS (
-           SELECT id, ((row_number() OVER (PARTITION BY channel_mask ORDER BY id) - 1 + channel_mask) % ${memberIds.length}) AS slot
-           FROM classified
-         )
-         UPDATE contacts
-         SET responsible_participant_id = CASE (SELECT slot FROM ranked WHERE ranked.id = contacts.id) ${cases} END
-         WHERE workspace_id = ?`,
-      ).bind(WORKSPACE_ID, ...memberIds, WORKSPACE_ID).run();
-    }
-    await db.insert(systemState).values({
-      key: "balanced-team-distribution-v1",
-      value: `members:${memberIds.length}`,
-      updatedAt: now,
-    }).onConflictDoNothing();
-  }
-
   const [initializationState] = await db
     .select()
     .from(systemState)
@@ -1008,6 +970,41 @@ async function seedDatabase(request: Request) {
       updatedAt: now,
     });
   }
+}
+
+export async function rebalanceContactsForChannelMask(mask: number) {
+  if (!Number.isInteger(mask) || mask < 0 || mask > 15) {
+    throw new ApiRequestError("Неверная группа каналов.");
+  }
+  const d1 = getD1();
+  const teamRows = await d1.prepare(
+    `SELECT id FROM participants
+     WHERE workspace_id = ? AND status = 'active' AND login IS NOT NULL AND login <> ''
+     ORDER BY login`,
+  ).bind(WORKSPACE_ID).all<{ id: string }>();
+  const memberIds = (teamRows.results ?? []).map((row) => row.id);
+  if (memberIds.length === 0) throw new ApiRequestError("В команде нет активных рабочих аккаунтов.", 409);
+  const cases = memberIds.map((_, index) => `WHEN ${index} THEN ?`).join(" ");
+  const result = await d1.prepare(
+    `WITH ranked AS (
+       SELECT id, row_number() OVER (ORDER BY id) - 1 AS position
+       FROM contacts
+       WHERE workspace_id = ?
+         AND (CASE WHEN email <> '' THEN 1 ELSE 0 END
+              + CASE WHEN telegram_chat_id IS NOT NULL AND telegram_chat_id <> '' THEN 2 ELSE 0 END
+              + CASE WHEN vk_user_id IS NOT NULL AND vk_user_id <> '' THEN 4 ELSE 0 END
+              + CASE WHEN phone <> '' THEN 8 ELSE 0 END) = ?
+     )
+     UPDATE contacts AS target
+     SET responsible_participant_id = CASE ((ranked.position + ${mask}) % ${memberIds.length}) ${cases} END
+     FROM ranked
+     WHERE target.id = ranked.id`,
+  ).bind(WORKSPACE_ID, mask, ...memberIds).run();
+  await d1.prepare(
+    `INSERT INTO system_state (key, value, updated_at) VALUES (?, ?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+  ).bind(`balanced-team-distribution-mask-${mask}`, `members:${memberIds.length}`, new Date().toISOString()).run();
+  return { mask, members: memberIds.length, updatedCount: Number(result.meta.changes ?? 0) };
 }
 
 export async function ensureDatabase(request: Request): Promise<TeamSession> {
