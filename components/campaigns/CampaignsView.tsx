@@ -26,6 +26,7 @@ import type {
   DeliveryPlanRecord,
   WorkspaceSnapshot,
 } from "@/types/api";
+import { DEFAULT_TIME_ZONE, detectBrowserTimeZone } from "@/lib/client-timezone";
 import { PageHeader } from "@/components/shared";
 import {
   Alert,
@@ -139,7 +140,7 @@ export function CampaignsView({
   const [campaigns, setCampaigns] = React.useState<CampaignListItem[]>([]);
   const [deliveryPlans, setDeliveryPlans] = React.useState<DeliveryPlanRecord[]>([]);
   const [apiMode, setApiMode] = React.useState<"loading" | "online" | "offline">("loading");
-  const [timeZone, setTimeZone] = React.useState("Europe/Moscow");
+  const [timeZone, setTimeZone] = React.useState(DEFAULT_TIME_ZONE);
   const [activeTab, setActiveTab] = React.useState<CampaignsTab>(initialTab);
   const [search, setSearch] = React.useState("");
 
@@ -151,7 +152,7 @@ export function CampaignsView({
       const body = await response.json() as WorkspaceSnapshot;
       setCampaigns(body.campaigns.map(fromApi));
       setDeliveryPlans(body.deliveryPlans);
-      setTimeZone(body.workspace.timezone || "Europe/Moscow");
+      setTimeZone(detectBrowserTimeZone(body.workspace.timezone || DEFAULT_TIME_ZONE));
       setApiMode("online");
     } catch {
       setCampaigns([]);

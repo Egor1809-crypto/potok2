@@ -12,6 +12,7 @@ import type {
   DeliveryPlanRecord,
   WorkspaceSnapshot,
 } from "@/types/api";
+import { DEFAULT_TIME_ZONE, detectBrowserTimeZone } from "@/lib/client-timezone";
 import { CampaignDetailView } from "./CampaignDetailView";
 
 export function CampaignDetailRoute() {
@@ -26,7 +27,7 @@ export function CampaignDetailRoute() {
   const [dispatching, setDispatching] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
   const [dispatchNotice, setDispatchNotice] = React.useState<string | null>(null);
-  const [timeZone, setTimeZone] = React.useState("Europe/Moscow");
+  const [timeZone, setTimeZone] = React.useState(DEFAULT_TIME_ZONE);
   const syncedJobsRef = React.useRef(new Set<string>());
 
   const loadCampaign = React.useCallback(async () => {
@@ -41,7 +42,7 @@ export function CampaignDetailRoute() {
       const body = await response.json() as WorkspaceSnapshot;
       const item = body.campaigns.find((candidate) => candidate.id === campaignId) ?? null;
       setCampaign(item);
-      setTimeZone(body.workspace.timezone || "Europe/Moscow");
+      setTimeZone(detectBrowserTimeZone(body.workspace.timezone || DEFAULT_TIME_ZONE));
       setDeliveryPlans(body.deliveryPlans.filter((plan) => plan.campaignId === campaignId));
       setEvents(body.events.filter((event) => event.campaignId === campaignId));
       setDeliveryJob(

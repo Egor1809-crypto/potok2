@@ -63,6 +63,7 @@ import {
   integrationProviderById,
   type IntegrationProviderId,
 } from "@/config/integrations";
+import { describeTimeZone, useBrowserTimeZone } from "@/lib/client-timezone";
 import type {
   ApiError,
   CampaignCreateInput,
@@ -1767,6 +1768,7 @@ function ReviewStep({
   minimumScheduledAt: string;
 }) {
   const blockers = evaluation?.blockers.length ? evaluation.blockers : clientBlockers;
+  const timeZone = useBrowserTimeZone();
   return (
     <div>
       <StepIntro number={4} title="Проверьте готовность" description="Сервер рассчитает точный охват, проверит согласия, подключения и сохранит план. Внешняя отправка на этом шаге не выполняется." />
@@ -1801,7 +1803,7 @@ function ReviewStep({
           </div>
         </div>
         {scheduledAt ? (
-          <FormField className="mt-4" label="Дата и время" htmlFor="campaign-scheduled-at" required hint="Время показывается в часовом поясе вашего устройства; календарь отображает его в часовом поясе рабочего пространства.">
+          <FormField className="mt-4" label="Дата и время" htmlFor="campaign-scheduled-at" required hint={`Часовой пояс определён по вашему устройству: ${describeTimeZone(timeZone)}. Календарь покажет то же локальное время.`}>
             <Input
               id="campaign-scheduled-at"
               type="datetime-local"

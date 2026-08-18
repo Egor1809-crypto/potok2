@@ -7,6 +7,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Filter, Play, Plus, Us
 
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Alert, Badge, Button, Input, Select, buttonVariants, cn } from "@/components/ui";
+import { describeTimeZone, useBrowserTimeZone } from "@/lib/client-timezone";
 import type { CampaignRecord, WorkspaceSnapshot } from "@/types/api";
 
 const weekdays = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
@@ -73,6 +74,7 @@ export function CalendarView() {
   const [status, setStatus] = React.useState("");
   const [running, setRunning] = React.useState(false);
   const [notice, setNotice] = React.useState<string | null>(null);
+  const timeZone = useBrowserTimeZone();
 
   const load = React.useCallback(async () => {
     try {
@@ -95,12 +97,12 @@ export function CalendarView() {
     if (!snapshot || !targetCampaignId) return;
     const campaign = snapshot.campaigns.find((item) => item.id === targetCampaignId);
     if (!campaign?.scheduledAt) return;
-    const key = dateKeyInTimezone(campaign.scheduledAt, snapshot.workspace.timezone);
+    const key = dateKeyInTimezone(campaign.scheduledAt, timeZone);
     const [year, monthNumber] = key.split("-").map(Number);
     if (!year || !monthNumber) return;
     const frame = window.requestAnimationFrame(() => setMonth(new Date(year, monthNumber - 1, 1)));
     return () => window.cancelAnimationFrame(frame);
-  }, [snapshot, targetCampaignId]);
+  }, [snapshot, targetCampaignId, timeZone]);
 
   const campaigns = React.useMemo(() => {
     if (!snapshot) return [];
@@ -128,13 +130,12 @@ export function CalendarView() {
   }, [month]);
   const campaignsByDay = React.useMemo(() => {
     const map = new Map<string, CampaignRecord[]>();
-    const timezone = snapshot?.workspace.timezone ?? "Europe/Moscow";
     for (const campaign of campaigns) {
-      const key = dateKeyInTimezone(campaign.scheduledAt!, timezone);
+      const key = dateKeyInTimezone(campaign.scheduledAt!, timeZone);
       map.set(key, [...(map.get(key) ?? []), campaign]);
     }
     return map;
-  }, [campaigns, snapshot?.workspace.timezone]);
+  }, [campaigns, timeZone]);
 
   const runQueue = async () => {
     setRunning(true);
@@ -165,6 +166,9 @@ export function CalendarView() {
       />
       {error ? <Alert tone="danger" title="Календарь недоступен">{error}</Alert> : null}
       {notice ? <Alert tone="success" title="Очередь проверена">{notice}</Alert> : null}
+      <Alert tone="info" title="Часовой пояс определён автоматически">
+        Все даты календаря и время отправки показаны по вашему устройству: {describeTimeZone(timeZone)}. На сервере расписание хранится в UTC без сдвига.
+      </Alert>
 
       <section className="card p-4 sm:p-5" aria-label="Фильтры календаря">
         <div className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_240px_200px_auto]">
@@ -222,7 +226,7 @@ export function CalendarView() {
                       "block rounded-lg border border-primary/15 bg-white/85 p-1.5 shadow-[0_1px_2px_rgba(17,24,39,0.04)] hover:border-primary/40",
                       campaign.id === targetCampaignId && "border-primary bg-primary/[0.09] ring-1 ring-primary/25",
                     )}>
-                      <div className="flex items-center gap-1 text-[10px] font-semibold text-primary"><Clock3 className="size-3" />{formatTime(campaign.scheduledAt!, snapshot?.workspace.timezone ?? "Europe/Moscow")}</div>
+                      <div className="flex items-center gap-1 text-[10px] font-semibold text-primary"><Clock3 className="size-3" />{formatTime(campaign.scheduledAt!, timeZone)}</div>
                       <div className="mt-0.5 truncate text-[11px] font-semibold text-text-strong">{campaign.subject || campaign.name}</div>
                       <div className="mt-0.5 flex items-center gap-1 truncate text-[10px] text-text-muted"><UsersRound className="size-3 shrink-0" />{snapshot ? audienceLabel(campaign, snapshot) : ""}</div>
                     </Link>
