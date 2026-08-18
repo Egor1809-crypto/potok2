@@ -28,6 +28,7 @@ function saveBlob(content: BlobPart, type: string, filename: string) {
 }
 
 async function renderPdf(html: string) {
+  const renderScale = 2;
   const frame = window.document.createElement("iframe");
   frame.setAttribute("aria-hidden", "true");
   Object.assign(frame.style, {
@@ -53,7 +54,7 @@ async function renderPdf(html: string) {
     const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import("html2canvas"), import("jspdf")]);
     const canvas = await html2canvas(frameDocument.body, {
       backgroundColor: "#ffffff",
-      scale: 2,
+      scale: renderScale,
       useCORS: true,
       allowTaint: false,
       logging: false,
@@ -65,11 +66,41 @@ async function renderPdf(html: string) {
     const pageHeight = 297 - margin * 2;
     const imageHeight = canvas.height * pageWidth / canvas.width;
     const imageData = canvas.toDataURL("image/jpeg", 0.94);
+    const bodyRect = frameDocument.body.getBoundingClientRect();
+    const cssToPdf = pageWidth / (canvas.width / renderScale);
+    const links = Array.from(frameDocument.querySelectorAll<HTMLAnchorElement>("a[href]"))
+      .flatMap((anchor) => {
+        const rawHref = anchor.getAttribute("href")?.trim();
+        if (!rawHref) return [];
+        let url: URL;
+        try {
+          url = new URL(rawHref, window.location.origin);
+        } catch {
+          return [];
+        }
+        if (!["http:", "https:", "mailto:", "tel:"].includes(url.protocol)) return [];
+        return Array.from(anchor.getClientRects()).map((rect) => ({
+          url: url.href,
+          x: margin + (rect.left - bodyRect.left) * cssToPdf,
+          y: (rect.top - bodyRect.top) * cssToPdf,
+          width: rect.width * cssToPdf,
+          height: rect.height * cssToPdf,
+        }));
+      })
+      .filter((link) => link.width > 0 && link.height > 0);
     let offset = 0;
     let page = 0;
     while (offset < imageHeight) {
       if (page > 0) pdf.addPage();
       pdf.addImage(imageData, "JPEG", margin, margin - offset, pageWidth, imageHeight, undefined, "FAST");
+      const pageStart = offset;
+      const pageEnd = offset + pageHeight;
+      for (const link of links) {
+        const top = Math.max(link.y, pageStart);
+        const bottom = Math.min(link.y + link.height, pageEnd);
+        if (bottom <= top) continue;
+        pdf.link(link.x, margin + top - pageStart, link.width, bottom - top, { url: link.url });
+      }
       offset += pageHeight;
       page += 1;
     }
