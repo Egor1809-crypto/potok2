@@ -45,7 +45,7 @@ let initialization: Promise<void> | null = null;
 // template-seeding routine in every new isolate made even a simple page load
 // wait several seconds for D1. Keep a durable completion marker instead.
 // Bump this value whenever a runtime-only schema migration is added here.
-const RUNTIME_SCHEMA_VERSION = "runtime-schema-v15-conference-company-name-correction";
+const RUNTIME_SCHEMA_VERSION = "runtime-schema-v16-practice-market-copy-correction";
 const DEFAULT_SENDER_NAME = "ТехнологИИ Права";
 const DEFAULT_SENDER_EMAIL = "info@tech-pravo.ru";
 
@@ -1162,6 +1162,41 @@ async function seedDatabase(request: Request) {
     }
     await db.insert(systemState).values({
       key: "conference-production-html-v7-company-name",
+      value: "corrected",
+      updatedAt: now,
+    }).onConflictDoUpdate({
+      target: systemState.key,
+      set: { value: "corrected", updatedAt: now },
+    });
+  }
+
+  const [practiceMarketCopyCorrectionState] = await db
+    .select({ key: systemState.key })
+    .from(systemState)
+    .where(eq(systemState.key, "conference-production-html-v8-practice-market-copy"))
+    .limit(1);
+  if (!practiceMarketCopyCorrectionState) {
+    const template = conferenceProductionTemplateValues.find(
+      (item) => item.id === "template-user-conference-06-editorial-manifesto",
+    );
+    if (template) {
+      await db
+        .update(emailTemplates)
+        .set({
+          subject: template.subject,
+          previewText: template.previewText,
+          builderDocument: template.builderDocument,
+          emailBodyHtml: template.emailBodyHtml,
+          emailBodyText: template.emailBodyText,
+          updatedAt: now,
+        })
+        .where(and(
+          eq(emailTemplates.id, template.id),
+          eq(emailTemplates.workspaceId, WORKSPACE_ID),
+        ));
+    }
+    await db.insert(systemState).values({
+      key: "conference-production-html-v8-practice-market-copy",
       value: "corrected",
       updatedAt: now,
     }).onConflictDoUpdate({

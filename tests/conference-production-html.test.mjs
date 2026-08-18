@@ -32,6 +32,8 @@ test("ten conference HTML letters are seeded as editable user templates", async 
   assert.match(generated, /В кризис конкуренция становится всё жёстче и всё меньше прощает ошибки/);
   assert.match(generated, /абсолютное конкурентное преимущество в эпоху перемен/);
   assert.match(generated, /Вы первыми увидите, что делает лидеров первыми\./);
+  assert.match(generated, /Здравствуйте, \{\{first_name\}\}! Пока одни обсуждают ИИ, другие уже перестраивают процессы, продукт и команду\./);
+  assert.match(generated, /На конференции «ТехнологИИ Права» Вы увидите, как это делают лидеры БФЛ и юридического бизнеса\./);
   assert.match(database, /conference-production-html-v1/);
   assert.match(database, /conference-production-html-v2-practice-lab/);
   assert.match(database, /conference-production-html-v3-executive-memo/);
@@ -39,7 +41,8 @@ test("ten conference HTML letters are seeded as editable user templates", async 
   assert.match(database, /conference-production-html-v5-professional-circle/);
   assert.match(database, /conference-production-html-v6-market-race/);
   assert.match(database, /conference-production-html-v7-company-name/);
-  assert.match(database, /runtime-schema-v15-conference-company-name-correction/);
+  assert.match(database, /conference-production-html-v8-practice-market-copy/);
+  assert.match(database, /runtime-schema-v16-practice-market-copy-correction/);
   assert.match(database, /https:\/\/t\.me\/TechPravoAI/);
   assert.match(compiler, /if \(document\.rawHtml\) return document\.rawHtml/);
   assert.match(preview, /srcDoc=\{template\.emailBodyHtml\}/);
