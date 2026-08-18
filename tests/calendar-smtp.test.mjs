@@ -9,11 +9,12 @@ async function source(path) {
 }
 
 test("calendar connects scheduled campaigns, audience filters and the due queue", async () => {
-  const [calendar, wizard, store, worker, topbar, navigation] = await Promise.all([
+  const [calendar, wizard, store, worker, assets, topbar, navigation] = await Promise.all([
     source("components/calendar/CalendarView.tsx"),
     source("components/campaigns/CampaignWizard.tsx"),
     source("lib/server/mailflow-store.ts"),
     source("worker/index.ts"),
+    source("lib/server/email-asset-store.ts"),
     source("components/layout/topbar.tsx"),
     source("components/layout/navigation.ts"),
   ]);
@@ -31,6 +32,7 @@ test("calendar connects scheduled campaigns, audience filters and the due queue"
   assert.match(store, /eq\(campaigns\.status, "scheduled"\)/);
   assert.match(store, /lte\(campaigns\.scheduledAt, now\)/);
   assert.match(worker, /scheduled\(_controller/);
+  assert.match(assets, /storeInlineEmailAsset[\s\S]*ensureSystemDatabase\(\)/);
   assert.match(topbar, /href="\/calendar"/);
   assert.doesNotMatch(navigation, /href: "\/calendar"/);
 });

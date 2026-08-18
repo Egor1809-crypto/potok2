@@ -10,7 +10,7 @@ import type {
 } from "@/types/api";
 
 import { ApiRequestError, cleanText, newId } from "./api-utils";
-import { ensureDatabase, WORKSPACE_ID } from "./database-init";
+import { ensureDatabase, ensureSystemDatabase, WORKSPACE_ID } from "./database-init";
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const MAX_GENERATED_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -189,7 +189,10 @@ export async function storeInlineEmailAsset(
   request: Request,
   dataUrl: string,
 ): Promise<string> {
-  await ensureDatabase(request);
+  // This helper is also used by the authenticated cron dispatcher. Public
+  // routes authorize their caller before reaching it, while cron has no user
+  // cookie and must operate through the system database context.
+  await ensureSystemDatabase();
   const { bytes, mimeType } = inlineImageDataUrl(dataUrl);
   const asset = await persistEmailAsset(
     request,
