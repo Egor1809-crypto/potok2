@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Filter, Play, Plus, UsersRound } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Filter, Plus, UsersRound } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Alert, Badge, Button, Input, Select, buttonVariants, cn } from "@/components/ui";
@@ -72,8 +72,6 @@ export function CalendarView() {
   const [query, setQuery] = React.useState("");
   const [group, setGroup] = React.useState("");
   const [status, setStatus] = React.useState("");
-  const [running, setRunning] = React.useState(false);
-  const [notice, setNotice] = React.useState<string | null>(null);
   const timeZone = useBrowserTimeZone();
 
   const load = React.useCallback(async () => {
@@ -91,6 +89,16 @@ export function CalendarView() {
   React.useEffect(() => {
     const frame = window.requestAnimationFrame(() => void load());
     return () => window.cancelAnimationFrame(frame);
+  }, [load]);
+
+  React.useEffect(() => {
+    const refresh = () => void load();
+    const interval = window.setInterval(refresh, 30_000);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+    };
   }, [load]);
 
   React.useEffect(() => {
@@ -137,35 +145,15 @@ export function CalendarView() {
     return map;
   }, [campaigns, timeZone]);
 
-  const runQueue = async () => {
-    setRunning(true);
-    setNotice(null);
-    try {
-      const response = await fetch("/api/scheduler", { method: "POST", headers: { Accept: "application/json" } });
-      const body = await response.json() as { dueCount?: number; dispatched?: unknown[]; error?: string };
-      if (!response.ok) throw new Error(body.error ?? "Не удалось проверить очередь.");
-      setNotice(body.dueCount ? `Обработано запланированных рассылок: ${body.dueCount}.` : "Просроченных заданий нет — очередь актуальна.");
-      await load();
-    } catch (runError) {
-      setError(runError instanceof Error ? runError.message : "Не удалось проверить очередь.");
-    } finally {
-      setRunning(false);
-    }
-  };
-
   return (
     <div className="space-y-5">
       <PageHeader
         eyebrow="Расписание"
         title="Календарь рассылок"
         description="Планируйте одно письмо человеку или серию для группы. Тема, аудитория и время остаются видны в одном календаре."
-        action={<>
-          <Button variant="secondary" onClick={() => void runQueue()} loading={running} loadingText="Проверяем…" leadingIcon={<Play className="size-4" />}>Проверить очередь</Button>
-          <Link href={`/campaigns/new?scheduledDate=${dateKey(new Date())}`} className={buttonVariants()}><Plus className="size-4" />Запланировать</Link>
-        </>}
+        action={<Link href={`/campaigns/new?scheduledDate=${dateKey(new Date())}`} className={buttonVariants()}><Plus className="size-4" />Запланировать</Link>}
       />
       {error ? <Alert tone="danger" title="Календарь недоступен">{error}</Alert> : null}
-      {notice ? <Alert tone="success" title="Очередь проверена">{notice}</Alert> : null}
       <Alert tone="info" title="Часовой пояс определён автоматически">
         Все даты календаря и время отправки показаны по вашему устройству: {describeTimeZone(timeZone)}. На сервере расписание хранится в UTC без сдвига.
       </Alert>
@@ -221,17 +209,19 @@ export function CalendarView() {
                   ) : null}
                 </div>
                 <div className="mt-1 space-y-1">
-                  {items.slice(0, 3).map((campaign) => (
+                  {items.map((campaign) => (
                     <Link key={campaign.id} href={`/campaigns/${campaign.id}`} className={cn(
                       "block rounded-lg border border-primary/15 bg-white/85 p-1.5 shadow-[0_1px_2px_rgba(17,24,39,0.04)] hover:border-primary/40",
+                      campaign.status === "completed" && "border-success/25 bg-success-subtle/50",
+                      campaign.status === "blocked" && "border-warning/30 bg-warning-subtle/60",
+                      campaign.status === "cancelled" && "border-border bg-surface-subtle opacity-70",
                       campaign.id === targetCampaignId && "border-primary bg-primary/[0.09] ring-1 ring-primary/25",
                     )}>
-                      <div className="flex items-center gap-1 text-[10px] font-semibold text-primary"><Clock3 className="size-3" />{formatTime(campaign.scheduledAt!, timeZone)}</div>
+                      <div className="flex items-center justify-between gap-1 text-[10px] font-semibold text-primary"><span className="flex items-center gap-1"><Clock3 className="size-3" />{formatTime(campaign.scheduledAt!, timeZone)}</span><span className="truncate text-[9px] text-text-subtle">{statusLabel[campaign.status]}</span></div>
                       <div className="mt-0.5 truncate text-[11px] font-semibold text-text-strong">{campaign.subject || campaign.name}</div>
                       <div className="mt-0.5 flex items-center gap-1 truncate text-[10px] text-text-muted"><UsersRound className="size-3 shrink-0" />{snapshot ? audienceLabel(campaign, snapshot) : ""}</div>
                     </Link>
                   ))}
-                  {items.length > 3 ? <div className="text-[10px] font-medium text-text-muted">Ещё {items.length - 3}</div> : null}
                 </div>
               </div>
             );
