@@ -15,8 +15,12 @@ test("ten conference HTML letters are seeded as editable user templates", async 
   assert.match(generated, /\{\{first_name\}\}/);
   assert.match(generated, /https:\/\/tech-pravo\.ru\/conference/);
   assert.match(generated, /https:\/\/t\.me\/NeuroPravo_Bot/);
+  assert.doesNotMatch(generated, /PRACTICE MODE: ON/);
+  assert.equal((generated.match(/ООО «АСПБ»/g) ?? []).length, 27);
+  assert.match(generated, /На втором дне конференции «ТехнологИИ Права»/);
   assert.match(database, /conference-production-html-v1/);
-  assert.match(database, /runtime-schema-v9-team-distribution/);
+  assert.match(database, /conference-production-html-v2-practice-lab/);
+  assert.match(database, /runtime-schema-v10-practice-lab-correction/);
   assert.match(database, /https:\/\/t\.me\/TechPravoAI/);
   assert.match(compiler, /if \(document\.rawHtml\) return document\.rawHtml/);
   assert.match(preview, /srcDoc=\{template\.emailBodyHtml\}/);
