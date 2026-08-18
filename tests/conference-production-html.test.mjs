@@ -25,11 +25,14 @@ test("ten conference HTML letters are seeded as editable user templates", async 
   assert.match(generated, /—ДЛЯ руководителей юридического бизнеса и практикующих юристов/);
   assert.match(generated, /АВТОМАТИЗАЦИЯ БФЛ, ИИ в юрбизнесе, LegalTech, данные и безопасность\./);
   assert.match(generated, /© 2026 ООО «ТехнологИИ Права»/);
+  assert.match(generated, /Здравствуйте, \{\{first_name\}\}! Конференция «ТехнологИИ Права» собирает лучших экспертов ИИ-индустрии/);
+  assert.match(generated, /объединяет их с представителями юридического сообщества: юристами-практиками/);
   assert.match(database, /conference-production-html-v1/);
   assert.match(database, /conference-production-html-v2-practice-lab/);
   assert.match(database, /conference-production-html-v3-executive-memo/);
   assert.match(database, /conference-production-html-v4-personal-invitation/);
-  assert.match(database, /runtime-schema-v12-personal-invitation-correction/);
+  assert.match(database, /conference-production-html-v5-professional-circle/);
+  assert.match(database, /runtime-schema-v13-professional-circle-correction/);
   assert.match(database, /https:\/\/t\.me\/TechPravoAI/);
   assert.match(compiler, /if \(document\.rawHtml\) return document\.rawHtml/);
   assert.match(preview, /srcDoc=\{template\.emailBodyHtml\}/);
