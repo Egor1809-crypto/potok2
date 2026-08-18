@@ -362,7 +362,7 @@ function SendingSection({ form, update }: { form: WorkspaceForm; update: UpdateF
         </div>
       </FormBlock>
       <div className="rounded-xl border border-[var(--success)]/15 bg-[var(--success-subtle)] p-4 text-[11px] leading-5 text-[var(--text-muted)]">
-        Согласие на email, Telegram и ВКонтакте всегда проверяется отдельно перед переводом кампании в готовность.
+        Для email-рассылки доступны все активные контакты с адресом. Отписанные, недоставляемые и некорректные контакты исключаются. Для Telegram и ВКонтакте согласие по-прежнему проверяется перед запуском.
       </div>
     </div>
   );

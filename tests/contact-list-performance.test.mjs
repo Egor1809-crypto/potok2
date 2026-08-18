@@ -41,7 +41,7 @@ test("contacts page exposes four deduplicated channel databases and balanced own
   assert.match(databaseInit, /balanced-team-distribution-mask/);
 });
 
-test("service email basis and marketing consent evidence are independent", async () => {
+test("all active email contacts are eligible while service email keeps its basis check", async () => {
   const [view, store, wizard] = await Promise.all([
     readFile(new URL("../components/contacts/ContactsView.tsx", import.meta.url), "utf8"),
     readFile(new URL("../lib/server/mailflow-store.ts", import.meta.url), "utf8"),
@@ -49,11 +49,12 @@ test("service email basis and marketing consent evidence are independent", async
   ]);
   assert.match(view, /Рекламная email-рассылка/);
   assert.match(view, /Сервисные email-сообщения/);
-  assert.match(store, /marketingConsentSource/);
+  assert.match(store, /emailReady: sql<number>`coalesce\(sum\(case when \$\{contacts\.status\} = 'active' and \$\{contacts\.email\} <> '' then 1 else 0 end\), 0\)`/);
   assert.match(store, /serviceEmailBasis/);
-  assert.match(store, /полного доказательства рекламного согласия/);
   assert.match(store, /основание для сервисного сообщения/);
-  assert.match(wizard, /purpose === "transactional" \? serviceAllowed : marketingAllowed/);
+  assert.match(wizard, /purpose === "transactional" \? serviceAllowed : true/);
+  assert.doesNotMatch(wizard, /recipientCount > 5_000/);
+  assert.doesNotMatch(store, /audience\.length > 5_000/);
 });
 
 test("large contact payloads are loaded only by workflows that require them", async () => {

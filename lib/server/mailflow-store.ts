@@ -1002,7 +1002,7 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
         active: sql<number>`coalesce(sum(case when ${contacts.status} = 'active' then 1 else 0 end), 0)`,
         assigned: sql<number>`coalesce(sum(case when ${contacts.responsibleParticipantId} is not null then 1 else 0 end), 0)`,
         emailFound: sql<number>`coalesce(sum(case when ${contacts.email} <> '' then 1 else 0 end), 0)`,
-        emailReady: sql<number>`coalesce(sum(case when ${contacts.status} = 'active' and ${contacts.email} <> '' and ${contacts.emailConsent} = 1 and coalesce(json_extract(${contacts.customFields}, '$.marketingConsentSource'), '') <> '' and coalesce(json_extract(${contacts.customFields}, '$.marketingConsentAt'), '') <> '' and coalesce(json_extract(${contacts.customFields}, '$.marketingConsentText'), '') <> '' then 1 else 0 end), 0)`,
+        emailReady: sql<number>`coalesce(sum(case when ${contacts.status} = 'active' and ${contacts.email} <> '' then 1 else 0 end), 0)`,
         serviceEmailReady: sql<number>`coalesce(sum(case when ${contacts.status} = 'active' and ${contacts.email} <> '' and json_extract(${contacts.customFields}, '$.serviceEmailAllowed') = 'true' and coalesce(json_extract(${contacts.customFields}, '$.serviceEmailBasis'), '') <> '' and coalesce(json_extract(${contacts.customFields}, '$.serviceEmailAllowedAt'), '') <> '' then 1 else 0 end), 0)`,
         telegramFound: sql<number>`coalesce(sum(case when ${contacts.telegramChatId} is not null and ${contacts.telegramChatId} <> '' then 1 else 0 end), 0)`,
         telegramReady: sql<number>`coalesce(sum(case when ${contacts.status} = 'active' and ${contacts.telegramChatId} is not null and ${contacts.telegramChatId} <> '' and ${contacts.telegramConsent} = 1 then 1 else 0 end), 0)`,
@@ -1056,7 +1056,7 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
           sum(CASE WHEN telegram_chat_id IS NOT NULL AND telegram_chat_id <> '' THEN 1 ELSE 0 END) AS telegram,
           sum(CASE WHEN vk_user_id IS NOT NULL AND vk_user_id <> '' THEN 1 ELSE 0 END) AS vk,
           sum(CASE WHEN phone <> '' THEN 1 ELSE 0 END) AS phone,
-          sum(CASE WHEN status = 'active' AND email <> '' AND email_consent = 1 AND coalesce(json_extract(custom_fields, '$.marketingConsentSource'), '') <> '' AND coalesce(json_extract(custom_fields, '$.marketingConsentAt'), '') <> '' AND coalesce(json_extract(custom_fields, '$.marketingConsentText'), '') <> '' THEN 1 ELSE 0 END) AS readyEmail,
+          sum(CASE WHEN status = 'active' AND email <> '' THEN 1 ELSE 0 END) AS readyEmail,
           sum(CASE WHEN status = 'active' AND email <> '' AND json_extract(custom_fields, '$.serviceEmailAllowed') = 'true' AND coalesce(json_extract(custom_fields, '$.serviceEmailBasis'), '') <> '' AND coalesce(json_extract(custom_fields, '$.serviceEmailAllowedAt'), '') <> '' THEN 1 ELSE 0 END) AS serviceEmail,
           sum(CASE WHEN status = 'active' AND telegram_chat_id IS NOT NULL AND telegram_chat_id <> '' AND telegram_consent = 1 THEN 1 ELSE 0 END) AS readyTelegram
           ,sum(CASE WHEN last_contacted_at IS NOT NULL THEN 1 ELSE 0 END) AS sent
@@ -2476,12 +2476,11 @@ async function versionHash(snapshot: CampaignVersionSnapshot): Promise<string> {
 function recipientFingerprints(
   plans: DeliveryPlanRecord[],
   audience: ContactRecord[],
-  requireConsent: boolean,
   purpose: CampaignRecord["purpose"],
 ) {
   return plans.flatMap((plan) =>
     audience
-      .filter((contact) => contactEligible(contact, plan.channel, requireConsent, purpose))
+      .filter((contact) => contactEligible(contact, plan.channel, purpose))
       .map((contact) =>
         JSON.stringify([
           plan.channel,
@@ -2490,16 +2489,14 @@ function recipientFingerprints(
           endpointForContact(contact, plan.channel),
           contact.status,
           plan.channel === "email"
-            ? [
-                purpose,
-                contact.emailConsent,
-                contact.marketingConsentSource,
-                contact.marketingConsentAt,
-                contact.marketingConsentText,
-                contact.serviceEmailAllowed,
-                contact.serviceEmailBasis,
-                contact.serviceEmailAllowedAt,
-              ]
+            ? purpose === "transactional"
+              ? [
+                  purpose,
+                  contact.serviceEmailAllowed,
+                  contact.serviceEmailBasis,
+                  contact.serviceEmailAllowedAt,
+                ]
+              : [purpose]
             : plan.channel === "telegram"
               ? contact.telegramConsent
               : contact.vkConsent,
@@ -2517,7 +2514,6 @@ async function ensureCampaignVersion(
   campaign: CampaignRecord,
   plans: DeliveryPlanRecord[],
   audience: ContactRecord[],
-  workspace: WorkspaceRecord,
 ): Promise<CampaignVersionRecord> {
   const snapshot: CampaignVersionSnapshot = {
     campaignId: campaign.id,
@@ -2543,7 +2539,6 @@ async function ensureCampaignVersion(
     recipientFingerprints: recipientFingerprints(
       plans,
       audience,
-      workspace.requireConsent,
       campaign.purpose,
     ),
   };
@@ -2600,16 +2595,13 @@ async function ensureCampaignVersion(
 function contactEligible(
   contact: ContactRecord,
   channel: DeliveryChannelId,
-  requireConsent: boolean,
   purpose: CampaignRecord["purpose"] = "marketing",
 ) {
   if (contact.status !== "active") return false;
   if (channel === "email") {
-    const marketingAllowed = contact.emailConsent
-      && Boolean(contact.marketingConsentSource && contact.marketingConsentAt && contact.marketingConsentText);
     const serviceAllowed = contact.serviceEmailAllowed
       && Boolean(contact.serviceEmailBasis && contact.serviceEmailAllowedAt);
-    return Boolean(contact.email) && (purpose === "transactional" ? serviceAllowed : !requireConsent || marketingAllowed);
+    return Boolean(contact.email) && (purpose === "transactional" ? serviceAllowed : true);
   }
   if (channel === "telegram") {
     return Boolean(contact.telegramChatId) && contact.telegramConsent;
@@ -2620,7 +2612,6 @@ function contactEligible(
 function noEligibleAudienceBlocker(
   channel: DeliveryChannelId,
   audience: ContactRecord[],
-  requireConsent: boolean,
   purpose: CampaignRecord["purpose"],
 ) {
   if (channel !== "email") {
@@ -2634,9 +2625,6 @@ function noEligibleAudienceBlocker(
   }
   if (purpose === "transactional" && !contactsWithEmail.some((contact) => contact.serviceEmailAllowed && contact.serviceEmailBasis && contact.serviceEmailAllowedAt)) {
     return `Email: у получателя не зафиксировано основание для сервисного сообщения. Укажите покупку, регистрацию или другое документируемое основание и его дату.`;
-  }
-  if (purpose !== "transactional" && requireConsent && !contactsWithEmail.some((contact) => contact.emailConsent && contact.marketingConsentSource && contact.marketingConsentAt && contact.marketingConsentText)) {
-    return `Email: адреса есть у ${contactsWithEmail.length} контактов, но нет полного доказательства рекламного согласия. Укажите источник, дату и формулировку согласия.`;
   }
   if (activeContacts.length === 0) {
     return "Email: в выбранной аудитории нет активных контактов. Проверьте статус получателей.";
@@ -2697,9 +2685,8 @@ async function evaluateLaunch(
   deliveryPlans: DeliveryPlanRecord[];
 }> {
   const db = getDb();
-  const [{ campaign, plans }, workspace, integrationRecords] = await Promise.all([
+  const [{ campaign, plans }, integrationRecords] = await Promise.all([
     campaignBundle(campaignId),
-    workspaceRecord(),
     allIntegrationRecords(),
   ]);
   const audience = await audienceForCampaign(campaign);
@@ -2707,9 +2694,6 @@ async function evaluateLaunch(
   const eligibleByChannel: CampaignEvaluation["eligibleByChannel"] = {};
   if (campaign.purpose === "transactional" && audience.length !== 1) {
     blockers.push("Сервисное письмо отправляется строго одному получателю. Для массовой аудитории выберите рекламную рассылку.");
-  }
-  if (campaign.purpose === "marketing" && audience.length > 5_000) {
-    blockers.push("Для защиты репутации Gmail одна рекламная отправка ограничена 5 000 контактами. Разделите базу на прогреваемые сегменты.");
   }
   const unknownTokens = unknownMergeTokens(
     campaign.subject,
@@ -2750,7 +2734,7 @@ async function evaluateLaunch(
   for (const plan of plans) {
     const channelBlockers: string[] = [];
     const eligibleCount = audience.filter((contact) =>
-      contactEligible(contact, plan.channel, workspace.requireConsent, campaign.purpose),
+      contactEligible(contact, plan.channel, campaign.purpose),
     ).length;
     eligibleByChannel[plan.channel] = eligibleCount;
     const provider = integrationRecords.find(
@@ -2770,7 +2754,7 @@ async function evaluateLaunch(
     }
     if (eligibleCount === 0) {
       channelBlockers.push(
-        noEligibleAudienceBlocker(plan.channel, audience, workspace.requireConsent, campaign.purpose),
+        noEligibleAudienceBlocker(plan.channel, audience, campaign.purpose),
       );
     }
     if (
@@ -2841,7 +2825,6 @@ async function evaluateLaunch(
         campaign,
         plans,
         audience,
-        workspace,
       );
   await db
     .update(campaigns)
@@ -3249,8 +3232,7 @@ async function dispatchCampaign(
   if (version.campaignId !== campaignId) {
     return blockDispatch(campaignId, "Проверенная версия не принадлежит кампании. Повторите проверку.");
   }
-  const [workspace, integrationsNow, freshAudience] = await Promise.all([
-    workspaceRecord(),
+  const [integrationsNow, freshAudience] = await Promise.all([
     allIntegrationRecords(),
     audienceForCampaign(current.campaign),
   ]);
@@ -3264,7 +3246,6 @@ async function dispatchCampaign(
   const freshFingerprints = recipientFingerprints(
     current.plans,
     freshAudience,
-    workspace.requireConsent,
     current.campaign.purpose,
   );
   if (
@@ -3273,7 +3254,7 @@ async function dispatchCampaign(
   ) {
     return blockDispatch(
       campaignId,
-      "Адрес, согласие или статус одного из получателей изменился после проверки. Проверьте готовность повторно.",
+      "Адрес, статус или данные одного из получателей изменились после проверки. Проверьте готовность повторно.",
     );
   }
 
@@ -3297,12 +3278,12 @@ async function dispatchCampaign(
       );
     }
     const eligible = freshAudience.filter((contact) =>
-      contactEligible(contact, plan.channel, workspace.requireConsent, current.campaign.purpose),
+      contactEligible(contact, plan.channel, current.campaign.purpose),
     );
     if (eligible.length !== plan.eligibleCount || eligible.length === 0) {
       return blockDispatch(
         campaignId,
-        `Доступность контактов в канале ${plan.channel} изменилась. Повторите проверку согласий и адресов.`,
+        `Доступность контактов в канале ${plan.channel} изменилась. Повторите проверку адресов и статусов.`,
       );
     }
     if (
@@ -3785,8 +3766,7 @@ export async function exportCampaignManualCsv(
       409,
     );
   }
-  const [workspace, version, audience] = await Promise.all([
-    workspaceRecord(),
+  const [version, audience] = await Promise.all([
     campaignVersionById(bundle.campaign.readyVersionId),
     audienceForCampaign(bundle.campaign),
   ]);
@@ -3798,18 +3778,17 @@ export async function exportCampaignManualCsv(
     );
   }
   const eligible = audience.filter((contact) =>
-    contactEligible(contact, "email", workspace.requireConsent, bundle.campaign.purpose),
+    contactEligible(contact, "email", bundle.campaign.purpose),
   );
   if (eligible.length !== manualPlan.eligibleCount) {
     throw new ApiRequestError(
-      "Согласия или email контактов изменились. Повторите проверку готовности.",
+      "Email или статус контактов изменились. Повторите проверку готовности.",
       409,
     );
   }
   const currentFingerprints = recipientFingerprints(
     [manualPlan],
     audience,
-    workspace.requireConsent,
     bundle.campaign.purpose,
   );
   const versionFingerprints = (version.snapshot.recipientFingerprints ?? [])
@@ -3824,7 +3803,7 @@ export async function exportCampaignManualCsv(
     .sort();
   if (JSON.stringify(currentFingerprints) !== JSON.stringify(versionFingerprints)) {
     throw new ApiRequestError(
-      "Email, согласие или статус получателя изменился после проверки. Повторите проверку перед экспортом.",
+      "Email, статус или данные получателя изменились после проверки. Повторите проверку перед экспортом.",
       409,
     );
   }

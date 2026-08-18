@@ -629,7 +629,6 @@ function CampaignWizardState({
     }
     if (!campaignName.trim()) blockers.push("Укажите внутреннее название рассылки.");
     if (purpose === "transactional" && recipientCount !== 1) blockers.push("Сервисное письмо можно отправить только одному получателю.");
-    if (purpose === "marketing" && recipientCount > 5_000) blockers.push("Разделите массовую рассылку на сегменты до 5 000 контактов для безопасного прогрева домена.");
     if (channels.length === 0) blockers.push("Выберите хотя бы один канал доставки.");
     if (channels.includes("email") && !subject.trim()) blockers.push("Добавьте тему email-письма.");
     if (channels.includes("email") && !emailBodyText.trim()) blockers.push("Добавьте текст email-письма.");
@@ -1198,9 +1197,8 @@ function countAudienceReachable(contacts: AudienceContact[], channel: CampaignCh
   return contacts.filter((contact) => {
     if (contact.status !== "active") return false;
     if (channel === "email") {
-      const marketingAllowed = contact.emailConsent !== false && Boolean(contact.marketingConsentSource && contact.marketingConsentAt && contact.marketingConsentText);
       const serviceAllowed = contact.serviceEmailAllowed && Boolean(contact.serviceEmailBasis && contact.serviceEmailAllowedAt);
-      return Boolean(contact.email) && (purpose === "transactional" ? serviceAllowed : marketingAllowed);
+      return Boolean(contact.email) && (purpose === "transactional" ? serviceAllowed : true);
     }
     if (channel === "telegram") {
       return Boolean(contact.telegramChatId && contact.telegramConsent);

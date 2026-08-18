@@ -541,7 +541,7 @@ export function ContactsView() {
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Четыре канальные базы">
         {coverage.map(({ id, label, found, ready, Icon, color }) => (
-          <button type="button" key={id} onClick={() => { setPage(1); setChannel(channel === id ? "all" : id); }} aria-pressed={channel === id} className={`card flex items-center gap-3 p-4 text-left transition hover:-translate-y-px hover:shadow-sm ${channel === id ? "ring-2 ring-[var(--primary)]/45" : ""}`}><span className="grid size-9 place-items-center rounded-xl" style={{ backgroundColor: `${color}18`, color }}><Icon aria-hidden="true" className="size-4" /></span><div><p className="text-[12px] font-semibold">{label}</p><p className="mt-0.5 text-[11px] text-[var(--text-muted)]">Уникальных контактов: {found.toLocaleString("ru-RU")}{id === "email" ? ` · реклама: ${ready.toLocaleString("ru-RU")} · сервисные: ${summary.coverage.email.serviceReady.toLocaleString("ru-RU")}` : id !== "phone" ? ` · разрешено: ${ready.toLocaleString("ru-RU")}` : ""}</p></div></button>
+          <button type="button" key={id} onClick={() => { setPage(1); setChannel(channel === id ? "all" : id); }} aria-pressed={channel === id} className={`card flex items-center gap-3 p-4 text-left transition hover:-translate-y-px hover:shadow-sm ${channel === id ? "ring-2 ring-[var(--primary)]/45" : ""}`}><span className="grid size-9 place-items-center rounded-xl" style={{ backgroundColor: `${color}18`, color }}><Icon aria-hidden="true" className="size-4" /></span><div><p className="text-[12px] font-semibold">{label}</p><p className="mt-0.5 text-[11px] text-[var(--text-muted)]">Уникальных контактов: {found.toLocaleString("ru-RU")}{id === "email" ? ` · доступно для отправки: ${ready.toLocaleString("ru-RU")} · сервисные: ${summary.coverage.email.serviceReady.toLocaleString("ru-RU")}` : id !== "phone" ? ` · разрешено: ${ready.toLocaleString("ru-RU")}` : ""}</p></div></button>
         ))}
       </section>
       <p className="-mt-3 text-[10px] text-[var(--text-muted)]">Это четыре представления одной объединённой базы: контакт не дублируется, даже если у него несколько каналов.</p>
@@ -565,7 +565,7 @@ export function ContactsView() {
                     <span><b className="block text-[12px] text-[var(--text-strong)]">{item.vk.toLocaleString("ru-RU")}</b>VK</span>
                     <span><b className="block text-[12px] text-[var(--text-strong)]">{item.phone.toLocaleString("ru-RU")}</b>Тел.</span>
                   </span>
-                  <span className="mt-2 block text-[9px] text-[var(--text-muted)]">Email: реклама {item.readyEmail.toLocaleString("ru-RU")} · сервисные {item.serviceEmail.toLocaleString("ru-RU")} · Telegram {item.readyTelegram.toLocaleString("ru-RU")}</span>
+                  <span className="mt-2 block text-[9px] text-[var(--text-muted)]">Email: доступно {item.readyEmail.toLocaleString("ru-RU")} · сервисные {item.serviceEmail.toLocaleString("ru-RU")} · Telegram {item.readyTelegram.toLocaleString("ru-RU")}</span>
                   <span className="mt-1 block text-[9px] font-semibold text-[var(--success)]">Уже обработано: {item.sent.toLocaleString("ru-RU")}</span>
                   {item.sheets.length > 0 && <span className="mt-2 flex flex-wrap gap-1">{item.sheets.map((entry) => <span key={entry.label} className="rounded-md bg-[var(--surface-subtle)] px-1.5 py-1 text-[8px] text-[var(--text-muted)]">{entry.label.replace(/^Импорт: /, "")} · {entry.count.toLocaleString("ru-RU")}</span>)}</span>}
                 </button>

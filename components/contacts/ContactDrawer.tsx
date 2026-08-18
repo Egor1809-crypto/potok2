@@ -76,8 +76,8 @@ export function ContactDrawer({
           id: "email",
           label: "Рекламный Email",
           address: contact.email || "Адрес не указан",
-          ready: Boolean(contact.email && contact.emailConsent && contact.marketingConsentSource && contact.marketingConsentAt && contact.marketingConsentText && contact.status === "active"),
-          reason: !contact.email ? "Email не указан" : contact.status !== "active" ? "Контакт недоступен" : !contact.emailConsent ? "Нет согласия" : !contact.marketingConsentSource || !contact.marketingConsentAt || !contact.marketingConsentText ? "Нет полного доказательства согласия" : "Готов к рекламной отправке",
+          ready: Boolean(contact.email && contact.status === "active"),
+          reason: !contact.email ? "Email не указан" : contact.status !== "active" ? "Контакт недоступен" : "Готов к рекламной отправке",
           Icon: Mail,
         },
         {
