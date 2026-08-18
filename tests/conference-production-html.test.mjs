@@ -19,7 +19,8 @@ test("ten conference HTML letters are seeded as editable user templates", async 
   assert.doesNotMatch(generated, /Private executive note · №07/);
   assert.match(generated, /Конференция руководителей в большом зале/);
   assert.match(generated, /background:#dffbfc;color:#10213b/);
-  assert.equal((generated.match(/ООО «АСПБ»/g) ?? []).length, 21);
+  assert.doesNotMatch(generated, /ООО «АСПБ»/);
+  assert.equal((generated.match(/© 2026 ООО «ТехнологИИ Права»/g) ?? []).length, 30);
   assert.match(generated, /На втором дне конференции «ТехнологИИ Права»/);
   assert.match(generated, /Маняша — AI-ассистент конференции/);
   assert.match(generated, /—ДЛЯ руководителей юридического бизнеса и практикующих юристов/);
@@ -37,7 +38,8 @@ test("ten conference HTML letters are seeded as editable user templates", async 
   assert.match(database, /conference-production-html-v4-personal-invitation/);
   assert.match(database, /conference-production-html-v5-professional-circle/);
   assert.match(database, /conference-production-html-v6-market-race/);
-  assert.match(database, /runtime-schema-v14-market-race-correction/);
+  assert.match(database, /conference-production-html-v7-company-name/);
+  assert.match(database, /runtime-schema-v15-conference-company-name-correction/);
   assert.match(database, /https:\/\/t\.me\/TechPravoAI/);
   assert.match(compiler, /if \(document\.rawHtml\) return document\.rawHtml/);
   assert.match(preview, /srcDoc=\{template\.emailBodyHtml\}/);

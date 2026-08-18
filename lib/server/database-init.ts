@@ -45,7 +45,7 @@ let initialization: Promise<void> | null = null;
 // template-seeding routine in every new isolate made even a simple page load
 // wait several seconds for D1. Keep a durable completion marker instead.
 // Bump this value whenever a runtime-only schema migration is added here.
-const RUNTIME_SCHEMA_VERSION = "runtime-schema-v14-market-race-correction";
+const RUNTIME_SCHEMA_VERSION = "runtime-schema-v15-conference-company-name-correction";
 const DEFAULT_SENDER_NAME = "ТехнологИИ Права";
 const DEFAULT_SENDER_EMAIL = "info@tech-pravo.ru";
 
@@ -1130,6 +1130,38 @@ async function seedDatabase(request: Request) {
     }
     await db.insert(systemState).values({
       key: "conference-production-html-v6-market-race",
+      value: "corrected",
+      updatedAt: now,
+    }).onConflictDoUpdate({
+      target: systemState.key,
+      set: { value: "corrected", updatedAt: now },
+    });
+  }
+
+  const [conferenceCompanyNameCorrectionState] = await db
+    .select({ key: systemState.key })
+    .from(systemState)
+    .where(eq(systemState.key, "conference-production-html-v7-company-name"))
+    .limit(1);
+  if (!conferenceCompanyNameCorrectionState) {
+    for (const template of conferenceProductionTemplateValues) {
+      await db
+        .update(emailTemplates)
+        .set({
+          subject: template.subject,
+          previewText: template.previewText,
+          builderDocument: template.builderDocument,
+          emailBodyHtml: template.emailBodyHtml,
+          emailBodyText: template.emailBodyText,
+          updatedAt: now,
+        })
+        .where(and(
+          eq(emailTemplates.id, template.id),
+          eq(emailTemplates.workspaceId, WORKSPACE_ID),
+        ));
+    }
+    await db.insert(systemState).values({
+      key: "conference-production-html-v7-company-name",
       value: "corrected",
       updatedAt: now,
     }).onConflictDoUpdate({
