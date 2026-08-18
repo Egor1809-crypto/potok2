@@ -553,6 +553,21 @@ function participantKey(value: string): string {
     .join(" ");
 }
 
+function normalizedImportedPhone(value: string): {
+  value: string;
+  invalid: boolean;
+} {
+  const firstPhone = value
+    .split(/[,;|\n]+/)
+    .map((part) => part.trim())
+    .find(Boolean) ?? "";
+  const digitCount = firstPhone.replace(/\D/g, "").length;
+  return {
+    value: firstPhone,
+    invalid: Boolean(firstPhone && (digitCount < 7 || digitCount > 15)),
+  };
+}
+
 function mappedContact(
   row: CsvRow,
   mapping: FieldMapping,
@@ -582,8 +597,13 @@ function mappedContact(
   };
   if (email) input.email = email;
 
+  // В старых базах несколько телефонов часто лежат в одной ячейке.
+  // Основным каналом становится первый номер, а исходная строка целиком
+  // остаётся ниже в customFields вместе с остальными колонками файла.
+  const phone = normalizedImportedPhone(valueFor(row, mapping, "phone"));
+  if (phone.value) input.phone = phone.value;
+
   const optionalTextFields = [
-    "phone",
     "companyName",
     "jobTitle",
     "category",
@@ -646,6 +666,7 @@ function mappedContact(
   if (Object.keys(customFields).length) input.customFields = customFields;
 
   const invalidChannel =
+    phone.invalid ||
     emailConsent.invalid ||
     telegramConsent.invalid ||
     vkConsent.invalid ||

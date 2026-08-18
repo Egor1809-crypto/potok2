@@ -188,3 +188,30 @@ test("XLSX detects a service header row and imports only aggregate contact queue
   assert.equal(validation.rows[2]?.input?.lastName, "Гамма");
   assert.equal(validation.rows[2]?.input?.customFields?.Статус, "Готово");
 });
+
+test("a cell with several phone numbers keeps the first phone and preserves the source value", async () => {
+  const parsed = await parseCsvFile(
+    spreadsheetFile(
+      [
+        ["Контакт / организация", "Мобильные номера"],
+        ["ООО Альфа", "+7 900 000-00-01, +7 900 000-00-02"],
+      ],
+      "xlsx",
+      "xlsx",
+    ),
+  );
+  const mapping = suggestMapping(parsed.headers);
+  const validation = validateRows(parsed.rows, mapping, {
+    emails: new Set(),
+    phones: new Set(),
+    telegramChatIds: new Set(),
+    vkUserIds: new Set(),
+  }, parsed.headers);
+
+  assert.equal(validation.summary.ready, 1);
+  assert.equal(validation.rows[0]?.input?.phone, "+7 900 000-00-01");
+  assert.equal(
+    validation.rows[0]?.input?.customFields?.["Мобильные номера"],
+    "+7 900 000-00-01, +7 900 000-00-02",
+  );
+});

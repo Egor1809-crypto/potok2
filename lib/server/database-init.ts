@@ -593,6 +593,33 @@ async function seedDatabase(request: Request) {
     )
     .onConflictDoNothing();
 
+  const [uniSenderConfigState] = await db
+    .select({ key: systemState.key })
+    .from(systemState)
+    .where(eq(systemState.key, "unisender-tech-pravo-list-v1"))
+    .limit(1);
+  if (!uniSenderConfigState) {
+    await db
+      .update(integrations)
+      .set({
+        enabled: true,
+        publicConfig: { senderEmail: DEFAULT_SENDER_EMAIL, listId: "2" },
+        checkStatus: "connected",
+        checkMessage: "API-ключ и список «Поток — ТехнологИИ Права» проверены. Отправитель: info@tech-pravo.ru.",
+        lastCheckedAt: now,
+        updatedAt: now,
+      })
+      .where(and(
+        eq(integrations.workspaceId, WORKSPACE_ID),
+        eq(integrations.providerId, "unisender"),
+      ));
+    await db.insert(systemState).values({
+      key: "unisender-tech-pravo-list-v1",
+      value: "list:2;sender:info@tech-pravo.ru",
+      updatedAt: now,
+    }).onConflictDoNothing();
+  }
+
   const [senderDefaultsState] = await db
     .select()
     .from(systemState)
