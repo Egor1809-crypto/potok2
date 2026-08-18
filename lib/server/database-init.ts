@@ -35,7 +35,7 @@ let initialization: Promise<void> | null = null;
 // template-seeding routine in every new isolate made even a simple page load
 // wait several seconds for D1. Keep a durable completion marker instead.
 // Bump this value whenever a runtime-only schema migration is added here.
-const RUNTIME_SCHEMA_VERSION = "runtime-schema-v5-team-mailing";
+const RUNTIME_SCHEMA_VERSION = "runtime-schema-v6-contacts-and-techpravo-link";
 const DEFAULT_SENDER_NAME = "ТехнологИИ Права";
 const DEFAULT_SENDER_EMAIL = "info@tech-pravo.ru";
 
@@ -446,15 +446,15 @@ async function createSchema() {
     await d1.prepare("ALTER TABLE email_templates ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0").run();
   }
   const canonicalHandle = (column: string) =>
-    `${column} = REPLACE(REPLACE(${column}, '@TechPravoAI', 'TechPravoAI'), 'TechPravoAI', '@TechPravoAI')`;
+    `${column} = REPLACE(REPLACE(${column}, 'https://t.me/@TechPravoAI', 'https://t.me/TechPravoAI'), 'TexPravoAI', 'TechPravoAI')`;
   await d1.batch([
     d1.prepare(`UPDATE email_templates SET ${[
       "name", "description", "subject", "preview_text", "builder_document", "email_body_html", "email_body_text",
-    ].map(canonicalHandle).join(", ")} WHERE name LIKE '%TechPravoAI%' OR description LIKE '%TechPravoAI%' OR subject LIKE '%TechPravoAI%' OR preview_text LIKE '%TechPravoAI%' OR builder_document LIKE '%TechPravoAI%' OR email_body_html LIKE '%TechPravoAI%' OR email_body_text LIKE '%TechPravoAI%'`),
+    ].map(canonicalHandle).join(", ")} WHERE name LIKE '%TexPravoAI%' OR description LIKE '%TexPravoAI%' OR subject LIKE '%TexPravoAI%' OR preview_text LIKE '%TexPravoAI%' OR builder_document LIKE '%TexPravoAI%' OR email_body_html LIKE '%TexPravoAI%' OR email_body_text LIKE '%TexPravoAI%' OR email_body_html LIKE '%t.me/@TechPravoAI%'`),
     d1.prepare(`UPDATE campaigns SET ${[
       "name", "subject", "preview_text", "email_body_text", "email_body_html", "email_builder_document", "messenger_message",
-    ].map(canonicalHandle).join(", ")} WHERE name LIKE '%TechPravoAI%' OR subject LIKE '%TechPravoAI%' OR preview_text LIKE '%TechPravoAI%' OR email_body_text LIKE '%TechPravoAI%' OR email_body_html LIKE '%TechPravoAI%' OR email_builder_document LIKE '%TechPravoAI%' OR messenger_message LIKE '%TechPravoAI%'`),
-    d1.prepare(`UPDATE presentation_projects SET ${["name", "description", "slides"].map(canonicalHandle).join(", ")} WHERE name LIKE '%TechPravoAI%' OR description LIKE '%TechPravoAI%' OR slides LIKE '%TechPravoAI%'`),
+    ].map(canonicalHandle).join(", ")} WHERE name LIKE '%TexPravoAI%' OR subject LIKE '%TexPravoAI%' OR preview_text LIKE '%TexPravoAI%' OR email_body_text LIKE '%TexPravoAI%' OR email_body_html LIKE '%TexPravoAI%' OR email_builder_document LIKE '%TexPravoAI%' OR messenger_message LIKE '%TexPravoAI%' OR email_body_html LIKE '%t.me/@TechPravoAI%'`),
+    d1.prepare(`UPDATE presentation_projects SET ${["name", "description", "slides"].map(canonicalHandle).join(", ")} WHERE name LIKE '%TexPravoAI%' OR description LIKE '%TexPravoAI%' OR slides LIKE '%TexPravoAI%' OR slides LIKE '%t.me/@TechPravoAI%'`),
   ]);
   await d1.batch([
     d1.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_participants_workspace_login ON participants(workspace_id, login) WHERE login IS NOT NULL"),
@@ -466,6 +466,7 @@ async function createSchema() {
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_contacts_workspace_city ON contacts(workspace_id, city)"),
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_contacts_workspace_company_name ON contacts(workspace_id, company_name)"),
   ]);
+  await d1.prepare("PRAGMA optimize").run();
   const campaignColumns = await d1
     .prepare("PRAGMA table_info(campaigns)")
     .all<{ name: string }>();

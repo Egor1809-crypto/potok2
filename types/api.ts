@@ -785,20 +785,36 @@ export type ContactListSummary = {
 
 export type ContactListFacet = { label: string; count: number };
 
+export type ContactOwnerSummary = {
+  participantId: string;
+  displayName: string;
+  color: string;
+  total: number;
+  email: number;
+  telegram: number;
+  vk: number;
+  phone: number;
+  readyEmail: number;
+  readyTelegram: number;
+  sheets: ContactListFacet[];
+};
+
 export type ContactsListResponse = {
   contacts: ContactRecord[];
   members: ParticipantRecord[];
+  participantId: string;
   timezone: string;
   page: number;
   pageSize: number;
   totalPages: number;
   filteredCount: number;
-  summary: ContactListSummary;
-  facets: {
+  summary?: ContactListSummary;
+  facets?: {
     companies: string[];
     cities: string[];
     teams: string[];
     sheets: ContactListFacet[];
+    owners: ContactOwnerSummary[];
   };
 };
 

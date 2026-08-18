@@ -32,6 +32,7 @@ import type {
   ContactMutationResponse,
   ContactRecord,
   ContactListSummary,
+  ContactOwnerSummary,
   ContactsListResponse,
   ParticipantRecord,
 } from "@/types/api";
@@ -132,6 +133,8 @@ export function ContactsView() {
   const [contacts, setContacts] = useState<ContactRecord[]>([]);
   const [members, setMembers] = useState<ParticipantRecord[]>([]);
   const [summary, setSummary] = useState<ContactListSummary>(emptySummary);
+  const [owners, setOwners] = useState<ContactOwnerSummary[]>([]);
+  const [participantId, setParticipantId] = useState("");
   const [sheets, setSheets] = useState<Array<{ label: string; count: number }>>([]);
   const [companies, setCompanies] = useState<string[]>([]);
   const [cities, setCities] = useState<string[]>([]);
@@ -158,12 +161,16 @@ export function ContactsView() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [timezone, setTimezone] = useState("Europe/Moscow");
+  const metadataLoaded = useRef(false);
   const activeView = searchParams.get("view") === "import" ? "import" : "contacts";
 
   const setView = (view: "contacts" | "import") => {
     const params = new URLSearchParams(searchParams.toString());
     if (view === "import") params.set("view", "import");
-    else params.delete("view");
+    else {
+      params.delete("view");
+      metadataLoaded.current = false;
+    }
     router.replace(params.size ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
   };
 
@@ -175,11 +182,13 @@ export function ContactsView() {
     return () => window.clearTimeout(timeout);
   }, [search]);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (refreshMeta = false) => {
     setLoading(true);
     setError("");
     try {
       const params = new URLSearchParams({ page: String(page), pageSize: "100" });
+      if (refreshMeta) metadataLoaded.current = false;
+      if (metadataLoaded.current) params.set("meta", "0");
       if (debouncedSearch) params.set("q", debouncedSearch);
       if (status !== "all") params.set("status", status);
       if (company !== "all") params.set("company", company);
@@ -193,12 +202,17 @@ export function ContactsView() {
       if (!response.ok || !("contacts" in payload)) throw new Error(messageFrom(payload, "Не удалось загрузить контакты"));
       setContacts(payload.contacts);
       setMembers(payload.members);
+      setParticipantId(payload.participantId);
       setTimezone(payload.timezone);
-      setSummary(payload.summary);
-      setSheets(payload.facets.sheets);
-      setCompanies(payload.facets.companies);
-      setCities(payload.facets.cities);
-      setTeams(payload.facets.teams);
+      if (payload.summary && payload.facets) {
+        setSummary(payload.summary);
+        setSheets(payload.facets.sheets);
+        setCompanies(payload.facets.companies);
+        setCities(payload.facets.cities);
+        setTeams(payload.facets.teams);
+        setOwners(payload.facets.owners);
+        metadataLoaded.current = true;
+      }
       setFilteredCount(payload.filteredCount);
       setTotalPages(payload.totalPages);
       if (payload.page !== page) setPage(payload.page);
@@ -211,9 +225,10 @@ export function ContactsView() {
   }, [channel, city, company, debouncedSearch, owner, page, sheet, status, team]);
 
   useEffect(() => {
+    if (activeView !== "contacts") return;
     const frame = window.requestAnimationFrame(() => void load());
     return () => window.cancelAnimationFrame(frame);
-  }, [load]);
+  }, [activeView, load]);
 
   const visible = contacts;
 
@@ -277,7 +292,7 @@ export function ContactsView() {
       if (!response.ok || !("contact" in payload)) throw new Error(messageFrom(payload, "Не удалось сохранить контакт"));
       setDrawerContact(payload.contact);
       setEditing(null);
-      await load();
+      await load(true);
       notify(existing ? "Контакт обновлён" : "Контакт добавлен");
     } catch (reason) {
       throw reason instanceof Error ? reason : new Error("Не удалось сохранить контакт");
@@ -300,7 +315,7 @@ export function ContactsView() {
       }
       setContacts((current) => current.filter((contact) => !deletedIds.has(contact.id)));
       setSelected(new Set());
-      await load();
+      await load(true);
       notify("Контакты удалены");
     } catch (reason) {
       if (deletedIds.size) {
@@ -333,7 +348,7 @@ export function ContactsView() {
       if (!response.ok || !("contacts" in payload) || !payload.contacts) throw new Error(messageFrom(payload, "Не удалось добавить контакты в команду"));
       const updated = new Map(payload.contacts.map((contact) => [contact.id, contact]));
       setTeamName("");
-      await load();
+      await load(true);
       notify(`В команду «${normalized}» добавлено: ${updated.size}`);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Не удалось добавить контакты в команду");
@@ -350,7 +365,7 @@ export function ContactsView() {
       if (!response.ok || !("contacts" in payload) || !payload.contacts) throw new Error(messageFrom(payload, "Не удалось назначить ответственного"));
       const updated = new Map(payload.contacts.map((contact) => [contact.id, contact]));
       const member = members.find((item) => item.id === responsibleId);
-      await load();
+      await load(true);
       notify(`Ответственный «${member?.displayName ?? "участник"}» назначен: ${updated.size}`);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Не удалось назначить ответственного");
@@ -483,6 +498,34 @@ export function ContactsView() {
           <div key={label} className="card flex items-center gap-3 p-4"><span className="grid size-9 place-items-center rounded-xl" style={{ backgroundColor: `${color}18`, color }}><Icon aria-hidden="true" className="size-4" /></span><div><p className="text-[12px] font-semibold">{label}</p><p className="mt-0.5 text-[11px] text-[var(--text-muted)]">Найдено: {found.toLocaleString("ru-RU")}{label !== "Телефон" ? ` · можно писать: ${ready.toLocaleString("ru-RU")}` : ""}</p></div></div>
         ))}
       </section>
+
+      {owners.length > 0 && (
+        <section className="card overflow-hidden" aria-labelledby="owner-statistics-title">
+          <div className="border-b border-[var(--border)] px-4 py-3 sm:px-5">
+            <h2 id="owner-statistics-title" className="text-[13px] font-semibold">Контакты по ответственным</h2>
+            <p className="mt-1 text-[10px] text-[var(--text-muted)]">Точное количество контактов и доступных каналов у каждого участника. Нажмите карточку, чтобы отфильтровать базу.</p>
+          </div>
+          <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
+            {owners.map((item) => {
+              const isCurrent = item.participantId === participantId;
+              return (
+                <button key={item.participantId} type="button" onClick={() => { setPage(1); setOwner(item.participantId); }} className={`rounded-xl border p-3 text-left transition hover:-translate-y-px hover:shadow-sm ${isCurrent ? "border-[var(--primary)]/45 bg-[var(--primary)]/[.04]" : "border-[var(--border)] bg-white"}`}>
+                  <span className="flex items-center gap-2"><i className="size-2.5 rounded-full" style={{ backgroundColor: item.color }} /><b className="text-[12px]">{item.displayName}</b>{isCurrent && <span className="badge badge-primary ml-auto">Вы</span>}</span>
+                  <span className="mt-2 grid grid-cols-5 gap-1 text-center text-[9px] text-[var(--text-muted)]">
+                    <span><b className="block text-[12px] text-[var(--text-strong)]">{item.total.toLocaleString("ru-RU")}</b>Всего</span>
+                    <span><b className="block text-[12px] text-[var(--text-strong)]">{item.email.toLocaleString("ru-RU")}</b>Email</span>
+                    <span><b className="block text-[12px] text-[var(--text-strong)]">{item.telegram.toLocaleString("ru-RU")}</b>TG</span>
+                    <span><b className="block text-[12px] text-[var(--text-strong)]">{item.vk.toLocaleString("ru-RU")}</b>VK</span>
+                    <span><b className="block text-[12px] text-[var(--text-strong)]">{item.phone.toLocaleString("ru-RU")}</b>Тел.</span>
+                  </span>
+                  <span className="mt-2 block text-[9px] text-[var(--text-muted)]">Можно писать: Email {item.readyEmail.toLocaleString("ru-RU")} · Telegram {item.readyTelegram.toLocaleString("ru-RU")}</span>
+                  {item.sheets.length > 0 && <span className="mt-2 flex flex-wrap gap-1">{item.sheets.map((entry) => <span key={entry.label} className="rounded-md bg-[var(--surface-subtle)] px-1.5 py-1 text-[8px] text-[var(--text-muted)]">{entry.label.replace(/^Импорт: /, "")} · {entry.count.toLocaleString("ru-RU")}</span>)}</span>}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {error && <div role="alert" className="flex items-start gap-3 rounded-xl border border-[var(--danger)]/20 bg-[var(--danger-subtle)] p-4 text-[12px] text-[var(--danger)]"><CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" /><span className="flex-1">{error}</span><button type="button" onClick={() => void load()} className="font-semibold underline underline-offset-2">Повторить</button></div>}
 
