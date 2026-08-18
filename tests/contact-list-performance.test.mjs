@@ -49,3 +49,15 @@ test("contact filters and ordering have database indexes", async () => {
     assert.match(migration, new RegExp(indexName));
   }
 });
+
+test("campaign dispatch loads only selected contacts and reconciles UniSender delivery", async () => {
+  const [store, detail] = await Promise.all([
+    readFile(new URL("../lib/server/mailflow-store.ts", import.meta.url), "utf8"),
+    readFile(new URL("../components/campaigns/CampaignDetailRoute.tsx", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(store, /chunksOf\(Array\.from\(new Set\(rows\.map\(\(row\) => row\.contactId\)\)\)\)/);
+  assert.match(store, /getUniSenderCampaignStats/);
+  assert.match(store, /action !== "sync_delivery"/);
+  assert.match(detail, /action: "sync_delivery"/);
+});

@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   createUniSenderCampaign,
   deterministicVkRandomId,
+  getUniSenderCampaignStats,
   renderMergeTemplate,
   sendTelegramMessage,
   sendVkMessage,
@@ -286,4 +287,35 @@ test("UniSender does not mark recipients accepted when createCampaign is ambiguo
   assert.equal(result.status, "ambiguous");
   assert.deepEqual(result.acceptedOutboxIds, []);
   assert.equal(result.messageId, "1234");
+});
+
+test("UniSender delivery reconciliation uses the provider's final statistics", async () => {
+  const methods = [];
+  const result = await getUniSenderCampaignStats({
+    apiKey: "api-key",
+    campaignId: "372377546",
+    fetchFn: async (url) => {
+      const method = String(url).split("/").at(-1);
+      methods.push(method);
+      if (method === "getCampaignStatus") {
+        return jsonResponse({ result: { status: "analysed", status_comment: "" } });
+      }
+      assert.equal(method, "getCampaignCommonStats");
+      return jsonResponse({ result: {
+        total: 3,
+        sent: 3,
+        delivered: 2,
+        read_unique: 1,
+        clicked_unique: 1,
+        unsubscribed: 0,
+        spam: 0,
+      } });
+    },
+  });
+
+  assert.equal(result.status, "accepted");
+  assert.equal(result.providerStatus, "analysed");
+  assert.equal(result.sent, 3);
+  assert.equal(result.delivered, 2);
+  assert.deepEqual(methods.sort(), ["getCampaignCommonStats", "getCampaignStatus"]);
 });

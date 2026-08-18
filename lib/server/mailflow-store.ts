@@ -80,6 +80,7 @@ import { checkProviderConnection, automaticProviderSecrets } from "./provider-ch
 import { storeInlineEmailAsset } from "./email-asset-store";
 import {
   createUniSenderCampaign,
+  getUniSenderCampaignStats,
   renderMergeTemplate,
   sendTelegramMessage,
   sendVkMessage,
@@ -2851,14 +2852,14 @@ async function processUniSenderOutbox(
   version: CampaignVersionRecord,
 ) {
   if (!rows.length) return {} as Record<string, string>;
-  const contactsById = new Map(
-    (await getDb()
-      .select()
-      .from(contacts)
-      .where(eq(contacts.workspaceId, WORKSPACE_ID)))
-      .map(toContact)
-      .map((contact) => [contact.id, contact]),
-  );
+  const selectedContactRows: ContactRow[] = [];
+  for (const idChunk of chunksOf(Array.from(new Set(rows.map((row) => row.contactId))))) {
+    selectedContactRows.push(...await getDb().select().from(contacts).where(and(
+      eq(contacts.workspaceId, WORKSPACE_ID),
+      inArray(contacts.id, idChunk),
+    )));
+  }
+  const contactsById = new Map(selectedContactRows.map(toContact).map((contact) => [contact.id, contact]));
   await getDb()
     .update(deliveryOutbox)
     .set({
@@ -3389,6 +3390,100 @@ async function dispatchCampaign(
   };
 }
 
+export async function syncCampaignDelivery(
+  request: Request,
+  campaignId: string,
+): Promise<CampaignMutationResponse> {
+  await ensureDatabase(request);
+  const current = await campaignBundle(campaignId);
+  const [job] = await getDb()
+    .select()
+    .from(deliveryJobs)
+    .where(and(
+      eq(deliveryJobs.workspaceId, WORKSPACE_ID),
+      eq(deliveryJobs.campaignId, campaignId),
+    ))
+    .orderBy(desc(deliveryJobs.createdAt))
+    .limit(1);
+  const externalCampaignId = job?.providerExternalIds?.unisender?.campaignId;
+  if (!job || !externalCampaignId) {
+    throw new ApiRequestError("У этой кампании нет отправки UniSender для проверки.", 409);
+  }
+  const credentials = automaticProviderSecrets("unisender") as { apiKey?: string };
+  const report = await getUniSenderCampaignStats({
+    apiKey: credentials.apiKey ?? "",
+    campaignId: externalCampaignId,
+    signal: AbortSignal.timeout(12_000),
+  });
+  if (report.status !== "accepted") {
+    throw new ApiRequestError(report.message, report.status === "ambiguous" ? 503 : 502);
+  }
+  const now = new Date().toISOString();
+  const isFinal = report.providerStatus === "analysed";
+  const undelivered = isFinal ? Math.max(0, report.sent - report.delivered) : 0;
+  const jobStatus: DeliveryJobRecord["status"] = !isFinal
+    ? "processing"
+    : undelivered === 0
+      ? "completed"
+      : report.delivered > 0
+        ? "partial"
+        : "failed";
+  const statusMessage = isFinal
+    ? report.delivered === report.sent
+      ? `UniSender подтвердил доставку ${report.delivered} из ${report.sent} писем.`
+      : `UniSender завершил отправку: доставлено ${report.delivered} из ${report.sent}, не доставлено ${undelivered}.`
+    : `UniSender ещё обрабатывает рассылку: ${report.providerStatus}. Обновите статус через несколько минут.`;
+
+  const [updatedJob] = await getDb().update(deliveryJobs).set({
+    status: jobStatus,
+    acceptedCount: isFinal ? report.delivered : job.acceptedCount,
+    rejectedCount: isFinal ? undelivered : job.rejectedCount,
+    statusMessage,
+    completedAt: isFinal ? now : null,
+    updatedAt: now,
+  }).where(eq(deliveryJobs.id, job.id)).returning();
+  await getDb().update(deliveryOutbox).set({
+    statusMessage,
+    updatedAt: now,
+  }).where(and(
+    eq(deliveryOutbox.jobId, job.id),
+    eq(deliveryOutbox.providerId, "unisender"),
+  ));
+  await getDb().update(campaigns).set({
+    status: isFinal ? "completed" : "sending",
+    statusReason: statusMessage,
+    metrics: {
+      ...current.campaign.metrics,
+      recipients: report.total || current.campaign.metrics.recipients,
+      sent: report.sent,
+      delivered: report.delivered,
+      opened: report.readUnique,
+      clicked: report.clickedUnique,
+      bounced: undelivered,
+      unsubscribed: report.unsubscribed,
+    },
+    updatedAt: now,
+  }).where(eq(campaigns.id, campaignId));
+  const event = await appendEvent(campaignId, "delivery_synced", statusMessage, {
+    provider: "unisender",
+    providerStatus: report.providerStatus,
+    total: report.total,
+    sent: report.sent,
+    delivered: report.delivered,
+    undelivered,
+    opened: report.readUnique,
+    clicked: report.clickedUnique,
+    spam: report.spam,
+  });
+  const updated = await campaignBundle(campaignId);
+  return {
+    campaign: updated.campaign,
+    deliveryPlans: updated.plans,
+    deliveryJob: toDeliveryJob(updatedJob),
+    event,
+  };
+}
+
 export type ScheduledRunResult = {
   checkedAt: string;
   dueCount: number;
@@ -3534,6 +3629,7 @@ export async function updateCampaign(
     action !== "save" &&
     action !== "launch" &&
     action !== "dispatch" &&
+    action !== "sync_delivery" &&
     action !== "cancel"
   ) {
     throw new ApiRequestError("Неизвестное действие с кампанией.");
@@ -3541,6 +3637,9 @@ export async function updateCampaign(
   const current = await campaignBundle(id);
   if (action === "dispatch") {
     return dispatchCampaign(request, id, object.idempotencyKey);
+  }
+  if (action === "sync_delivery") {
+    return syncCampaignDelivery(request, id);
   }
   if (["sending", "completed"].includes(current.campaign.status)) {
     throw new ApiRequestError(

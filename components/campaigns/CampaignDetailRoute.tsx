@@ -27,6 +27,7 @@ export function CampaignDetailRoute() {
   const [deleting, setDeleting] = React.useState(false);
   const [dispatchNotice, setDispatchNotice] = React.useState<string | null>(null);
   const [timeZone, setTimeZone] = React.useState("Europe/Moscow");
+  const syncedJobsRef = React.useRef(new Set<string>());
 
   const loadCampaign = React.useCallback(async () => {
     if (!campaignId) {
@@ -124,6 +125,35 @@ export function CampaignDetailRoute() {
     const frame = window.requestAnimationFrame(() => void loadCampaign());
     return () => window.cancelAnimationFrame(frame);
   }, [loadCampaign]);
+
+  React.useEffect(() => {
+    const providerCampaignId = deliveryJob?.providerExternalIds?.unisender?.campaignId;
+    if (!campaign || !deliveryJob || !providerCampaignId || syncedJobsRef.current.has(deliveryJob.id)) return;
+    syncedJobsRef.current.add(deliveryJob.id);
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const response = await fetch("/api/campaigns", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ id: campaign.id, action: "sync_delivery" }),
+          signal: controller.signal,
+        });
+        const body = await response.json() as CampaignMutationResponse | ApiError;
+        if (!response.ok || !("campaign" in body)) return;
+        setCampaign(body.campaign);
+        setDeliveryPlans(body.deliveryPlans);
+        if (body.deliveryJob) setDeliveryJob(body.deliveryJob);
+        if (body.event) setEvents((current) => [body.event!, ...current.filter((event) => event.id !== body.event!.id)]);
+        setDispatchNotice(body.deliveryJob?.statusMessage ?? body.campaign.statusReason);
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          syncedJobsRef.current.delete(deliveryJob.id);
+        }
+      }
+    })();
+    return () => controller.abort();
+  }, [campaign, deliveryJob]);
 
   return (
     <CampaignDetailView

@@ -375,6 +375,91 @@ export type UniSenderCampaignResult = ProviderCallResult & {
   rejectedOutboxIds: string[];
 };
 
+export type UniSenderCampaignStatsResult = ProviderCallResult & {
+  providerStatus?: string;
+  total: number;
+  sent: number;
+  delivered: number;
+  readUnique: number;
+  clickedUnique: number;
+  unsubscribed: number;
+  spam: number;
+};
+
+export async function getUniSenderCampaignStats(input: {
+  apiKey: string;
+  campaignId: string;
+  fetchFn?: FetchLike;
+  signal?: AbortSignal;
+}): Promise<UniSenderCampaignStatsResult> {
+  const fetchFn = input.fetchFn ?? fetch;
+  const empty = {
+    total: 0,
+    sent: 0,
+    delivered: 0,
+    readUnique: 0,
+    clickedUnique: 0,
+    unsubscribed: 0,
+    spam: 0,
+  };
+  try {
+    const [campaignStatus, commonStats] = await Promise.all([
+      callUniSender<{ status?: string; status_comment?: string }>({
+        method: "getCampaignStatus",
+        apiKey: input.apiKey,
+        parameters: [["campaign_id", input.campaignId]],
+        fetchFn,
+        signal: input.signal,
+      }),
+      callUniSender<{
+        total?: number;
+        sent?: number;
+        delivered?: number;
+        read_unique?: number;
+        clicked_unique?: number;
+        unsubscribed?: number;
+        spam?: number;
+      }>({
+        method: "getCampaignCommonStats",
+        apiKey: input.apiKey,
+        parameters: [["campaign_id", input.campaignId]],
+        fetchFn,
+        signal: input.signal,
+      }),
+    ]);
+    if (campaignStatus.response.status >= 500 || commonStats.response.status >= 500) {
+      return { status: "ambiguous", message: "UniSender временно не вернул статус доставки.", ...empty };
+    }
+    if (!campaignStatus.response.ok || campaignStatus.body?.error || !campaignStatus.body?.result?.status) {
+      return { status: "rejected", message: providerMessage(campaignStatus.body, "UniSender не вернул статус кампании."), ...empty };
+    }
+    if (!commonStats.response.ok || commonStats.body?.error || !commonStats.body?.result) {
+      return { status: "rejected", message: providerMessage(commonStats.body, "UniSender не вернул статистику доставки."), ...empty };
+    }
+    const stats = commonStats.body.result;
+    const providerStatus = campaignStatus.body.result.status;
+    const sent = Number(stats.sent ?? 0);
+    const delivered = Number(stats.delivered ?? 0);
+    return {
+      status: "accepted",
+      externalId: input.campaignId,
+      providerStatus,
+      total: Number(stats.total ?? 0),
+      sent,
+      delivered,
+      readUnique: Number(stats.read_unique ?? 0),
+      clickedUnique: Number(stats.clicked_unique ?? 0),
+      unsubscribed: Number(stats.unsubscribed ?? 0),
+      spam: Number(stats.spam ?? 0),
+      message: providerStatus === "analysed"
+        ? `UniSender завершил рассылку: доставлено ${delivered} из ${sent}.`
+        : `UniSender обрабатывает рассылку, текущий статус: ${providerStatus}.`,
+    };
+  } catch (error) {
+    return { ...ambiguousFailure(error, "UniSender"), ...empty };
+  }
+}
+
 function escapeHtml(value: string) {
   return value
     .replaceAll("&", "&amp;")

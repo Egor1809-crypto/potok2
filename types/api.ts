@@ -601,7 +601,8 @@ export type CampaignEventRecord = {
     | "dispatch_started"
     | "dispatch_completed"
     | "dispatch_partial"
-    | "dispatch_blocked";
+    | "dispatch_blocked"
+    | "delivery_synced";
   message: string;
   details: Record<string, unknown>;
   occurredAt: string;
