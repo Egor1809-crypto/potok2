@@ -20,6 +20,16 @@ interface ExecutionContext {
   passThroughOnException(): void;
 }
 
+function runDueCampaignsInBackground(ctx: ExecutionContext) {
+  ctx.waitUntil(
+    import("../lib/server/mailflow-store")
+      .then(({ runDueScheduledCampaignsSystem }) => runDueScheduledCampaignsSystem())
+      .catch((error) => {
+        console.error("Automatic campaign scheduler failed.", error);
+      }),
+  );
+}
+
 // Image security config. SVG sources with .svg extension auto-skip the
 // optimization endpoint on the client side (served directly, no proxy).
 // To route SVGs through the optimizer (with security headers), set
@@ -41,15 +51,19 @@ const worker = {
       }, allowedWidths);
     }
 
-    return handler.fetch(request, env, ctx);
+    const response = await handler.fetch(request, env, ctx);
+
+    // Sites deployments can briefly miss a newly-published cron trigger. The
+    // calendar polls this authenticated endpoint every 30 seconds, so use that
+    // normal traffic as an idempotent safety net for already-approved plans.
+    if (request.method === "GET" && url.pathname === "/api/workspace" && response.ok) {
+      runDueCampaignsInBackground(ctx);
+    }
+
+    return response;
   },
   async scheduled(_controller: ScheduledController, _env: Env, ctx: ExecutionContext) {
-    // Keep the scheduler's database/provider graph out of the SSR entry. It is
-    // only needed when Cloudflare invokes the cron handler.
-    ctx.waitUntil(
-      import("../lib/server/mailflow-store")
-        .then(({ runDueScheduledCampaignsSystem }) => runDueScheduledCampaignsSystem()),
-    );
+    runDueCampaignsInBackground(ctx);
   },
 };
 

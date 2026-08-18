@@ -38,6 +38,8 @@ test("calendar connects scheduled campaigns, audience filters and the due queue"
   assert.match(store, /eq\(campaigns\.status, "scheduled"\)/);
   assert.match(store, /lte\(campaigns\.scheduledAt, now\)/);
   assert.match(worker, /scheduled\(_controller/);
+  assert.match(worker, /url\.pathname === "\/api\/workspace"/);
+  assert.match(worker, /runDueCampaignsInBackground\(ctx\)/);
   assert.match(assets, /storeInlineEmailAsset[\s\S]*ensureSystemDatabase\(\)/);
   assert.match(timezone, /resolvedOptions\(\)\.timeZone/);
   assert.match(calendar, /formatTime\(campaign\.scheduledAt!, timeZone\)/);
