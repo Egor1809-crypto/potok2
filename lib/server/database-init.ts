@@ -313,6 +313,10 @@ const schemaStatements = [
   `DROP INDEX IF EXISTS idx_contacts_workspace_vk`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_contacts_workspace_vk ON contacts(workspace_id, vk_user_id) WHERE vk_user_id IS NOT NULL`,
   `CREATE INDEX IF NOT EXISTS idx_contacts_workspace_status ON contacts(workspace_id, status)`,
+  `CREATE INDEX IF NOT EXISTS idx_contacts_workspace_status_updated ON contacts(workspace_id, status, updated_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_contacts_workspace_updated ON contacts(workspace_id, updated_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_contacts_workspace_city ON contacts(workspace_id, city)`,
+  `CREATE INDEX IF NOT EXISTS idx_contacts_workspace_company_name ON contacts(workspace_id, company_name)`,
   `CREATE INDEX IF NOT EXISTS idx_contacts_workspace_company ON contacts(workspace_id, company_id)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_segments_workspace_name ON segments(workspace_id, name)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_integrations_workspace_provider ON integrations(workspace_id, provider_id)`,
@@ -457,6 +461,10 @@ async function createSchema() {
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_participants_workspace_status ON participants(workspace_id, status)"),
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_contacts_workspace_creator ON contacts(workspace_id, created_by_participant_id)"),
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_contacts_workspace_responsible ON contacts(workspace_id, responsible_participant_id)"),
+    d1.prepare("CREATE INDEX IF NOT EXISTS idx_contacts_workspace_status_updated ON contacts(workspace_id, status, updated_at)"),
+    d1.prepare("CREATE INDEX IF NOT EXISTS idx_contacts_workspace_updated ON contacts(workspace_id, updated_at)"),
+    d1.prepare("CREATE INDEX IF NOT EXISTS idx_contacts_workspace_city ON contacts(workspace_id, city)"),
+    d1.prepare("CREATE INDEX IF NOT EXISTS idx_contacts_workspace_company_name ON contacts(workspace_id, company_name)"),
   ]);
   const campaignColumns = await d1
     .prepare("PRAGMA table_info(campaigns)")

@@ -1,5 +1,5 @@
-import { and, asc, desc, eq, inArray, lte, or } from "drizzle-orm";
-import { getDb } from "@/db";
+import { and, asc, desc, eq, inArray, lte, or, sql, type SQL } from "drizzle-orm";
+import { getD1, getDb } from "@/db";
 import {
   campaignEvents,
   campaignVersions,
@@ -32,6 +32,7 @@ import type {
   ContactCreateInput,
   ContactMutationResponse,
   ContactRecord,
+  ContactEndpointsResponse,
   ContactsBatchCreateResponse,
   ContactsBulkMutationResponse,
   ContactsListResponse,
@@ -430,7 +431,7 @@ function toSegment(
   };
 }
 
-async function loadCoreRows(participantId: string) {
+async function loadCoreRows(participantId: string, includeContacts: boolean) {
   const db = getDb();
   const [
     workspaceRows,
@@ -456,11 +457,13 @@ async function loadCoreRows(participantId: string) {
       .from(participants)
       .where(eq(participants.workspaceId, WORKSPACE_ID))
       .orderBy(participants.createdAt),
-    db
-      .select()
-      .from(contacts)
-      .where(eq(contacts.workspaceId, WORKSPACE_ID))
-      .orderBy(desc(contacts.updatedAt)),
+    includeContacts
+      ? db
+          .select()
+          .from(contacts)
+          .where(eq(contacts.workspaceId, WORKSPACE_ID))
+          .orderBy(desc(contacts.updatedAt))
+      : Promise.resolve([] as ContactRow[]),
     db
       .select()
       .from(segments)
@@ -519,7 +522,9 @@ export async function getWorkspaceSnapshot(
   request: Request,
 ): Promise<WorkspaceSnapshot> {
   const actor = await ensureDatabase(request);
-  const rows = await loadCoreRows(actor.participant.id);
+  const include = new URL(request.url).searchParams.get("include");
+  const includeContacts = include === "contacts" || include === "export";
+  const rows = await loadCoreRows(actor.participant.id, includeContacts);
   const contactRecords = rows.contactRows.map(toContact);
   const campaignRecords = rows.campaignRows.map(toCampaign);
   // Rows from providers removed from the product stay inert in older databases
@@ -527,6 +532,18 @@ export async function getWorkspaceSnapshot(
   const integrationRecords = rows.integrationRows
     .filter((row) => PROVIDERS.includes(row.providerId))
     .map(toIntegrationRecord);
+  const [contactStats] = includeContacts
+    ? [{
+        total: contactRecords.length,
+        active: contactRecords.filter((contact) => contact.status === "active").length,
+      }]
+    : await getDb()
+        .select({
+          total: sql<number>`count(*)`,
+          active: sql<number>`coalesce(sum(case when ${contacts.status} = 'active' then 1 else 0 end), 0)`,
+        })
+        .from(contacts)
+        .where(eq(contacts.workspaceId, WORKSPACE_ID));
   return {
     workspace: toWorkspace(rows.workspace),
     participant: toParticipant(rows.participant),
@@ -547,8 +564,8 @@ export async function getWorkspaceSnapshot(
       campaignEventsLimit: WORKSPACE_HISTORY_LIMIT,
     },
     stats: {
-      totalContacts: contactRecords.length,
-      activeContacts: contactRecords.filter((contact) => contact.status === "active").length,
+      totalContacts: Number(contactStats?.total ?? 0),
+      activeContacts: Number(contactStats?.active ?? 0),
       totalSegments: rows.segmentRows.length,
       totalCampaigns: campaignRecords.length,
       activeCampaigns: campaignRecords.filter((campaign) =>
@@ -856,15 +873,99 @@ async function duplicateOwnerMessage(row: ContactRow, fallback: string) {
     : fallback;
 }
 
-export async function listContacts(request: Request): Promise<ContactsListResponse> {
+const CONTACTS_PAGE_SIZE = 100;
+const CONTACTS_MAX_PAGE_SIZE = 250;
+
+function positiveInteger(value: string | null, fallback: number, maximum: number) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? Math.min(parsed, maximum) : fallback;
+}
+
+function contactListFilters(url: URL): SQL[] {
+  const filters: SQL[] = [eq(contacts.workspaceId, WORKSPACE_ID)];
+  const search = url.searchParams.get("q")?.trim().slice(0, 160) ?? "";
+  const status = url.searchParams.get("status")?.trim() ?? "";
+  const company = url.searchParams.get("company")?.trim().slice(0, 160) ?? "";
+  const city = url.searchParams.get("city")?.trim().slice(0, 120) ?? "";
+  const team = url.searchParams.get("team")?.trim().slice(0, 120) ?? "";
+  const sheet = url.searchParams.get("sheet")?.trim().slice(0, 140) ?? "";
+  const channel = url.searchParams.get("channel")?.trim() ?? "";
+  const owner = url.searchParams.get("owner")?.trim().slice(0, 120) ?? "";
+
+  if (search) {
+    filters.push(sql`(
+      instr(lower(${contacts.fullName}), lower(${search})) > 0 OR
+      instr(lower(${contacts.email}), lower(${search})) > 0 OR
+      instr(lower(${contacts.phone}), lower(${search})) > 0 OR
+      instr(lower(${contacts.companyName}), lower(${search})) > 0 OR
+      instr(lower(${contacts.jobTitle}), lower(${search})) > 0 OR
+      instr(lower(${contacts.city}), lower(${search})) > 0 OR
+      instr(lower(cast(${contacts.tags} as text)), lower(${search})) > 0
+    )`);
+  }
+  if (CONTACT_STATUSES.includes(status as ContactStatus)) filters.push(eq(contacts.status, status as ContactStatus));
+  if (company) filters.push(sql`instr(lower(${contacts.companyName}), lower(${company})) > 0`);
+  if (city) filters.push(eq(contacts.city, city));
+  if (team) filters.push(sql`exists (select 1 from json_each(${contacts.tags}) where value = ${`Команда: ${team}`})`);
+  if (sheet) filters.push(sql`exists (select 1 from json_each(${contacts.tags}) where value = ${sheet})`);
+  if (channel === "email") filters.push(sql`${contacts.email} <> ''`);
+  if (channel === "telegram") filters.push(sql`${contacts.telegramChatId} is not null and ${contacts.telegramChatId} <> ''`);
+  if (channel === "vk") filters.push(sql`${contacts.vkUserId} is not null and ${contacts.vkUserId} <> ''`);
+  if (channel === "phone") filters.push(sql`${contacts.phone} <> ''`);
+  if (owner) filters.push(sql`coalesce(${contacts.responsibleParticipantId}, ${contacts.createdByParticipantId}) = ${owner}`);
+  return filters;
+}
+
+export async function listContactEndpoints(request: Request): Promise<ContactEndpointsResponse> {
   await ensureDatabase(request);
   const db = getDb();
-  const [rows, workspaceRows, memberRows] = await Promise.all([
+  const [rows, memberRows] = await Promise.all([
+    db
+      .select({
+        email: contacts.email,
+        phone: contacts.phone,
+        telegramChatId: contacts.telegramChatId,
+        vkUserId: contacts.vkUserId,
+      })
+      .from(contacts)
+      .where(eq(contacts.workspaceId, WORKSPACE_ID)),
     db
       .select()
+      .from(participants)
+      .where(eq(participants.workspaceId, WORKSPACE_ID))
+      .orderBy(participants.createdAt),
+  ]);
+  return { contacts: rows, members: memberRows.map(toParticipant) };
+}
+
+export async function listContacts(request: Request): Promise<ContactsListResponse> {
+  await ensureDatabase(request);
+  const url = new URL(request.url);
+  const pageSize = positiveInteger(url.searchParams.get("pageSize"), CONTACTS_PAGE_SIZE, CONTACTS_MAX_PAGE_SIZE);
+  const requestedPage = positiveInteger(url.searchParams.get("page"), 1, 1_000_000);
+  const filters = contactListFilters(url);
+  const where = and(...filters);
+  const db = getDb();
+
+  const [filteredRows, summaryRows, workspaceRows, memberRows, companyRows, cityRows, tagFacets] = await Promise.all([
+    db.select({ count: sql<number>`count(*)` }).from(contacts).where(where),
+    db
+      .select({
+        total: sql<number>`count(*)`,
+        active: sql<number>`coalesce(sum(case when ${contacts.status} = 'active' then 1 else 0 end), 0)`,
+        assigned: sql<number>`coalesce(sum(case when ${contacts.responsibleParticipantId} is not null then 1 else 0 end), 0)`,
+        primaryBase: sql<number>`coalesce(sum(case when exists (select 1 from json_each(${contacts.tags}) where value = 'База №1') then 1 else 0 end), 0)`,
+        secondaryBase: sql<number>`coalesce(sum(case when exists (select 1 from json_each(${contacts.tags}) where value = 'База №2') then 1 else 0 end), 0)`,
+        emailFound: sql<number>`coalesce(sum(case when ${contacts.email} <> '' then 1 else 0 end), 0)`,
+        emailReady: sql<number>`coalesce(sum(case when ${contacts.status} = 'active' and ${contacts.email} <> '' and ${contacts.emailConsent} = 1 then 1 else 0 end), 0)`,
+        telegramFound: sql<number>`coalesce(sum(case when ${contacts.telegramChatId} is not null and ${contacts.telegramChatId} <> '' then 1 else 0 end), 0)`,
+        telegramReady: sql<number>`coalesce(sum(case when ${contacts.status} = 'active' and ${contacts.telegramChatId} is not null and ${contacts.telegramChatId} <> '' and ${contacts.telegramConsent} = 1 then 1 else 0 end), 0)`,
+        vkFound: sql<number>`coalesce(sum(case when ${contacts.vkUserId} is not null and ${contacts.vkUserId} <> '' then 1 else 0 end), 0)`,
+        vkReady: sql<number>`coalesce(sum(case when ${contacts.status} = 'active' and ${contacts.vkUserId} is not null and ${contacts.vkUserId} <> '' and ${contacts.vkConsent} = 1 then 1 else 0 end), 0)`,
+        phoneFound: sql<number>`coalesce(sum(case when ${contacts.phone} <> '' then 1 else 0 end), 0)`,
+      })
       .from(contacts)
-      .where(eq(contacts.workspaceId, WORKSPACE_ID))
-      .orderBy(desc(contacts.updatedAt)),
+      .where(eq(contacts.workspaceId, WORKSPACE_ID)),
     db
       .select({ timezone: workspaces.timezone })
       .from(workspaces)
@@ -875,11 +976,75 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
       .from(participants)
       .where(eq(participants.workspaceId, WORKSPACE_ID))
       .orderBy(participants.createdAt),
+    db
+      .select({ value: contacts.companyName, count: sql<number>`count(*)` })
+      .from(contacts)
+      .where(and(eq(contacts.workspaceId, WORKSPACE_ID), sql`${contacts.companyName} <> ''`))
+      .groupBy(contacts.companyName)
+      .orderBy(desc(sql<number>`count(*)`), asc(contacts.companyName))
+      .limit(300),
+    db
+      .select({ value: contacts.city })
+      .from(contacts)
+      .where(and(eq(contacts.workspaceId, WORKSPACE_ID), sql`${contacts.city} <> ''`))
+      .groupBy(contacts.city)
+      .orderBy(asc(contacts.city))
+      .limit(500),
+    getD1()
+      .prepare(`
+        SELECT json_each.value AS label, count(*) AS count
+        FROM contacts, json_each(contacts.tags)
+        WHERE contacts.workspace_id = ?
+          AND (json_each.value LIKE 'Импорт: %' OR json_each.value LIKE 'Команда: %' OR json_each.value GLOB 'База №[0-9]*')
+        GROUP BY json_each.value
+        ORDER BY json_each.value
+      `)
+      .bind(WORKSPACE_ID)
+      .all<{ label: string; count: number }>(),
   ]);
+
+  const filteredCount = Number(filteredRows[0]?.count ?? 0);
+  const totalPages = Math.max(1, Math.ceil(filteredCount / pageSize));
+  const page = Math.min(requestedPage, totalPages);
+  const rows = await db
+    .select()
+    .from(contacts)
+    .where(where)
+    .orderBy(desc(contacts.updatedAt), desc(contacts.id))
+    .limit(pageSize)
+    .offset((page - 1) * pageSize);
+  const summary = summaryRows[0];
+  const tagRows = tagFacets.results ?? [];
+
   return {
     contacts: rows.map(toContact),
     members: memberRows.map(toParticipant),
     timezone: workspaceRows[0]?.timezone ?? "Europe/Moscow",
+    page,
+    pageSize,
+    totalPages,
+    filteredCount,
+    summary: {
+      total: Number(summary?.total ?? 0),
+      active: Number(summary?.active ?? 0),
+      assigned: Number(summary?.assigned ?? 0),
+      primaryBase: Number(summary?.primaryBase ?? 0),
+      secondaryBase: Number(summary?.secondaryBase ?? 0),
+      coverage: {
+        email: { found: Number(summary?.emailFound ?? 0), ready: Number(summary?.emailReady ?? 0) },
+        telegram: { found: Number(summary?.telegramFound ?? 0), ready: Number(summary?.telegramReady ?? 0) },
+        vk: { found: Number(summary?.vkFound ?? 0), ready: Number(summary?.vkReady ?? 0) },
+        phone: { found: Number(summary?.phoneFound ?? 0), ready: 0 },
+      },
+    },
+    facets: {
+      companies: companyRows.map((row) => row.value),
+      cities: cityRows.map((row) => row.value),
+      teams: tagRows.filter((row) => row.label.startsWith("Команда: ")).map((row) => row.label.slice(9)),
+      sheets: tagRows
+        .filter((row) => row.label.startsWith("Импорт: ") || /^База №\d+$/u.test(row.label))
+        .map((row) => ({ label: row.label, count: Number(row.count) })),
+    },
   };
 }
 

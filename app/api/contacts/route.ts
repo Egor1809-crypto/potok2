@@ -3,6 +3,7 @@ import {
   createContact,
   createContactsBatch,
   deleteContact,
+  listContactEndpoints,
   listContacts,
   updateContact,
   updateContactsBatch,
@@ -12,7 +13,8 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
-    return Response.json(await listContacts(request), {
+    const scope = new URL(request.url).searchParams.get("scope");
+    return Response.json(scope === "endpoints" ? await listContactEndpoints(request) : await listContacts(request), {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {

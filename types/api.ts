@@ -766,10 +766,44 @@ export type ContactCreateInput = {
 
 export type ContactPatchInput = Partial<ContactCreateInput> & { id: string };
 
+export type ContactCoverageSummary = {
+  email: { found: number; ready: number };
+  telegram: { found: number; ready: number };
+  vk: { found: number; ready: number };
+  phone: { found: number; ready: number };
+};
+
+export type ContactListSummary = {
+  total: number;
+  active: number;
+  assigned: number;
+  primaryBase: number;
+  secondaryBase: number;
+  coverage: ContactCoverageSummary;
+};
+
+export type ContactListFacet = { label: string; count: number };
+
 export type ContactsListResponse = {
   contacts: ContactRecord[];
   members: ParticipantRecord[];
   timezone: string;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  filteredCount: number;
+  summary: ContactListSummary;
+  facets: {
+    companies: string[];
+    cities: string[];
+    teams: string[];
+    sheets: ContactListFacet[];
+  };
+};
+
+export type ContactEndpointsResponse = {
+  contacts: Array<Pick<ContactRecord, "email" | "phone" | "telegramChatId" | "vkUserId">>;
+  members: ParticipantRecord[];
 };
 export type ContactMutationResponse = { contact: ContactRecord };
 export type ContactsBatchCreateInput = {

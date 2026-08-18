@@ -463,7 +463,7 @@ function CampaignWizardState({
     setApiMode("loading");
     try {
       const [response, templatesResponse, presentationsResponse] = await Promise.all([
-        fetch("/api/workspace", { headers: { Accept: "application/json" } }),
+        fetch("/api/workspace?include=contacts", { headers: { Accept: "application/json" } }),
         fetch("/api/templates", { headers: { Accept: "application/json" } }),
         fetch("/api/presentations", { headers: { Accept: "application/json" } }),
       ]);

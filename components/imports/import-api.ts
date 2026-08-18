@@ -1,7 +1,7 @@
 import type {
   ContactCreateInput,
+  ContactEndpointsResponse,
   ContactsBatchCreateResponse,
-  ContactsListResponse,
   ParticipantRecord,
 } from "@/types/api";
 
@@ -32,12 +32,12 @@ export type ExistingContactEndpoints = {
 export async function getExistingContactEndpoints(
   signal?: AbortSignal,
 ): Promise<ExistingContactEndpoints> {
-  const response = await fetch("/api/contacts", {
+  const response = await fetch("/api/contacts?scope=endpoints", {
     method: "GET",
     headers: { Accept: "application/json" },
     signal,
   });
-  const payload = await readResponse<ContactsListResponse>(response);
+  const payload = await readResponse<ContactEndpointsResponse>(response);
   if (!Array.isArray(payload.contacts)) {
     throw new Error("Сервер вернул неверный список контактов.");
   }
