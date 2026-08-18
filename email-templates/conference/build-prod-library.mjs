@@ -6,6 +6,9 @@ const root = dirname(fileURLToPath(import.meta.url));
 const target = resolve(root, "../../data/conference-production-templates.generated.ts");
 const updatedAt = "2026-08-18T19:45:00.000Z";
 const conferenceUrl = "https://tech-pravo.ru/conference";
+const costReductionHero = `data:image/jpeg;base64,${(
+  await readFile(resolve(root, "conference-11-cost-reduction-hero.jpg"))
+).toString("base64")}`;
 
 const templates = [
   ["01-personal-invitation", "Личное приглашение", "Личное приглашение на «ТехнологИИ Права»", "Ваша профессиональная практика уже меняется — предлагаем увидеть рабочие решения в Москве."],
@@ -38,6 +41,7 @@ const values = [];
 for (const [slug, name, subject, previewText] of templates) {
   const source = await readFile(resolve(root, `conference-${slug}.html`), "utf8");
   const html = source
+    .replaceAll("__COST_REDUCTION_HERO__", costReductionHero)
     .replaceAll("{{Имя}}", "{{first_name}}")
     .replace(/https:\/\/tech-pravo\.ru\/conference\/uchastnik(?:\?[^\"']*)?/g, conferenceUrl)
     .replaceAll("https://tech-pravo.ru/programma-tehnologii-prava-2026.pdf", conferenceUrl);

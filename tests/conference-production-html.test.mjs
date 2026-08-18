@@ -42,6 +42,9 @@ test("conference HTML letters are seeded as editable user templates", async () =
   assert.match(generated, /Как сократить расходы на почтовые отправления на 50%/);
   assert.match(generated, /более чем на 5 млн рублей в год/);
   assert.match(generated, /25–26 сентября 2026 года/);
+  assert.match(generated, /alt=\\"Экономия более 5 млн рублей в год\\"/);
+  assert.match(generated, /data:image\/jpeg;base64,/);
+  assert.doesNotMatch(generated, /__COST_REDUCTION_HERO__/);
   assert.match(database, /conference-production-html-v1/);
   assert.match(database, /conference-production-html-v2-practice-lab/);
   assert.match(database, /conference-production-html-v3-executive-memo/);
@@ -54,7 +57,8 @@ test("conference HTML letters are seeded as editable user templates", async () =
   assert.match(database, /conference-production-html-v10-inbox-friendly-personal-invitation/);
   assert.match(database, /conference-production-html-v11-restore-personal-invitation-design/);
   assert.match(database, /conference-production-html-v12-links-and-cost-template/);
-  assert.match(database, /runtime-schema-v20-conference-links-cost-template-inline-images/);
+  assert.match(database, /conference-production-html-v13-cost-template-hero-image/);
+  assert.match(database, /runtime-schema-v21-cost-template-hero-image/);
   assert.match(database, /template-user-conference-11-cost-reduction/);
   assert.match(database, /isFavorite: true/);
   assert.match(database, /https:\/\/t\.me\/TechPravoAI/);

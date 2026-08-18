@@ -45,7 +45,7 @@ let initialization: Promise<void> | null = null;
 // template-seeding routine in every new isolate made even a simple page load
 // wait several seconds for D1. Keep a durable completion marker instead.
 // Bump this value whenever a runtime-only schema migration is added here.
-const RUNTIME_SCHEMA_VERSION = "runtime-schema-v20-conference-links-cost-template-inline-images";
+const RUNTIME_SCHEMA_VERSION = "runtime-schema-v21-cost-template-hero-image";
 const DEFAULT_SENDER_NAME = "ТехнологИИ Права";
 const DEFAULT_SENDER_EMAIL = "info@tech-pravo.ru";
 
@@ -1356,6 +1356,42 @@ async function seedDatabase(request: Request) {
     }
     await db.insert(systemState).values({
       key: "conference-production-html-v12-links-and-cost-template",
+      value: "updated",
+      updatedAt: now,
+    }).onConflictDoUpdate({
+      target: systemState.key,
+      set: { value: "updated", updatedAt: now },
+    });
+  }
+
+  const [costTemplateHeroImageState] = await db
+    .select({ key: systemState.key })
+    .from(systemState)
+    .where(eq(systemState.key, "conference-production-html-v13-cost-template-hero-image"))
+    .limit(1);
+  if (!costTemplateHeroImageState) {
+    const template = conferenceProductionTemplateValues.find(
+      (item) => item.id === "template-user-conference-11-cost-reduction",
+    );
+    if (template) {
+      await db
+        .update(emailTemplates)
+        .set({
+          subject: template.subject,
+          previewText: template.previewText,
+          builderDocument: template.builderDocument,
+          emailBodyHtml: template.emailBodyHtml,
+          emailBodyText: template.emailBodyText,
+          isFavorite: true,
+          updatedAt: now,
+        })
+        .where(and(
+          eq(emailTemplates.id, template.id),
+          eq(emailTemplates.workspaceId, WORKSPACE_ID),
+        ));
+    }
+    await db.insert(systemState).values({
+      key: "conference-production-html-v13-cost-template-hero-image",
       value: "updated",
       updatedAt: now,
     }).onConflictDoUpdate({
