@@ -146,6 +146,12 @@ export function CampaignDetailRoute() {
         if (body.deliveryJob) setDeliveryJob(body.deliveryJob);
         if (body.event) setEvents((current) => [body.event!, ...current.filter((event) => event.id !== body.event!.id)]);
         setDispatchNotice(body.deliveryJob?.statusMessage ?? body.campaign.statusReason);
+        if (body.deliveryJob?.status === "processing") {
+          window.setTimeout(() => {
+            syncedJobsRef.current.delete(deliveryJob.id);
+            void loadCampaign();
+          }, 15_000);
+        }
       } catch (error) {
         if (!(error instanceof DOMException && error.name === "AbortError")) {
           syncedJobsRef.current.delete(deliveryJob.id);
@@ -153,7 +159,7 @@ export function CampaignDetailRoute() {
       }
     })();
     return () => controller.abort();
-  }, [campaign, deliveryJob]);
+  }, [campaign, deliveryJob, loadCampaign]);
 
   return (
     <CampaignDetailView

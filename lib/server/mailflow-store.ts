@@ -3576,7 +3576,15 @@ export async function syncCampaignDelivery(
     throw new ApiRequestError(report.message, report.status === "ambiguous" ? 503 : 502);
   }
   const now = new Date().toISOString();
-  const isFinal = report.providerStatus === "analysed";
+  // UniSender can report `analysed` before its aggregate delivery counters
+  // catch up with the per-recipient delivery record. Do not turn that short
+  // reporting lag into a false hard failure in the UI.
+  const reportAgeMs = Date.now() - Date.parse(job.createdAt);
+  const deliveryCountersSettling = report.providerStatus === "analysed"
+    && report.sent > 0
+    && report.delivered === 0
+    && reportAgeMs < 2 * 60_000;
+  const isFinal = report.providerStatus === "analysed" && !deliveryCountersSettling;
   const undelivered = isFinal ? Math.max(0, report.sent - report.delivered) : 0;
   const jobStatus: DeliveryJobRecord["status"] = !isFinal
     ? "processing"
@@ -3589,7 +3597,9 @@ export async function syncCampaignDelivery(
     ? report.delivered === report.sent
       ? `UniSender подтвердил доставку ${report.delivered} из ${report.sent} писем.`
       : `UniSender завершил отправку: доставлено ${report.delivered} из ${report.sent}, не доставлено ${undelivered}.`
-    : `UniSender ещё обрабатывает рассылку: ${report.providerStatus}. Обновите статус через несколько минут.`;
+    : deliveryCountersSettling
+      ? `UniSender принял ${report.sent} писем и обновляет подтверждение доставки. Поток проверит статус автоматически.`
+      : `UniSender ещё обрабатывает рассылку: ${report.providerStatus}. Обновите статус через несколько минут.`;
 
   const [updatedJob] = await getDb().update(deliveryJobs).set({
     status: jobStatus,
