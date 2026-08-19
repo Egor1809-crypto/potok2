@@ -44,6 +44,8 @@ test("calendar connects scheduled campaigns, audience filters and the due queue"
   assert.match(wizard, /Показать в календаре/);
   assert.match(store, /eq\(campaigns\.status, "scheduled"\)/);
   assert.match(store, /lte\(campaigns\.scheduledAt, now\)/);
+  assert.match(store, /providerScheduledAt/);
+  assert.match(store, /provider_schedule_created/);
   assert.match(worker, /scheduled\(_controller/);
   assert.match(worker, /url\.pathname === "\/api\/workspace"/);
   assert.match(worker, /runDueCampaignsInBackground\(ctx\)/);

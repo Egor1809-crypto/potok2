@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  cancelUniSenderCampaign,
   createUniSenderCampaign,
   checkUniSenderEmail,
   deterministicVkRandomId,
@@ -160,6 +161,45 @@ test("UniSender maps MAILFLOW merge fields into imported provider fields", async
     "createEmailMessage",
     "createCampaign",
   ]);
+});
+
+test("UniSender receives scheduled campaigns in UTC", async () => {
+  const result = await createUniSenderCampaign({
+    apiKey: "api-key",
+    listId: "88",
+    senderName: "Поток",
+    senderEmail: "sender@example.test",
+    subject: "Письмо по расписанию",
+    textBody: "Текст",
+    scheduledAt: "2026-08-18T20:30:00.000Z",
+    recipients: [{ email: "reader@example.test", name: "Получатель", outboxId: "outbox-scheduled" }],
+    fetchFn: async (url, init) => {
+      const method = String(url).split("/").at(-1);
+      if (method === "importContacts") return jsonResponse({ result: { invalid: 0, log: [] } });
+      if (method === "createEmailMessage") return jsonResponse({ result: { message_id: 1234 } });
+      assert.equal(method, "createCampaign");
+      const body = new URLSearchParams(String(init.body));
+      assert.equal(body.get("start_time"), "2026-08-18 20:30");
+      assert.equal(body.get("timezone"), "UTC");
+      return jsonResponse({ result: { campaign_id: 5678, status: "scheduled" } });
+    },
+  });
+  assert.equal(result.status, "accepted");
+  assert.match(result.message, /по расписанию/);
+});
+
+test("UniSender scheduled campaign can be cancelled safely", async () => {
+  const result = await cancelUniSenderCampaign({
+    apiKey: "api-key",
+    campaignId: "5678",
+    fetchFn: async (url, init) => {
+      assert.match(String(url), /\/cancelCampaign$/);
+      const body = new URLSearchParams(String(init.body));
+      assert.equal(body.get("campaign_id"), "5678");
+      return jsonResponse({ result: [] });
+    },
+  });
+  assert.equal(result.status, "accepted");
 });
 
 test("UniSender attaches a generated PowerPoint file to the email message", async () => {

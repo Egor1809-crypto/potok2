@@ -478,6 +478,7 @@ export async function createUniSenderCampaign(input: {
   textBody: string;
   htmlBody?: string;
   attachments?: Array<{ filename: string; bytes: Uint8Array }>;
+  scheduledAt?: string;
   recipients: UniSenderRecipient[];
   fetchFn?: FetchLike;
   signal?: AbortSignal;
@@ -696,6 +697,16 @@ export async function createUniSenderCampaign(input: {
     }
     const messageId = String(message.body.result.message_id);
 
+    const scheduledAt = input.scheduledAt ? new Date(input.scheduledAt) : null;
+    if (scheduledAt && Number.isNaN(scheduledAt.getTime())) {
+      return {
+        status: "rejected",
+        message: "UniSender: некорректная дата запланированной отправки.",
+        messageId,
+        acceptedOutboxIds: [],
+        rejectedOutboxIds: allOutboxIds,
+      };
+    }
     const campaign = await callUniSender<{ campaign_id?: number }>({
       method: "createCampaign",
       apiKey: input.apiKey,
@@ -703,6 +714,10 @@ export async function createUniSenderCampaign(input: {
         ["message_id", messageId],
         ["track_read", 1],
         ["track_links", 1],
+        ...(scheduledAt ? [
+          ["start_time", scheduledAt.toISOString().slice(0, 16).replace("T", " ")],
+          ["timezone", "UTC"],
+        ] as Array<[string, string]> : []),
         // The configured list can contain contacts from other MAILFLOW
         // campaigns. The provider-supported contacts filter is therefore the
         // final, explicit audience boundary for this immutable dispatch.
@@ -735,7 +750,9 @@ export async function createUniSenderCampaign(input: {
       externalId: campaignId,
       messageId,
       campaignId,
-      message: "UniSender импортировал аудиторию и принял массовую email-кампанию.",
+      message: scheduledAt
+        ? `UniSender принял рассылку по расписанию на ${scheduledAt.toISOString()}.`
+        : "UniSender импортировал аудиторию и принял массовую email-кампанию.",
       acceptedOutboxIds: validRecipients.map((recipient) => recipient.outboxId),
       rejectedOutboxIds,
     };
@@ -745,6 +762,37 @@ export async function createUniSenderCampaign(input: {
       acceptedOutboxIds: [],
       rejectedOutboxIds: [],
     };
+  }
+}
+
+export async function cancelUniSenderCampaign(input: {
+  apiKey: string;
+  campaignId: string;
+  fetchFn?: FetchLike;
+  signal?: AbortSignal;
+}): Promise<ProviderCallResult> {
+  const fetchFn = input.fetchFn ?? fetch;
+  try {
+    const cancelled = await callUniSender<unknown>({
+      method: "cancelCampaign",
+      apiKey: input.apiKey,
+      parameters: [["campaign_id", input.campaignId]],
+      fetchFn,
+      signal: input.signal,
+    });
+    if (cancelled.response.status >= 500) {
+      return { status: "ambiguous", message: `UniSender вернул HTTP ${cancelled.response.status}; проверьте расписание перед повтором.` };
+    }
+    if (!cancelled.response.ok || cancelled.body?.error) {
+      return { status: "rejected", message: providerMessage(cancelled.body, "UniSender не отменил запланированную рассылку.") };
+    }
+    return {
+      status: "accepted",
+      externalId: input.campaignId,
+      message: "Запланированная рассылка отменена в UniSender.",
+    };
+  } catch (error) {
+    return ambiguousFailure(error, "UniSender");
   }
 }
 

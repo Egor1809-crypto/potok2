@@ -79,6 +79,7 @@ import {
 import { checkProviderConnection, automaticProviderSecrets } from "./provider-checks";
 import { extractInlineEmailImages } from "./inline-email-images";
 import {
+  cancelUniSenderCampaign,
   createUniSenderCampaign,
   checkUniSenderEmail,
   getUniSenderCampaignStats,
@@ -2841,6 +2842,31 @@ async function evaluateLaunch(
     },
   );
   const updated = await campaignBundle(campaignId);
+  const canScheduleAtProvider = status === "scheduled" &&
+    updated.campaign.purpose === "marketing" &&
+    updated.plans.length > 0 &&
+    updated.plans.every((plan) => plan.channel === "email" && plan.providerId === "unisender");
+  if (canScheduleAtProvider && updated.campaign.scheduledAt && readyVersion) {
+    const armed = await dispatchCampaign(
+      request,
+      campaignId,
+      `provider-schedule:${readyVersion.id}`,
+      { providerScheduledAt: updated.campaign.scheduledAt },
+    );
+    const providerBlockers = armed.campaign.status === "blocked"
+      ? [armed.campaign.statusReason || "UniSender не принял запланированную рассылку."]
+      : blockers;
+    return {
+      evaluation: {
+        status: armed.campaign.status === "blocked" ? "blocked" : status,
+        eligibleByChannel,
+        blockers: providerBlockers,
+      },
+      event: armed.event ?? event,
+      campaign: armed.campaign,
+      deliveryPlans: armed.deliveryPlans,
+    };
+  }
   return {
     evaluation: { status, eligibleByChannel, blockers },
     event,
@@ -2981,6 +3007,7 @@ async function processUniSenderOutbox(
   rows: DeliveryOutboxRecord[],
   integration: IntegrationRecord,
   version: CampaignVersionRecord,
+  scheduledAt?: string,
 ) {
   if (!rows.length) return {} as Record<string, string>;
   const selectedContactRows: ContactRow[] = [];
@@ -3055,6 +3082,7 @@ async function processUniSenderOutbox(
     textBody: version.snapshot.emailBodyText,
     htmlBody: preparedEmail.html,
     attachments: emailAttachments.length ? emailAttachments : undefined,
+    scheduledAt,
     recipients: rows.map((row) => ({
       email: row.recipientEndpoint,
       name: contactsById.get(row.contactId)?.fullName ?? "",
@@ -3162,9 +3190,37 @@ async function dispatchCampaign(
   request: Request,
   campaignId: string,
   requestedIdempotencyKey: unknown,
+  options?: { providerScheduledAt?: string },
 ): Promise<CampaignMutationResponse> {
   const db = getDb();
-  const current = await campaignBundle(campaignId);
+  let current = await campaignBundle(campaignId);
+  const existingJobResponse = async (job: DeliveryJobRow): Promise<CampaignMutationResponse> => {
+    const providerCampaignId = job.providerExternalIds?.unisender?.campaignId;
+    const scheduleIsDue = current.campaign.status === "scheduled" &&
+      Boolean(current.campaign.scheduledAt) &&
+      Date.parse(current.campaign.scheduledAt ?? "") <= Date.now();
+    if (providerCampaignId && scheduleIsDue) {
+      const now = new Date().toISOString();
+      const statusReason = "Наступило время отправки; рассылка выполняется по расписанию UniSender.";
+      await db.update(campaigns).set({
+        status: "sending",
+        statusReason,
+        sentAt: current.campaign.scheduledAt,
+        updatedAt: now,
+      }).where(eq(campaigns.id, campaignId));
+      await appendEvent(campaignId, "provider_schedule_due", statusReason, {
+        provider: "unisender",
+        campaignId: providerCampaignId,
+        scheduledAt: current.campaign.scheduledAt,
+      });
+      current = await campaignBundle(campaignId);
+    }
+    return {
+      campaign: current.campaign,
+      deliveryPlans: current.plans,
+      deliveryJob: toDeliveryJob(job),
+    };
+  };
   const clientKey = requestedIdempotencyKey === undefined
     ? ""
     : cleanText(requestedIdempotencyKey, "Ключ идемпотентности", 200);
@@ -3186,11 +3242,7 @@ async function dispatchCampaign(
           409,
         );
       }
-      return {
-        campaign: current.campaign,
-        deliveryPlans: current.plans,
-        deliveryJob: toDeliveryJob(jobByKey),
-      };
+      return existingJobResponse(jobByKey);
     }
   }
   if (current.campaign.readyVersionId) {
@@ -3205,17 +3257,17 @@ async function dispatchCampaign(
       )
       .limit(1);
     if (jobByVersion) {
-      return {
-        campaign: current.campaign,
-        deliveryPlans: current.plans,
-        deliveryJob: toDeliveryJob(jobByVersion),
-      };
+      return existingJobResponse(jobByVersion);
     }
   }
   const scheduledIsDue = current.campaign.status === "scheduled" &&
     Boolean(current.campaign.scheduledAt) &&
     Date.parse(current.campaign.scheduledAt ?? "") <= Date.now();
-  if ((current.campaign.status !== "ready" && !scheduledIsDue) || !current.campaign.readyVersionId) {
+  const schedulingAtProvider = current.campaign.status === "scheduled" &&
+    Boolean(options?.providerScheduledAt) &&
+    options?.providerScheduledAt === current.campaign.scheduledAt &&
+    Date.parse(options.providerScheduledAt) > Date.now();
+  if ((current.campaign.status !== "ready" && !scheduledIsDue && !schedulingAtProvider) || !current.campaign.readyVersionId) {
     throw new ApiRequestError(
       current.campaign.status === "scheduled"
         ? "Время запланированной отправки ещё не наступило."
@@ -3432,6 +3484,7 @@ async function dispatchCampaign(
           unisenderRows,
           integration,
           version,
+          schedulingAtProvider ? options?.providerScheduledAt : undefined,
         ),
       };
     }
@@ -3484,8 +3537,9 @@ async function dispatchCampaign(
           ? "partial"
           : "failed"
         : "completed";
-  const statusMessage =
-    jobStatus === "completed"
+  const statusMessage = schedulingAtProvider && jobStatus === "completed"
+    ? `UniSender принял рассылку по расписанию на ${options?.providerScheduledAt}. Отправка не зависит от открытой вкладки.`
+    : jobStatus === "completed"
       ? `Провайдеры приняли ${acceptedCount} сообщений. Это ещё не подтверждение доставки.`
       : jobStatus === "manual_required"
         ? `Подготовлено ${manualCount} ${russianPlural(manualCount, "строка", "строки", "строк")} для ручного экспорта; автоматические запросы не выполнялись.`
@@ -3506,8 +3560,9 @@ async function dispatchCampaign(
     })
     .where(eq(deliveryJobs.id, jobId))
     .returning();
-  const campaignStatus: CampaignRecord["status"] =
-    jobStatus === "completed" || jobStatus === "partial"
+  const campaignStatus: CampaignRecord["status"] = schedulingAtProvider && jobStatus === "completed"
+    ? "scheduled"
+    : jobStatus === "completed" || jobStatus === "partial"
       ? "completed"
       : jobStatus === "manual_required"
         ? "ready"
@@ -3519,15 +3574,15 @@ async function dispatchCampaign(
     .set({
       status: campaignStatus,
       statusReason: statusMessage,
-      sentAt: acceptedCount ? completedAt : null,
+      sentAt: schedulingAtProvider ? null : acceptedCount ? completedAt : null,
       metrics: {
         ...current.campaign.metrics,
-        sent: acceptedContactIds.length,
+        sent: schedulingAtProvider ? 0 : acceptedContactIds.length,
       },
       updatedAt: completedAt,
     })
     .where(eq(campaigns.id, campaignId));
-  if (acceptedRows.length) {
+  if (acceptedRows.length && !schedulingAtProvider) {
     await db
       .update(contacts)
       .set({ lastContactedAt: completedAt, updatedAt: completedAt })
@@ -3535,7 +3590,9 @@ async function dispatchCampaign(
   }
   const event = await appendEvent(
     campaignId,
-    jobStatus === "completed" ? "dispatch_completed" : "dispatch_partial",
+    schedulingAtProvider && jobStatus === "completed"
+      ? "provider_schedule_created"
+      : jobStatus === "completed" ? "dispatch_completed" : "dispatch_partial",
     statusMessage,
     {
       jobId,
@@ -3850,7 +3907,41 @@ export async function updateCampaign(
       409,
     );
   }
+  const [existingDeliveryJob] = await getDb()
+    .select()
+    .from(deliveryJobs)
+    .where(and(
+      eq(deliveryJobs.workspaceId, WORKSPACE_ID),
+      eq(deliveryJobs.campaignId, id),
+    ))
+    .orderBy(desc(deliveryJobs.createdAt))
+    .limit(1);
+  const scheduledProviderCampaignId = existingDeliveryJob?.providerExternalIds?.unisender?.campaignId;
+  if (
+    current.campaign.status === "scheduled" &&
+    scheduledProviderCampaignId &&
+    action !== "cancel"
+  ) {
+    throw new ApiRequestError(
+      "Рассылка уже поставлена в расписание UniSender. Сначала отмените её, затем внесите изменения и запланируйте заново.",
+      409,
+    );
+  }
   if (action === "cancel") {
+    if (scheduledProviderCampaignId) {
+      const credentials = automaticProviderSecrets("unisender") as { apiKey?: string };
+      const cancelled = await cancelUniSenderCampaign({
+        apiKey: credentials.apiKey ?? "",
+        campaignId: scheduledProviderCampaignId,
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (cancelled.status !== "accepted") {
+        throw new ApiRequestError(
+          `${cancelled.message} Кампания в Потоке не отменена, чтобы не потерять контроль над отправкой.`,
+          cancelled.status === "ambiguous" ? 503 : 502,
+        );
+      }
+    }
     const now = new Date().toISOString();
     await getDb()
       .update(campaigns)
@@ -3863,8 +3954,10 @@ export async function updateCampaign(
     const event = await appendEvent(
       id,
       "campaign_cancelled",
-      "Кампания отменена.",
-      {},
+      scheduledProviderCampaignId
+        ? "Кампания отменена в Потоке и UniSender."
+        : "Кампания отменена.",
+      scheduledProviderCampaignId ? { provider: "unisender", campaignId: scheduledProviderCampaignId } : {},
     );
     const updated = await campaignBundle(id);
     return { campaign: updated.campaign, deliveryPlans: updated.plans, event };
@@ -3930,9 +4023,11 @@ export async function deleteCampaign(
   await ensureDatabase(request);
   const id = cleanText(idValue, "Идентификатор кампании", 120);
   const current = await campaignBundle(id);
-  if (["sending", "completed"].includes(current.campaign.status)) {
+  if (["scheduled", "sending", "completed"].includes(current.campaign.status)) {
     throw new ApiRequestError(
-      "Отправляемую или завершённую кампанию нельзя удалить.",
+      current.campaign.status === "scheduled"
+        ? "Сначала отмените запланированную рассылку, затем её можно удалить."
+        : "Отправляемую или завершённую кампанию нельзя удалить.",
       409,
     );
   }
