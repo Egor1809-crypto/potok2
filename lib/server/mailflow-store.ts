@@ -558,7 +558,9 @@ export async function getWorkspaceSnapshot(
   return {
     workspace: toWorkspace(rows.workspace),
     participant: toParticipant(rows.participant),
-    members: rows.memberRows.filter((member) => member.passwordHash).map(toParticipant),
+    // Audience filters must include every active responsible person, including
+    // directory members who have not created their own login yet.
+    members: rows.memberRows.filter((member) => member.status === "active").map(toParticipant),
     contacts: contactRecords,
     segments: rows.segmentRows.map((segment) =>
       toSegment(segment, contactRecords, rows.campaignRows),

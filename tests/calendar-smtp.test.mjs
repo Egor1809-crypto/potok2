@@ -46,6 +46,7 @@ test("calendar connects scheduled campaigns, audience filters and the due queue"
   assert.match(store, /lte\(campaigns\.scheduledAt, now\)/);
   assert.match(store, /providerScheduledAt/);
   assert.match(store, /provider_schedule_created/);
+  assert.match(store, /member\.status === "active"/);
   assert.match(worker, /scheduled\(_controller/);
   assert.match(worker, /url\.pathname === "\/api\/workspace"/);
   assert.match(worker, /runDueCampaignsInBackground\(ctx\)/);
@@ -54,6 +55,13 @@ test("calendar connects scheduled campaigns, audience filters and the due queue"
   assert.match(calendar, /formatTime\(campaign\.scheduledAt!, timeZone\)/);
   assert.match(calendar, /Часовой пояс определён автоматически/);
   assert.match(wizard, /Часовой пояс:/);
+  assert.match(wizard, /Базы ответственных/);
+  assert.match(wizard, /Выбрать базу/);
+  assert.match(wizard, /Все ответственные/);
+  assert.match(wizard, /Все команды/);
+  assert.match(wizard, /Все листы баз/);
+  assert.match(wizard, /Есть Email/);
+  assert.match(wizard, /Ответственный:/);
   assert.match(topbar, /href="\/calendar"/);
   assert.doesNotMatch(navigation, /href: "\/calendar"/);
 });
