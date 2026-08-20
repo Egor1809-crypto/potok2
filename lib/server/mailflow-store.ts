@@ -55,6 +55,7 @@ import type {
   WorkspacePatchResponse,
   WorkspaceRecord,
   WorkspaceSnapshot,
+  UniSenderLifetimeStatsResponse,
 } from "@/types/api";
 import {
   ApiRequestError,
@@ -110,6 +111,7 @@ import {
 } from "./template-store";
 import { getPresentationProject } from "./presentation-store";
 import { buildPresentationPptx, safePresentationFilename } from "./presentation-pptx";
+import { sumUniSenderLifetimeMetrics } from "./lifetime-metrics";
 
 type ContactRow = typeof contacts.$inferSelect;
 type SegmentRow = typeof segments.$inferSelect;
@@ -590,6 +592,7 @@ export async function getWorkspaceSnapshot(
       connectedIntegrations: integrationRecords.filter(
         (integration) => integration.status === "connected",
       ).length,
+      unisenderLifetime: sumUniSenderLifetimeMetrics(campaignRecords),
     },
   };
 }
@@ -691,6 +694,7 @@ export async function getWorkspaceBootstrap(request: Request) {
         totalCampaigns: campaignRecords.length,
         activeCampaigns: campaignRecords.filter((campaign) => ["ready", "scheduled", "sending"].includes(campaign.status)).length,
         connectedIntegrations: integrationRecords.filter((integration) => integration.status === "connected").length,
+        unisenderLifetime: sumUniSenderLifetimeMetrics(campaignRecords),
       },
     };
   }
@@ -710,6 +714,32 @@ export async function getWorkspaceBootstrap(request: Request) {
     campaigns: sourceCampaignRows.map(toCampaign),
     deliveryPlans: sourcePlanRows.map(toDeliveryPlan),
   };
+}
+
+/** Refresh a small provider-safe batch and return the all-time UniSender totals. */
+export async function getUniSenderLifetimeStats(
+  request: Request,
+): Promise<UniSenderLifetimeStatsResponse> {
+  await ensureDatabase(request);
+  const pendingRows = await getDb().select({
+    campaignId: deliveryJobs.campaignId,
+  }).from(deliveryJobs).where(and(
+    eq(deliveryJobs.workspaceId, WORKSPACE_ID),
+    eq(deliveryJobs.status, "processing"),
+    sql`json_extract(${deliveryJobs.providerExternalIds}, '$.unisender') is not null`,
+  )).orderBy(asc(deliveryJobs.updatedAt)).limit(3);
+
+  // Provider statistics are read-only. A bounded batch keeps the dashboard
+  // responsive and gradually reconciles older pending campaigns on each visit.
+  for (const row of pendingRows) {
+    try {
+      await syncCampaignDelivery(request, row.campaignId);
+    } catch {
+      // A temporary provider error must not hide the saved lifetime totals.
+    }
+  }
+
+  return { stats: sumUniSenderLifetimeMetrics(await campaignSummaryRecords()) };
 }
 
 function contactStatus(value: unknown, fallback?: ContactStatus): ContactStatus {

@@ -707,6 +707,20 @@ export type WorkspaceStats = {
   totalCampaigns: number;
   activeCampaigns: number;
   connectedIntegrations: number;
+  unisenderLifetime: UniSenderLifetimeStats;
+};
+
+export type UniSenderLifetimeStats = {
+  campaigns: number;
+  sent: number;
+  delivered: number;
+  opened: number;
+  clicked: number;
+  updatedAt: string | null;
+};
+
+export type UniSenderLifetimeStatsResponse = {
+  stats: UniSenderLifetimeStats;
 };
 
 export type WorkspaceHistoryWindow = {

@@ -11,9 +11,11 @@ import {
   ContactRound,
   FileText,
   GalleryHorizontalEnd,
+  Eye,
   ImagePlus,
   LibraryBig,
   MailPlus,
+  MailCheck,
   LayoutTemplate,
   LoaderCircle,
   Megaphone,
@@ -23,6 +25,7 @@ import {
   RefreshCw,
   Send,
   SearchCheck,
+  MousePointerClick,
   SendHorizontal,
   Upload,
   UsersRound,
@@ -36,6 +39,7 @@ import type {
   CampaignStatus,
   ImageStudioStatusResponse,
   PresentationsListResponse,
+  UniSenderLifetimeStatsResponse,
   WorkspaceSnapshot,
 } from "@/types/api";
 
@@ -93,6 +97,25 @@ export function DashboardView() {
   const [creativeCounts, setCreativeCounts] = useState({ presentations: 0, images: 0 });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [providerRefreshing, setProviderRefreshing] = useState(false);
+
+  const refreshProviderStats = useCallback(async () => {
+    setProviderRefreshing(true);
+    try {
+      const response = await fetch("/api/analytics/unisender-summary", {
+        method: "POST",
+        headers: { Accept: "application/json" },
+      });
+      if (!response.ok) return;
+      const payload = await response.json() as UniSenderLifetimeStatsResponse;
+      setSnapshot((current) => current ? {
+        ...current,
+        stats: { ...current.stats, unisenderLifetime: payload.stats },
+      } : current);
+    } finally {
+      setProviderRefreshing(false);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -102,6 +125,7 @@ export function DashboardView() {
       const payload: unknown = await response.json().catch(() => null);
       if (!response.ok) throw new Error(errorMessage(payload));
       setSnapshot(unwrap(payload));
+      void refreshProviderStats();
       const [presentationsResult, imagesResult] = await Promise.allSettled([
         fetch("/api/presentations", { cache: "no-store" }).then(async (result) => {
           if (!result.ok) throw new Error("Презентации недоступны");
@@ -121,7 +145,7 @@ export function DashboardView() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [refreshProviderStats]);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => void load());
@@ -158,6 +182,16 @@ export function DashboardView() {
       integration.deliveryMode === "automatic" &&
       integration.channels.includes("email"),
   );
+  const providerStats = snapshot.stats.unisenderLifetime;
+  const deliveryRate = providerStats.sent ? Math.round((providerStats.delivered / providerStats.sent) * 100) : 0;
+  const openRate = providerStats.delivered ? Math.round((providerStats.opened / providerStats.delivered) * 100) : 0;
+  const clickRate = providerStats.delivered ? Math.round((providerStats.clicked / providerStats.delivered) * 100) : 0;
+  const providerMetrics = [
+    { label: "Отправлено", value: providerStats.sent, note: `${number.format(providerStats.campaigns)} кампаний`, Icon: SendHorizontal, tone: "bg-primary-subtle text-primary" },
+    { label: "Доставлено", value: providerStats.delivered, note: `${deliveryRate}% от отправленных`, Icon: MailCheck, tone: "bg-success-subtle text-success" },
+    { label: "Прочитано", value: providerStats.opened, note: `${openRate}% от доставленных`, Icon: Eye, tone: "bg-info-subtle text-info" },
+    { label: "Переходы", value: providerStats.clicked, note: `${clickRate}% от доставленных`, Icon: MousePointerClick, tone: "bg-surface-subtle text-text-strong" },
+  ];
   const metrics = [
     { label: "Шаблоны", value: number.format(snapshot.templates.length), note: "Макеты можно редактировать и клонировать", Icon: LibraryBig, href: "/templates", iconTone: "bg-primary-subtle text-text-strong border-border-strong" },
     { label: "Презентации", value: number.format(creativeCounts.presentations), note: "Сохранённые редактируемые проекты", Icon: GalleryHorizontalEnd, href: "/presentations", iconTone: "bg-surface-subtle text-text-strong border-border-strong" },
@@ -176,6 +210,30 @@ export function DashboardView() {
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-muted)]">Письмо, презентация и изображения живут в одной студии. Найденные контакты проходят вашу проверку, а готовые материалы можно повторно использовать в проектах.</p>
         </div>
         <div className="flex flex-wrap gap-2"><Link href="/templates" className="btn btn-secondary w-fit gap-2"><LayoutTemplate aria-hidden="true" className="size-4" />Выбрать шаблон</Link><Link href="/email-builder?new=1" className="btn btn-primary w-fit gap-2"><Plus aria-hidden="true" className="size-4" />Создать письмо</Link><Link href="/campaigns" className="btn btn-secondary w-fit gap-2"><SendHorizontal aria-hidden="true" className="size-4" />Рассылка писем</Link></div>
+      </section>
+
+      <section className="card overflow-hidden" aria-labelledby="unisender-lifetime-title">
+        <div className="flex flex-col gap-3 border-b border-[var(--border)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <div>
+            <p className="section-eyebrow">UniSender · за всё время</p>
+            <h2 id="unisender-lifetime-title" className="mt-1 text-[17px] font-semibold">Общие результаты рассылок</h2>
+            <p className="mt-1 text-[11px] text-[var(--text-subtle)]">Данные провайдера по всем синхронизированным email-кампаниям.</p>
+          </div>
+          <button type="button" onClick={() => void refreshProviderStats()} disabled={providerRefreshing} className="btn btn-secondary w-fit gap-2">
+            <RefreshCw aria-hidden="true" className={`size-4 ${providerRefreshing ? "animate-spin" : ""}`} />
+            {providerRefreshing ? "Обновляем…" : "Обновить данные"}
+          </button>
+        </div>
+        <div className="grid gap-px bg-[var(--border)] sm:grid-cols-2 xl:grid-cols-4">
+          {providerMetrics.map(({ label, value, note, Icon, tone }) => (
+            <article key={label} className="bg-[var(--surface)] p-5 sm:p-6">
+              <span className={`grid size-10 place-items-center rounded-xl ${tone}`}><Icon aria-hidden="true" className="size-5" /></span>
+              <p className="mt-5 text-[30px] font-semibold tracking-[-.045em]">{number.format(value)}</p>
+              <p className="mt-1 text-[12px] font-semibold">{label}</p>
+              <p className="mt-1 text-[10px] text-[var(--text-subtle)]">{note}</p>
+            </article>
+          ))}
+        </div>
       </section>
 
       <section id="creative-studio" className="grid scroll-mt-24 gap-3 md:grid-cols-2 xl:grid-cols-4" aria-label="Творческие модули">
