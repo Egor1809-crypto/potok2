@@ -415,6 +415,9 @@ function CampaignWizardState({
 
   const [apiMode, setApiMode] = React.useState<ApiMode>("loading");
   const [workspaceContacts, setWorkspaceContacts] = React.useState<AudienceContact[]>([]);
+  const [workspaceContactCount, setWorkspaceContactCount] = React.useState(0);
+  const [workspaceContactsPage, setWorkspaceContactsPage] = React.useState(1);
+  const [workspaceContactsLoadingMore, setWorkspaceContactsLoadingMore] = React.useState(false);
   const [workspaceMembers, setWorkspaceMembers] = React.useState<ParticipantRecord[]>([]);
   const [workspaceSegments, setWorkspaceSegments] = React.useState<AudienceSegment[]>([]);
   const [workspaceTemplates, setWorkspaceTemplates] = React.useState<EmailTemplateRecord[]>([]);
@@ -516,7 +519,7 @@ function CampaignWizardState({
       if (sourceId) bootstrapParams.set("sourceId", sourceId);
       const [response, contactsResponse, templatesResponse, presentationsResponse] = await Promise.all([
         fetch(`/api/workspace?${bootstrapParams.toString()}`, { headers: { Accept: "application/json" } }),
-        fetch("/api/contacts?page=1&pageSize=250&meta=0", { headers: { Accept: "application/json" }, cache: "no-store" }),
+        fetch("/api/contacts?page=1&pageSize=250&meta=0&delivery=pending", { headers: { Accept: "application/json" }, cache: "no-store" }),
         fetch("/api/templates", { headers: { Accept: "application/json" } }),
         fetch("/api/presentations", { headers: { Accept: "application/json" } }),
       ]);
@@ -540,7 +543,11 @@ function CampaignWizardState({
       } else {
         setWorkspacePresentations([]);
       }
-      if (Array.isArray(contactsBody.contacts)) setWorkspaceContacts(contactsBody.contacts);
+      if (Array.isArray(contactsBody.contacts)) {
+        setWorkspaceContacts(contactsBody.contacts);
+        setWorkspaceContactCount(contactsBody.filteredCount);
+        setWorkspaceContactsPage(1);
+      }
       if (Array.isArray(body.members)) setWorkspaceMembers(body.members);
       if (Array.isArray(body.segments)) setWorkspaceSegments(body.segments);
       setIntegrations((body.integrations ?? []).flatMap((record) => {
@@ -619,6 +626,43 @@ function CampaignWizardState({
     const frame = window.requestAnimationFrame(() => void loadWorkspace());
     return () => window.cancelAnimationFrame(frame);
   }, [loadWorkspace]);
+
+  const loadMorePendingContacts = React.useCallback(async () => {
+    if (workspaceContactsLoadingMore || workspaceContacts.length >= workspaceContactCount) return;
+    setWorkspaceContactsLoadingMore(true);
+    try {
+      const nextPage = workspaceContactsPage + 1;
+      const response = await fetch(`/api/contacts?page=${nextPage}&pageSize=250&meta=0&delivery=pending`, {
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      });
+      const body = await response.json() as ContactsListResponse | ApiError;
+      if (!response.ok || !("contacts" in body)) throw new Error("Не удалось загрузить следующую часть базы.");
+      setWorkspaceContacts((current) => {
+        const byId = new Map(current.map((contact) => [contact.id, contact]));
+        body.contacts.forEach((contact) => byId.set(contact.id, contact));
+        return [...byId.values()];
+      });
+      setWorkspaceContactCount(body.filteredCount);
+      setWorkspaceContactsPage(body.page);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Не удалось загрузить следующую часть базы.");
+    } finally {
+      setWorkspaceContactsLoadingMore(false);
+    }
+  }, [workspaceContactCount, workspaceContacts.length, workspaceContactsLoadingMore, workspaceContactsPage]);
+
+  const refreshPendingContacts = React.useCallback(async () => {
+    const response = await fetch("/api/contacts?page=1&pageSize=250&meta=0&delivery=pending", {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+    if (!response.ok) return;
+    const body = await response.json() as ContactsListResponse;
+    setWorkspaceContacts(body.contacts);
+    setWorkspaceContactCount(body.filteredCount);
+    setWorkspaceContactsPage(1);
+  }, []);
 
   React.useEffect(() => {
     if (!shouldApplyTemplateQuery(queryTemplateId, consumedTemplateQueryId) || sourceId || builderResult || templateLoadState !== "ready") return;
@@ -957,6 +1001,8 @@ function CampaignWizardState({
           }
           completedCampaign = dispatchBody.campaign;
           dispatched = true;
+          await refreshPendingContacts();
+          setContactIds([]);
         }
         try {
           window.sessionStorage.removeItem(handoffStorageKey);
@@ -1134,6 +1180,9 @@ function CampaignWizardState({
               selectedSegmentId={segmentId}
               onSegmentChange={setSegmentId}
               contacts={workspaceContacts}
+              totalContactCount={workspaceContactCount}
+              loadingMore={workspaceContactsLoadingMore}
+              onLoadMore={() => void loadMorePendingContacts()}
               members={workspaceMembers}
               contactIds={contactIds}
               onToggleContact={toggleContact}
@@ -1384,6 +1433,9 @@ function AudienceStep({
   selectedSegmentId,
   onSegmentChange,
   contacts,
+  totalContactCount,
+  loadingMore,
+  onLoadMore,
   members,
   contactIds,
   onToggleContact,
@@ -1395,6 +1447,9 @@ function AudienceStep({
   selectedSegmentId: string;
   onSegmentChange: (value: string) => void;
   contacts: AudienceContact[];
+  totalContactCount: number;
+  loadingMore: boolean;
+  onLoadMore: () => void;
   members: ParticipantRecord[];
   contactIds: string[];
   onToggleContact: (id: string) => void;
@@ -1579,7 +1634,7 @@ function AudienceStep({
               <Select value={sheet} onChange={(event) => setSheet(event.target.value)} options={[{ value: "", label: "Все листы баз" }, ...sheets.map((value) => ({ value, label: value.replace(/^Импорт: /, "") }))]} />
             </div>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-[11px] text-text-muted">Найдено: {formatNumber(filteredContacts.length)} · выбрано: {formatNumber(contactIds.length)}</span>
+              <span className="text-[11px] text-text-muted">Всего к отправке: {formatNumber(totalContactCount)} · загружено: {formatNumber(contacts.length)} · показано: {formatNumber(filteredContacts.length)} · выбрано: {formatNumber(contactIds.length)}</span>
               <div className="flex gap-2">
                 {filtersActive ? (
                   <Button
@@ -1606,7 +1661,7 @@ function AudienceStep({
                   disabled={filteredIds.length === 0}
                   onClick={() => onSetContacts(allVisibleSelected ? contactIds.filter((id) => !filteredIdSet.has(id)) : [...new Set([...contactIds, ...filteredIds])])}
                 >
-                  {allVisibleSelected ? "Убрать найденных" : "Добавить всех найденных"}
+                  {allVisibleSelected ? "Убрать показанных" : "Добавить показанных"}
                 </Button>
               </div>
             </div>
@@ -1630,6 +1685,14 @@ function AudienceStep({
             ))}
             {filteredContacts.length === 0 ? <p className="m-0 px-4 py-8 text-center text-[12px] text-text-muted">По выбранным фильтрам контактов нет.</p> : null}
           </div>
+          {contacts.length < totalContactCount ? (
+            <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-border bg-surface-subtle/45 px-4 py-3">
+              <p className="m-0 text-[11px] text-text-muted">Осталось загрузить: {formatNumber(totalContactCount - contacts.length)}. Уже отправленные контакты исключены.</p>
+              <Button type="button" variant="outline" size="sm" disabled={loadingMore} onClick={onLoadMore}>
+                {loadingMore ? "Загружаем…" : "Показать ещё 250"}
+              </Button>
+            </div>
+          ) : null}
         </fieldset>
       ) : (
         <Alert tone="info" title="Аудитория пока не выбрана" className="mt-6">
