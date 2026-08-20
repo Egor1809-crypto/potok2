@@ -1,0 +1,1 @@
+CREATE INDEX `idx_contacts_workspace_last_contacted` ON `contacts` (`workspace_id`,`last_contacted_at`);

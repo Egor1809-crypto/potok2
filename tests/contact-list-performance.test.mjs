@@ -73,15 +73,18 @@ test("large contact payloads are loaded only by workflows that require them", as
 });
 
 test("contact filters and ordering have database indexes", async () => {
-  const [schema, runtimeSchema, migration] = await Promise.all([
+  const [schema, runtimeSchema, originalMigration, sentMigration] = await Promise.all([
     readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
     readFile(new URL("../lib/server/database-init.ts", import.meta.url), "utf8"),
     readFile(new URL("../drizzle/0012_handy_may_parker.sql", import.meta.url), "utf8"),
+    readFile(new URL("../drizzle/0014_smart_exodus.sql", import.meta.url), "utf8"),
   ]);
+  const migration = `${originalMigration}\n${sentMigration}`;
 
   for (const indexName of [
     "idx_contacts_workspace_status_updated",
     "idx_contacts_workspace_updated",
+    "idx_contacts_workspace_last_contacted",
     "idx_contacts_workspace_city",
     "idx_contacts_workspace_company_name",
   ]) {
@@ -101,4 +104,31 @@ test("campaign dispatch loads only selected contacts and reconciles UniSender de
   assert.match(store, /getUniSenderCampaignStats/);
   assert.match(store, /action !== "sync_delivery"/);
   assert.match(detail, /action: "sync_delivery"/);
+});
+
+test("sent contacts stay durable and are separated by provider history", async () => {
+  const [view, store, route] = await Promise.all([
+    readFile(new URL("../components/contacts/ContactsView.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/server/mailflow-store.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/contacts/route.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(view, /К отправке/);
+  assert.match(view, /Отправлено/);
+  assert.match(view, /Контакт остаётся в общей базе/);
+  assert.match(view, /Управление ответственными/);
+  assert.match(store, /delivery === "sent"/);
+  assert.match(store, /delivery === "pending"/);
+  assert.match(store, /deliveryHistory/);
+  assert.match(store, /acceptedRows\.length && !schedulingAtProvider/);
+  assert.match(route, /selection\?: unknown/);
+});
+
+test("an untouched queued delivery job can resume without duplicating accepted mail", async () => {
+  const store = await readFile(new URL("../lib/server/mailflow-store.ts", import.meta.url), "utf8");
+
+  assert.match(store, /const isUnstartedJob/);
+  assert.match(store, /job\.status === "queued"/);
+  assert.match(store, /Object\.keys\(job\.providerExternalIds \?\? \{\}\)\.length === 0/);
+  assert.match(store, /resumableJob\?\.id \?\? newId\("delivery-job"\)/);
 });

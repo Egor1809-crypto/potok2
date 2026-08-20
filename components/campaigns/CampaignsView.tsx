@@ -147,7 +147,7 @@ export function CampaignsView({
   const loadCampaigns = React.useCallback(async () => {
     setApiMode("loading");
     try {
-      const response = await fetch("/api/workspace", { headers: { Accept: "application/json" } });
+      const response = await fetch("/api/workspace?scope=campaign-list", { headers: { Accept: "application/json" } });
       if (!response.ok) throw new Error("Кампании недоступны");
       const body = await response.json() as WorkspaceSnapshot;
       setCampaigns(body.campaigns.map(fromApi));

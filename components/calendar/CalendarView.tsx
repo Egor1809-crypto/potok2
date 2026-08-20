@@ -76,7 +76,7 @@ export function CalendarView() {
 
   const load = React.useCallback(async () => {
     try {
-      const response = await fetch("/api/workspace", { headers: { Accept: "application/json" } });
+      const response = await fetch("/api/workspace?scope=campaign-list", { headers: { Accept: "application/json" } });
       const body = await response.json() as WorkspaceSnapshot | { error?: string };
       if (!response.ok || !("campaigns" in body)) throw new Error("error" in body ? body.error : "Календарь недоступен.");
       setSnapshot(body);

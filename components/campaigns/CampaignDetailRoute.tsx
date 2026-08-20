@@ -37,7 +37,7 @@ export function CampaignDetailRoute() {
     }
     setApiMode("loading");
     try {
-      const response = await fetch("/api/workspace", { headers: { Accept: "application/json" } });
+      const response = await fetch(`/api/workspace?scope=campaign-detail&sourceId=${encodeURIComponent(campaignId)}`, { headers: { Accept: "application/json" } });
       if (!response.ok) throw new Error("Кампания недоступна");
       const body = await response.json() as WorkspaceSnapshot;
       const item = body.campaigns.find((candidate) => candidate.id === campaignId) ?? null;

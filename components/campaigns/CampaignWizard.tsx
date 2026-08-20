@@ -483,7 +483,7 @@ function CampaignWizardState({
   const [senderEmail, setSenderEmail] = React.useState(
     seedDraft?.senderEmail ?? "",
   );
-  const [scheduledTimes, setScheduledTimes] = React.useState<string[]>(() => initialScheduledTimes(params, seedDraft));
+  const [scheduledTimes, setScheduledTimes] = React.useState<string[]>([]);
   const scheduledAt = scheduledTimes[0] ?? null;
   const setScheduledAt = React.useCallback((value: string | null) => {
     setScheduledTimes(value ? [value] : []);
@@ -1960,7 +1960,7 @@ function ReviewStep({
   const totalMessages = recipientCount * scheduledTimes.length;
   return (
     <div>
-      <StepIntro number={4} title="Проверьте готовность" description="Сервер рассчитает точный охват, проверит согласия, подключения и сохранит план. Внешняя отправка на этом шаге не выполняется." />
+      <StepIntro number={4} title="Проверьте и отправьте" description="Сервер рассчитает точный охват, проверит согласия и подключения, а затем сразу передаст письма провайдеру." />
       <div className="mt-6 divide-y divide-border rounded-xl border border-border">
         <ReviewRow label="Название рассылки" value={campaignName || "Без названия"} />
         <ReviewRow label="Аудитория" value={`${audienceLabel} · ${formatRecipientCount(recipientCount)}`} />
@@ -1985,16 +1985,11 @@ function ReviewStep({
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h3 id="schedule-title" className="text-[15px] font-semibold text-text-strong">Когда отправить</h3>
-            <p className="mt-1 text-[12px] leading-5 text-text-muted">«Сейчас» сохранит готовую кампанию для явного запуска. Дата добавит её в календарь и очередь Потока.</p>
+            <p className="mt-1 text-[12px] leading-5 text-text-muted">Рассылка запускается сразу после успешной серверной проверки. Отправка через календарь временно отключена.</p>
           </div>
           <div className="flex gap-2">
             <Button size="sm" variant={scheduledAt ? "secondary" : "primary"} onClick={() => onScheduledTimesChange([])}>Сейчас</Button>
-            <Button size="sm" variant={scheduledAt ? "primary" : "secondary"} onClick={() => {
-              if (scheduledAt) return;
-              const date = new Date(Date.now() + 60 * 60 * 1000);
-              date.setMinutes(Math.ceil(date.getMinutes() / 15) * 15, 0, 0);
-              onScheduledTimesChange([date.toISOString()]);
-            }}>По расписанию</Button>
+            <Button size="sm" variant="secondary" disabled>По расписанию — временно отключено</Button>
           </div>
         </div>
         {scheduledAt ? (
@@ -2053,14 +2048,14 @@ function ReviewStep({
         ) : null}
       </section>
 
-      <Alert tone="info" title={scheduledTimes.length > 1 ? `Запланировано волн: ${scheduledTimes.length}` : scheduledAt ? "Рассылка запланирована" : "Запуск выполняется отдельно"} className="mt-6">
+      <Alert tone="info" title={scheduledTimes.length > 1 ? `Запланировано волн: ${scheduledTimes.length}` : scheduledAt ? "Рассылка запланирована" : "Отправка сразу после проверки"} className="mt-6">
         {manualVkWorkspace
           ? scheduledAt
             ? "В каждое выбранное время серверная очередь передаст персонализированное HTML-письмо всем получателям через VK WorkSpace SMTP. Кнопки останутся ссылками; статус каждой волны будет виден в Календаре."
-            : "Поток подготовит адресатов и HTML-письмо. После проверки откройте рассылку и нажмите «Начать отправку» — переходить в VK WorkSpace не нужно."
+            : "Поток проверит адресатов и HTML-письмо, после чего сразу передаст рассылку через VK WorkSpace SMTP."
           : scheduledAt
             ? "После успешной проверки «Поток» создаст отдельную карточку для каждой волны. Каждый получатель получит это письмо во все выбранные периоды."
-            : "Проверка фиксирует готовую версию. После неё откройте рассылку и нажмите «Начать отправку»."}
+            : "После успешной проверки Поток сразу передаст письма выбранному провайдеру."}
       </Alert>
 
       <section className={cn("mt-6 rounded-xl border p-5", blockers.length ? "border-warning/30 bg-warning-subtle" : "border-success/25 bg-success-subtle")} aria-labelledby="blockers-title">
@@ -2076,7 +2071,7 @@ function ReviewStep({
             {blockers.map((blocker) => <li key={blocker} className="flex gap-2"><CircleDashed aria-hidden="true" className="mt-1 size-3.5 shrink-0" />{blocker}</li>)}
           </ul>
         ) : (
-          <p className="mt-3 text-[12px] leading-5 text-text">Нажмите «Проверить готовность»: сервер рассчитает финальный охват и сохранит план. Внешняя отправка не выполняется.</p>
+          <p className="mt-3 text-[12px] leading-5 text-text">Нажмите «Проверить и отправить»: сервер рассчитает финальный охват и после успешной проверки передаст письма провайдеру.</p>
         )}
       </section>
     </div>

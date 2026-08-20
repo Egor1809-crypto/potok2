@@ -42,7 +42,10 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const payload = await readJsonBody(request);
-    const isBatch = Boolean(payload) && typeof payload === "object" && !Array.isArray(payload) && Array.isArray((payload as { ids?: unknown }).ids);
+    const isBatch = Boolean(payload) && typeof payload === "object" && !Array.isArray(payload) && (
+      Array.isArray((payload as { ids?: unknown }).ids) ||
+      Boolean((payload as { selection?: unknown }).selection)
+    );
     return Response.json(isBatch ? await updateContactsBatch(request, payload) : await updateContact(request, payload));
   } catch (error) {
     return jsonError(error);

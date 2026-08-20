@@ -591,7 +591,43 @@ export async function getWorkspaceSnapshot(
   };
 }
 
-/** Lightweight data for persistent navigation and the campaign wizard. */
+async function campaignSummaryRecords(): Promise<CampaignRecord[]> {
+  const rows = await getDb().select({
+    id: campaigns.id,
+    workspaceId: campaigns.workspaceId,
+    participantId: campaigns.participantId,
+    name: campaigns.name,
+    purpose: campaigns.purpose,
+    audienceType: campaigns.audienceType,
+    audienceLabel: campaigns.audienceLabel,
+    segmentId: campaigns.segmentId,
+    contactIds: campaigns.contactIds,
+    templateId: campaigns.templateId,
+    presentationId: campaigns.presentationId,
+    senderName: campaigns.senderName,
+    senderEmail: campaigns.senderEmail,
+    subject: campaigns.subject,
+    previewText: campaigns.previewText,
+    emailBodyText: sql<string>`''`,
+    emailBodyHtml: sql<string>`''`,
+    emailBuilderDocument: sql<null>`null`,
+    messengerMessage: sql<string>`''`,
+    deliveryChannels: campaigns.deliveryChannels,
+    status: campaigns.status,
+    statusReason: campaigns.statusReason,
+    scheduledAt: campaigns.scheduledAt,
+    sentAt: campaigns.sentAt,
+    metrics: campaigns.metrics,
+    readyVersionId: campaigns.readyVersionId,
+    createdAt: campaigns.createdAt,
+    updatedAt: campaigns.updatedAt,
+  }).from(campaigns)
+    .where(eq(campaigns.workspaceId, WORKSPACE_ID))
+    .orderBy(desc(campaigns.updatedAt));
+  return rows.map((row) => toCampaign(row as CampaignRow));
+}
+
+/** Lightweight data for screens that do not need the complete workspace dump. */
 export async function getWorkspaceBootstrap(request: Request) {
   const actor = await ensureDatabase(request);
   const url = new URL(request.url);
@@ -609,20 +645,62 @@ export async function getWorkspaceBootstrap(request: Request) {
   }
 
   const sourceId = url.searchParams.get("sourceId")?.trim() ?? "";
+  const base = { workspace: toWorkspace(workspace), participant: toParticipant(participant) };
+  if (scope === "integrations") {
+    const rows = await db.select().from(integrations).where(eq(integrations.workspaceId, WORKSPACE_ID)).orderBy(integrations.providerId);
+    return { ...base, integrations: rows.filter((row) => PROVIDERS.includes(row.providerId)).map(toIntegrationRecord) };
+  }
+  if (scope === "campaign-detail" && sourceId) {
+    const [campaignRows, planRows, jobRows, eventRows] = await Promise.all([
+      db.select().from(campaigns).where(and(eq(campaigns.workspaceId, WORKSPACE_ID), eq(campaigns.id, sourceId))).limit(1),
+      db.select().from(deliveryPlans).where(eq(deliveryPlans.campaignId, sourceId)),
+      db.select().from(deliveryJobs).where(and(eq(deliveryJobs.workspaceId, WORKSPACE_ID), eq(deliveryJobs.campaignId, sourceId))).orderBy(desc(deliveryJobs.createdAt)).limit(WORKSPACE_HISTORY_LIMIT),
+      db.select().from(campaignEvents).where(and(eq(campaignEvents.workspaceId, WORKSPACE_ID), eq(campaignEvents.campaignId, sourceId))).orderBy(desc(campaignEvents.occurredAt)).limit(WORKSPACE_HISTORY_LIMIT),
+    ]);
+    return { ...base, campaigns: campaignRows.map(toCampaign), deliveryPlans: planRows.map(toDeliveryPlan), deliveryJobs: jobRows.map(toDeliveryJob), events: eventRows.map(toCampaignEvent) };
+  }
+  if (scope === "campaign-list" || scope === "history" || scope === "dashboard") {
+    const [campaignRecords, segmentRows, integrationRows, planRows, jobRows, eventRows, statsRows, templateCountRows] = await Promise.all([
+      campaignSummaryRecords(),
+      db.select().from(segments).where(eq(segments.workspaceId, WORKSPACE_ID)).orderBy(desc(segments.updatedAt)),
+      db.select().from(integrations).where(eq(integrations.workspaceId, WORKSPACE_ID)).orderBy(integrations.providerId),
+      scope === "campaign-list" ? db.select().from(deliveryPlans) : Promise.resolve([]),
+      scope === "history" ? db.select().from(deliveryJobs).where(eq(deliveryJobs.workspaceId, WORKSPACE_ID)).orderBy(desc(deliveryJobs.createdAt)).limit(WORKSPACE_HISTORY_LIMIT) : Promise.resolve([]),
+      scope === "history" ? db.select().from(campaignEvents).where(eq(campaignEvents.workspaceId, WORKSPACE_ID)).orderBy(desc(campaignEvents.occurredAt)).limit(WORKSPACE_HISTORY_LIMIT) : Promise.resolve([]),
+      db.select({ total: sql<number>`count(*)`, active: sql<number>`coalesce(sum(case when ${contacts.status} = 'active' then 1 else 0 end), 0)` }).from(contacts).where(eq(contacts.workspaceId, WORKSPACE_ID)),
+      db.select({ total: sql<number>`count(*)` }).from(emailTemplates).where(eq(emailTemplates.workspaceId, WORKSPACE_ID)),
+    ]);
+    const integrationRecords = integrationRows.filter((row) => PROVIDERS.includes(row.providerId)).map(toIntegrationRecord);
+    return {
+      ...base,
+      campaigns: campaignRecords,
+      deliveryPlans: planRows.map(toDeliveryPlan),
+      deliveryJobs: jobRows.map(toDeliveryJob),
+      events: eventRows.map(toCampaignEvent),
+      segments: segmentRows.map((segment) => toSegment(segment, [], [])),
+      integrations: integrationRecords,
+      templates: Array.from({ length: Number(templateCountRows[0]?.total ?? 0) }, (_, index) => ({ id: `template-count-${index}` })),
+      historyWindow: { scope: "latest_workspace", deliveryJobsLimit: WORKSPACE_HISTORY_LIMIT, campaignEventsLimit: WORKSPACE_HISTORY_LIMIT },
+      stats: {
+        totalContacts: Number(statsRows[0]?.total ?? 0),
+        activeContacts: Number(statsRows[0]?.active ?? 0),
+        totalSegments: segmentRows.length,
+        totalCampaigns: campaignRecords.length,
+        activeCampaigns: campaignRecords.filter((campaign) => ["ready", "scheduled", "sending"].includes(campaign.status)).length,
+        connectedIntegrations: integrationRecords.filter((integration) => integration.status === "connected").length,
+      },
+    };
+  }
+
   const [memberRows, segmentRows, integrationRows, sourceCampaignRows, sourcePlanRows] = await Promise.all([
     db.select().from(participants).where(eq(participants.workspaceId, WORKSPACE_ID)).orderBy(participants.createdAt),
     db.select().from(segments).where(eq(segments.workspaceId, WORKSPACE_ID)).orderBy(desc(segments.updatedAt)),
     db.select().from(integrations).where(eq(integrations.workspaceId, WORKSPACE_ID)).orderBy(integrations.providerId),
-    sourceId
-      ? db.select().from(campaigns).where(and(eq(campaigns.workspaceId, WORKSPACE_ID), eq(campaigns.id, sourceId))).limit(1)
-      : Promise.resolve([]),
-    sourceId
-      ? db.select().from(deliveryPlans).where(eq(deliveryPlans.campaignId, sourceId))
-      : Promise.resolve([]),
+    sourceId ? db.select().from(campaigns).where(and(eq(campaigns.workspaceId, WORKSPACE_ID), eq(campaigns.id, sourceId))).limit(1) : Promise.resolve([]),
+    sourceId ? db.select().from(deliveryPlans).where(eq(deliveryPlans.campaignId, sourceId)) : Promise.resolve([]),
   ]);
   return {
-    workspace: toWorkspace(workspace),
-    participant: toParticipant(participant),
+    ...base,
     members: memberRows.filter((member) => member.status === "active").map(toParticipant),
     segments: segmentRows.map((segment) => toSegment(segment, [], [])),
     integrations: integrationRows.filter((row) => PROVIDERS.includes(row.providerId)).map(toIntegrationRecord),
@@ -980,6 +1058,7 @@ function contactListFilters(url: URL): SQL[] {
   const sheet = url.searchParams.get("sheet")?.trim().slice(0, 140) ?? "";
   const channel = url.searchParams.get("channel")?.trim() ?? "";
   const owner = url.searchParams.get("owner")?.trim().slice(0, 120) ?? "";
+  const delivery = url.searchParams.get("delivery")?.trim() ?? "";
 
   if (search) {
     filters.push(sql`(
@@ -1002,6 +1081,8 @@ function contactListFilters(url: URL): SQL[] {
   if (channel === "vk") filters.push(sql`${contacts.vkUserId} is not null and ${contacts.vkUserId} <> ''`);
   if (channel === "phone") filters.push(sql`${contacts.phone} <> ''`);
   if (owner) filters.push(sql`coalesce(${contacts.responsibleParticipantId}, ${contacts.createdByParticipantId}) = ${owner}`);
+  if (delivery === "sent") filters.push(isNotNull(contacts.lastContactedAt));
+  if (delivery === "pending") filters.push(sql`${contacts.lastContactedAt} is null`);
   return filters;
 }
 
@@ -1044,6 +1125,8 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
         total: sql<number>`count(*)`,
         active: sql<number>`coalesce(sum(case when ${contacts.status} = 'active' then 1 else 0 end), 0)`,
         assigned: sql<number>`coalesce(sum(case when ${contacts.responsibleParticipantId} is not null then 1 else 0 end), 0)`,
+        sent: sql<number>`coalesce(sum(case when ${contacts.lastContactedAt} is not null then 1 else 0 end), 0)`,
+        pending: sql<number>`coalesce(sum(case when ${contacts.lastContactedAt} is null then 1 else 0 end), 0)`,
         emailFound: sql<number>`coalesce(sum(case when ${contacts.email} <> '' then 1 else 0 end), 0)`,
         emailReady: sql<number>`coalesce(sum(case when ${contacts.status} = 'active' and ${contacts.email} <> '' then 1 else 0 end), 0)`,
         serviceEmailReady: sql<number>`coalesce(sum(case when ${contacts.status} = 'active' and ${contacts.email} <> '' and json_extract(${contacts.customFields}, '$.serviceEmailAllowed') = 'true' and coalesce(json_extract(${contacts.customFields}, '$.serviceEmailBasis'), '') <> '' and coalesce(json_extract(${contacts.customFields}, '$.serviceEmailAllowedAt'), '') <> '' then 1 else 0 end), 0)`,
@@ -1136,6 +1219,41 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
     .orderBy(desc(contacts.updatedAt), desc(contacts.id))
     .limit(pageSize)
     .offset((page - 1) * pageSize);
+  const historyRows = rows.length
+    ? await db
+        .select({
+          contactId: deliveryOutbox.contactId,
+          campaignId: deliveryOutbox.campaignId,
+          campaignName: campaigns.name,
+          providerId: deliveryOutbox.providerId,
+          channel: deliveryOutbox.channel,
+          status: deliveryOutbox.status,
+          statusMessage: deliveryOutbox.statusMessage,
+          externalId: deliveryOutbox.externalId,
+          updatedAt: deliveryOutbox.updatedAt,
+        })
+        .from(deliveryOutbox)
+        .leftJoin(campaigns, eq(deliveryOutbox.campaignId, campaigns.id))
+        .where(inArray(deliveryOutbox.contactId, rows.map((row) => row.id)))
+        .orderBy(desc(deliveryOutbox.updatedAt))
+        .limit(Math.max(250, rows.length * 10))
+    : [];
+  const deliveryHistory: NonNullable<ContactsListResponse["deliveryHistory"]> = {};
+  for (const item of historyRows) {
+    const contactHistory = deliveryHistory[item.contactId] ?? [];
+    if (contactHistory.length >= 10) continue;
+    contactHistory.push({
+      campaignId: item.campaignId,
+      campaignName: item.campaignName ?? "Рассылка",
+      providerId: item.providerId,
+      channel: item.channel,
+      status: item.status,
+      statusMessage: item.statusMessage,
+      externalId: item.externalId,
+      updatedAt: item.updatedAt,
+    });
+    deliveryHistory[item.contactId] = contactHistory;
+  }
   const summary = summaryRows[0];
   const tagRows = tagFacets.results ?? [];
   const memberMap = new Map(memberRows.map((member) => [member.id, member]));
@@ -1173,10 +1291,13 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
     pageSize,
     totalPages,
     filteredCount,
+    deliveryHistory,
     ...(includeMeta ? { summary: {
       total: Number(summary?.total ?? 0),
       active: Number(summary?.active ?? 0),
       assigned: Number(summary?.assigned ?? 0),
+      sent: Number(summary?.sent ?? 0),
+      pending: Number(summary?.pending ?? 0),
       primaryBase: Number(tagRows.find((row) => row.label === "База №1")?.count ?? 0),
       secondaryBase: Number(tagRows.find((row) => row.label === "База №2")?.count ?? 0),
       coverage: {
@@ -1450,8 +1571,26 @@ export async function updateContactsBatch(
 ): Promise<ContactsBulkMutationResponse> {
   const actor = await ensureDatabase(request);
   const object = asObject(payload);
-  if (!Array.isArray(object.ids)) throw new ApiRequestError("Передайте список контактов.");
-  const ids = Array.from(new Set(object.ids.map((id) => cleanText(id, "Идентификатор контакта", 120))));
+  const bulkSelection = !Array.isArray(object.ids);
+  let ids: string[];
+  if (Array.isArray(object.ids)) {
+    ids = Array.from(new Set(object.ids.map((id) => cleanText(id, "Идентификатор контакта", 120))));
+  } else if (object.selection && typeof object.selection === "object") {
+    const selection = asObject(object.selection);
+    const selectionUrl = new URL("https://local.invalid/api/contacts");
+    for (const key of ["sheet", "owner", "delivery"] as const) {
+      const value = typeof selection[key] === "string" ? selection[key].trim() : "";
+      if (value && value !== "all") selectionUrl.searchParams.set(key, value);
+    }
+    if (selection.all !== true && selectionUrl.searchParams.size === 0) {
+      throw new ApiRequestError("Укажите базу или фильтр для массового изменения.");
+    }
+    const selectedRows = await getDb().select({ id: contacts.id }).from(contacts)
+      .where(and(...contactListFilters(selectionUrl))).limit(20_001);
+    ids = selectedRows.map((row) => row.id);
+  } else {
+    throw new ApiRequestError("Передайте список или фильтр контактов.");
+  }
   if (!ids.length) throw new ApiRequestError("Выберите хотя бы один контакт.");
   if (ids.length > 20_000) throw new ApiRequestError("За одну операцию можно изменить не более 20 000 контактов.");
   const responsibleParticipantId = object.responsibleParticipantId === undefined
@@ -1468,17 +1607,20 @@ export async function updateContactsBatch(
   }
   const now = new Date().toISOString();
   const affected: ContactRow[] = [];
+  let bulkUpdatedCount = 0;
   for (const idChunk of chunksOf(ids, 80)) {
     const rows = await getDb().select().from(contacts).where(and(
       eq(contacts.workspaceId, WORKSPACE_ID), inArray(contacts.id, idChunk),
     ));
     if (!addTags.length) {
-      affected.push(...await getDb().update(contacts).set({
+      const updatedRows = await getDb().update(contacts).set({
         ...(responsibleParticipantId !== undefined ? { responsibleParticipantId } : {}),
         ...(markContacted ? { lastContactedAt: now } : {}),
         updatedByParticipantId: actor.participant.id,
         updatedAt: now,
-      }).where(and(eq(contacts.workspaceId, WORKSPACE_ID), inArray(contacts.id, idChunk))).returning());
+      }).where(and(eq(contacts.workspaceId, WORKSPACE_ID), inArray(contacts.id, idChunk))).returning();
+      bulkUpdatedCount += updatedRows.length;
+      if (!bulkSelection) affected.push(...updatedRows);
       continue;
     }
     for (const row of rows) {
@@ -1489,10 +1631,13 @@ export async function updateContactsBatch(
         updatedByParticipantId: actor.participant.id,
         updatedAt: now,
       }).where(eq(contacts.id, row.id)).returning();
-      if (updated) affected.push(updated);
+      if (updated) {
+        bulkUpdatedCount += 1;
+        if (!bulkSelection) affected.push(updated);
+      }
     }
   }
-  return { contacts: affected.map(toContact), updatedCount: affected.length };
+  return { contacts: affected.map(toContact), updatedCount: bulkSelection ? bulkUpdatedCount : affected.length };
 }
 
 export async function deleteContact(
@@ -3236,6 +3381,14 @@ async function dispatchCampaign(
 ): Promise<CampaignMutationResponse> {
   const db = getDb();
   let current = await campaignBundle(campaignId);
+  let resumableJob: DeliveryJobRow | null = null;
+  const isUnstartedJob = (job: DeliveryJobRow) =>
+    job.status === "queued" &&
+    job.acceptedCount === 0 &&
+    job.rejectedCount === 0 &&
+    job.ambiguousCount === 0 &&
+    job.manualCount === 0 &&
+    Object.keys(job.providerExternalIds ?? {}).length === 0;
   const existingJobResponse = async (job: DeliveryJobRow): Promise<CampaignMutationResponse> => {
     const providerCampaignId = job.providerExternalIds?.unisender?.campaignId;
     const scheduleIsDue = current.campaign.status === "scheduled" &&
@@ -3284,7 +3437,11 @@ async function dispatchCampaign(
           409,
         );
       }
-      return existingJobResponse(jobByKey);
+      if (isUnstartedJob(jobByKey)) {
+        resumableJob = jobByKey;
+      } else {
+        return existingJobResponse(jobByKey);
+      }
     }
   }
   if (current.campaign.readyVersionId) {
@@ -3299,7 +3456,11 @@ async function dispatchCampaign(
       )
       .limit(1);
     if (jobByVersion) {
-      return existingJobResponse(jobByVersion);
+      if (isUnstartedJob(jobByVersion)) {
+        resumableJob = jobByVersion;
+      } else {
+        return existingJobResponse(jobByVersion);
+      }
     }
   }
   const scheduledIsDue = current.campaign.status === "scheduled" &&
@@ -3398,8 +3559,8 @@ async function dispatchCampaign(
 
   const idempotencyKey = clientKey || `dispatch:${version.id}`;
   const now = new Date().toISOString();
-  const jobId = newId("delivery-job");
-  const inserted = await db
+  let jobId = resumableJob?.id ?? newId("delivery-job");
+  const inserted = resumableJob ? [resumableJob] : await db
     .insert(deliveryJobs)
     .values({
       id: jobId,
@@ -3441,11 +3602,15 @@ async function dispatchCampaign(
         409,
       );
     }
-    return {
-      campaign: current.campaign,
-      deliveryPlans: current.plans,
-      deliveryJob: toDeliveryJob(existingJob),
-    };
+    if (!isUnstartedJob(existingJob)) {
+      return {
+        campaign: current.campaign,
+        deliveryPlans: current.plans,
+        deliveryJob: toDeliveryJob(existingJob),
+      };
+    }
+    resumableJob = existingJob;
+    jobId = existingJob.id;
   }
 
   const outboxValues = current.plans.flatMap((plan) =>

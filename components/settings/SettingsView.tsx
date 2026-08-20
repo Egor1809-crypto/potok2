@@ -111,7 +111,7 @@ export function SettingsView() {
   const load = useCallback(async () => {
     setState("loading");
     try {
-      const response = await fetch("/api/workspace", { cache: "no-store" });
+      const response = await fetch("/api/workspace?scope=identity", { cache: "no-store" });
       const payload: unknown = await response.json().catch(() => null);
       if (!response.ok) throw new Error(messageFrom(payload, "Не удалось загрузить настройки"));
       const snapshot = unwrapSnapshot(payload);

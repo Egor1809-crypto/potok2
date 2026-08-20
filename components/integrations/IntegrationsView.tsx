@@ -212,7 +212,7 @@ export function IntegrationsView() {
     setApiMode("loading");
     setNotice(null);
     try {
-      const response = await fetch("/api/workspace", {
+      const response = await fetch("/api/workspace?scope=integrations", {
         headers: { Accept: "application/json" },
       });
       if (!response.ok) throw new Error("Сервис настроек временно недоступен.");

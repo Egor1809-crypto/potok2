@@ -86,6 +86,8 @@ const emptySummary: ContactListSummary = {
   total: 0,
   active: 0,
   assigned: 0,
+  sent: 0,
+  pending: 0,
   primaryBase: 0,
   secondaryBase: 0,
   coverage: {
@@ -152,6 +154,7 @@ export function ContactsView() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [contacts, setContacts] = useState<ContactRecord[]>([]);
+  const [deliveryHistory, setDeliveryHistory] = useState<NonNullable<ContactsListResponse["deliveryHistory"]>>({});
   const [members, setMembers] = useState<ParticipantRecord[]>([]);
   const [summary, setSummary] = useState<ContactListSummary>(emptySummary);
   const [owners, setOwners] = useState<ContactOwnerSummary[]>([]);
@@ -174,6 +177,7 @@ export function ContactsView() {
   const [channel, setChannel] = useState("all");
   const [owner, setOwner] = useState("all");
   const [sheet, setSheet] = useState("all");
+  const [delivery, setDelivery] = useState<"pending" | "sent" | "all">("pending");
   const [teamName, setTeamName] = useState("");
   const [responsibleId, setResponsibleId] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -218,10 +222,12 @@ export function ContactsView() {
       if (channel !== "all") params.set("channel", channel);
       if (owner !== "all") params.set("owner", owner);
       if (sheet !== "all") params.set("sheet", sheet);
+      if (delivery !== "all") params.set("delivery", delivery);
       const response = await fetch(`/api/contacts?${params.toString()}`, { cache: "no-store" });
       const payload: ContactsListResponse | ApiError = await response.json();
       if (!response.ok || !("contacts" in payload)) throw new Error(messageFrom(payload, "Не удалось загрузить контакты"));
       setContacts(payload.contacts);
+      setDeliveryHistory(payload.deliveryHistory ?? {});
       setMembers(payload.members);
       setParticipantId(payload.participantId);
       setTimezone(payload.timezone);
@@ -243,7 +249,7 @@ export function ContactsView() {
     } finally {
       setLoading(false);
     }
-  }, [channel, city, company, debouncedSearch, owner, page, sheet, status, team]);
+  }, [channel, city, company, debouncedSearch, delivery, owner, page, sheet, status, team]);
 
   useEffect(() => {
     if (activeView !== "contacts") return;
@@ -393,6 +399,32 @@ export function ContactsView() {
     } finally { setBusy(false); }
   };
 
+  const assignResponsibleToBase = async (remove = false) => {
+    if (!remove && !responsibleId) return;
+    const baseLabel = sheet === "all" ? "всей базе" : `базе «${sheet.replace(/^Импорт: /, "")}»`;
+    if (!window.confirm(`${remove ? "Снять" : "Назначить"} ответственного по ${baseLabel}?`)) return;
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/contacts", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          selection: { all: sheet === "all", sheet },
+          responsibleParticipantId: remove ? null : responsibleId,
+        }),
+      });
+      const payload = await response.json() as { updatedCount?: number } | ApiError;
+      if (!response.ok || !("updatedCount" in payload)) throw new Error(messageFrom(payload, "Не удалось изменить базу"));
+      await load(true);
+      notify(`Обновлено контактов: ${payload.updatedCount ?? 0}`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Не удалось изменить базу");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const markContacted = async (contact: ContactRecord) => {
     setBusy(true);
     try {
@@ -518,6 +550,30 @@ export function ContactsView() {
         </section>
       ) : <>
 
+      <section className="card p-3" aria-label="Статус отправки контактам">
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => { setPage(1); setDelivery("pending"); }} aria-pressed={delivery === "pending"} className={`btn ${delivery === "pending" ? "btn-primary" : "btn-secondary"}`}>К отправке · {summary.pending.toLocaleString("ru-RU")}</button>
+          <button type="button" onClick={() => { setPage(1); setDelivery("sent"); }} aria-pressed={delivery === "sent"} className={`btn ${delivery === "sent" ? "btn-primary" : "btn-secondary"}`}>Отправлено · {summary.sent.toLocaleString("ru-RU")}</button>
+          <button type="button" onClick={() => { setPage(1); setDelivery("all"); }} aria-pressed={delivery === "all"} className={`btn ${delivery === "all" ? "btn-primary" : "btn-secondary"}`}>Все · {summary.total.toLocaleString("ru-RU")}</button>
+        </div>
+        <p className="mt-2 text-[10px] text-[var(--text-muted)]">Контакт остаётся в общей базе. Когда провайдер принял письмо, он автоматически показывается в таблице «Отправлено».
+        </p>
+      </section>
+
+      <section className="card p-4" aria-labelledby="base-responsible-title">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 id="base-responsible-title" className="text-[13px] font-semibold">Управление ответственными</h2>
+            <p className="mt-1 text-[10px] text-[var(--text-muted)]">Выбрана {sheet === "all" ? "вся база" : `база «${sheet.replace(/^Импорт: /, "")}»`}. Можно назначить или снять ответственного сразу для всего листа.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <select value={responsibleId} onChange={(event) => setResponsibleId(event.target.value)} className="input min-w-52"><option value="">Выберите ответственного</option>{members.map((member) => <option key={member.id} value={member.id}>{member.displayName}</option>)}</select>
+            <button type="button" onClick={() => void assignResponsibleToBase(false)} disabled={busy || !responsibleId} className="btn btn-primary">Назначить базе</button>
+            <button type="button" onClick={() => void assignResponsibleToBase(true)} disabled={busy} className="btn btn-secondary">Снять с базы</button>
+          </div>
+        </div>
+      </section>
+
       {sheets.length > 0 && (
         <section className="card overflow-hidden" aria-labelledby="contact-sheets-title">
           <div className="flex flex-col gap-1 border-b border-[var(--border)] px-4 py-3 sm:px-5">
@@ -606,12 +662,14 @@ export function ContactsView() {
                 const responsible = membersById.get(contact.responsibleParticipantId ?? contact.createdByParticipantId ?? "");
                 const primaryEndpoint = contact.email || contact.phone || (contact.telegramChatId ? `Telegram: ${contact.telegramChatId}` : contact.vkUserId ? `ВК: ${contact.vkUserId}` : "Канал не указан");
                 const telegramHref = personalTelegramHref(contact.telegramChatId);
+                const contactHistory = deliveryHistory[contact.id] ?? [];
+                const latestDelivery = contactHistory[0];
                 return <tr key={contact.id} data-selected={checked} style={{ boxShadow: `inset 4px 0 0 ${responsible?.color ?? creator?.color ?? "#CBD5E1"}` }}>
                   <td><button type="button" onClick={() => setSelected((current) => { const next = new Set(current); if (next.has(contact.id)) next.delete(contact.id); else next.add(contact.id); return next; })} aria-label={`Выбрать ${contact.fullName}`} className={`grid size-4 place-items-center rounded border ${checked ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-[var(--border-strong)] bg-white"}`}>{checked && <Check aria-hidden="true" className="size-3" />}</button></td>
                   <td><button type="button" onClick={() => setDrawerContact(contact)} className="flex items-center gap-3 text-left"><span className="grid size-9 shrink-0 place-items-center rounded-full text-[10px] font-semibold text-white" style={{ backgroundColor: responsible?.color ?? creator?.color ?? contact.avatarColor }}>{contact.firstName[0]}{contact.lastName[0]}</span><span><span className="block text-[12px] font-semibold hover:text-[var(--primary)]">{contact.fullName}</span><span className="mt-0.5 block text-[10px] text-[var(--text-subtle)]">{primaryEndpoint}</span>{responsible && <span className="mt-1 inline-flex items-center gap-1 text-[9px] font-semibold" style={{ color: responsible.color }}><i className="size-1.5 rounded-full" style={{ backgroundColor: responsible.color }} />Ответственный: {responsible.displayName}</span>}</span></button></td>
                   <td><p className="text-[11px] font-medium">{contact.companyName || "—"}</p><p className="mt-0.5 text-[10px] text-[var(--text-subtle)]">{contact.jobTitle || "Должность не указана"}</p></td>
                   <td><div className="flex max-w-44 flex-wrap gap-1">{contact.email && <SourcePill label="Email" color="#F43CB8" ready={Boolean(contact.emailConsent && contact.marketingConsentSource && contact.marketingConsentAt && contact.marketingConsentText)} />}{contact.telegramChatId && <SourcePill label="TG" color="#229ED9" ready={contact.telegramConsent} />}{contact.vkUserId && <SourcePill label="VK" color="#0077FF" ready={contact.vkConsent} />}{contact.phone && <SourcePill label="Телефон" color="#0E7490" />}</div></td>
-                  <td>{contact.lastContactedAt ? <span className="badge badge-success">✓ Отправлено</span> : telegramHref ? <span className="flex flex-wrap gap-1"><a href={telegramHref} target="_blank" rel="noreferrer" className="badge badge-primary">Открыть TG</a><button type="button" disabled={busy} onClick={() => void markContacted(contact)} className="badge badge-neutral">Отметить</button></span> : <span className="badge badge-neutral">Не отправляли</span>}</td>
+                  <td>{contact.lastContactedAt ? <span className="block"><span className="badge badge-success">✓ Отправлено</span>{latestDelivery ? <details className="mt-1 max-w-56 text-[9px] text-[var(--text-muted)]"><summary className="cursor-pointer truncate" title={latestDelivery.statusMessage}>{latestDelivery.campaignName} · {latestDelivery.providerId} · {latestDelivery.status}</summary><div className="mt-1 space-y-1 rounded-lg bg-[var(--surface-subtle)] p-2">{contactHistory.map((entry, index) => <p key={`${entry.campaignId}-${entry.updatedAt}-${index}`}><b>{entry.campaignName}</b><br />{entry.providerId} · {entry.channel} · {entry.status}<br />{entry.statusMessage}{entry.externalId ? <><br />ID: {entry.externalId}</> : null}</p>)}</div></details> : null}</span> : telegramHref ? <span className="flex flex-wrap gap-1"><a href={telegramHref} target="_blank" rel="noreferrer" className="badge badge-primary">Открыть TG</a><button type="button" disabled={busy} onClick={() => void markContacted(contact)} className="badge badge-neutral">Отметить</button></span> : <span className="badge badge-neutral">Не отправляли</span>}</td>
                   <td><span className={`badge ${statusTone[contact.status]}`}>{statusLabel[contact.status]}</span></td>
                   <td className="text-[11px] text-[var(--text-muted)]">{dateFormatter.format(new Date(contact.updatedAt))}</td>
                   <td><div className="flex"><Link href={campaignHref([contact.id])} className="grid size-8 place-items-center rounded-lg text-[var(--primary)] hover:bg-[var(--primary-subtle)]" aria-label={`Написать ${contact.fullName}`}><SendHorizontal aria-hidden="true" className="size-4" /></Link><button type="button" onClick={() => setEditing(contact)} className="grid size-8 place-items-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface-subtle)]" aria-label={`Изменить ${contact.fullName}`}><Pencil aria-hidden="true" className="size-4" /></button></div></td>

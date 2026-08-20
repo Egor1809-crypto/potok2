@@ -198,6 +198,10 @@ export const contacts = sqliteTable(
       table.workspaceId,
       table.updatedAt,
     ),
+    index("idx_contacts_workspace_last_contacted").on(
+      table.workspaceId,
+      table.lastContactedAt,
+    ),
     index("idx_contacts_workspace_city").on(
       table.workspaceId,
       table.city,

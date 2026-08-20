@@ -64,7 +64,7 @@ export function AnalyticsView() {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/workspace", { cache: "no-store" });
+      const response = await fetch("/api/workspace?scope=history", { cache: "no-store" });
       const payload: WorkspaceSnapshot | { error?: string } = await response.json();
       if (!response.ok || !("campaigns" in payload)) {
         throw new Error("error" in payload && payload.error ? payload.error : "Не удалось загрузить журнал отправки");

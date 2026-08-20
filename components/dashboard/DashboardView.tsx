@@ -98,7 +98,7 @@ export function DashboardView() {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/workspace", { cache: "no-store" });
+      const response = await fetch("/api/workspace?scope=dashboard", { cache: "no-store" });
       const payload: unknown = await response.json().catch(() => null);
       if (!response.ok) throw new Error(errorMessage(payload));
       setSnapshot(unwrap(payload));
