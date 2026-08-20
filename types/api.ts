@@ -575,7 +575,10 @@ export type CampaignMetricsRecord = {
   sent: number;
   delivered: number;
   opened: number;
+  /** Все переходы, включая повторные клики одного получателя. */
   clicked: number;
+  /** Уникальные получатели, которые перешли хотя бы по одной ссылке. */
+  clickedUnique?: number;
   replies: number;
   bounced: number;
   unsubscribed: number;
@@ -720,13 +723,23 @@ export type UniSenderLifetimeStats = {
   sent: number;
   delivered: number;
   opened: number;
+  /** Все переходы по ссылкам, включая повторные. */
   clicked: number;
+  /** Уникальные переходы по кампаниям; один получатель считается один раз в кампании. */
+  clickedUnique?: number;
   updatedAt: string | null;
 };
 
 export type UniSenderLifetimeStatsResponse = {
   stats: UniSenderLifetimeStats;
   byParticipant: ParticipantUniSenderStats[];
+  sync: {
+    processed: number;
+    total: number;
+    nextCursor: number | null;
+    complete: boolean;
+    failed: number;
+  };
 };
 
 export type ParticipantUniSenderStats = UniSenderLifetimeStats & {

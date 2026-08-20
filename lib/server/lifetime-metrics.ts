@@ -23,6 +23,7 @@ export function sumUniSenderLifetimeMetrics(
     delivered: total.delivered + Math.max(0, campaign.metrics.delivered),
     opened: total.opened + Math.max(0, campaign.metrics.opened),
     clicked: total.clicked + Math.max(0, campaign.metrics.clicked),
+    clickedUnique: (total.clickedUnique ?? 0) + Math.max(0, campaign.metrics.clickedUnique ?? campaign.metrics.clicked),
     updatedAt: !total.updatedAt || campaign.updatedAt > total.updatedAt
       ? campaign.updatedAt
       : total.updatedAt,
@@ -32,6 +33,7 @@ export function sumUniSenderLifetimeMetrics(
     delivered: 0,
     opened: 0,
     clicked: 0,
+    clickedUnique: 0,
     updatedAt: null,
   });
 }

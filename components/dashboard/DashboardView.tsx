@@ -98,24 +98,36 @@ export function DashboardView() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [providerRefreshing, setProviderRefreshing] = useState(false);
+  const [providerRefreshProgress, setProviderRefreshProgress] = useState(0);
 
-  const refreshProviderStats = useCallback(async () => {
+  const refreshProviderStats = useCallback(async (full = false) => {
     setProviderRefreshing(true);
+    setProviderRefreshProgress(0);
     try {
-      const response = await fetch("/api/analytics/unisender-summary", {
-        method: "POST",
-        headers: { Accept: "application/json" },
-      });
-      if (!response.ok) return;
-      const payload = await response.json() as UniSenderLifetimeStatsResponse;
-      setSnapshot((current) => current ? {
-        ...current,
-        stats: {
-          ...current.stats,
-          unisenderLifetime: payload.stats,
-          unisenderByParticipant: payload.byParticipant,
-        },
-      } : current);
+      let cursor = 0;
+      let keepRefreshing = true;
+      while (keepRefreshing) {
+        const response = await fetch("/api/analytics/unisender-summary", {
+          method: "POST",
+          headers: { Accept: "application/json", "Content-Type": "application/json" },
+          body: JSON.stringify({ mode: full ? "full" : "quick", cursor }),
+        });
+        if (!response.ok) return;
+        const payload = await response.json() as UniSenderLifetimeStatsResponse;
+        setSnapshot((current) => current ? {
+          ...current,
+          stats: {
+            ...current.stats,
+            unisenderLifetime: payload.stats,
+            unisenderByParticipant: payload.byParticipant,
+          },
+        } : current);
+        setProviderRefreshProgress(payload.sync.total > 0
+          ? Math.min(100, Math.round(((payload.sync.nextCursor ?? payload.sync.total) / payload.sync.total) * 100))
+          : 100);
+        keepRefreshing = full && !payload.sync.complete && payload.sync.nextCursor !== null;
+        if (payload.sync.nextCursor !== null) cursor = payload.sync.nextCursor;
+      }
     } finally {
       setProviderRefreshing(false);
     }
@@ -129,7 +141,7 @@ export function DashboardView() {
       const payload: unknown = await response.json().catch(() => null);
       if (!response.ok) throw new Error(errorMessage(payload));
       setSnapshot(unwrap(payload));
-      void refreshProviderStats();
+      void refreshProviderStats(false);
       const [presentationsResult, imagesResult] = await Promise.allSettled([
         fetch("/api/presentations", { cache: "no-store" }).then(async (result) => {
           if (!result.ok) throw new Error("Презентации недоступны");
@@ -190,12 +202,13 @@ export function DashboardView() {
   const participantStats = snapshot.stats.unisenderByParticipant ?? [];
   const deliveryRate = providerStats.sent ? Math.round((providerStats.delivered / providerStats.sent) * 100) : 0;
   const openRate = providerStats.delivered ? Math.round((providerStats.opened / providerStats.delivered) * 100) : 0;
-  const clickRate = providerStats.delivered ? Math.round((providerStats.clicked / providerStats.delivered) * 100) : 0;
+  const uniqueClicks = providerStats.clickedUnique ?? providerStats.clicked;
+  const clickRate = providerStats.delivered ? Math.round((uniqueClicks / providerStats.delivered) * 100) : 0;
   const providerMetrics = [
     { label: "Отправлено", value: providerStats.sent, note: `${number.format(providerStats.campaigns)} кампаний`, Icon: SendHorizontal, tone: "bg-primary-subtle text-primary" },
     { label: "Доставлено", value: providerStats.delivered, note: `${deliveryRate}% от отправленных`, Icon: MailCheck, tone: "bg-success-subtle text-success" },
     { label: "Прочитано", value: providerStats.opened, note: `${openRate}% от доставленных`, Icon: Eye, tone: "bg-info-subtle text-info" },
-    { label: "Переходы", value: providerStats.clicked, note: `${clickRate}% от доставленных`, Icon: MousePointerClick, tone: "bg-surface-subtle text-text-strong" },
+    { label: "Переходы", value: providerStats.clicked, note: `${number.format(uniqueClicks)} уникальных · ${clickRate}%`, Icon: MousePointerClick, tone: "bg-surface-subtle text-text-strong" },
   ];
   const metrics = [
     { label: "Шаблоны", value: number.format(snapshot.templates.length), note: "Макеты можно редактировать и клонировать", Icon: LibraryBig, href: "/templates", iconTone: "bg-primary-subtle text-text-strong border-border-strong" },
@@ -224,9 +237,9 @@ export function DashboardView() {
             <h2 id="unisender-lifetime-title" className="mt-1 text-[17px] font-semibold">Общие результаты рассылок</h2>
             <p className="mt-1 text-[11px] text-[var(--text-subtle)]">Данные провайдера по всем синхронизированным email-кампаниям.</p>
           </div>
-          <button type="button" onClick={() => void refreshProviderStats()} disabled={providerRefreshing} className="btn btn-secondary w-fit gap-2">
+          <button type="button" onClick={() => void refreshProviderStats(true)} disabled={providerRefreshing} className="btn btn-secondary w-fit gap-2">
             <RefreshCw aria-hidden="true" className={`size-4 ${providerRefreshing ? "animate-spin" : ""}`} />
-            {providerRefreshing ? "Обновляем…" : "Обновить данные"}
+            {providerRefreshing ? `Обновляем… ${providerRefreshProgress}%` : "Обновить все данные"}
           </button>
         </div>
         <div className="grid gap-px bg-[var(--border)] sm:grid-cols-2 xl:grid-cols-4">
@@ -249,7 +262,7 @@ export function DashboardView() {
               const isCurrent = item.participantId === snapshot.participant.id;
               return <article key={item.participantId} className={`rounded-xl border px-3 py-2.5 ${isCurrent ? "border-[var(--primary)]/35 bg-[var(--primary-subtle)]/40" : "border-[var(--border)] bg-[var(--surface-subtle)]/55"}`}>
                 <div className="flex items-center gap-2"><i className="size-2 rounded-full" style={{ backgroundColor: item.color }} /><b className="text-[11px]">{item.displayName}</b>{isCurrent && <span className="badge badge-primary ml-auto">Вы</span>}</div>
-                <p className="mt-2 text-[10px] text-[var(--text-muted)]">Отправлено <b className="text-[var(--text-strong)]">{number.format(item.sent)}</b> · доставлено {number.format(item.delivered)} · прочитано {number.format(item.opened)} · переходы {number.format(item.clicked)}</p>
+                <p className="mt-2 text-[10px] text-[var(--text-muted)]">Отправлено <b className="text-[var(--text-strong)]">{number.format(item.sent)}</b> · доставлено {number.format(item.delivered)} · прочитано {number.format(item.opened)} · переходы {number.format(item.clicked)}{item.clickedUnique !== undefined ? ` · уникальных ${number.format(item.clickedUnique)}` : ""}</p>
               </article>;
             })}
           </div>

@@ -381,6 +381,7 @@ export type UniSenderCampaignStatsResult = ProviderCallResult & {
   sent: number;
   delivered: number;
   readUnique: number;
+  clickedAll: number;
   clickedUnique: number;
   unsubscribed: number;
   spam: number;
@@ -398,6 +399,7 @@ export async function getUniSenderCampaignStats(input: {
     sent: 0,
     delivered: 0,
     readUnique: 0,
+    clickedAll: 0,
     clickedUnique: 0,
     unsubscribed: 0,
     spam: 0,
@@ -416,6 +418,7 @@ export async function getUniSenderCampaignStats(input: {
         sent?: number;
         delivered?: number;
         read_unique?: number;
+        clicked_all?: number;
         clicked_unique?: number;
         unsubscribed?: number;
         spam?: number;
@@ -448,6 +451,7 @@ export async function getUniSenderCampaignStats(input: {
       sent,
       delivered,
       readUnique: Number(stats.read_unique ?? 0),
+      clickedAll: Number(stats.clicked_all ?? stats.clicked_unique ?? 0),
       clickedUnique: Number(stats.clicked_unique ?? 0),
       unsubscribed: Number(stats.unsubscribed ?? 0),
       spam: Number(stats.spam ?? 0),

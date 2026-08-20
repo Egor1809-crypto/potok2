@@ -732,25 +732,53 @@ export async function getWorkspaceBootstrap(request: Request) {
 /** Refresh a small provider-safe batch and return the all-time UniSender totals. */
 export async function getUniSenderLifetimeStats(
   request: Request,
+  options: { mode?: "quick" | "full"; cursor?: number } = {},
 ): Promise<UniSenderLifetimeStatsResponse> {
   await ensureDatabase(request);
-  const pendingRows = await getDb().select({
+  const providerRows = await getDb().select({
     campaignId: deliveryJobs.campaignId,
   }).from(deliveryJobs).where(and(
     eq(deliveryJobs.workspaceId, WORKSPACE_ID),
-    eq(deliveryJobs.status, "processing"),
     sql`json_extract(${deliveryJobs.providerExternalIds}, '$.unisender') is not null`,
-  )).orderBy(asc(deliveryJobs.updatedAt)).limit(3);
+  )).orderBy(asc(deliveryJobs.createdAt), asc(deliveryJobs.id));
 
-  // Provider statistics are read-only. A bounded batch keeps the dashboard
-  // responsive and gradually reconciles older pending campaigns on each visit.
-  for (const row of pendingRows) {
-    try {
-      await syncCampaignDelivery(request, row.campaignId);
-    } catch {
-      // A temporary provider error must not hide the saved lifetime totals.
-    }
+  const campaignIds = Array.from(new Set(providerRows.map((row) => row.campaignId)));
+  const fullRefresh = options.mode === "full";
+  const cursor = fullRefresh ? Math.min(options.cursor ?? 0, campaignIds.length) : 0;
+  const batchSize = fullRefresh ? 12 : 6;
+  let rowsToSync: string[];
+  if (fullRefresh) {
+    rowsToSync = campaignIds.slice(cursor, cursor + batchSize);
+  } else {
+    const pendingRows = await getDb().select({ campaignId: deliveryJobs.campaignId })
+      .from(deliveryJobs)
+      .where(and(
+        eq(deliveryJobs.workspaceId, WORKSPACE_ID),
+        eq(deliveryJobs.status, "processing"),
+        sql`json_extract(${deliveryJobs.providerExternalIds}, '$.unisender') is not null`,
+      ))
+      .orderBy(asc(deliveryJobs.updatedAt))
+      .limit(3);
+    const staleRows = await getDb().select({ campaignId: deliveryJobs.campaignId })
+      .from(deliveryJobs)
+      .where(and(
+        eq(deliveryJobs.workspaceId, WORKSPACE_ID),
+        sql`${deliveryJobs.status} <> 'processing'`,
+        sql`json_extract(${deliveryJobs.providerExternalIds}, '$.unisender') is not null`,
+      ))
+      .orderBy(asc(deliveryJobs.updatedAt))
+      .limit(3);
+    rowsToSync = Array.from(new Set([...pendingRows, ...staleRows].map((row) => row.campaignId)));
   }
+
+  // Clicks and opens continue to accrue after delivery finishes. Refresh both
+  // active and completed campaigns so saved totals cannot freeze at the first
+  // provider report. A bounded batch keeps every Worker request responsive.
+  const syncResults = await Promise.allSettled(
+    rowsToSync.map((campaignId) => syncCampaignDelivery(request, campaignId)),
+  );
+  // A temporary provider error must not hide the saved lifetime totals.
+  const failed = syncResults.filter((result) => result.status === "rejected").length;
 
   const [campaignRecords, memberRows] = await Promise.all([
     campaignSummaryRecords(),
@@ -762,6 +790,15 @@ export async function getUniSenderLifetimeStats(
   return {
     stats: sumUniSenderLifetimeMetrics(campaignRecords),
     byParticipant: sumUniSenderMetricsByParticipant(campaignRecords, memberRows),
+    sync: {
+      processed: rowsToSync.length,
+      total: campaignIds.length,
+      nextCursor: fullRefresh && cursor + rowsToSync.length < campaignIds.length
+        ? cursor + rowsToSync.length
+        : null,
+      complete: !fullRefresh || cursor + rowsToSync.length >= campaignIds.length,
+      failed,
+    },
   };
 }
 
@@ -3957,7 +3994,10 @@ async function markAcceptedCampaignContactsSent(campaignId: string, contactedAt:
   for (const contactIdChunk of chunksOf(contactIds, 40)) {
     await db.update(contacts)
       .set({ lastContactedAt: contactedAt, updatedAt: contactedAt })
-      .where(inArray(contacts.id, contactIdChunk));
+      .where(and(
+        inArray(contacts.id, contactIdChunk),
+        sql`(${contacts.lastContactedAt} IS NULL OR ${contacts.lastContactedAt} < ${contactedAt})`,
+      ));
   }
 }
 
@@ -4051,16 +4091,18 @@ export async function syncCampaignDelivery(
     acceptedCount: isFinal ? report.delivered : Math.max(job.acceptedCount, report.sent),
     rejectedCount: isFinal ? undelivered : 0,
     statusMessage,
-    completedAt: isFinal ? now : null,
+    completedAt: isFinal ? (job.completedAt ?? now) : null,
     updatedAt: now,
   }).where(eq(deliveryJobs.id, job.id)).returning();
-  await getDb().update(deliveryOutbox).set({
-    statusMessage,
-    updatedAt: now,
-  }).where(and(
-    eq(deliveryOutbox.jobId, job.id),
-    eq(deliveryOutbox.providerId, "unisender"),
-  ));
+  if (job.statusMessage !== statusMessage) {
+    await getDb().update(deliveryOutbox).set({
+      statusMessage,
+      updatedAt: now,
+    }).where(and(
+      eq(deliveryOutbox.jobId, job.id),
+      eq(deliveryOutbox.providerId, "unisender"),
+    ));
+  }
   await getDb().update(campaigns).set({
     status: isFinal ? "completed" : "sending",
     statusReason: statusMessage,
@@ -4070,13 +4112,16 @@ export async function syncCampaignDelivery(
       sent: report.sent,
       delivered: report.delivered,
       opened: report.readUnique,
-      clicked: report.clickedUnique,
+      clicked: report.clickedAll,
+      clickedUnique: report.clickedUnique,
       bounced: undelivered,
       unsubscribed: report.unsubscribed,
     },
     updatedAt: now,
   }).where(eq(campaigns.id, campaignId));
-  if (report.sent > 0) await markAcceptedCampaignContactsSent(campaignId, now);
+  if (report.sent > 0) {
+    await markAcceptedCampaignContactsSent(campaignId, current.campaign.sentAt ?? job.createdAt);
+  }
   const event = await appendEvent(campaignId, "delivery_synced", statusMessage, {
     provider: "unisender",
     providerStatus: report.providerStatus,
@@ -4085,7 +4130,8 @@ export async function syncCampaignDelivery(
     delivered: report.delivered,
     undelivered,
     opened: report.readUnique,
-    clicked: report.clickedUnique,
+    clicked: report.clickedAll,
+    clickedUnique: report.clickedUnique,
     spam: report.spam,
   });
   const updated = await campaignBundle(campaignId);

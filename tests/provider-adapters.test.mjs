@@ -376,6 +376,7 @@ test("UniSender delivery reconciliation uses the provider's final statistics", a
         sent: 3,
         delivered: 2,
         read_unique: 1,
+        clicked_all: 3,
         clicked_unique: 1,
         unsubscribed: 0,
         spam: 0,
@@ -387,6 +388,8 @@ test("UniSender delivery reconciliation uses the provider's final statistics", a
   assert.equal(result.providerStatus, "analysed");
   assert.equal(result.sent, 3);
   assert.equal(result.delivered, 2);
+  assert.equal(result.clickedAll, 3);
+  assert.equal(result.clickedUnique, 1);
   assert.deepEqual(methods.sort(), ["getCampaignCommonStats", "getCampaignStatus"]);
 });
 
