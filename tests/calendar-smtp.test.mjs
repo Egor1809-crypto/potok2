@@ -8,7 +8,7 @@ async function source(path) {
   return readFile(new URL(path, root), "utf8");
 }
 
-test("calendar connects scheduled campaigns, audience filters and the due queue", async () => {
+test("calendar backend remains compatible while new campaigns use immediate delivery", async () => {
   const [calendar, wizard, store, worker, assets, timezone, topbar, navigation] = await Promise.all([
     source("components/calendar/CalendarView.tsx"),
     source("components/campaigns/CampaignWizard.tsx"),
@@ -31,17 +31,9 @@ test("calendar connects scheduled campaigns, audience filters and the due queue"
   assert.doesNotMatch(calendar, /Проверить очередь/);
   assert.doesNotMatch(calendar, /fetch\("\/api\/scheduler"/);
   assert.doesNotMatch(calendar, /items\.slice\(0, 3\)/);
-  assert.match(wizard, /scheduledAt/);
-  assert.match(wizard, /scheduledTimes/);
-  assert.match(wizard, /Добавить время/);
-  assert.match(wizard, /волна \$\{index \+ 1\}\/\$\{launchTimes\.length\}/);
-  assert.match(wizard, /recipientCount \* waveCount/);
-  assert.match(wizard, /Каждый получатель получит это письмо во все выбранные периоды/);
-  assert.match(wizard, /createdWaveIds/);
-  assert.match(wizard, /Незавершённые дополнительные волны удалены/);
-  assert.match(wizard, /formatWaveCount\(scheduledTimes\.length\).*в календарь/);
-  assert.match(wizard, /Времена волн.*сохранены/);
-  assert.match(wizard, /Показать в календаре/);
+  assert.match(wizard, /Отправка без календаря/);
+  assert.match(wizard, /Отложенная отправка временно отключена/);
+  assert.doesNotMatch(wizard, /По расписанию/);
   assert.match(store, /eq\(campaigns\.status, "scheduled"\)/);
   assert.match(store, /lte\(campaigns\.scheduledAt, now\)/);
   assert.match(store, /providerScheduledAt/);
@@ -54,7 +46,6 @@ test("calendar connects scheduled campaigns, audience filters and the due queue"
   assert.match(timezone, /resolvedOptions\(\)\.timeZone/);
   assert.match(calendar, /formatTime\(campaign\.scheduledAt!, timeZone\)/);
   assert.match(calendar, /Часовой пояс определён автоматически/);
-  assert.match(wizard, /Часовой пояс:/);
   assert.match(wizard, /Базы ответственных/);
   assert.match(wizard, /Выбрать базу/);
   assert.match(wizard, /Все ответственные/);
@@ -62,7 +53,7 @@ test("calendar connects scheduled campaigns, audience filters and the due queue"
   assert.match(wizard, /Все листы баз/);
   assert.match(wizard, /Есть Email/);
   assert.match(wizard, /Ответственный:/);
-  assert.match(topbar, /href="\/calendar"/);
+  assert.doesNotMatch(topbar, /href="\/calendar"/);
   assert.doesNotMatch(navigation, /href: "\/calendar"/);
 });
 

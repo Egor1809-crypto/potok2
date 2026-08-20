@@ -792,6 +792,8 @@ export type ContactListSummary = {
   total: number;
   active: number;
   assigned: number;
+  sent: number;
+  pending: number;
   primaryBase: number;
   secondaryBase: number;
   coverage: ContactCoverageSummary;
@@ -824,6 +826,16 @@ export type ContactsListResponse = {
   pageSize: number;
   totalPages: number;
   filteredCount: number;
+  deliveryHistory?: Record<string, Array<{
+    campaignId: string;
+    campaignName: string;
+    providerId: string;
+    channel: string;
+    status: string;
+    statusMessage: string;
+    externalId: string | null;
+    updatedAt: string;
+  }>>;
   summary?: ContactListSummary;
   facets?: {
     companies: string[];
