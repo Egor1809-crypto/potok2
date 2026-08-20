@@ -486,7 +486,7 @@ function CampaignWizardState({
   const [senderEmail, setSenderEmail] = React.useState(
     seedDraft?.senderEmail ?? "",
   );
-  const [scheduledTimes, setScheduledTimes] = React.useState<string[]>([]);
+  const [scheduledTimes, setScheduledTimes] = React.useState<string[]>(() => initialScheduledTimes(params, seedDraft));
   const scheduledAt = scheduledTimes[0] ?? null;
   const setScheduledAt = React.useCallback((value: string | null) => {
     setScheduledTimes(value ? [value] : []);
@@ -2048,11 +2048,16 @@ function ReviewStep({
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h3 id="schedule-title" className="text-[15px] font-semibold text-text-strong">Когда отправить</h3>
-            <p className="mt-1 text-[12px] leading-5 text-text-muted">Рассылка запускается сразу после успешной серверной проверки. Отправка через календарь временно отключена.</p>
+            <p className="mt-1 text-[12px] leading-5 text-text-muted">«Сейчас» запустит рассылку после проверки. «По расписанию» добавит одну или несколько волн в календарь и очередь отправки.</p>
           </div>
           <div className="flex gap-2">
             <Button size="sm" variant={scheduledAt ? "secondary" : "primary"} onClick={() => onScheduledTimesChange([])}>Сейчас</Button>
-            <Button size="sm" variant="secondary" disabled>По расписанию — временно отключено</Button>
+            <Button size="sm" variant={scheduledAt ? "primary" : "secondary"} onClick={() => {
+              if (scheduledAt) return;
+              const date = new Date(Date.now() + 60 * 60 * 1000);
+              date.setMinutes(Math.ceil(date.getMinutes() / 15) * 15, 0, 0);
+              onScheduledTimesChange([date.toISOString()]);
+            }}>По расписанию</Button>
           </div>
         </div>
         {scheduledAt ? (

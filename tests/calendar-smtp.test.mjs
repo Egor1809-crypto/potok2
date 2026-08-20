@@ -33,6 +33,9 @@ test("calendar connects scheduled campaigns, audience filters and the due queue"
   assert.doesNotMatch(calendar, /items\.slice\(0, 3\)/);
   assert.match(wizard, /scheduledAt/);
   assert.match(wizard, /scheduledTimes/);
+  assert.match(wizard, /initialScheduledTimes\(params, seedDraft\)/);
+  assert.match(wizard, />По расписанию<\/Button>/);
+  assert.doesNotMatch(wizard, /По расписанию — временно отключено/);
   assert.match(wizard, /Добавить время/);
   assert.match(wizard, /волна \$\{index \+ 1\}\/\$\{launchTimes\.length\}/);
   assert.match(wizard, /recipientCount \* waveCount/);
