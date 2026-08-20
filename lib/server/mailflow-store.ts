@@ -774,11 +774,21 @@ export async function getUniSenderLifetimeStats(
   // Clicks and opens continue to accrue after delivery finishes. Refresh both
   // active and completed campaigns so saved totals cannot freeze at the first
   // provider report. A bounded batch keeps every Worker request responsive.
-  const syncResults = await Promise.allSettled(
-    rowsToSync.map((campaignId) => syncCampaignDelivery(request, campaignId)),
-  );
+  // Keep provider and D1 concurrency modest. Retry temporary failures once so
+  // one click normally produces a complete historical reconciliation.
+  let failed = 0;
+  for (const campaignIdChunk of chunksOf(rowsToSync, 4)) {
+    const firstAttempt = await Promise.allSettled(
+      campaignIdChunk.map((campaignId) => syncCampaignDelivery(request, campaignId)),
+    );
+    const retryIds = campaignIdChunk.filter((_, index) => firstAttempt[index]?.status === "rejected");
+    if (!retryIds.length) continue;
+    const retryAttempt = await Promise.allSettled(
+      retryIds.map((campaignId) => syncCampaignDelivery(request, campaignId)),
+    );
+    failed += retryAttempt.filter((result) => result.status === "rejected").length;
+  }
   // A temporary provider error must not hide the saved lifetime totals.
-  const failed = syncResults.filter((result) => result.status === "rejected").length;
 
   const [campaignRecords, memberRows] = await Promise.all([
     campaignSummaryRecords(),

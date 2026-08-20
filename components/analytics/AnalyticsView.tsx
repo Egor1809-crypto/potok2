@@ -172,7 +172,7 @@ export function AnalyticsView() {
     { label: "Отправлено", value: providerTotals.sent, note: `${number.format(selectedCampaigns.length)} email-кампаний`, Icon: Send },
     { label: "Доставлено", value: providerTotals.delivered, note: "подтверждено UniSender", Icon: MailCheck },
     { label: "Прочитано", value: providerTotals.opened, note: "уникальные открытия", Icon: Eye },
-    { label: "Переходы", value: providerTotals.clicked, note: "все клики, включая повторные", Icon: MousePointerClick },
+    { label: "Все переходы", value: providerTotals.clicked, note: "включая повторные клики", Icon: MousePointerClick },
     { label: "Не доставлено", value: providerTotals.bounced, note: "по данным провайдера", Icon: ShieldAlert },
     { label: "Принято в заданиях", value: jobTotals.accepted, note: `последние ${number.format(snapshot.historyWindow.deliveryJobsLimit)} заданий`, Icon: BarChart3 },
   ];

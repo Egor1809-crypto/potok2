@@ -208,7 +208,7 @@ export function DashboardView() {
     { label: "Отправлено", value: providerStats.sent, note: `${number.format(providerStats.campaigns)} кампаний`, Icon: SendHorizontal, tone: "bg-primary-subtle text-primary" },
     { label: "Доставлено", value: providerStats.delivered, note: `${deliveryRate}% от отправленных`, Icon: MailCheck, tone: "bg-success-subtle text-success" },
     { label: "Прочитано", value: providerStats.opened, note: `${openRate}% от доставленных`, Icon: Eye, tone: "bg-info-subtle text-info" },
-    { label: "Переходы", value: providerStats.clicked, note: `${number.format(uniqueClicks)} уникальных · ${clickRate}%`, Icon: MousePointerClick, tone: "bg-surface-subtle text-text-strong" },
+    { label: "Все переходы", value: providerStats.clicked, note: `${number.format(uniqueClicks)} уникальных получателя · ${clickRate}%`, Icon: MousePointerClick, tone: "bg-surface-subtle text-text-strong" },
   ];
   const metrics = [
     { label: "Шаблоны", value: number.format(snapshot.templates.length), note: "Макеты можно редактировать и клонировать", Icon: LibraryBig, href: "/templates", iconTone: "bg-primary-subtle text-text-strong border-border-strong" },

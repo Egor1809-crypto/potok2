@@ -16,6 +16,8 @@ test("dashboard refresh is bounded and provider failures preserve saved totals",
   assert.match(store, /const batchSize = fullRefresh \? 12 : 6/);
   assert.match(store, /status} <> 'processing'/);
   assert.match(store, /Promise\.allSettled/);
+  assert.match(store, /chunksOf\(rowsToSync, 4\)/);
+  assert.match(store, /retryIds/);
   assert.match(store, /A temporary provider error must not hide the saved lifetime totals/);
 });
 
