@@ -110,7 +110,11 @@ export function DashboardView() {
       const payload = await response.json() as UniSenderLifetimeStatsResponse;
       setSnapshot((current) => current ? {
         ...current,
-        stats: { ...current.stats, unisenderLifetime: payload.stats },
+        stats: {
+          ...current.stats,
+          unisenderLifetime: payload.stats,
+          unisenderByParticipant: payload.byParticipant,
+        },
       } : current);
     } finally {
       setProviderRefreshing(false);
@@ -183,6 +187,7 @@ export function DashboardView() {
       integration.channels.includes("email"),
   );
   const providerStats = snapshot.stats.unisenderLifetime;
+  const participantStats = snapshot.stats.unisenderByParticipant ?? [];
   const deliveryRate = providerStats.sent ? Math.round((providerStats.delivered / providerStats.sent) * 100) : 0;
   const openRate = providerStats.delivered ? Math.round((providerStats.opened / providerStats.delivered) * 100) : 0;
   const clickRate = providerStats.delivered ? Math.round((providerStats.clicked / providerStats.delivered) * 100) : 0;
@@ -233,6 +238,21 @@ export function DashboardView() {
               <p className="mt-1 text-[10px] text-[var(--text-subtle)]">{note}</p>
             </article>
           ))}
+        </div>
+        <div className="border-t border-[var(--border)] px-5 py-4 sm:px-6">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div><h3 className="text-[13px] font-semibold">Кто реально отправлял</h3><p className="mt-1 text-[10px] text-[var(--text-subtle)]">Показатели относятся к автору кампании, а не к ответственному за контакт.</p></div>
+            <Link href="/analytics" className="text-[11px] font-semibold text-[var(--primary)]">Подробная аналитика →</Link>
+          </div>
+          <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+            {participantStats.map((item) => {
+              const isCurrent = item.participantId === snapshot.participant.id;
+              return <article key={item.participantId} className={`rounded-xl border px-3 py-2.5 ${isCurrent ? "border-[var(--primary)]/35 bg-[var(--primary-subtle)]/40" : "border-[var(--border)] bg-[var(--surface-subtle)]/55"}`}>
+                <div className="flex items-center gap-2"><i className="size-2 rounded-full" style={{ backgroundColor: item.color }} /><b className="text-[11px]">{item.displayName}</b>{isCurrent && <span className="badge badge-primary ml-auto">Вы</span>}</div>
+                <p className="mt-2 text-[10px] text-[var(--text-muted)]">Отправлено <b className="text-[var(--text-strong)]">{number.format(item.sent)}</b> · доставлено {number.format(item.delivered)} · прочитано {number.format(item.opened)} · переходы {number.format(item.clicked)}</p>
+              </article>;
+            })}
+          </div>
         </div>
       </section>
 

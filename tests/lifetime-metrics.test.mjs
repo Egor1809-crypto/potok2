@@ -16,3 +16,9 @@ test("dashboard refresh is bounded and provider failures preserve saved totals",
   assert.match(store, /orderBy\(asc\(deliveryJobs\.updatedAt\)\)\.limit\(3\)/);
   assert.match(store, /A temporary provider error must not hide the saved lifetime totals/);
 });
+
+test("provider metrics are grouped by campaign author instead of contact owner", () => {
+  assert.match(source, /sumUniSenderMetricsByParticipant/);
+  assert.match(source, /campaign\.participantId/);
+  assert.match(source, /campaignsByParticipant/);
+});

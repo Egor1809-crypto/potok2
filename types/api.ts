@@ -541,6 +541,8 @@ export type PresentationAiResponse = {
 export type CampaignRecord = {
   id: string;
   workspaceId: string;
+  /** Участник, который создал и запустил кампанию. */
+  participantId: string;
   name: string;
   purpose: "marketing" | "transactional";
   audienceType: "none" | "segment" | "contacts";
@@ -609,6 +611,8 @@ export type CampaignEventRecord = {
     | "dispatch_completed"
     | "dispatch_partial"
     | "dispatch_blocked"
+    | "provider_schedule_created"
+    | "provider_schedule_due"
     | "delivery_synced";
   message: string;
   details: Record<string, unknown>;
@@ -708,6 +712,7 @@ export type WorkspaceStats = {
   activeCampaigns: number;
   connectedIntegrations: number;
   unisenderLifetime: UniSenderLifetimeStats;
+  unisenderByParticipant: ParticipantUniSenderStats[];
 };
 
 export type UniSenderLifetimeStats = {
@@ -721,6 +726,13 @@ export type UniSenderLifetimeStats = {
 
 export type UniSenderLifetimeStatsResponse = {
   stats: UniSenderLifetimeStats;
+  byParticipant: ParticipantUniSenderStats[];
+};
+
+export type ParticipantUniSenderStats = UniSenderLifetimeStats & {
+  participantId: string;
+  displayName: string;
+  color: string;
 };
 
 export type WorkspaceHistoryWindow = {
@@ -827,7 +839,13 @@ export type ContactOwnerSummary = {
   readyEmail: number;
   serviceEmail: number;
   readyTelegram: number;
+  /** Реальные email-отправки кампаний этого участника, а не контакты его базы. */
   sent: number;
+  delivered: number;
+  opened: number;
+  clicked: number;
+  campaigns: number;
+  lastActivityAt: string | null;
   sheets: ContactListFacet[];
 };
 
@@ -843,6 +861,8 @@ export type ContactsListResponse = {
   deliveryHistory?: Record<string, Array<{
     campaignId: string;
     campaignName: string;
+    participantId: string | null;
+    participantName: string;
     providerId: string;
     channel: string;
     status: string;

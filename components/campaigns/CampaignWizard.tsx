@@ -650,7 +650,7 @@ function CampaignWizardState({
     } finally {
       setWorkspaceContactsLoadingMore(false);
     }
-  }, [workspaceContactCount, workspaceContacts.length, workspaceContactsLoadingMore, workspaceContactsPage]);
+  }, [setError, workspaceContactCount, workspaceContacts.length, workspaceContactsLoadingMore, workspaceContactsPage]);
 
   const refreshPendingContacts = React.useCallback(async () => {
     const response = await fetch("/api/contacts?page=1&pageSize=250&meta=0&delivery=pending", {

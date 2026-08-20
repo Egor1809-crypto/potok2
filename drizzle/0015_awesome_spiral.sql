@@ -1,0 +1,2 @@
+CREATE INDEX `idx_campaigns_workspace_participant_updated` ON `campaigns` (`workspace_id`,`participant_id`,`updated_at`);--> statement-breakpoint
+CREATE INDEX `idx_delivery_outbox_contact_updated` ON `delivery_outbox` (`contact_id`,`updated_at`);

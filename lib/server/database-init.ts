@@ -340,6 +340,7 @@ const schemaStatements = [
   `CREATE INDEX IF NOT EXISTS idx_ai_idempotency_workspace_operation_created ON ai_idempotency(workspace_id, operation, created_at)`,
   `CREATE INDEX IF NOT EXISTS idx_presentation_projects_workspace_updated ON presentation_projects(workspace_id, updated_at)`,
   `CREATE INDEX IF NOT EXISTS idx_campaigns_workspace_status_updated ON campaigns(workspace_id, status, updated_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_campaigns_workspace_participant_updated ON campaigns(workspace_id, participant_id, updated_at)`,
   `CREATE INDEX IF NOT EXISTS idx_campaigns_segment ON campaigns(segment_id)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_campaign_versions_number ON campaign_versions(campaign_id, version)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_campaign_versions_hash ON campaign_versions(campaign_id, content_hash)`,
@@ -349,6 +350,7 @@ const schemaStatements = [
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_delivery_outbox_idempotency ON delivery_outbox(idempotency_key)`,
   `CREATE INDEX IF NOT EXISTS idx_delivery_outbox_job_status ON delivery_outbox(job_id, status)`,
   `CREATE INDEX IF NOT EXISTS idx_delivery_outbox_campaign_channel ON delivery_outbox(campaign_id, channel)`,
+  `CREATE INDEX IF NOT EXISTS idx_delivery_outbox_contact_updated ON delivery_outbox(contact_id, updated_at)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_delivery_plans_campaign_channel ON delivery_plans(campaign_id, channel)`,
   `CREATE INDEX IF NOT EXISTS idx_delivery_plans_provider ON delivery_plans(provider_id)`,
   `CREATE INDEX IF NOT EXISTS idx_campaign_events_workspace_occurred ON campaign_events(workspace_id, occurred_at)`,
@@ -478,6 +480,8 @@ async function createSchema() {
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_contacts_workspace_last_contacted ON contacts(workspace_id, last_contacted_at)"),
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_contacts_workspace_city ON contacts(workspace_id, city)"),
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_contacts_workspace_company_name ON contacts(workspace_id, company_name)"),
+    d1.prepare("CREATE INDEX IF NOT EXISTS idx_campaigns_workspace_participant_updated ON campaigns(workspace_id, participant_id, updated_at)"),
+    d1.prepare("CREATE INDEX IF NOT EXISTS idx_delivery_outbox_contact_updated ON delivery_outbox(contact_id, updated_at)"),
   ]);
   await d1.prepare("PRAGMA optimize").run();
   const campaignColumns = await d1

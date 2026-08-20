@@ -492,6 +492,11 @@ export const campaigns = sqliteTable(
       table.status,
       table.updatedAt,
     ),
+    index("idx_campaigns_workspace_participant_updated").on(
+      table.workspaceId,
+      table.participantId,
+      table.updatedAt,
+    ),
     index("idx_campaigns_segment").on(table.segmentId),
   ],
 );
@@ -595,6 +600,10 @@ export const deliveryOutbox = sqliteTable(
     index("idx_delivery_outbox_campaign_channel").on(
       table.campaignId,
       table.channel,
+    ),
+    index("idx_delivery_outbox_contact_updated").on(
+      table.contactId,
+      table.updatedAt,
     ),
   ],
 );

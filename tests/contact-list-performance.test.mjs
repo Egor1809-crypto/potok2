@@ -76,13 +76,14 @@ test("large contact payloads are loaded only by workflows that require them", as
 });
 
 test("contact filters and ordering have database indexes", async () => {
-  const [schema, runtimeSchema, originalMigration, sentMigration] = await Promise.all([
+  const [schema, runtimeSchema, originalMigration, sentMigration, analyticsMigration] = await Promise.all([
     readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
     readFile(new URL("../lib/server/database-init.ts", import.meta.url), "utf8"),
     readFile(new URL("../drizzle/0012_handy_may_parker.sql", import.meta.url), "utf8"),
     readFile(new URL("../drizzle/0014_smart_exodus.sql", import.meta.url), "utf8"),
+    readFile(new URL("../drizzle/0015_awesome_spiral.sql", import.meta.url), "utf8"),
   ]);
-  const migration = `${originalMigration}\n${sentMigration}`;
+  const migration = `${originalMigration}\n${sentMigration}\n${analyticsMigration}`;
 
   for (const indexName of [
     "idx_contacts_workspace_status_updated",
@@ -90,6 +91,8 @@ test("contact filters and ordering have database indexes", async () => {
     "idx_contacts_workspace_last_contacted",
     "idx_contacts_workspace_city",
     "idx_contacts_workspace_company_name",
+    "idx_campaigns_workspace_participant_updated",
+    "idx_delivery_outbox_contact_updated",
   ]) {
     assert.match(schema, new RegExp(indexName));
     assert.match(runtimeSchema, new RegExp(indexName));
@@ -124,7 +127,31 @@ test("sent contacts stay durable and are separated by provider history", async (
   assert.match(store, /delivery === "pending"/);
   assert.match(store, /deliveryHistory/);
   assert.match(store, /acceptedRows\.length && !schedulingAtProvider/);
+  assert.match(store, /markAcceptedCampaignContactsSent/);
+  assert.match(store, /if \(report\.sent > 0\)/);
   assert.match(route, /selection\?: unknown/);
+});
+
+test("contact ownership is not confused with the participant who sent a campaign", async () => {
+  const [view, store, types] = await Promise.all([
+    readFile(new URL("../components/contacts/ContactsView.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/server/mailflow-store.ts", import.meta.url), "utf8"),
+    readFile(new URL("../types/api.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(view, /Фактическая активность участника/);
+  assert.match(view, /Отправитель: <b>\{entry\.participantName\}/);
+  assert.doesNotMatch(view, /Уже обработано:/);
+  assert.match(store, /participant_id AS participantId/);
+  assert.match(store, /FROM campaigns/);
+  assert.match(store, /participantName: participants\.displayName/);
+  assert.match(types, /participantId: string;/);
+});
+
+test("lightweight campaign summaries skip recipient-id blobs", async () => {
+  const store = await readFile(new URL("../lib/server/mailflow-store.ts", import.meta.url), "utf8");
+  assert.match(store, /do not pull those JSON blobs/);
+  assert.match(store, /contactIds: \[\]/);
 });
 
 test("an untouched queued delivery job can resume without duplicating accepted mail", async () => {

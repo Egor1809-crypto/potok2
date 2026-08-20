@@ -72,7 +72,9 @@ export function ProductGuide() {
     if (!node) return;
     node.scrollIntoView({ block: "center", behavior: "smooth" });
     node.setAttribute("data-guide-active", "true");
-    return () => node.removeAttribute("data-guide-active");
+    return () => {
+      node.removeAttribute("data-guide-active");
+    };
   }, [currentStep.target, open, targetExists]);
 
   const close = () => {

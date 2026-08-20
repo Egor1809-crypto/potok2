@@ -57,7 +57,8 @@ async function makePdfLinksViewerCompatible(pdfBlob: Blob) {
     }
   }
 
-  return new Blob([await document.save({ useObjectStreams: false })], { type: "application/pdf" });
+  const bytes = Uint8Array.from(await document.save({ useObjectStreams: false }));
+  return new Blob([bytes.buffer], { type: "application/pdf" });
 }
 
 async function renderPdf(html: string) {

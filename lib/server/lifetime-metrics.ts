@@ -1,4 +1,9 @@
-import type { CampaignRecord, UniSenderLifetimeStats } from "@/types/api";
+import type {
+  CampaignRecord,
+  ParticipantRecord,
+  ParticipantUniSenderStats,
+  UniSenderLifetimeStats,
+} from "@/types/api";
 
 /**
  * Campaign metrics are persisted after UniSender status synchronization. The
@@ -29,4 +34,24 @@ export function sumUniSenderLifetimeMetrics(
     clicked: 0,
     updatedAt: null,
   });
+}
+
+/** Attribute provider results to the campaign author, never to a contact owner. */
+export function sumUniSenderMetricsByParticipant(
+  campaigns: Pick<CampaignRecord, "participantId" | "deliveryChannels" | "metrics" | "updatedAt">[],
+  participants: Pick<ParticipantRecord, "id" | "displayName" | "color">[],
+): ParticipantUniSenderStats[] {
+  const campaignsByParticipant = new Map<string, typeof campaigns>();
+  for (const campaign of campaigns) {
+    const values = campaignsByParticipant.get(campaign.participantId) ?? [];
+    values.push(campaign);
+    campaignsByParticipant.set(campaign.participantId, values);
+  }
+
+  return participants.map((participant) => ({
+    participantId: participant.id,
+    displayName: participant.displayName,
+    color: participant.color,
+    ...sumUniSenderLifetimeMetrics(campaignsByParticipant.get(participant.id) ?? []),
+  })).sort((left, right) => right.sent - left.sent || left.displayName.localeCompare(right.displayName, "ru"));
 }

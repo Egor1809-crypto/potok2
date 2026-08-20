@@ -111,7 +111,10 @@ import {
 } from "./template-store";
 import { getPresentationProject } from "./presentation-store";
 import { buildPresentationPptx, safePresentationFilename } from "./presentation-pptx";
-import { sumUniSenderLifetimeMetrics } from "./lifetime-metrics";
+import {
+  sumUniSenderLifetimeMetrics,
+  sumUniSenderMetricsByParticipant,
+} from "./lifetime-metrics";
 
 type ContactRow = typeof contacts.$inferSelect;
 type SegmentRow = typeof segments.$inferSelect;
@@ -240,6 +243,7 @@ function toCampaign(row: CampaignRow): CampaignRecord {
   return {
     id: row.id,
     workspaceId: row.workspaceId,
+    participantId: row.participantId,
     name: row.name,
     purpose: row.purpose as CampaignRecord["purpose"],
     audienceType: row.audienceType as CampaignRecord["audienceType"],
@@ -593,6 +597,10 @@ export async function getWorkspaceSnapshot(
         (integration) => integration.status === "connected",
       ).length,
       unisenderLifetime: sumUniSenderLifetimeMetrics(campaignRecords),
+      unisenderByParticipant: sumUniSenderMetricsByParticipant(
+        campaignRecords,
+        rows.memberRows.filter((member) => member.status === "active"),
+      ),
     },
   };
 }
@@ -607,7 +615,6 @@ async function campaignSummaryRecords(): Promise<CampaignRecord[]> {
     audienceType: campaigns.audienceType,
     audienceLabel: campaigns.audienceLabel,
     segmentId: campaigns.segmentId,
-    contactIds: campaigns.contactIds,
     templateId: campaigns.templateId,
     presentationId: campaigns.presentationId,
     senderName: campaigns.senderName,
@@ -630,7 +637,10 @@ async function campaignSummaryRecords(): Promise<CampaignRecord[]> {
   }).from(campaigns)
     .where(eq(campaigns.workspaceId, WORKSPACE_ID))
     .orderBy(desc(campaigns.updatedAt));
-  return rows.map((row) => toCampaign(row as CampaignRow));
+  // List, dashboard and analytics screens never need every recipient id. Large
+  // campaigns can contain thousands of ids, so do not pull those JSON blobs
+  // into Worker memory for lightweight summaries.
+  return rows.map((row) => toCampaign({ ...row, contactIds: [] } as CampaignRow));
 }
 
 /** Lightweight data for screens that do not need the complete workspace dump. */
@@ -666,7 +676,7 @@ export async function getWorkspaceBootstrap(request: Request) {
     return { ...base, campaigns: campaignRows.map(toCampaign), deliveryPlans: planRows.map(toDeliveryPlan), deliveryJobs: jobRows.map(toDeliveryJob), events: eventRows.map(toCampaignEvent) };
   }
   if (scope === "campaign-list" || scope === "history" || scope === "dashboard") {
-    const [campaignRecords, segmentRows, integrationRows, planRows, jobRows, eventRows, statsRows, templateCountRows] = await Promise.all([
+    const [campaignRecords, segmentRows, integrationRows, planRows, jobRows, eventRows, statsRows, templateCountRows, memberRows] = await Promise.all([
       campaignSummaryRecords(),
       db.select().from(segments).where(eq(segments.workspaceId, WORKSPACE_ID)).orderBy(desc(segments.updatedAt)),
       db.select().from(integrations).where(eq(integrations.workspaceId, WORKSPACE_ID)).orderBy(integrations.providerId),
@@ -675,10 +685,12 @@ export async function getWorkspaceBootstrap(request: Request) {
       scope === "history" ? db.select().from(campaignEvents).where(eq(campaignEvents.workspaceId, WORKSPACE_ID)).orderBy(desc(campaignEvents.occurredAt)).limit(WORKSPACE_HISTORY_LIMIT) : Promise.resolve([]),
       db.select({ total: sql<number>`count(*)`, active: sql<number>`coalesce(sum(case when ${contacts.status} = 'active' then 1 else 0 end), 0)` }).from(contacts).where(eq(contacts.workspaceId, WORKSPACE_ID)),
       db.select({ total: sql<number>`count(*)` }).from(emailTemplates).where(eq(emailTemplates.workspaceId, WORKSPACE_ID)),
+      db.select().from(participants).where(and(eq(participants.workspaceId, WORKSPACE_ID), eq(participants.status, "active"))).orderBy(participants.createdAt),
     ]);
     const integrationRecords = integrationRows.filter((row) => PROVIDERS.includes(row.providerId)).map(toIntegrationRecord);
     return {
       ...base,
+      members: memberRows.map(toParticipant),
       campaigns: campaignRecords,
       deliveryPlans: planRows.map(toDeliveryPlan),
       deliveryJobs: jobRows.map(toDeliveryJob),
@@ -695,6 +707,7 @@ export async function getWorkspaceBootstrap(request: Request) {
         activeCampaigns: campaignRecords.filter((campaign) => ["ready", "scheduled", "sending"].includes(campaign.status)).length,
         connectedIntegrations: integrationRecords.filter((integration) => integration.status === "connected").length,
         unisenderLifetime: sumUniSenderLifetimeMetrics(campaignRecords),
+        unisenderByParticipant: sumUniSenderMetricsByParticipant(campaignRecords, memberRows),
       },
     };
   }
@@ -739,7 +752,17 @@ export async function getUniSenderLifetimeStats(
     }
   }
 
-  return { stats: sumUniSenderLifetimeMetrics(await campaignSummaryRecords()) };
+  const [campaignRecords, memberRows] = await Promise.all([
+    campaignSummaryRecords(),
+    getDb().select().from(participants).where(and(
+      eq(participants.workspaceId, WORKSPACE_ID),
+      eq(participants.status, "active"),
+    )).orderBy(participants.createdAt),
+  ]);
+  return {
+    stats: sumUniSenderLifetimeMetrics(campaignRecords),
+    byParticipant: sumUniSenderMetricsByParticipant(campaignRecords, memberRows),
+  };
 }
 
 function contactStatus(value: unknown, fallback?: ContactStatus): ContactStatus {
@@ -1151,7 +1174,7 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
   const where = and(...filters);
   const db = getDb();
 
-  const [filteredRows, summaryRows, workspaceRows, memberRows, companyRows, cityRows, tagFacets, ownerFacets, ownerSheetFacets] = await Promise.all([
+  const [filteredRows, summaryRows, workspaceRows, memberRows, companyRows, cityRows, tagFacets, ownerFacets, ownerSheetFacets, participantActivityFacets] = await Promise.all([
     db.select({ count: sql<number>`count(*)` }).from(contacts).where(where),
     includeMeta ? db
       .select({
@@ -1218,13 +1241,12 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
           sum(CASE WHEN status = 'active' AND email <> '' THEN 1 ELSE 0 END) AS readyEmail,
           sum(CASE WHEN status = 'active' AND email <> '' AND json_extract(custom_fields, '$.serviceEmailAllowed') = 'true' AND coalesce(json_extract(custom_fields, '$.serviceEmailBasis'), '') <> '' AND coalesce(json_extract(custom_fields, '$.serviceEmailAllowedAt'), '') <> '' THEN 1 ELSE 0 END) AS serviceEmail,
           sum(CASE WHEN status = 'active' AND telegram_chat_id IS NOT NULL AND telegram_chat_id <> '' AND telegram_consent = 1 THEN 1 ELSE 0 END) AS readyTelegram
-          ,sum(CASE WHEN last_contacted_at IS NOT NULL THEN 1 ELSE 0 END) AS sent
         FROM contacts
         WHERE workspace_id = ? AND coalesce(responsible_participant_id, created_by_participant_id) IS NOT NULL
         GROUP BY coalesce(responsible_participant_id, created_by_participant_id)
       `)
       .bind(WORKSPACE_ID)
-      .all<{ participantId: string; total: number; email: number; telegram: number; vk: number; phone: number; readyEmail: number; serviceEmail: number; readyTelegram: number; sent: number }>() : Promise.resolve({ results: [] }),
+      .all<{ participantId: string; total: number; email: number; telegram: number; vk: number; phone: number; readyEmail: number; serviceEmail: number; readyTelegram: number }>() : Promise.resolve({ results: [] }),
     includeMeta ? getD1()
       .prepare(`
         SELECT
@@ -1240,6 +1262,23 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
       `)
       .bind(WORKSPACE_ID)
       .all<{ participantId: string; label: string; count: number }>() : Promise.resolve({ results: [] }),
+    includeMeta ? getD1()
+      .prepare(`
+        SELECT
+          participant_id AS participantId,
+          sum(CASE WHEN coalesce(json_extract(metrics, '$.sent'), 0) > 0 THEN 1 ELSE 0 END) AS campaigns,
+          sum(coalesce(json_extract(metrics, '$.sent'), 0)) AS sent,
+          sum(coalesce(json_extract(metrics, '$.delivered'), 0)) AS delivered,
+          sum(coalesce(json_extract(metrics, '$.opened'), 0)) AS opened,
+          sum(coalesce(json_extract(metrics, '$.clicked'), 0)) AS clicked,
+          max(CASE WHEN coalesce(json_extract(metrics, '$.sent'), 0) > 0 THEN coalesce(sent_at, updated_at) END) AS lastActivityAt
+        FROM campaigns
+        WHERE workspace_id = ?
+          AND EXISTS (SELECT 1 FROM json_each(campaigns.delivery_channels) WHERE json_each.value = 'email')
+        GROUP BY participant_id
+      `)
+      .bind(WORKSPACE_ID)
+      .all<{ participantId: string; campaigns: number; sent: number; delivered: number; opened: number; clicked: number; lastActivityAt: string | null }>() : Promise.resolve({ results: [] }),
   ]);
 
   const filteredCount = Number(filteredRows[0]?.count ?? 0);
@@ -1257,6 +1296,8 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
     contactId: string;
     campaignId: string;
     campaignName: string | null;
+    participantId: string | null;
+    participantName: string | null;
     providerId: string;
     channel: string;
     status: string;
@@ -1273,6 +1314,8 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
           contactId: deliveryOutbox.contactId,
           campaignId: deliveryOutbox.campaignId,
           campaignName: campaigns.name,
+          participantId: campaigns.participantId,
+          participantName: participants.displayName,
           providerId: deliveryOutbox.providerId,
           channel: deliveryOutbox.channel,
           status: deliveryOutbox.status,
@@ -1282,6 +1325,7 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
         })
         .from(deliveryOutbox)
         .leftJoin(campaigns, eq(deliveryOutbox.campaignId, campaigns.id))
+        .leftJoin(participants, eq(campaigns.participantId, participants.id))
         .where(inArray(deliveryOutbox.contactId, contactIdChunk))
         .orderBy(desc(deliveryOutbox.updatedAt))
         .limit(contactIdChunk.length * 10));
@@ -1295,6 +1339,8 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
     contactHistory.push({
       campaignId: item.campaignId,
       campaignName: item.campaignName ?? "Рассылка",
+      participantId: item.participantId,
+      participantName: item.participantName ?? "Участник команды",
       providerId: item.providerId,
       channel: item.channel,
       status: item.status,
@@ -1308,6 +1354,9 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
   const tagRows = tagFacets.results ?? [];
   const memberMap = new Map(memberRows.map((member) => [member.id, member]));
   const ownerSheets = new Map<string, Array<{ label: string; count: number }>>();
+  const participantActivity = new Map(
+    (participantActivityFacets.results ?? []).map((row) => [row.participantId, row]),
+  );
   for (const row of ownerSheetFacets.results ?? []) {
     const values = ownerSheets.get(row.participantId) ?? [];
     values.push({ label: row.label, count: Number(row.count) });
@@ -1315,6 +1364,7 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
   }
   const owners = (ownerFacets.results ?? []).map((row) => {
     const member = memberMap.get(row.participantId);
+    const activity = participantActivity.get(row.participantId);
     return {
       participantId: row.participantId,
       displayName: member?.displayName ?? "Участник команды",
@@ -1327,7 +1377,12 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
       readyEmail: Number(row.readyEmail),
       serviceEmail: Number(row.serviceEmail),
       readyTelegram: Number(row.readyTelegram),
-      sent: Number(row.sent),
+      campaigns: Number(activity?.campaigns ?? 0),
+      sent: Number(activity?.sent ?? 0),
+      delivered: Number(activity?.delivered ?? 0),
+      opened: Number(activity?.opened ?? 0),
+      clicked: Number(activity?.clicked ?? 0),
+      lastActivityAt: activity?.lastActivityAt ?? null,
       sheets: ownerSheets.get(row.participantId) ?? [],
     };
   }).sort((left, right) => Number(right.participantId === actor.participant.id) - Number(left.participantId === actor.participant.id) || right.total - left.total);
@@ -3890,6 +3945,22 @@ async function dispatchCampaign(
   };
 }
 
+async function markAcceptedCampaignContactsSent(campaignId: string, contactedAt: string) {
+  const db = getDb();
+  const rows = await db.select({ contactId: deliveryOutbox.contactId })
+    .from(deliveryOutbox)
+    .where(and(
+      eq(deliveryOutbox.campaignId, campaignId),
+      eq(deliveryOutbox.status, "accepted"),
+    ));
+  const contactIds = Array.from(new Set(rows.map((row) => row.contactId)));
+  for (const contactIdChunk of chunksOf(contactIds, 40)) {
+    await db.update(contacts)
+      .set({ lastContactedAt: contactedAt, updatedAt: contactedAt })
+      .where(inArray(contacts.id, contactIdChunk));
+  }
+}
+
 export async function syncCampaignDelivery(
   request: Request,
   campaignId: string,
@@ -3934,6 +4005,7 @@ export async function syncCampaignDelivery(
       metrics: { ...current.campaign.metrics, sent: 1, delivered: checked.delivered ? 1 : 0, opened: checked.opened ? 1 : 0 },
       updatedAt: now,
     }).where(eq(campaigns.id, campaignId));
+    if (checked.delivered) await markAcceptedCampaignContactsSent(campaignId, now);
     const event = await appendEvent(campaignId, "delivery_synced", checked.message, { provider: "unisender", emailId: externalEmailId, delivered: checked.delivered, opened: checked.opened });
     const updated = await campaignBundle(campaignId);
     return { campaign: updated.campaign, deliveryPlans: updated.plans, deliveryJob: toDeliveryJob(updatedJob), event };
@@ -4004,6 +4076,7 @@ export async function syncCampaignDelivery(
     },
     updatedAt: now,
   }).where(eq(campaigns.id, campaignId));
+  if (report.sent > 0) await markAcceptedCampaignContactsSent(campaignId, now);
   const event = await appendEvent(campaignId, "delivery_synced", statusMessage, {
     provider: "unisender",
     providerStatus: report.providerStatus,

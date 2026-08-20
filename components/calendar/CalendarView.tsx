@@ -48,7 +48,8 @@ function audienceLabel(campaign: CampaignRecord, snapshot: WorkspaceSnapshot) {
     return snapshot.segments.find((segment) => segment.id === campaign.segmentId)?.name ?? "Удалённая группа";
   }
   if (campaign.audienceType === "contacts") {
-    return `${campaign.contactIds.length} ${campaign.contactIds.length === 1 ? "получатель" : "получателей"}`;
+    const count = campaign.metrics.recipients;
+    return `${count} ${count === 1 ? "получатель" : "получателей"}`;
   }
   return "Аудитория не выбрана";
 }

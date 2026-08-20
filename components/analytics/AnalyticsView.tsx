@@ -6,12 +6,12 @@ import {
   BarChart3,
   CircleAlert,
   Download,
-  FileDown,
+  Eye,
   LoaderCircle,
-  Megaphone,
+  MailCheck,
+  MousePointerClick,
   Send,
   ShieldAlert,
-  UsersRound,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -52,11 +52,16 @@ function campaignName(campaigns: CampaignRecord[], campaignId: string) {
   return campaigns.find((campaign) => campaign.id === campaignId)?.name ?? "Удалённая кампания";
 }
 
+function participantName(snapshot: WorkspaceSnapshot, participantId: string) {
+  return snapshot.members.find((participant) => participant.id === participantId)?.displayName ?? "Участник команды";
+}
+
 export function AnalyticsView() {
   const searchParams = useSearchParams();
   const requestedCampaign = searchParams.get("campaign") ?? "all";
   const [snapshot, setSnapshot] = useState<WorkspaceSnapshot | null>(null);
   const [selection, setSelection] = useState(requestedCampaign);
+  const [participantSelection, setParticipantSelection] = useState("mine");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -70,8 +75,10 @@ export function AnalyticsView() {
         throw new Error("error" in payload && payload.error ? payload.error : "Не удалось загрузить журнал отправки");
       }
       setSnapshot(payload);
-      if (requestedCampaign !== "all" && !payload.campaigns.some((campaign) => campaign.id === requestedCampaign)) {
-        setSelection("all");
+      if (requestedCampaign !== "all") {
+        const requested = payload.campaigns.find((campaign) => campaign.id === requestedCampaign);
+        if (!requested) setSelection("all");
+        else setParticipantSelection(requested.participantId === payload.participant.id ? "mine" : requested.participantId);
       }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Не удалось загрузить журнал отправки");
@@ -86,9 +93,14 @@ export function AnalyticsView() {
   }, [load]);
 
   const campaigns = useMemo(() => snapshot?.campaigns ?? [], [snapshot]);
+  const participantCampaigns = useMemo(() => {
+    if (!snapshot || participantSelection === "all") return campaigns;
+    const selectedParticipantId = participantSelection === "mine" ? snapshot.participant.id : participantSelection;
+    return campaigns.filter((campaign) => campaign.participantId === selectedParticipantId);
+  }, [campaigns, participantSelection, snapshot]);
   const selectedCampaigns = useMemo(
-    () => selection === "all" ? campaigns : campaigns.filter((campaign) => campaign.id === selection),
-    [campaigns, selection],
+    () => selection === "all" ? participantCampaigns : participantCampaigns.filter((campaign) => campaign.id === selection),
+    [participantCampaigns, selection],
   );
   const selectedIds = useMemo(
     () => new Set(selectedCampaigns.map((campaign) => campaign.id)),
@@ -100,7 +112,7 @@ export function AnalyticsView() {
       .sort((first, second) => Date.parse(second.createdAt) - Date.parse(first.createdAt)),
     [selectedIds, snapshot?.deliveryJobs],
   );
-  const totals = useMemo(() => jobs.reduce(
+  const jobTotals = useMemo(() => jobs.reduce(
     (result, job) => ({
       accepted: result.accepted + job.acceptedCount,
       manual: result.manual + job.manualCount,
@@ -109,17 +121,21 @@ export function AnalyticsView() {
     }),
     { accepted: 0, manual: 0, rejected: 0, ambiguous: 0 },
   ), [jobs]);
-  const audience = useMemo(
-    () => selectedCampaigns.reduce((total, campaign) => total + campaign.metrics.recipients, 0),
-    [selectedCampaigns],
-  );
+  const providerTotals = useMemo(() => selectedCampaigns.reduce((result, campaign) => ({
+    sent: result.sent + campaign.metrics.sent,
+    delivered: result.delivered + campaign.metrics.delivered,
+    opened: result.opened + campaign.metrics.opened,
+    clicked: result.clicked + campaign.metrics.clicked,
+    bounced: result.bounced + campaign.metrics.bounced,
+  }), { sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0 }), [selectedCampaigns]);
 
   const exportCsv = () => {
     if (!snapshot) return;
     const rows = [
-      ["Кампания", "Статус задания", "Принято провайдером", "Ручной экспорт", "Отклонено", "Неопределённо", "Создано"],
+      ["Кампания", "Отправитель", "Статус задания", "Принято провайдером", "Ручной экспорт", "Отклонено", "Неопределённо", "Создано"],
       ...jobs.map((job) => [
         campaignName(campaigns, job.campaignId),
+        participantName(snapshot, campaigns.find((campaign) => campaign.id === job.campaignId)?.participantId ?? ""),
         jobStatusLabel[job.status],
         String(job.acceptedCount),
         String(job.manualCount),
@@ -153,12 +169,12 @@ export function AnalyticsView() {
   }
 
   const kpis = [
-    { label: "Кампании", value: selectedCampaigns.length, note: "в выбранном представлении", Icon: Megaphone },
-    { label: "Получатели", value: audience, note: "уникальные контакты внутри кампаний", Icon: UsersRound },
-    { label: "Принято провайдером", value: totals.accepted, note: "задания приняты, но доставка не подтверждена", Icon: Send },
-    { label: "Ручной экспорт", value: totals.manual, note: "строки подготовлены без автоматической отправки", Icon: FileDown },
-    { label: "Отклонено", value: totals.rejected, note: "провайдер вернул явную ошибку", Icon: ShieldAlert },
-    { label: "Неопределённо", value: totals.ambiguous, note: "результат запроса требует проверки", Icon: BarChart3 },
+    { label: "Отправлено", value: providerTotals.sent, note: `${number.format(selectedCampaigns.length)} email-кампаний`, Icon: Send },
+    { label: "Доставлено", value: providerTotals.delivered, note: "подтверждено UniSender", Icon: MailCheck },
+    { label: "Прочитано", value: providerTotals.opened, note: "уникальные открытия", Icon: Eye },
+    { label: "Переходы", value: providerTotals.clicked, note: "уникальные клики", Icon: MousePointerClick },
+    { label: "Не доставлено", value: providerTotals.bounced, note: "по данным провайдера", Icon: ShieldAlert },
+    { label: "Принято в заданиях", value: jobTotals.accepted, note: `последние ${number.format(snapshot.historyWindow.deliveryJobsLimit)} заданий`, Icon: BarChart3 },
   ];
   const historyLimit = snapshot.historyWindow.deliveryJobsLimit;
 
@@ -168,12 +184,11 @@ export function AnalyticsView() {
         <div>
           <p className="section-eyebrow">Факты выполнения</p>
           <h1 className="text-[28px] font-semibold tracking-[-.04em]">Журнал отправки</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-muted)]">
-            Здесь показано только то, что Поток действительно выполнил: последние {number.format(historyLimit)} заданий провайдерам и ручных выгрузок. Подтверждения доставки, открытия и ответы смотрите у подключённого провайдера.
-          </p>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-muted)]">Итоги доставки, прочтений и переходов синхронизируются из UniSender. Автор определяется по участнику, который создал и запустил кампанию; ответственный за контакт на эту аналитику не влияет.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <label><span className="sr-only">Выбрать кампанию</span><select className="input min-w-56" value={selection} onChange={(event) => setSelection(event.target.value)}><option value="all">Все кампании</option>{campaigns.map((campaign) => <option key={campaign.id} value={campaign.id}>{campaign.name}</option>)}</select></label>
+          <label><span className="sr-only">Выбрать участника</span><select className="input min-w-56" value={participantSelection} onChange={(event) => { setParticipantSelection(event.target.value); setSelection("all"); }}><option value="mine">Моя фактическая активность</option><option value="all">Вся команда</option>{snapshot.members.filter((member) => member.id !== snapshot.participant.id).map((member) => <option key={member.id} value={member.id}>{member.displayName}</option>)}</select></label>
+          <label><span className="sr-only">Выбрать кампанию</span><select className="input min-w-56" value={selection} onChange={(event) => setSelection(event.target.value)}><option value="all">Все кампании участника</option>{participantCampaigns.map((campaign) => <option key={campaign.id} value={campaign.id}>{campaign.name}</option>)}</select></label>
           <button type="button" onClick={exportCsv} disabled={!jobs.length} className="btn btn-secondary gap-2"><Download aria-hidden="true" className="size-4" />Скачать CSV</button>
         </div>
       </header>
@@ -201,10 +216,11 @@ export function AnalyticsView() {
           </div>
           <div className="overflow-x-auto">
             <table className="data-table min-w-[820px]">
-              <thead><tr><th>Кампания</th><th>Результат</th><th>Принято</th><th>Вручную</th><th>Проблемы</th><th>Время</th></tr></thead>
+              <thead><tr><th>Кампания</th><th>Отправитель</th><th>Результат</th><th>Принято</th><th>Вручную</th><th>Проблемы</th><th>Время</th></tr></thead>
               <tbody>{jobs.map((job) => (
                 <tr key={job.id}>
                   <td><Link href={`/campaigns/${job.campaignId}`} className="text-[12px] font-semibold hover:text-[var(--primary)]">{campaignName(campaigns, job.campaignId)}</Link></td>
+                  <td>{participantName(snapshot, campaigns.find((campaign) => campaign.id === job.campaignId)?.participantId ?? "")}</td>
                   <td><span className="badge badge-neutral">{jobStatusLabel[job.status]}</span><p className="mt-1 max-w-xs text-[9px] leading-4 text-[var(--text-subtle)]">{job.statusMessage}</p></td>
                   <td>{number.format(job.acceptedCount)}</td>
                   <td>{number.format(job.manualCount)}</td>

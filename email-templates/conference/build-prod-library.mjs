@@ -43,7 +43,7 @@ for (const [slug, name, subject, previewText] of templates) {
   const html = source
     .replaceAll("__COST_REDUCTION_HERO__", costReductionHero)
     .replaceAll("{{Имя}}", "{{first_name}}")
-    .replace(/https:\/\/tech-pravo\.ru\/conference\/uchastnik(?:\?[^\"']*)?/g, conferenceUrl)
+    .replace(/https:\/\/tech-pravo\.ru\/conference\/uchastnik(?:\?[^"']*)?/g, conferenceUrl)
     .replaceAll("https://tech-pravo.ru/programma-tehnologii-prava-2026.pdf", conferenceUrl);
   const id = `template-user-conference-${slug}`;
   values.push({
