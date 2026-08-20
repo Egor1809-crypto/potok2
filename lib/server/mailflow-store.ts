@@ -3650,7 +3650,9 @@ async function dispatchCampaign(
     })),
   );
   if (outboxValues.length) {
-    for (const values of chunksOf(outboxValues, 80)) {
+    // Each outbox row binds 15 values. D1 has a conservative bound-parameter
+    // ceiling, so persist small chunks while keeping one provider campaign.
+    for (const values of chunksOf(outboxValues, 5)) {
       await db.insert(deliveryOutbox).values(values).onConflictDoNothing();
     }
   }

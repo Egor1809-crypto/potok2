@@ -131,4 +131,5 @@ test("an untouched queued delivery job can resume without duplicating accepted m
   assert.match(store, /job\.status === "queued"/);
   assert.match(store, /Object\.keys\(job\.providerExternalIds \?\? \{\}\)\.length === 0/);
   assert.match(store, /resumableJob\?\.id \?\? newId\("delivery-job"\)/);
+  assert.match(store, /chunksOf\(outboxValues, 5\)/);
 });
