@@ -94,7 +94,10 @@ import {
   parseEmailBuilderDocument,
   plainTextEmailHtml,
 } from "./email-document";
-import { uniqueAcceptedContactIds } from "./delivery-metrics";
+import {
+  isUniSenderAggregateFinal,
+  uniqueAcceptedContactIds,
+} from "./delivery-metrics";
 import {
   ensureDatabase,
   ensureSystemDatabase,
@@ -3222,15 +3225,17 @@ async function processUniSenderOutbox(
     )));
   }
   const contactsById = new Map(selectedContactRows.map(toContact).map((contact) => [contact.id, contact]));
-  await getDb()
-    .update(deliveryOutbox)
-    .set({
-      status: "processing",
-      attempts: 1,
-      statusMessage: "UniSender импортирует аудиторию перед созданием письма.",
-      updatedAt: new Date().toISOString(),
-    })
-    .where(inArray(deliveryOutbox.id, rows.map((row) => row.id)));
+  for (const rowChunk of chunksOf(rows, 40)) {
+    await getDb()
+      .update(deliveryOutbox)
+      .set({
+        status: "processing",
+        attempts: 1,
+        statusMessage: "UniSender импортирует аудиторию перед созданием письма.",
+        updatedAt: new Date().toISOString(),
+      })
+      .where(inArray(deliveryOutbox.id, rowChunk.map((row) => row.id)));
+  }
   const credentials = automaticProviderSecrets("unisender") as {
     apiKey?: string;
   };
@@ -3308,29 +3313,43 @@ async function processUniSenderOutbox(
   });
   const acceptedIds = new Set(result.acceptedOutboxIds);
   const rejectedIds = new Set(result.rejectedOutboxIds);
-  for (const row of rows) {
-    if (acceptedIds.has(row.id) && result.status === "accepted") {
-      await updateOutboxResult(row, {
-        status: "accepted",
-        externalId: result.campaignId,
-        message: result.message,
-      });
-    } else if (rejectedIds.has(row.id)) {
-      await updateOutboxResult(row, {
-        status: "rejected",
-        // Keep the provider's sanitized reason. Without it a failed wave was
-        // indistinguishable from an invalid address, even when UniSender
-        // rejected the message, sender, or account-level campaign instead.
-        message: result.message || "UniSender не включил этот адрес в принятую кампанию.",
-      });
-    } else {
-      await updateOutboxResult(row, {
-        status: result.status === "rejected" ? "rejected" : "ambiguous",
-        externalId: result.campaignId ?? result.messageId,
-        message: result.message,
-      });
+  const acceptedRows = result.status === "accepted"
+    ? rows.filter((row) => acceptedIds.has(row.id))
+    : [];
+  const rejectedRows = rows.filter((row) => rejectedIds.has(row.id));
+  const remainingRows = rows.filter(
+    (row) => !acceptedIds.has(row.id) && !rejectedIds.has(row.id),
+  );
+  const updateRows = async (
+    selectedRows: DeliveryOutboxRecord[],
+    values: {
+      status: "accepted" | "rejected" | "ambiguous";
+      externalId: string | null;
+      statusMessage: string;
+    },
+  ) => {
+    for (const rowChunk of chunksOf(selectedRows, 40)) {
+      await getDb().update(deliveryOutbox).set({
+        ...values,
+        updatedAt: new Date().toISOString(),
+      }).where(inArray(deliveryOutbox.id, rowChunk.map((row) => row.id)));
     }
-  }
+  };
+  await updateRows(acceptedRows, {
+    status: "accepted",
+    externalId: result.campaignId ?? null,
+    statusMessage: result.message,
+  });
+  await updateRows(rejectedRows, {
+    status: "rejected",
+    externalId: result.campaignId ?? result.messageId ?? null,
+    statusMessage: result.message || "UniSender не включил этот адрес в принятую кампанию.",
+  });
+  await updateRows(remainingRows, {
+    status: result.status === "rejected" ? "rejected" : "ambiguous",
+    externalId: result.campaignId ?? result.messageId ?? null,
+    statusMessage: result.message,
+  });
   return {
     ...(result.messageId ? { messageId: result.messageId } : {}),
     ...(result.campaignId ? { campaignId: result.campaignId } : {}),
@@ -3809,10 +3828,12 @@ async function dispatchCampaign(
     })
     .where(eq(campaigns.id, campaignId));
   if (acceptedRows.length && !schedulingAtProvider) {
-    await db
-      .update(contacts)
-      .set({ lastContactedAt: completedAt, updatedAt: completedAt })
-      .where(inArray(contacts.id, acceptedContactIds));
+    for (const contactIdChunk of chunksOf(acceptedContactIds, 40)) {
+      await db
+        .update(contacts)
+        .set({ lastContactedAt: completedAt, updatedAt: completedAt })
+        .where(inArray(contacts.id, contactIdChunk));
+    }
   }
   const event = await appendEvent(
     campaignId,
@@ -3896,15 +3917,15 @@ export async function syncCampaignDelivery(
     throw new ApiRequestError(report.message, report.status === "ambiguous" ? 503 : 502);
   }
   const now = new Date().toISOString();
-  // UniSender can report `analysed` before its aggregate delivery counters
-  // catch up with the per-recipient delivery record. Do not turn that short
-  // reporting lag into a false hard failure in the UI.
+  // UniSender can report `analysed` before aggregate delivery counters catch
+  // up. Never turn a positive sent count with zero deliveries into a mass
+  // rejection: the common statistics endpoint has not provided per-recipient
+  // evidence for that conclusion.
   const reportAgeMs = Date.now() - Date.parse(job.createdAt);
+  const isFinal = isUniSenderAggregateFinal({ ...report, reportAgeMs });
   const deliveryCountersSettling = report.providerStatus === "analysed"
     && report.sent > 0
-    && report.delivered === 0
-    && reportAgeMs < 2 * 60_000;
-  const isFinal = report.providerStatus === "analysed" && !deliveryCountersSettling;
+    && !isFinal;
   const undelivered = isFinal ? Math.max(0, report.sent - report.delivered) : 0;
   const jobStatus: DeliveryJobRecord["status"] = !isFinal
     ? "processing"
@@ -3918,13 +3939,15 @@ export async function syncCampaignDelivery(
       ? `UniSender подтвердил доставку ${report.delivered} из ${report.sent} писем.`
       : `UniSender завершил отправку: доставлено ${report.delivered} из ${report.sent}, не доставлено ${undelivered}.`
     : deliveryCountersSettling
-      ? `UniSender принял ${report.sent} писем и обновляет подтверждение доставки. Поток проверит статус автоматически.`
+      ? reportAgeMs < 5 * 60_000
+        ? `UniSender принял ${report.sent} писем и обновляет подтверждение доставки. Поток проверит статус автоматически.`
+        : `UniSender принял ${report.sent} писем, но статистика доставки задерживается. Письма не считаются отклонёнными; Поток продолжит проверку автоматически.`
       : `UniSender ещё обрабатывает рассылку: ${report.providerStatus}. Обновите статус через несколько минут.`;
 
   const [updatedJob] = await getDb().update(deliveryJobs).set({
     status: jobStatus,
-    acceptedCount: isFinal ? report.delivered : job.acceptedCount,
-    rejectedCount: isFinal ? undelivered : job.rejectedCount,
+    acceptedCount: isFinal ? report.delivered : Math.max(job.acceptedCount, report.sent),
+    rejectedCount: isFinal ? undelivered : 0,
     statusMessage,
     completedAt: isFinal ? now : null,
     updatedAt: now,
