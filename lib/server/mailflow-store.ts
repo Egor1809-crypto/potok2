@@ -1219,8 +1219,23 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
     .orderBy(desc(contacts.updatedAt), desc(contacts.id))
     .limit(pageSize)
     .offset((page - 1) * pageSize);
-  const historyRows = rows.length
-    ? await db
+  const includeDeliveryHistory = url.searchParams.get("delivery") === "sent";
+  const historyRows = [] as Array<{
+    contactId: string;
+    campaignId: string;
+    campaignName: string | null;
+    providerId: string;
+    channel: string;
+    status: string;
+    statusMessage: string;
+    externalId: string | null;
+    updatedAt: string;
+  }>;
+  if (includeDeliveryHistory && rows.length) {
+    // D1 limits the number of bound values in a statement. Query small chunks so
+    // a 100/250-row contact page can never make the whole base fail to load.
+    for (const contactIdChunk of chunksOf(rows.map((row) => row.id), 40)) {
+      historyRows.push(...await db
         .select({
           contactId: deliveryOutbox.contactId,
           campaignId: deliveryOutbox.campaignId,
@@ -1234,10 +1249,12 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
         })
         .from(deliveryOutbox)
         .leftJoin(campaigns, eq(deliveryOutbox.campaignId, campaigns.id))
-        .where(inArray(deliveryOutbox.contactId, rows.map((row) => row.id)))
+        .where(inArray(deliveryOutbox.contactId, contactIdChunk))
         .orderBy(desc(deliveryOutbox.updatedAt))
-        .limit(Math.max(250, rows.length * 10))
-    : [];
+        .limit(contactIdChunk.length * 10));
+    }
+    historyRows.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  }
   const deliveryHistory: NonNullable<ContactsListResponse["deliveryHistory"]> = {};
   for (const item of historyRows) {
     const contactHistory = deliveryHistory[item.contactId] ?? [];
