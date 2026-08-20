@@ -1,5 +1,6 @@
 import { jsonError, readJsonBody } from "@/lib/server/api-utils";
 import {
+  getWorkspaceBootstrap,
   getWorkspaceSnapshot,
   updateWorkspace,
 } from "@/lib/server/mailflow-store";
@@ -8,7 +9,8 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
-    return Response.json(await getWorkspaceSnapshot(request), {
+    const scope = new URL(request.url).searchParams.get("scope");
+    return Response.json(scope ? await getWorkspaceBootstrap(request) : await getWorkspaceSnapshot(request), {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {

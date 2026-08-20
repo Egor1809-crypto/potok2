@@ -591,6 +591,46 @@ export async function getWorkspaceSnapshot(
   };
 }
 
+/** Lightweight data for persistent navigation and the campaign wizard. */
+export async function getWorkspaceBootstrap(request: Request) {
+  const actor = await ensureDatabase(request);
+  const url = new URL(request.url);
+  const scope = url.searchParams.get("scope") ?? "identity";
+  const db = getDb();
+  const [workspaceRows, participantRows] = await Promise.all([
+    db.select().from(workspaces).where(eq(workspaces.id, WORKSPACE_ID)).limit(1),
+    db.select().from(participants).where(eq(participants.id, actor.participant.id)).limit(1),
+  ]);
+  const workspace = workspaceRows[0];
+  const participant = participantRows[0];
+  if (!workspace || !participant) throw new Error("Singleton workspace was not initialized");
+  if (scope === "identity") {
+    return { workspace: toWorkspace(workspace), participant: toParticipant(participant) };
+  }
+
+  const sourceId = url.searchParams.get("sourceId")?.trim() ?? "";
+  const [memberRows, segmentRows, integrationRows, sourceCampaignRows, sourcePlanRows] = await Promise.all([
+    db.select().from(participants).where(eq(participants.workspaceId, WORKSPACE_ID)).orderBy(participants.createdAt),
+    db.select().from(segments).where(eq(segments.workspaceId, WORKSPACE_ID)).orderBy(desc(segments.updatedAt)),
+    db.select().from(integrations).where(eq(integrations.workspaceId, WORKSPACE_ID)).orderBy(integrations.providerId),
+    sourceId
+      ? db.select().from(campaigns).where(and(eq(campaigns.workspaceId, WORKSPACE_ID), eq(campaigns.id, sourceId))).limit(1)
+      : Promise.resolve([]),
+    sourceId
+      ? db.select().from(deliveryPlans).where(eq(deliveryPlans.campaignId, sourceId))
+      : Promise.resolve([]),
+  ]);
+  return {
+    workspace: toWorkspace(workspace),
+    participant: toParticipant(participant),
+    members: memberRows.filter((member) => member.status === "active").map(toParticipant),
+    segments: segmentRows.map((segment) => toSegment(segment, [], [])),
+    integrations: integrationRows.filter((row) => PROVIDERS.includes(row.providerId)).map(toIntegrationRecord),
+    campaigns: sourceCampaignRows.map(toCampaign),
+    deliveryPlans: sourcePlanRows.map(toDeliveryPlan),
+  };
+}
+
 function contactStatus(value: unknown, fallback?: ContactStatus): ContactStatus {
   if (value === undefined && fallback) return fallback;
   if (!CONTACT_STATUSES.includes(value as ContactStatus)) {

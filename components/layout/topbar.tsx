@@ -28,7 +28,7 @@ export function Topbar({
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
-      void fetch("/api/workspace", { cache: "no-store" })
+      void fetch("/api/workspace?scope=identity", { cache: "force-cache" })
         .then((response) => response.ok
           ? response.json() as Promise<{ participant?: { displayName?: string; color?: string } }>
           : null)

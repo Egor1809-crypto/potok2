@@ -73,6 +73,7 @@ import type {
   CampaignMutationResponse,
   CampaignRecord,
   ContactRecord,
+  ContactsListResponse,
   DeliveryPlanRecord,
   EmailBuilderDocumentInput,
   EmailTemplateRecord,
@@ -511,13 +512,20 @@ function CampaignWizardState({
   const loadWorkspace = React.useCallback(async () => {
     setApiMode("loading");
     try {
-      const [response, templatesResponse, presentationsResponse] = await Promise.all([
-        fetch("/api/workspace?include=contacts", { headers: { Accept: "application/json" } }),
+      const bootstrapParams = new URLSearchParams({ scope: "campaign-wizard" });
+      if (sourceId) bootstrapParams.set("sourceId", sourceId);
+      const [response, contactsResponse, templatesResponse, presentationsResponse] = await Promise.all([
+        fetch(`/api/workspace?${bootstrapParams.toString()}`, { headers: { Accept: "application/json" } }),
+        fetch("/api/contacts?page=1&pageSize=250&meta=0", { headers: { Accept: "application/json" }, cache: "no-store" }),
         fetch("/api/templates", { headers: { Accept: "application/json" } }),
         fetch("/api/presentations", { headers: { Accept: "application/json" } }),
       ]);
       if (!response.ok) throw new Error("Рабочее пространство недоступно");
-      const body = await response.json() as WorkspaceSnapshot;
+      if (!contactsResponse.ok) throw new Error("Контакты недоступны");
+      const [body, contactsBody] = await Promise.all([
+        response.json() as Promise<WorkspaceSnapshot>,
+        contactsResponse.json() as Promise<ContactsListResponse>,
+      ]);
       if (templatesResponse.ok) {
         const templateBody = await templatesResponse.json() as EmailTemplatesListResponse;
         setWorkspaceTemplates(Array.isArray(templateBody.templates) ? templateBody.templates : []);
@@ -532,7 +540,7 @@ function CampaignWizardState({
       } else {
         setWorkspacePresentations([]);
       }
-      if (Array.isArray(body.contacts)) setWorkspaceContacts(body.contacts);
+      if (Array.isArray(contactsBody.contacts)) setWorkspaceContacts(contactsBody.contacts);
       if (Array.isArray(body.members)) setWorkspaceMembers(body.members);
       if (Array.isArray(body.segments)) setWorkspaceSegments(body.segments);
       setIntegrations((body.integrations ?? []).flatMap((record) => {
