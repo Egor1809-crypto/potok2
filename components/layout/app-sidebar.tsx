@@ -40,7 +40,7 @@ export function AppSidebar({
     };
     window.addEventListener("mailflow:workspace-updated", onWorkspaceUpdate);
     const frame = window.requestAnimationFrame(() => {
-      void fetch("/api/workspace?scope=identity", { cache: "force-cache" })
+      void fetch("/api/workspace", { cache: "no-store" })
         .then((response) => response.ok ? response.json() as Promise<{ workspace?: { name?: string }; participant?: { displayName?: string } }> : null)
         .then((payload) => {
           if (payload?.workspace?.name) setWorkspaceName(payload.workspace.name);

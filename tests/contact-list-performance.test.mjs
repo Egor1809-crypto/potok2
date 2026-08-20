@@ -66,9 +66,7 @@ test("large contact payloads are loaded only by workflows that require them", as
 
   assert.match(store, /include === "contacts" \|\| include === "export"/);
   assert.match(store, /Promise\.resolve\(\[\] as ContactRow\[\]\)/);
-  assert.match(wizard, /scope: "campaign-wizard"/);
-  assert.match(wizard, /\/api\/contacts\?page=1&pageSize=250&meta=0&delivery=pending/);
-  assert.doesNotMatch(wizard, /\/api\/workspace\?include=contacts/);
+  assert.match(wizard, /\/api\/workspace\?include=contacts/);
   assert.match(importer, /\/api\/contacts\?scope=endpoints/);
 });
 

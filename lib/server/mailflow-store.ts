@@ -591,50 +591,6 @@ export async function getWorkspaceSnapshot(
   };
 }
 
-/**
- * Small bootstrap used by persistent navigation and the campaign wizard.
- * The full workspace snapshot contains campaign HTML, template documents and
- * delivery history and can exceed a worker's memory limit on large accounts.
- */
-export async function getWorkspaceBootstrap(request: Request) {
-  const actor = await ensureDatabase(request);
-  const url = new URL(request.url);
-  const scope = url.searchParams.get("scope") ?? "identity";
-  const db = getDb();
-  const [workspaceRows, participantRows] = await Promise.all([
-    db.select().from(workspaces).where(eq(workspaces.id, WORKSPACE_ID)).limit(1),
-    db.select().from(participants).where(eq(participants.id, actor.participant.id)).limit(1),
-  ]);
-  const workspace = workspaceRows[0];
-  const participant = participantRows[0];
-  if (!workspace || !participant) throw new Error("Singleton workspace was not initialized");
-  if (scope === "identity") {
-    return { workspace: toWorkspace(workspace), participant: toParticipant(participant) };
-  }
-
-  const sourceId = url.searchParams.get("sourceId")?.trim() ?? "";
-  const [memberRows, segmentRows, integrationRows, sourceCampaignRows, sourcePlanRows] = await Promise.all([
-    db.select().from(participants).where(eq(participants.workspaceId, WORKSPACE_ID)).orderBy(participants.createdAt),
-    db.select().from(segments).where(eq(segments.workspaceId, WORKSPACE_ID)).orderBy(desc(segments.updatedAt)),
-    db.select().from(integrations).where(eq(integrations.workspaceId, WORKSPACE_ID)).orderBy(integrations.providerId),
-    sourceId
-      ? db.select().from(campaigns).where(and(eq(campaigns.workspaceId, WORKSPACE_ID), eq(campaigns.id, sourceId))).limit(1)
-      : Promise.resolve([]),
-    sourceId
-      ? db.select().from(deliveryPlans).where(eq(deliveryPlans.campaignId, sourceId))
-      : Promise.resolve([]),
-  ]);
-  return {
-    workspace: toWorkspace(workspace),
-    participant: toParticipant(participant),
-    members: memberRows.filter((member) => member.status === "active").map(toParticipant),
-    segments: segmentRows.map((segment) => toSegment(segment, [], [])),
-    integrations: integrationRows.filter((row) => PROVIDERS.includes(row.providerId)).map(toIntegrationRecord),
-    campaigns: sourceCampaignRows.map(toCampaign),
-    deliveryPlans: sourcePlanRows.map(toDeliveryPlan),
-  };
-}
-
 function contactStatus(value: unknown, fallback?: ContactStatus): ContactStatus {
   if (value === undefined && fallback) return fallback;
   if (!CONTACT_STATUSES.includes(value as ContactStatus)) {
@@ -984,7 +940,6 @@ function contactListFilters(url: URL): SQL[] {
   const sheet = url.searchParams.get("sheet")?.trim().slice(0, 140) ?? "";
   const channel = url.searchParams.get("channel")?.trim() ?? "";
   const owner = url.searchParams.get("owner")?.trim().slice(0, 120) ?? "";
-  const delivery = url.searchParams.get("delivery")?.trim() ?? "";
 
   if (search) {
     filters.push(sql`(
@@ -1007,8 +962,6 @@ function contactListFilters(url: URL): SQL[] {
   if (channel === "vk") filters.push(sql`${contacts.vkUserId} is not null and ${contacts.vkUserId} <> ''`);
   if (channel === "phone") filters.push(sql`${contacts.phone} <> ''`);
   if (owner) filters.push(sql`coalesce(${contacts.responsibleParticipantId}, ${contacts.createdByParticipantId}) = ${owner}`);
-  if (delivery === "sent") filters.push(isNotNull(contacts.lastContactedAt));
-  if (delivery === "pending") filters.push(sql`${contacts.lastContactedAt} is null`);
   return filters;
 }
 
@@ -1051,8 +1004,6 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
         total: sql<number>`count(*)`,
         active: sql<number>`coalesce(sum(case when ${contacts.status} = 'active' then 1 else 0 end), 0)`,
         assigned: sql<number>`coalesce(sum(case when ${contacts.responsibleParticipantId} is not null then 1 else 0 end), 0)`,
-        sent: sql<number>`coalesce(sum(case when ${contacts.lastContactedAt} is not null then 1 else 0 end), 0)`,
-        pending: sql<number>`coalesce(sum(case when ${contacts.lastContactedAt} is null then 1 else 0 end), 0)`,
         emailFound: sql<number>`coalesce(sum(case when ${contacts.email} <> '' then 1 else 0 end), 0)`,
         emailReady: sql<number>`coalesce(sum(case when ${contacts.status} = 'active' and ${contacts.email} <> '' then 1 else 0 end), 0)`,
         serviceEmailReady: sql<number>`coalesce(sum(case when ${contacts.status} = 'active' and ${contacts.email} <> '' and json_extract(${contacts.customFields}, '$.serviceEmailAllowed') = 'true' and coalesce(json_extract(${contacts.customFields}, '$.serviceEmailBasis'), '') <> '' and coalesce(json_extract(${contacts.customFields}, '$.serviceEmailAllowedAt'), '') <> '' then 1 else 0 end), 0)`,
@@ -1145,41 +1096,6 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
     .orderBy(desc(contacts.updatedAt), desc(contacts.id))
     .limit(pageSize)
     .offset((page - 1) * pageSize);
-  const historyRows = rows.length
-    ? await db
-        .select({
-          contactId: deliveryOutbox.contactId,
-          campaignId: deliveryOutbox.campaignId,
-          campaignName: campaigns.name,
-          providerId: deliveryOutbox.providerId,
-          channel: deliveryOutbox.channel,
-          status: deliveryOutbox.status,
-          statusMessage: deliveryOutbox.statusMessage,
-          externalId: deliveryOutbox.externalId,
-          updatedAt: deliveryOutbox.updatedAt,
-        })
-        .from(deliveryOutbox)
-        .leftJoin(campaigns, eq(deliveryOutbox.campaignId, campaigns.id))
-        .where(inArray(deliveryOutbox.contactId, rows.map((row) => row.id)))
-        .orderBy(desc(deliveryOutbox.updatedAt))
-        .limit(Math.max(250, rows.length * 10))
-    : [];
-  const deliveryHistory: NonNullable<ContactsListResponse["deliveryHistory"]> = {};
-  for (const item of historyRows) {
-    const contactHistory = deliveryHistory[item.contactId] ?? [];
-    if (contactHistory.length >= 10) continue;
-    contactHistory.push({
-      campaignId: item.campaignId,
-      campaignName: item.campaignName ?? "Рассылка",
-      providerId: item.providerId,
-      channel: item.channel,
-      status: item.status,
-      statusMessage: item.statusMessage,
-      externalId: item.externalId,
-      updatedAt: item.updatedAt,
-    });
-    deliveryHistory[item.contactId] = contactHistory;
-  }
   const summary = summaryRows[0];
   const tagRows = tagFacets.results ?? [];
   const memberMap = new Map(memberRows.map((member) => [member.id, member]));
@@ -1217,13 +1133,10 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
     pageSize,
     totalPages,
     filteredCount,
-    deliveryHistory,
     ...(includeMeta ? { summary: {
       total: Number(summary?.total ?? 0),
       active: Number(summary?.active ?? 0),
       assigned: Number(summary?.assigned ?? 0),
-      sent: Number(summary?.sent ?? 0),
-      pending: Number(summary?.pending ?? 0),
       primaryBase: Number(tagRows.find((row) => row.label === "База №1")?.count ?? 0),
       secondaryBase: Number(tagRows.find((row) => row.label === "База №2")?.count ?? 0),
       coverage: {
@@ -1279,7 +1192,6 @@ export async function createContactsBatch(
 ): Promise<ContactsBatchCreateResponse> {
   const actor = await ensureDatabase(request);
   const object = asObject(payload);
-  const bulkSelection = !Array.isArray(object.ids);
   if (!Array.isArray(object.contacts) || object.contacts.length === 0) {
     throw new ApiRequestError("Добавьте хотя бы один контакт для импорта.");
   }
@@ -1498,25 +1410,8 @@ export async function updateContactsBatch(
 ): Promise<ContactsBulkMutationResponse> {
   const actor = await ensureDatabase(request);
   const object = asObject(payload);
-  let ids: string[];
-  if (Array.isArray(object.ids)) {
-    ids = Array.from(new Set(object.ids.map((id) => cleanText(id, "Идентификатор контакта", 120))));
-  } else if (object.selection && typeof object.selection === "object") {
-    const selection = asObject(object.selection);
-    const selectionUrl = new URL("https://local.invalid/api/contacts");
-    for (const key of ["sheet", "owner", "delivery"] as const) {
-      const value = typeof selection[key] === "string" ? selection[key].trim() : "";
-      if (value && value !== "all") selectionUrl.searchParams.set(key, value);
-    }
-    if (selection.all !== true && selectionUrl.searchParams.size === 0) {
-      throw new ApiRequestError("Укажите базу или фильтр для массового изменения.");
-    }
-    const selectedRows = await getDb().select({ id: contacts.id }).from(contacts)
-      .where(and(...contactListFilters(selectionUrl))).limit(20_001);
-    ids = selectedRows.map((row) => row.id);
-  } else {
-    throw new ApiRequestError("Передайте список или фильтр контактов.");
-  }
+  if (!Array.isArray(object.ids)) throw new ApiRequestError("Передайте список контактов.");
+  const ids = Array.from(new Set(object.ids.map((id) => cleanText(id, "Идентификатор контакта", 120))));
   if (!ids.length) throw new ApiRequestError("Выберите хотя бы один контакт.");
   if (ids.length > 20_000) throw new ApiRequestError("За одну операцию можно изменить не более 20 000 контактов.");
   const responsibleParticipantId = object.responsibleParticipantId === undefined
@@ -1533,20 +1428,17 @@ export async function updateContactsBatch(
   }
   const now = new Date().toISOString();
   const affected: ContactRow[] = [];
-  let bulkUpdatedCount = 0;
   for (const idChunk of chunksOf(ids, 80)) {
     const rows = await getDb().select().from(contacts).where(and(
       eq(contacts.workspaceId, WORKSPACE_ID), inArray(contacts.id, idChunk),
     ));
     if (!addTags.length) {
-      const updatedRows = await getDb().update(contacts).set({
+      affected.push(...await getDb().update(contacts).set({
         ...(responsibleParticipantId !== undefined ? { responsibleParticipantId } : {}),
         ...(markContacted ? { lastContactedAt: now } : {}),
         updatedByParticipantId: actor.participant.id,
         updatedAt: now,
-      }).where(and(eq(contacts.workspaceId, WORKSPACE_ID), inArray(contacts.id, idChunk))).returning();
-      bulkUpdatedCount += updatedRows.length;
-      if (!bulkSelection) affected.push(...updatedRows);
+      }).where(and(eq(contacts.workspaceId, WORKSPACE_ID), inArray(contacts.id, idChunk))).returning());
       continue;
     }
     for (const row of rows) {
@@ -1557,13 +1449,10 @@ export async function updateContactsBatch(
         updatedByParticipantId: actor.participant.id,
         updatedAt: now,
       }).where(eq(contacts.id, row.id)).returning();
-      if (updated) {
-        bulkUpdatedCount += 1;
-        if (!bulkSelection) affected.push(updated);
-      }
+      if (updated) affected.push(updated);
     }
   }
-  return { contacts: affected.map(toContact), updatedCount: bulkSelection ? bulkUpdatedCount : affected.length };
+  return { contacts: affected.map(toContact), updatedCount: affected.length };
 }
 
 export async function deleteContact(

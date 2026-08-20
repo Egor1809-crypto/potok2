@@ -12,6 +12,7 @@ import {
   Mail,
   MessageCircle,
   PencilLine,
+  Plus,
   RefreshCw,
   Save,
   Send,
@@ -21,6 +22,7 @@ import {
   Search,
   UserRound,
   UsersRound,
+  Trash2,
 } from "lucide-react";
 
 import {
@@ -63,6 +65,7 @@ import {
   integrationProviderById,
   type IntegrationProviderId,
 } from "@/config/integrations";
+import { describeTimeZone, useBrowserTimeZone } from "@/lib/client-timezone";
 import type {
   ApiError,
   CampaignCreateInput,
@@ -70,7 +73,6 @@ import type {
   CampaignMutationResponse,
   CampaignRecord,
   ContactRecord,
-  ContactsListResponse,
   DeliveryPlanRecord,
   EmailBuilderDocumentInput,
   EmailTemplateRecord,
@@ -82,10 +84,6 @@ import type {
   SegmentRecord,
   WorkspaceSnapshot,
 } from "@/types/api";
-
-type CampaignWizardBootstrap = Pick<WorkspaceSnapshot,
-  "workspace" | "participant" | "members" | "segments" | "integrations" | "campaigns" | "deliveryPlans"
->;
 
 type ApiMode = "loading" | "online" | "offline";
 type ConnectionStatus = IntegrationConnectionStatus;
@@ -183,6 +181,37 @@ function getBrowserSnapshot() {
 
 function getServerSnapshot() {
   return JSON.stringify({ search: "", draft: "", builderDraft: "" });
+}
+
+function localInputValue(iso: string | null) {
+  if (!iso) return "";
+  const date = new Date(iso);
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
+function initialScheduledAt(params: URLSearchParams, draft: Partial<WizardDraft> | null) {
+  if (draft?.scheduledAt) return draft.scheduledAt;
+  const day = params.get("scheduledDate");
+  if (!day || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
+  const date = new Date(`${day}T10:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function initialScheduledTimes(params: URLSearchParams, draft: Partial<WizardDraft> | null) {
+  const restored = Array.isArray(draft?.scheduledTimes)
+    ? draft.scheduledTimes.filter((value): value is string => typeof value === "string" && !Number.isNaN(Date.parse(value)))
+    : [];
+  if (restored.length > 0) return Array.from(new Set(restored));
+  const first = initialScheduledAt(params, draft);
+  return first ? [first] : [];
+}
+
+function nextWaveTime(times: string[]) {
+  const latest = times.reduce((result, value) => Math.max(result, Date.parse(value)), Date.now());
+  const date = new Date(latest + 60 * 60 * 1000);
+  date.setMinutes(Math.ceil(date.getMinutes() / 10) * 10, 0, 0);
+  return date.toISOString();
 }
 
 function serializeParams(params?: CampaignWizardSearchParams | URLSearchParams) {
@@ -453,7 +482,7 @@ function CampaignWizardState({
   const [senderEmail, setSenderEmail] = React.useState(
     seedDraft?.senderEmail ?? "",
   );
-  const [scheduledTimes, setScheduledTimes] = React.useState<string[]>([]);
+  const [scheduledTimes, setScheduledTimes] = React.useState<string[]>(() => initialScheduledTimes(params, seedDraft));
   const scheduledAt = scheduledTimes[0] ?? null;
   const setScheduledAt = React.useCallback((value: string | null) => {
     setScheduledTimes(value ? [value] : []);
@@ -472,6 +501,7 @@ function CampaignWizardState({
     waveCount: number;
     totalMessages: number;
   } | null>(null);
+  const scheduleSaveTimer = React.useRef<number | null>(null);
   const hydratedCampaignId = React.useRef<string | null>(null);
   const hydratedQueryTemplateId = React.useRef<string | null>(null);
   const recoveredCampaignId = seedDraft?.campaignId;
@@ -481,20 +511,13 @@ function CampaignWizardState({
   const loadWorkspace = React.useCallback(async () => {
     setApiMode("loading");
     try {
-      const bootstrapParams = new URLSearchParams({ scope: "campaign-wizard" });
-      if (sourceId) bootstrapParams.set("sourceId", sourceId);
-      const [response, contactsResponse, templatesResponse, presentationsResponse] = await Promise.all([
-        fetch(`/api/workspace?${bootstrapParams.toString()}`, { headers: { Accept: "application/json" } }),
-        fetch("/api/contacts?page=1&pageSize=250&meta=0&delivery=pending", { headers: { Accept: "application/json" }, cache: "no-store" }),
+      const [response, templatesResponse, presentationsResponse] = await Promise.all([
+        fetch("/api/workspace?include=contacts", { headers: { Accept: "application/json" } }),
         fetch("/api/templates", { headers: { Accept: "application/json" } }),
         fetch("/api/presentations", { headers: { Accept: "application/json" } }),
       ]);
       if (!response.ok) throw new Error("Рабочее пространство недоступно");
-      if (!contactsResponse.ok) throw new Error("Контакты недоступны");
-      const [body, contactsBody] = await Promise.all([
-        response.json() as Promise<CampaignWizardBootstrap>,
-        contactsResponse.json() as Promise<ContactsListResponse>,
-      ]);
+      const body = await response.json() as WorkspaceSnapshot;
       if (templatesResponse.ok) {
         const templateBody = await templatesResponse.json() as EmailTemplatesListResponse;
         setWorkspaceTemplates(Array.isArray(templateBody.templates) ? templateBody.templates : []);
@@ -509,7 +532,7 @@ function CampaignWizardState({
       } else {
         setWorkspacePresentations([]);
       }
-      if (Array.isArray(contactsBody.contacts)) setWorkspaceContacts(contactsBody.contacts);
+      if (Array.isArray(body.contacts)) setWorkspaceContacts(body.contacts);
       if (Array.isArray(body.members)) setWorkspaceMembers(body.members);
       if (Array.isArray(body.segments)) setWorkspaceSegments(body.segments);
       setIntegrations((body.integrations ?? []).flatMap((record) => {
@@ -583,12 +606,6 @@ function CampaignWizardState({
       setApiMode("offline");
     }
   }, [duplicate, purpose, recoveredCampaignId, setScheduledAt, sourceId]);
-
-  React.useEffect(() => {
-    // Calendar scheduling is intentionally disabled: every new campaign is
-    // prepared for an explicit immediate launch.
-    setScheduledTimes([]);
-  }, []);
 
   React.useEffect(() => {
     const frame = window.requestAnimationFrame(() => void loadWorkspace());
@@ -968,6 +985,27 @@ function CampaignWizardState({
     }
   };
 
+  const changeScheduledTimes = (next: string[]) => {
+    const validTimes = next.filter((value) => !Number.isNaN(Date.parse(value))).slice(0, 20);
+    setScheduledTimes(validTimes);
+    setEvaluation(null);
+    if (scheduleSaveTimer.current !== null) window.clearTimeout(scheduleSaveTimer.current);
+    scheduleSaveTimer.current = window.setTimeout(() => {
+      scheduleSaveTimer.current = null;
+      void mutateCampaign(
+        "save",
+        { name: campaignName.trim() || "Новая рассылка", scheduledAt: validTimes[0] ?? null },
+        validTimes.length
+          ? `${validTimes.length === 1 ? "Дата" : "Времена волн"} сохранены. После проверки все волны появятся в календаре.`
+          : "Расписание убрано из календаря.",
+      );
+    }, 500);
+  };
+
+  React.useEffect(() => () => {
+    if (scheduleSaveTimer.current !== null) window.clearTimeout(scheduleSaveTimer.current);
+  }, []);
+
   if (finishedCampaign) {
     return (
       <div className="mx-auto flex min-h-[560px] max-w-2xl items-center py-10">
@@ -1204,6 +1242,9 @@ function CampaignWizardState({
               clientBlockers={clientBlockers}
               evaluation={evaluation}
               manualVkWorkspace={channels.includes("email") && providers.email === "vk-workspace"}
+              scheduledTimes={scheduledTimes}
+              onScheduledTimesChange={changeScheduledTimes}
+              minimumScheduledAt={minimumScheduledAt}
             />
           ) : null}
 
@@ -1232,8 +1273,8 @@ function CampaignWizardState({
                 {evaluation?.blockers.length
                   ? "Проверить повторно"
                   : channels.includes("email") && providers.email === "vk-workspace"
-                    ? "Проверить SMTP-отправку"
-                    : "Проверить и отправить"}
+                    ? scheduledAt ? `Поставить ${scheduledTimes.length > 1 ? `${formatWaveCount(scheduledTimes.length)} в календарь` : "в календарь"}` : "Проверить SMTP-отправку"
+                    : scheduledAt ? `Поставить ${scheduledTimes.length > 1 ? `${formatWaveCount(scheduledTimes.length)} в календарь` : "в календарь"}` : "Проверить и отправить"}
               </Button>
             )}
           </footer>
@@ -1887,6 +1928,9 @@ function ReviewStep({
   clientBlockers,
   evaluation,
   manualVkWorkspace,
+  scheduledTimes,
+  onScheduledTimesChange,
+  minimumScheduledAt,
 }: {
   campaignName: string;
   audienceLabel: string;
@@ -1898,8 +1942,14 @@ function ReviewStep({
   clientBlockers: string[];
   evaluation: Evaluation | null;
   manualVkWorkspace: boolean;
+  scheduledTimes: string[];
+  onScheduledTimesChange: (value: string[]) => void;
+  minimumScheduledAt: string;
 }) {
   const blockers = evaluation?.blockers.length ? evaluation.blockers : clientBlockers;
+  const timeZone = useBrowserTimeZone();
+  const scheduledAt = scheduledTimes[0] ?? null;
+  const totalMessages = recipientCount * scheduledTimes.length;
   return (
     <div>
       <StepIntro number={4} title="Проверьте готовность" description="Сервер рассчитает точный охват, проверит согласия, подключения и сохранит план. Внешняя отправка на этом шаге не выполняется." />
@@ -1915,17 +1965,94 @@ function ReviewStep({
               : `${integrationProviderById[providers[channel]].name} · доступно ${formatNumber(coverage[channel] ?? 0)}`}
           />
         ))}
+        {scheduledTimes.length > 0 ? (
+          <ReviewRow
+            label="Волны отправки"
+            value={`${formatWaveCount(scheduledTimes.length)} · всего ${formatNumber(totalMessages)} ${totalMessages === 1 ? "письмо" : "писем"}`}
+          />
+        ) : null}
       </div>
 
-      <section className="mt-6 rounded-xl border border-border bg-surface-subtle p-5" aria-labelledby="schedule-title">
-        <h3 id="schedule-title" className="text-[15px] font-semibold text-text-strong">Отправка без календаря</h3>
-        <p className="mt-1 text-[12px] leading-5 text-text-muted">После проверки кампания будет запущена сразу. Отложенная отправка временно отключена.</p>
+      <section className="mt-6 rounded-xl border border-border p-5" aria-labelledby="schedule-title">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h3 id="schedule-title" className="text-[15px] font-semibold text-text-strong">Когда отправить</h3>
+            <p className="mt-1 text-[12px] leading-5 text-text-muted">«Сейчас» сохранит готовую кампанию для явного запуска. Дата добавит её в календарь и очередь Потока.</p>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" variant={scheduledAt ? "secondary" : "primary"} onClick={() => onScheduledTimesChange([])}>Сейчас</Button>
+            <Button size="sm" variant={scheduledAt ? "primary" : "secondary"} onClick={() => {
+              if (scheduledAt) return;
+              const date = new Date(Date.now() + 60 * 60 * 1000);
+              date.setMinutes(Math.ceil(date.getMinutes() / 15) * 15, 0, 0);
+              onScheduledTimesChange([date.toISOString()]);
+            }}>По расписанию</Button>
+          </div>
+        </div>
+        {scheduledAt ? (
+          <div className="mt-4 space-y-3">
+            {scheduledTimes.map((waveTime, index) => (
+              <div key={`${index}-${waveTime}`} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                <FormField
+                  label={`Волна ${index + 1}`}
+                  htmlFor={`campaign-scheduled-at-${index}`}
+                  required
+                  hint={index === 0 ? `Часовой пояс: ${describeTimeZone(timeZone)}. Все получатели получат письмо в каждой волне.` : undefined}
+                >
+                  <Input
+                    id={`campaign-scheduled-at-${index}`}
+                    type="datetime-local"
+                    min={localInputValue(minimumScheduledAt)}
+                    value={localInputValue(waveTime)}
+                    onChange={(event) => {
+                      const value = new Date(event.target.value);
+                      if (Number.isNaN(value.getTime())) return;
+                      const next = [...scheduledTimes];
+                      next[index] = value.toISOString();
+                      onScheduledTimesChange(next);
+                    }}
+                  />
+                </FormField>
+                {scheduledTimes.length > 1 ? (
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    aria-label={`Удалить волну ${index + 1}`}
+                    onClick={() => onScheduledTimesChange(scheduledTimes.filter((_, itemIndex) => itemIndex !== index))}
+                  >
+                    <Trash2 aria-hidden="true" className="size-4" />
+                  </Button>
+                ) : null}
+              </div>
+            ))}
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-surface-subtle p-3">
+              <p className="text-[12px] leading-5 text-text-muted">
+                {formatRecipientCount(recipientCount)} × {formatWaveCount(scheduledTimes.length)} = {formatNumber(totalMessages)} писем.
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                disabled={scheduledTimes.length >= 20}
+                leadingIcon={<Plus aria-hidden="true" className="size-4" />}
+                onClick={() => onScheduledTimesChange([...scheduledTimes, nextWaveTime(scheduledTimes)])}
+              >
+                Добавить время
+              </Button>
+            </div>
+          </div>
+        ) : null}
       </section>
 
-      <Alert tone="info" title="Запуск выполняется сразу" className="mt-6">
+      <Alert tone="info" title={scheduledTimes.length > 1 ? `Запланировано волн: ${scheduledTimes.length}` : scheduledAt ? "Рассылка запланирована" : "Запуск выполняется отдельно"} className="mt-6">
         {manualVkWorkspace
-          ? "Поток подготовит адресатов и HTML-письмо и передаст их в VK WorkSpace SMTP."
-          : "После успешной проверки Поток сразу передаст всех допущенных получателей провайдеру."}
+          ? scheduledAt
+            ? "В каждое выбранное время серверная очередь передаст персонализированное HTML-письмо всем получателям через VK WorkSpace SMTP. Кнопки останутся ссылками; статус каждой волны будет виден в Календаре."
+            : "Поток подготовит адресатов и HTML-письмо. После проверки откройте рассылку и нажмите «Начать отправку» — переходить в VK WorkSpace не нужно."
+          : scheduledAt
+            ? "После успешной проверки «Поток» создаст отдельную карточку для каждой волны. Каждый получатель получит это письмо во все выбранные периоды."
+            : "Проверка фиксирует готовую версию. После неё откройте рассылку и нажмите «Начать отправку»."}
       </Alert>
 
       <section className={cn("mt-6 rounded-xl border p-5", blockers.length ? "border-warning/30 bg-warning-subtle" : "border-success/25 bg-success-subtle")} aria-labelledby="blockers-title">

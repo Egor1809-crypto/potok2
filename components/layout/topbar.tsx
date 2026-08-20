@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { Command, LogOut, Menu, Plus, Search } from "lucide-react";
+import { CalendarDays, Command, LogOut, Menu, Plus, Search } from "lucide-react";
 
 import { Avatar } from "@/components/ui/avatar";
 import { IconButton, buttonVariants } from "@/components/ui/button";
@@ -28,7 +28,7 @@ export function Topbar({
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
-      void fetch("/api/workspace?scope=identity", { cache: "force-cache" })
+      void fetch("/api/workspace", { cache: "no-store" })
         .then((response) => response.ok
           ? response.json() as Promise<{ participant?: { displayName?: string; color?: string } }>
           : null)
@@ -109,6 +109,15 @@ export function Topbar({
             <span className="hidden sm:inline">Создать</span>
           </Link>
         )}
+
+        <Link
+          href="/calendar"
+          aria-label="Открыть календарь рассылок"
+          className="hidden h-9 items-center gap-2 rounded-lg border border-primary/25 bg-primary/5 px-3 text-[12px] font-semibold text-primary shadow-[0_1px_2px_rgba(101,88,232,0.1)] transition hover:-translate-y-px hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-primary/30 md:inline-flex"
+        >
+          <CalendarDays aria-hidden="true" className="size-4" />
+          Календарь
+        </Link>
 
         <Link
           href="/settings"
