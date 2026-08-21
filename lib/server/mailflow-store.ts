@@ -608,7 +608,7 @@ export async function getWorkspaceSnapshot(
   };
 }
 
-async function campaignSummaryRecords(): Promise<CampaignRecord[]> {
+async function campaignSummaryRecords(options: { scheduledOnly?: boolean } = {}): Promise<CampaignRecord[]> {
   const rows = await getDb().select({
     id: campaigns.id,
     workspaceId: campaigns.workspaceId,
@@ -640,7 +640,9 @@ async function campaignSummaryRecords(): Promise<CampaignRecord[]> {
     createdAt: campaigns.createdAt,
     updatedAt: campaigns.updatedAt,
   }).from(campaigns)
-    .where(eq(campaigns.workspaceId, WORKSPACE_ID))
+    .where(options.scheduledOnly
+      ? and(eq(campaigns.workspaceId, WORKSPACE_ID), isNotNull(campaigns.scheduledAt))
+      : eq(campaigns.workspaceId, WORKSPACE_ID))
     .orderBy(desc(campaigns.updatedAt));
   // List, dashboard and analytics screens never need every recipient id. Large
   // campaigns can contain thousands of ids, so do not pull those JSON blobs
@@ -679,6 +681,17 @@ export async function getWorkspaceBootstrap(request: Request) {
       db.select().from(campaignEvents).where(and(eq(campaignEvents.workspaceId, WORKSPACE_ID), eq(campaignEvents.campaignId, sourceId))).orderBy(desc(campaignEvents.occurredAt)).limit(WORKSPACE_HISTORY_LIMIT),
     ]);
     return { ...base, campaigns: campaignRows.map(toCampaign), deliveryPlans: planRows.map(toDeliveryPlan), deliveryJobs: jobRows.map(toDeliveryJob), events: eventRows.map(toCampaignEvent) };
+  }
+  if (scope === "calendar") {
+    const [campaignRecords, segmentRows] = await Promise.all([
+      campaignSummaryRecords({ scheduledOnly: true }),
+      db.select().from(segments).where(eq(segments.workspaceId, WORKSPACE_ID)).orderBy(desc(segments.updatedAt)),
+    ]);
+    return {
+      ...base,
+      campaigns: campaignRecords,
+      segments: segmentRows.map((segment) => toSegment(segment, [], [])),
+    };
   }
   if (scope === "campaign-list" || scope === "history" || scope === "dashboard") {
     const [campaignRecords, segmentRows, integrationRows, planRows, jobRows, eventRows, statsRows, templateCountRows, memberRows] = await Promise.all([
