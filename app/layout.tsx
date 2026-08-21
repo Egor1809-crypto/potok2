@@ -29,6 +29,10 @@ export async function generateMetadata(): Promise<Metadata> {
     metadataBase: new URL(origin),
     title: { default: title, template: `%s · ${brandConfig.name}` },
     description,
+    other: {
+      "compliance152-site-verification":
+        "compliance152-verify=d368f68c5d299bb7d35aee74ee306af6",
+    },
     icons: {
       icon: [
         { url: "/favicon.ico", type: "image/x-icon", sizes: "32x32" },
