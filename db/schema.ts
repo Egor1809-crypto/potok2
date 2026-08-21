@@ -342,10 +342,10 @@ export const emailAssets = sqliteTable(
     objectKey: text("object_key").notNull(),
     filename: text("filename").notNull(),
     mimeType: text("mime_type")
-      .$type<"image/jpeg" | "image/png" | "image/gif" | "image/webp">()
+      .$type<"image/jpeg" | "image/png" | "image/gif" | "image/webp" | "application/pdf">()
       .notNull(),
     size: integer("size").notNull(),
-    kind: text("kind").$type<"photo" | "logo">().notNull(),
+    kind: text("kind").$type<"photo" | "logo" | "document">().notNull(),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [
@@ -471,6 +471,8 @@ export const campaigns = sqliteTable(
       .$type<EmailBuilderDocumentInput | null>()
       .default(null),
     messengerMessage: text("messenger_message").notNull().default(""),
+    messengerDocumentUrl: text("messenger_document_url"),
+    messengerDocumentName: text("messenger_document_name"),
     deliveryChannels: text("delivery_channels", { mode: "json" })
       .$type<DeliveryChannelId[]>()
       .notNull()

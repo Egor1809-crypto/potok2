@@ -87,6 +87,7 @@ import {
   renderMergeTemplate,
   sendUniSenderTransactionalEmail,
   sendTelegramMessage,
+  sendTelegramDocument,
   sendVkMessage,
   unknownMergeTokens,
 } from "./provider-adapters";
@@ -260,6 +261,8 @@ function toCampaign(row: CampaignRow): CampaignRecord {
     emailBodyHtml: row.emailBodyHtml,
     emailBuilderDocument: row.emailBuilderDocument,
     messengerMessage: row.messengerMessage,
+    messengerDocumentUrl: row.messengerDocumentUrl,
+    messengerDocumentName: row.messengerDocumentName,
     deliveryChannels: row.deliveryChannels,
     status: row.status as CampaignRecord["status"],
     statusReason: row.statusReason,
@@ -625,6 +628,8 @@ async function campaignSummaryRecords(): Promise<CampaignRecord[]> {
     emailBodyHtml: sql<string>`''`,
     emailBuilderDocument: sql<null>`null`,
     messengerMessage: sql<string>`''`,
+    messengerDocumentUrl: sql<null>`null`,
+    messengerDocumentName: sql<null>`null`,
     deliveryChannels: campaigns.deliveryChannels,
     status: campaigns.status,
     statusReason: campaigns.statusReason,
@@ -2013,15 +2018,108 @@ function parseSegment(
 
 async function allSegmentRecords() {
   const db = getDb();
-  const [segmentRows, contactRows, campaignRows] = await Promise.all([
-    db.select().from(segments).where(eq(segments.workspaceId, WORKSPACE_ID)).orderBy(desc(segments.updatedAt)),
-    db.select().from(contacts).where(eq(contacts.workspaceId, WORKSPACE_ID)),
-    db.select().from(campaigns).where(eq(campaigns.workspaceId, WORKSPACE_ID)),
-  ]);
-  const contactRecords = contactRows.map(toContact);
-  return segmentRows.map((segment) =>
-    toSegment(segment, contactRecords, campaignRows),
+  const segmentRows = await db.select().from(segments)
+    .where(eq(segments.workspaceId, WORKSPACE_ID))
+    .orderBy(desc(segments.updatedAt));
+  if (!segmentRows.length) return [];
+
+  const campaignRows = await db
+    .select({ segmentId: campaigns.segmentId, count: sql<number>`count(*)` })
+    .from(campaigns)
+    .where(eq(campaigns.workspaceId, WORKSPACE_ID))
+    .groupBy(campaigns.segmentId);
+  const campaignsBySegment = new Map(
+    campaignRows.flatMap((row) => row.segmentId ? [[row.segmentId, Number(row.count)] as const] : []),
   );
+  const d1 = getD1();
+  const records: SegmentRecord[] = [];
+  for (const segment of segmentRows) {
+    const ruleQuery = segmentRuleSql(segment.rules);
+    const countRow = await d1
+      .prepare(`SELECT COUNT(*) AS count FROM contacts WHERE workspace_id = ? AND (${ruleQuery.text})`)
+      .bind(WORKSPACE_ID, ...ruleQuery.values)
+      .first<{ count: number }>();
+    records.push({
+      id: segment.id,
+      workspaceId: segment.workspaceId,
+      name: segment.name,
+      description: segment.description,
+      rules: segment.rules,
+      color: segment.color,
+      isDynamic: segment.isDynamic,
+      contactCount: Number(countRow?.count ?? 0),
+      campaignsCount: campaignsBySegment.get(segment.id) ?? 0,
+      createdAt: segment.createdAt,
+      updatedAt: segment.updatedAt,
+    });
+  }
+  return records;
+}
+
+type SegmentSql = { text: string; values: Array<string | number> };
+
+function segmentRuleSql(rules: SegmentRule[]): SegmentSql {
+  if (!rules.length) return { text: "0 = 1", values: [] };
+  let result = singleSegmentRuleSql(rules[0]);
+  for (const rule of rules.slice(1)) {
+    const next = singleSegmentRuleSql(rule);
+    result = {
+      text: `(${result.text}) ${rule.join === "or" ? "OR" : "AND"} (${next.text})`,
+      values: [...result.values, ...next.values],
+    };
+  }
+  return result;
+}
+
+function singleSegmentRuleSql(rule: SegmentRule): SegmentSql {
+  const values = Array.isArray(rule.value) ? rule.value : [rule.value];
+  const normalized = values.map((value) => String(value).trim().toLocaleLowerCase("ru-RU"));
+  if (rule.field === "tag") {
+    const clauses = normalized.map((value) => ({
+      text: rule.operator === "contains"
+        ? "EXISTS (SELECT 1 FROM json_each(contacts.tags) WHERE lower(trim(CAST(json_each.value AS TEXT))) LIKE ?)"
+        : "EXISTS (SELECT 1 FROM json_each(contacts.tags) WHERE lower(trim(CAST(json_each.value AS TEXT))) = ?)",
+      value: rule.operator === "contains" ? `%${value}%` : value,
+    }));
+    const positive = clauses.map((clause) => clause.text).join(" OR ") || "0 = 1";
+    return {
+      text: rule.operator === "not_equals" ? `NOT (${positive})` : `(${positive})`,
+      values: clauses.map((clause) => clause.value),
+    };
+  }
+  const column = {
+    jobTitle: "job_title",
+    city: "city",
+    status: "status",
+    category: "category",
+    companyName: "company_name",
+    lastContactedAt: "last_contacted_at",
+    engagementScore: "engagement_score",
+  }[rule.field];
+  if (!column) return { text: "0 = 1", values: [] };
+  if (rule.operator === "greater_than" || rule.operator === "less_than") {
+    return {
+      text: `CAST(${column} AS REAL) ${rule.operator === "greater_than" ? ">" : "<"} CAST(? AS REAL)`,
+      values: [Number(values[0])],
+    };
+  }
+  if (rule.operator === "before" || rule.operator === "after") {
+    return {
+      text: `${column} IS NOT NULL AND datetime(${column}) ${rule.operator === "before" ? "<" : ">"} datetime(?)`,
+      values: [String(values[0])],
+    };
+  }
+  const expressions = normalized.map(() => rule.operator === "contains"
+    ? `lower(trim(COALESCE(${column}, ''))) LIKE ?`
+    : `lower(trim(COALESCE(${column}, ''))) = ?`);
+  const queryValues = rule.operator === "contains"
+    ? normalized.map((value) => `%${value}%`)
+    : normalized;
+  const positive = expressions.join(" OR ") || "0 = 1";
+  return {
+    text: rule.operator === "not_equals" ? `NOT (${positive})` : `(${positive})`,
+    values: queryValues,
+  };
 }
 
 export async function listSegments(request: Request): Promise<SegmentsListResponse> {
@@ -2245,7 +2343,7 @@ const SENSITIVE_KEY = /(token|secret|password|api.?key|credential|access.?key)/i
 
 const PUBLIC_CONFIG_FIELDS: Record<IntegrationProviderId, string[]> = {
   "vk-workspace": ["senderEmail"],
-  "telegram-bot-api": ["botUsername"],
+  "telegram-bot-api": ["botUsername", "botSlot"],
   "vk-api": ["communityId"],
   unisender: ["senderEmail", "marketingSenderEmail", "transactionalSenderEmail", "listId"],
 };
@@ -2432,6 +2530,8 @@ type ParsedCampaign = {
   emailBodyHtml: string;
   emailBuilderDocument: CampaignRecord["emailBuilderDocument"];
   messengerMessage: string;
+  messengerDocumentUrl: string | null;
+  messengerDocumentName: string | null;
   channels: CampaignChannelInput[];
   scheduledAt: string | null;
 };
@@ -2523,6 +2623,18 @@ function parseCampaign(
   const emailBodyHtml = emailBuilderDocument
     ? compileEmailDocument(emailBuilderDocument)
     : plainTextEmailHtml(emailBodyText, previewText);
+  const messengerDocumentUrl = (() => {
+    const parsed = nullableText(object.messengerDocumentUrl, "PDF для Telegram", 1000);
+    const value = parsed === undefined ? (existing?.messengerDocumentUrl ?? null) : parsed;
+    if (!value) return null;
+    try {
+      const url = new URL(value);
+      if (url.protocol !== "https:" || !/\/api\/assets\/asset-[a-z0-9-]+$/i.test(url.pathname)) throw new Error("Invalid asset URL");
+    } catch {
+      throw new ApiRequestError("PDF должен быть загружен в медиатеку Потока.");
+    }
+    return value;
+  })();
   return {
     name,
     purpose,
@@ -2555,6 +2667,10 @@ function parseCampaign(
       optionalText(object.messengerMessage, "Сообщение", 4000) ??
       existing?.messengerMessage ??
       "",
+    messengerDocumentUrl,
+    messengerDocumentName: messengerDocumentUrl
+      ? optionalText(object.messengerDocumentName, "Название PDF", 180) ?? existing?.messengerDocumentName ?? "document.pdf"
+      : null,
     channels,
     scheduledAt,
   };
@@ -2757,6 +2873,8 @@ export async function createCampaign(
     emailBodyHtml: input.emailBodyHtml,
     emailBuilderDocument: input.emailBuilderDocument,
     messengerMessage: input.messengerMessage,
+    messengerDocumentUrl: input.messengerDocumentUrl,
+    messengerDocumentName: input.messengerDocumentName,
     deliveryChannels: input.channels.map((item) => item.channel),
     status: "draft",
     statusReason: "Черновик сохранён. Запустите проверку перед отправкой.",
@@ -2872,6 +2990,8 @@ async function ensureCampaignVersion(
     emailBodyHtml: campaign.emailBodyHtml,
     emailBuilderDocument: campaign.emailBuilderDocument,
     messengerMessage: campaign.messengerMessage,
+    messengerDocumentUrl: campaign.messengerDocumentUrl,
+    messengerDocumentName: campaign.messengerDocumentName,
     channels: [...plans]
       .sort((left, right) => left.channel.localeCompare(right.channel))
       .map((plan) => ({ channel: plan.channel, providerId: plan.providerId })),
@@ -3053,6 +3173,12 @@ async function evaluateLaunch(
         blockers.push(error instanceof Error ? error.message : "Презентация для вложения недоступна.");
       }
     }
+  }
+  if (campaign.messengerDocumentUrl && !plans.some((plan) => plan.channel === "telegram" && plan.providerId === "telegram-bot-api")) {
+    blockers.push("PDF-документ можно отправить только через Telegram Bot API.");
+  }
+  if (campaign.messengerDocumentUrl && campaign.messengerMessage.length > 1024) {
+    blockers.push("Подпись к PDF в Telegram должна быть не длиннее 1 024 символов.");
   }
   if (campaign.scheduledAt && Date.parse(campaign.scheduledAt) <= Date.now()) {
     blockers.push("Дата запланированного запуска уже прошла. Выберите новую дату или режим «Сейчас».");
@@ -3277,6 +3403,8 @@ async function updateOutboxResult(
 async function processDirectOutbox(
   rows: DeliveryOutboxRecord[],
   messengerMessage: string,
+  integrationRecords: IntegrationRecord[],
+  messengerDocumentUrl: string | null,
 ) {
   const contactsById = new Map(
     (await getDb()
@@ -3311,15 +3439,25 @@ async function processDirectOutbox(
           })
           .where(eq(deliveryOutbox.id, row.id));
         if (row.providerId === "telegram-bot-api") {
-          const credentials = automaticProviderSecrets(row.providerId) as {
+          const publicConfig = integrationRecords.find((item) => item.providerId === row.providerId)?.publicConfig ?? {};
+          const credentials = automaticProviderSecrets(row.providerId, publicConfig) as {
             token?: string;
           };
-          const result = await sendTelegramMessage({
-            token: credentials.token ?? "",
-            chatId: row.recipientEndpoint,
-            text: renderContactTemplate(messengerMessage, contact),
-            signal: AbortSignal.timeout(15_000),
-          });
+          const renderedMessage = renderContactTemplate(messengerMessage, contact);
+          const result = messengerDocumentUrl
+            ? await sendTelegramDocument({
+                token: credentials.token ?? "",
+                chatId: row.recipientEndpoint,
+                documentUrl: messengerDocumentUrl,
+                caption: renderedMessage,
+                signal: AbortSignal.timeout(20_000),
+              })
+            : await sendTelegramMessage({
+                token: credentials.token ?? "",
+                chatId: row.recipientEndpoint,
+                text: renderedMessage,
+                signal: AbortSignal.timeout(15_000),
+              });
           await updateOutboxResult(row, result);
         } else {
           const credentials = automaticProviderSecrets(row.providerId) as {
@@ -3847,6 +3985,8 @@ async function dispatchCampaign(
         row.providerId === "telegram-bot-api" || row.providerId === "vk-api",
       ),
       version.snapshot.messengerMessage,
+      integrationsNow,
+      version.snapshot.messengerDocumentUrl,
     );
     const unisenderRows = rows.filter((row) => row.providerId === "unisender");
     if (unisenderRows.length) {
@@ -4401,6 +4541,8 @@ export async function updateCampaign(
       emailBodyHtml: input.emailBodyHtml,
       emailBuilderDocument: input.emailBuilderDocument,
       messengerMessage: input.messengerMessage,
+      messengerDocumentUrl: input.messengerDocumentUrl,
+      messengerDocumentName: input.messengerDocumentName,
       deliveryChannels: input.channels.map((item) => item.channel),
       scheduledAt: input.scheduledAt ?? null,
       status: "draft",

@@ -35,7 +35,7 @@ export async function checkProviderConnection(
       timeoutMs: CHECK_TIMEOUT_MS,
     });
   }
-  if (!hasRuntimeCredentials(integration.providerId)) {
+  if (!hasRuntimeCredentials(integration.providerId, integration.publicConfig)) {
     return {
       ok: false,
       message: "В серверном окружении отсутствуют обязательные секреты провайдера.",
@@ -43,7 +43,7 @@ export async function checkProviderConnection(
   }
   if (integration.providerId === "telegram-bot-api") {
     return checkTelegramBot({
-      token: runtimeSecret("TELEGRAM_BOT_TOKEN"),
+      token: runtimeSecret(integration.publicConfig.botSlot === "secondary" ? "TELEGRAM_BOT_TOKEN_2" : "TELEGRAM_BOT_TOKEN"),
       expectedUsername: integration.publicConfig.botUsername,
       signal: timeoutSignal(),
     });
@@ -72,12 +72,15 @@ export async function checkProviderConnection(
   };
 }
 
-export function automaticProviderSecrets(providerId: IntegrationProviderId) {
+export function automaticProviderSecrets(
+  providerId: IntegrationProviderId,
+  publicConfig: Record<string, string> = {},
+) {
   if (providerId === "vk-workspace") {
     return { password: runtimeSecret("VK_WORKSPACE_SMTP_PASSWORD") };
   }
   if (providerId === "telegram-bot-api") {
-    return { token: runtimeSecret("TELEGRAM_BOT_TOKEN") };
+    return { token: runtimeSecret(publicConfig.botSlot === "secondary" ? "TELEGRAM_BOT_TOKEN_2" : "TELEGRAM_BOT_TOKEN") };
   }
   if (providerId === "vk-api") {
     return { accessToken: runtimeSecret("VK_COMMUNITY_ACCESS_TOKEN") };

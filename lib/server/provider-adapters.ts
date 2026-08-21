@@ -200,6 +200,50 @@ export async function sendTelegramMessage(input: {
   }
 }
 
+export async function sendTelegramDocument(input: {
+  token: string;
+  chatId: string;
+  documentUrl: string;
+  caption: string;
+  fetchFn?: FetchLike;
+  signal?: AbortSignal;
+}): Promise<ProviderCallResult> {
+  const fetchFn = input.fetchFn ?? fetch;
+  try {
+    const response = await fetchFn(
+      `${TELEGRAM_API}/bot${encodeURIComponent(input.token)}/sendDocument`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: input.chatId,
+          document: input.documentUrl,
+          caption: input.caption.slice(0, 1024),
+        }),
+        signal: input.signal,
+      },
+    );
+    const body = await responseJson(response) as {
+      ok?: boolean;
+      description?: string;
+      result?: { message_id?: number };
+    } | null;
+    if (response.status >= 500) {
+      return { status: "ambiguous", message: `Telegram вернул HTTP ${response.status}; автоматический повтор отключён.` };
+    }
+    if (!response.ok || !body?.ok || !body.result?.message_id) {
+      return { status: "rejected", message: providerMessage(body, `Telegram отклонил PDF (HTTP ${response.status}).`) };
+    }
+    return {
+      status: "accepted",
+      externalId: String(body.result.message_id),
+      message: "Telegram принял PDF-документ.",
+    };
+  } catch (error) {
+    return ambiguousFailure(error, "Telegram");
+  }
+}
+
 export async function checkVkCommunity(input: {
   accessToken: string;
   communityId: string;

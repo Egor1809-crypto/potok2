@@ -239,6 +239,21 @@ export function SegmentsView() {
         )}
       </div>
 
+      <section className="grid gap-3 rounded-xl border border-[#c9dff7] bg-[#f4f8fd] p-4 md:grid-cols-3" aria-label="Как работают сегменты">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[.08em] text-[#285d91]">Что это</p>
+          <p className="mt-1 text-[12px] leading-5 text-[var(--text-secondary)]">Сохранённый набор правил: например, «Москва И активный статус И есть тег БФЛ».</p>
+        </div>
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[.08em] text-[#285d91]">Зачем</p>
+          <p className="mt-1 text-[12px] leading-5 text-[var(--text-secondary)]">Охват пересчитывается по актуальной базе, поэтому не нужно каждый раз выбирать контакты вручную.</p>
+        </div>
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[.08em] text-[#285d91]">Как использовать</p>
+          <p className="mt-1 text-[12px] leading-5 text-[var(--text-secondary)]">Создайте правила, проверьте число контактов и нажмите «Создать кампанию» на карточке сегмента.</p>
+        </div>
+      </section>
+
       <section className="card overflow-hidden" aria-labelledby="segments-list-title">
         <div className="flex flex-col gap-3 border-b border-[var(--border)] p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
           <div>

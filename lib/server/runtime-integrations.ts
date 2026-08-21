@@ -43,8 +43,15 @@ function runtimeEnvironment(): RuntimeEnv {
   return env as unknown as RuntimeEnv;
 }
 
-export function hasRuntimeCredentials(providerId: IntegrationProviderId) {
+export function hasRuntimeCredentials(
+  providerId: IntegrationProviderId,
+  publicConfig: Record<string, string> = {},
+) {
   const runtime = runtimeEnvironment();
+  if (providerId === "telegram-bot-api") {
+    const key = publicConfig.botSlot === "secondary" ? "TELEGRAM_BOT_TOKEN_2" : "TELEGRAM_BOT_TOKEN";
+    return Boolean(runtime[key]?.trim());
+  }
   return requiredSecretKeys[providerId].every((key) => Boolean(runtime[key]?.trim()));
 }
 
@@ -83,7 +90,7 @@ export function connectionStatus(
 ): IntegrationConnectionStatus {
   if (!integration.enabled) return "disconnected";
 
-  const credentials = hasRuntimeCredentials(integration.providerId);
+  const credentials = hasRuntimeCredentials(integration.providerId, integration.publicConfig);
   const publicConfigReady = hasRequiredPublicConfig(
     integration.providerId,
     integration.publicConfig,
@@ -102,7 +109,7 @@ export function toIntegrationRecord(
     throw new Error(`Unknown integration provider: ${integration.providerId}`);
   }
 
-  const credentialsConfigured = hasRuntimeCredentials(integration.providerId);
+  const credentialsConfigured = hasRuntimeCredentials(integration.providerId, integration.publicConfig);
   const status = connectionStatus(integration);
   const statusMessage =
     !credentialsConfigured

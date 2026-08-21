@@ -59,7 +59,7 @@ test("conference HTML letters are seeded as editable user templates", async () =
   assert.match(database, /conference-production-html-v12-links-and-cost-template/);
   assert.match(database, /conference-production-html-v13-cost-template-hero-image/);
   assert.match(database, /conference-production-html-v14-cost-template-hero-replacement/);
-  assert.match(database, /runtime-schema-v22-cost-template-hero-replacement/);
+  assert.match(database, /runtime-schema-v23-telegram-pdf/);
   assert.match(database, /template-user-conference-11-cost-reduction/);
   assert.match(database, /isFavorite: true/);
   assert.match(database, /https:\/\/t\.me\/TechPravoAI/);

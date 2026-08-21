@@ -10,6 +10,7 @@ import {
   renderMergeTemplate,
   sendUniSenderTransactionalEmail,
   sendTelegramMessage,
+  sendTelegramDocument,
   sendVkMessage,
   unknownMergeTokens,
 } from "../lib/server/provider-adapters.ts";
@@ -55,6 +56,26 @@ test("Telegram 5xx is ambiguous and is never retried blindly", async () => {
   });
   assert.equal(calls, 1);
   assert.equal(result.status, "ambiguous");
+});
+
+test("Telegram sends a PDF as one document with a caption", async () => {
+  const result = await sendTelegramDocument({
+    token: "test-token",
+    chatId: "42",
+    documentUrl: "https://example.test/report.pdf",
+    caption: "Ваше исследование",
+    fetchFn: async (url, init) => {
+      assert.match(String(url), /\/bottest-token\/sendDocument$/);
+      assert.deepEqual(JSON.parse(String(init.body)), {
+        chat_id: "42",
+        document: "https://example.test/report.pdf",
+        caption: "Ваше исследование",
+      });
+      return jsonResponse({ ok: true, result: { message_id: 88 } });
+    },
+  });
+  assert.equal(result.status, "accepted");
+  assert.equal(result.externalId, "88");
 });
 
 test("VK uses a deterministic non-zero random_id", async () => {

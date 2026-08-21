@@ -54,6 +54,7 @@ type SetupField = {
   placeholder: string;
   type?: "email" | "url" | "text";
   hint: string;
+  options?: Array<{ value: string; label: string }>;
 };
 
 const channelIcons = {
@@ -73,6 +74,16 @@ const setupFields: Record<IntegrationProviderId, SetupField[]> = {
     },
   ],
   "telegram-bot-api": [
+    {
+      key: "botSlot",
+      label: "Какой бот отправляет",
+      placeholder: "primary",
+      hint: "Первый бот использует TELEGRAM_BOT_TOKEN, второй — TELEGRAM_BOT_TOKEN_2.",
+      options: [
+        { value: "primary", label: "Бот №1 · основной" },
+        { value: "secondary", label: "Бот №2 · дополнительный" },
+      ],
+    },
     {
       key: "botUsername",
       label: "Имя бота",
@@ -559,6 +570,29 @@ export function IntegrationsView() {
         </div>
       </section>
 
+      <section className="grid gap-4 lg:grid-cols-2" aria-label="Инструкции подключения мессенджеров">
+        <article className="rounded-xl border border-[#b9def3] bg-[#f2f9fd] p-5">
+          <div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-xl bg-[#229ed9] text-white"><MessageCircleMore aria-hidden="true" className="size-5" /></span><div><h2 className="text-[14px] font-semibold text-text-strong">Telegram без риска блокировки</h2><p className="mt-0.5 text-[11px] text-text-muted">Официальный Bot API, до двух ботов</p></div></div>
+          <ol className="mt-4 space-y-2 text-[12px] leading-5 text-text-muted">
+            <li><b>1.</b> Создайте бота через @BotFather и добавьте токен в защищённый секрет сервера.</li>
+            <li><b>2.</b> Для второго бота используйте секрет <code>TELEGRAM_BOT_TOKEN_2</code> и выберите «Бот №2» в форме.</li>
+            <li><b>3.</b> Получатель должен сам открыть бота и нажать Start; после этого сохраните его числовой chat ID и согласие.</li>
+            <li><b>4.</b> PDF отправляется документом с подписью. Используйте очередь, паузы и не отправляйте одному чату чаще одного сообщения в секунду.</li>
+          </ol>
+          <p className="mt-3 rounded-lg bg-white/80 px-3 py-2 text-[10px] leading-4 text-[#3d647b]">Личные аккаунты не автоматизируются: такой маршрут нарушает ожидаемое поведение Telegram и намного чаще приводит к ограничениям.</p>
+        </article>
+        <article className="rounded-xl border border-[#bed8ff] bg-[#f4f8ff] p-5">
+          <div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-xl bg-[#0077ff] text-white"><MessagesSquare aria-hidden="true" className="size-5" /></span><div><h2 className="text-[14px] font-semibold text-text-strong">ВКонтакте от имени сообщества</h2><p className="mt-0.5 text-[11px] text-text-muted">Сообщения только разрешившим пользователям</p></div></div>
+          <ol className="mt-4 space-y-2 text-[12px] leading-5 text-text-muted">
+            <li><b>1.</b> Включите сообщения сообщества и разрешите пользователям писать ему.</li>
+            <li><b>2.</b> Создайте серверный ключ с доступом к сообщениям и сохраните его как <code>VK_COMMUNITY_ACCESS_TOKEN</code>.</li>
+            <li><b>3.</b> В Потоке укажите ID сообщества и нажмите «Сохранить и проверить».</li>
+            <li><b>4.</b> Импортируйте VK user ID только вместе с подтверждённым разрешением на сообщения.</li>
+          </ol>
+          <p className="mt-3 rounded-lg bg-white/80 px-3 py-2 text-[10px] leading-4 text-[#395c89]">Проверка выполняет безопасный запрос к API и покажет название сообщества до первой отправки.</p>
+        </article>
+      </section>
+
       <section className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
         <div className="rounded-xl border border-[#bcd8ff] bg-[#f3f8ff] p-5">
           <div className="flex items-start gap-3">
@@ -653,13 +687,22 @@ function SetupModal({
             htmlFor={`integration-${provider.id}-${field.key}`}
             hint={field.hint}
           >
-            <Input
-              id={`integration-${provider.id}-${field.key}`}
-              type={field.type ?? "text"}
-              value={values[field.key] ?? ""}
-              placeholder={field.placeholder}
-              onChange={(event) => onValueChange(field.key, event.target.value)}
-            />
+            {field.options ? (
+              <Select
+                id={`integration-${provider.id}-${field.key}`}
+                value={values[field.key] ?? field.options[0]?.value ?? ""}
+                onChange={(event) => onValueChange(field.key, event.target.value)}
+                options={field.options}
+              />
+            ) : (
+              <Input
+                id={`integration-${provider.id}-${field.key}`}
+                type={field.type ?? "text"}
+                value={values[field.key] ?? ""}
+                placeholder={field.placeholder}
+                onChange={(event) => onValueChange(field.key, event.target.value)}
+              />
+            )}
           </FormField>
         ))}
 

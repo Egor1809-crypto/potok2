@@ -6,6 +6,7 @@ import { creativeTemplates } from "./creative-template-library";
 import { conferenceTemplateSeries } from "./conference-template-series";
 import { conferenceSalesExpansion } from "./conference-sales-expansion";
 import { techPravoBrandTemplates } from "./tech-pravo-brand-templates";
+import { magneticCampaignTemplates } from "./magnetic-campaign-templates";
 
 const curatedTemplates: EmailTemplate[] = [
   {
@@ -1363,6 +1364,7 @@ const curatedTemplates: EmailTemplate[] = [
 ];
 
 export const templates: EmailTemplate[] = [
+  ...magneticCampaignTemplates,
   ...techPravoBrandTemplates,
   ...conferenceTemplateSeries,
   ...conferenceSalesExpansion,

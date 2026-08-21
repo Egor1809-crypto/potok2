@@ -284,9 +284,9 @@ export type EmailAssetRecord = {
   id: string;
   workspaceId: string;
   filename: string;
-  mimeType: "image/jpeg" | "image/png" | "image/gif" | "image/webp";
+  mimeType: "image/jpeg" | "image/png" | "image/gif" | "image/webp" | "application/pdf";
   size: number;
-  kind: "photo" | "logo";
+  kind: "photo" | "logo" | "document";
   url: string;
   createdAt: string;
 };
@@ -551,6 +551,8 @@ export type CampaignRecord = {
   contactIds: string[];
   templateId: string | null;
   presentationId: string | null;
+  messengerDocumentUrl: string | null;
+  messengerDocumentName: string | null;
   senderName: string;
   senderEmail: string;
   subject: string;
@@ -631,6 +633,8 @@ export type CampaignVersionSnapshot = {
   contactIds: string[];
   audienceContactIds: string[];
   presentationId: string | null;
+  messengerDocumentUrl: string | null;
+  messengerDocumentName: string | null;
   senderName: string;
   senderEmail: string;
   subject: string;
@@ -973,6 +977,8 @@ export type CampaignCreateInput = {
   contactIds?: string[];
   templateId?: string | null;
   presentationId?: string | null;
+  messengerDocumentUrl?: string | null;
+  messengerDocumentName?: string | null;
   senderName?: string;
   senderEmail?: string;
   subject?: string;

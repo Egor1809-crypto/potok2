@@ -45,7 +45,7 @@ let initialization: Promise<void> | null = null;
 // template-seeding routine in every new isolate made even a simple page load
 // wait several seconds for D1. Keep a durable completion marker instead.
 // Bump this value whenever a runtime-only schema migration is added here.
-const RUNTIME_SCHEMA_VERSION = "runtime-schema-v22-cost-template-hero-replacement";
+const RUNTIME_SCHEMA_VERSION = "runtime-schema-v23-telegram-pdf";
 const DEFAULT_SENDER_NAME = "ТехнологИИ Права";
 const DEFAULT_SENDER_EMAIL = "info@tech-pravo.ru";
 
@@ -232,6 +232,8 @@ const schemaStatements = [
     email_body_html TEXT NOT NULL DEFAULT '',
     email_builder_document TEXT,
     messenger_message TEXT NOT NULL DEFAULT '',
+    messenger_document_url TEXT,
+    messenger_document_name TEXT,
     delivery_channels TEXT NOT NULL DEFAULT '[]',
     status TEXT NOT NULL DEFAULT 'draft',
     status_reason TEXT NOT NULL DEFAULT 'Черновик сохранён',
@@ -518,6 +520,12 @@ async function createSchema() {
     await d1
       .prepare("ALTER TABLE campaigns ADD COLUMN presentation_id TEXT REFERENCES presentation_projects(id) ON DELETE SET NULL")
       .run();
+  }
+  if (!campaignColumns.results.some((column) => column.name === "messenger_document_url")) {
+    await d1.prepare("ALTER TABLE campaigns ADD COLUMN messenger_document_url TEXT").run();
+  }
+  if (!campaignColumns.results.some((column) => column.name === "messenger_document_name")) {
+    await d1.prepare("ALTER TABLE campaigns ADD COLUMN messenger_document_name TEXT").run();
   }
   const integrationColumns = await d1
     .prepare("PRAGMA table_info(integrations)")
@@ -889,6 +897,40 @@ async function seedDatabase(request: Request) {
     }
     await db.insert(systemState).values({
       key: "email-template-library-v12-tech-pravo-brand",
+      value: "seeded",
+      updatedAt: now,
+    }).onConflictDoUpdate({
+      target: systemState.key,
+      set: { value: "seeded", updatedAt: now },
+    });
+  }
+
+  const [magneticCampaignTemplateState] = await db
+    .select({ key: systemState.key })
+    .from(systemState)
+    .where(eq(systemState.key, "email-template-library-v13-magnetic-campaigns"))
+    .limit(1);
+  if (!magneticCampaignTemplateState) {
+    for (const template of starterEmailTemplateValues().filter((item) => item.id.startsWith("template-v13-"))) {
+      await db.insert(emailTemplates).values({ ...template, workspaceId: WORKSPACE_ID, isFavorite: true }).onConflictDoUpdate({
+        target: emailTemplates.id,
+        set: {
+          name: template.name,
+          nameKey: template.nameKey,
+          description: template.description,
+          category: template.category,
+          subject: template.subject,
+          previewText: template.previewText,
+          builderDocument: template.builderDocument,
+          emailBodyHtml: template.emailBodyHtml,
+          emailBodyText: template.emailBodyText,
+          isFavorite: true,
+          updatedAt: now,
+        },
+      });
+    }
+    await db.insert(systemState).values({
+      key: "email-template-library-v13-magnetic-campaigns",
       value: "seeded",
       updatedAt: now,
     }).onConflictDoUpdate({

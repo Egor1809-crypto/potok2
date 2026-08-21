@@ -46,6 +46,7 @@ import {
   getCampaignChannelProvider,
   type CampaignChannel,
 } from "./campaignChannels";
+import { TelegramDocumentPicker } from "./TelegramDocumentPicker";
 import {
   campaignEmailPatchFromTemplate,
   patchEmailDocumentMetadata,
@@ -126,6 +127,8 @@ type WizardDraft = {
   presentationId: string | null;
   consumedTemplateQueryId: string | null;
   messengerMessage: string;
+  messengerDocumentUrl?: string | null;
+  messengerDocumentName?: string | null;
   channels: CampaignChannel[];
   providers: Record<CampaignChannel, IntegrationProviderId>;
   senderName: string;
@@ -474,6 +477,12 @@ function CampaignWizardState({
   const [messengerMessage, setMessengerMessage] = React.useState(
     params.get("message") ?? seedDraft?.messengerMessage ?? "",
   );
+  const [messengerDocumentUrl, setMessengerDocumentUrl] = React.useState<string | null>(
+    seedDraft?.messengerDocumentUrl ?? null,
+  );
+  const [messengerDocumentName, setMessengerDocumentName] = React.useState<string | null>(
+    seedDraft?.messengerDocumentName ?? null,
+  );
   const [channels, setChannels] = React.useState<CampaignChannel[]>(
     () => initialChannels(params, seedDraft),
   );
@@ -741,6 +750,12 @@ function CampaignWizardState({
     if (presentationId && (!channels.includes("email") || providers.email !== "unisender")) {
       blockers.push("Презентацию во вложении можно отправить только по Email через UniSender.");
     }
+    if (messengerDocumentUrl && !channels.includes("telegram")) {
+      blockers.push("PDF-документ можно отправить только через Telegram Bot API.");
+    }
+    if (messengerDocumentUrl && messengerMessage.length > 1024) {
+      blockers.push("Сократите подпись к PDF до 1 024 символов.");
+    }
     if (scheduledTimes.some((value) => Date.parse(value) <= Date.parse(minimumScheduledAt))) {
       blockers.push("Все волны должны быть запланированы на будущее.");
     }
@@ -755,7 +770,7 @@ function CampaignWizardState({
       }
     });
     return Array.from(new Set(blockers));
-  }, [audienceType, campaignName, channels, emailBodyText, integrationByProvider, messengerMessage, minimumScheduledAt, presentationId, providers, purpose, recipientCount, scheduledTimes, senderEmail, senderName, subject]);
+  }, [audienceType, campaignName, channels, emailBodyText, integrationByProvider, messengerDocumentUrl, messengerMessage, minimumScheduledAt, presentationId, providers, purpose, recipientCount, scheduledTimes, senderEmail, senderName, subject]);
 
   const draft: WizardDraft = {
     campaignId,
@@ -773,6 +788,8 @@ function CampaignWizardState({
     presentationId,
     consumedTemplateQueryId,
     messengerMessage,
+    messengerDocumentUrl,
+    messengerDocumentName,
     channels,
     providers,
     senderName,
@@ -880,6 +897,8 @@ function CampaignWizardState({
     templateId,
     presentationId,
     messengerMessage: messengerMessage.trim(),
+    messengerDocumentUrl,
+    messengerDocumentName,
     channels: channels.map((channel) => ({
       channel,
       providerId: providers[channel],
@@ -1252,6 +1271,13 @@ function CampaignWizardState({
               }}
               messengerMessage={messengerMessage}
               onMessengerMessageChange={setMessengerMessage}
+              messengerDocumentUrl={messengerDocumentUrl}
+              messengerDocumentName={messengerDocumentName}
+              onMessengerDocumentChange={(url, name) => {
+                setMessengerDocumentUrl(url);
+                setMessengerDocumentName(name);
+                setEvaluation(null);
+              }}
               editorHref={editorHref}
               templateLibraryHref={templateLibraryHref}
             />
@@ -1726,6 +1752,9 @@ function MessageStep({
   onTemplateChange,
   messengerMessage,
   onMessengerMessageChange,
+  messengerDocumentUrl,
+  messengerDocumentName,
+  onMessengerDocumentChange,
   editorHref,
   templateLibraryHref,
 }: {
@@ -1747,6 +1776,9 @@ function MessageStep({
   onTemplateChange: (value: string) => void;
   messengerMessage: string;
   onMessengerMessageChange: (value: string) => void;
+  messengerDocumentUrl: string | null;
+  messengerDocumentName: string | null;
+  onMessengerDocumentChange: (url: string | null, name: string | null) => void;
   editorHref: string;
   templateLibraryHref: string;
 }) {
@@ -1845,6 +1877,11 @@ function MessageStep({
             <FormField label="Текст сообщения" htmlFor="campaign-messenger-message" hint={`${messengerMessage.length} из 4 000 символов`}>
               <Textarea id="campaign-messenger-message" rows={11} maxLength={4000} value={messengerMessage} onChange={(event) => onMessengerMessageChange(event.target.value)} placeholder="Здравствуйте, {{first_name}}…" />
             </FormField>
+            <div className="mt-4 border-t border-border pt-4">
+              <p className="mb-2 text-[12px] font-semibold text-text-strong">PDF для Telegram</p>
+              <TelegramDocumentPicker value={messengerDocumentUrl} filename={messengerDocumentName} onChange={onMessengerDocumentChange} />
+              <p className="mt-2 text-[10px] leading-4 text-text-muted">Получатель должен заранее нажать Start у выбранного бота и дать согласие. ВКонтакте этот PDF не отправляет.</p>
+            </div>
           </div>
         </section>
       </div>

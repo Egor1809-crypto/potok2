@@ -13,6 +13,7 @@ import { ApiRequestError, cleanText, newId } from "./api-utils";
 import { ensureDatabase, ensureSystemDatabase, WORKSPACE_ID } from "./database-init";
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+const MAX_DOCUMENT_BYTES = 20 * 1024 * 1024;
 const MAX_GENERATED_IMAGE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"] as const);
 type AllowedMime = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
@@ -126,9 +127,28 @@ export async function uploadEmailAsset(request: Request): Promise<EmailAssetMuta
   const form = await request.formData();
   const file = form.get("file");
   const kindValue = form.get("kind");
-  const kind = kindValue === "logo" ? "logo" : kindValue === "photo" ? "photo" : null;
-  if (!(file instanceof File)) throw new ApiRequestError("Выберите файл изображения.");
-  if (!kind) throw new ApiRequestError("Укажите назначение изображения: фото или логотип.");
+  const kind = kindValue === "logo" ? "logo" : kindValue === "photo" ? "photo" : kindValue === "document" ? "document" : null;
+  if (!(file instanceof File)) throw new ApiRequestError("Выберите файл.");
+  if (!kind) throw new ApiRequestError("Укажите назначение файла.");
+  if (kind === "document") {
+    if (file.type !== "application/pdf") throw new ApiRequestError("Для Telegram можно загрузить только PDF-файл.");
+    if (file.size < 1 || file.size > MAX_DOCUMENT_BYTES) throw new ApiRequestError("Размер PDF должен быть не больше 20 МБ.");
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    if (bytes.byteLength < 5 || new TextDecoder().decode(bytes.slice(0, 5)) !== "%PDF-") throw new ApiRequestError("Содержимое файла не соответствует формату PDF.");
+    const id = newId("asset");
+    const filename = cleanText(file.name || "document.pdf", "Название файла", 180) || "document.pdf";
+    const objectKey = `${WORKSPACE_ID}/documents/${id}.pdf`;
+    const now = new Date().toISOString();
+    await bucket().put(objectKey, bytes, { httpMetadata: { contentType: "application/pdf", cacheControl: "private, max-age=3600" }, customMetadata: { workspaceId: WORKSPACE_ID, originalFilename: filename, kind } });
+    try {
+      await getDb().insert(emailAssets).values({ id, workspaceId: WORKSPACE_ID, objectKey, filename, mimeType: "application/pdf", size: bytes.byteLength, kind, createdAt: now });
+    } catch (error) {
+      await bucket().delete(objectKey);
+      throw error;
+    }
+    const [row] = await getDb().select().from(emailAssets).where(eq(emailAssets.id, id)).limit(1);
+    return { asset: toRecord(request, row) };
+  }
   if (!ALLOWED_TYPES.has(file.type as AllowedMime)) {
     throw new ApiRequestError("Поддерживаются изображения PNG, JPEG и GIF.");
   }

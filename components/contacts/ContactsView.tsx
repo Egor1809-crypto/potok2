@@ -15,6 +15,7 @@ import {
   Phone,
   Search,
   SendHorizontal,
+  SlidersHorizontal,
   Trash2,
   Upload,
   UsersRound,
@@ -178,6 +179,7 @@ export function ContactsView() {
   const [owner, setOwner] = useState("all");
   const [sheet, setSheet] = useState("all");
   const [delivery, setDelivery] = useState<"pending" | "sent" | "all">("pending");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [teamName, setTeamName] = useState("");
   const [responsibleId, setResponsibleId] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -282,6 +284,15 @@ export function ContactsView() {
   const primaryBaseCount = summary.primaryBase;
   const secondaryBaseCount = summary.secondaryBase;
   const assignedCount = summary.assigned;
+  const activeFilterCount = [
+    status !== "all",
+    company !== "all",
+    city !== "all",
+    team !== "all",
+    channel !== "all",
+    owner !== "all",
+    sheet !== "all",
+  ].filter(Boolean).length;
   const membersById = useMemo(() => new Map(members.map((member) => [member.id, member])), [members]);
   const coverage = [
     { id: "email", label: "База №1 · Email", ...summary.coverage.email, Icon: Mail, color: "#F43CB8" },
@@ -293,6 +304,18 @@ export function ContactsView() {
   const notify = (message: string) => {
     setNotice(message);
     window.setTimeout(() => setNotice(""), 2600);
+  };
+
+  const resetFilters = () => {
+    setPage(1);
+    setSearch("");
+    setStatus("all");
+    setCompany("all");
+    setCity("all");
+    setTeam("all");
+    setChannel("all");
+    setOwner("all");
+    setSheet("all");
   };
 
   const saveContact = async (draft: ContactDraft) => {
@@ -641,19 +664,29 @@ export function ContactsView() {
       {error && <div role="alert" className="flex items-start gap-3 rounded-xl border border-[var(--danger)]/20 bg-[var(--danger-subtle)] p-4 text-[12px] text-[var(--danger)]"><CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" /><span className="flex-1">{error}</span><button type="button" onClick={() => void load()} className="font-semibold underline underline-offset-2">Повторить</button></div>}
 
       <section className="card overflow-hidden">
-        <div className="grid gap-3 border-b border-[var(--border)] p-3 lg:grid-cols-[minmax(220px,1fr)_repeat(6,minmax(125px,175px))_auto]">
-          <label className="relative min-w-0 flex-1"><span className="sr-only">Поиск контактов</span><Search aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--text-subtle)]" /><input className="input pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Имя, email, компания или тег" /></label>
-          <label><span className="sr-only">Фильтр по статусу</span><select className="input" value={status} onChange={(event) => { setPage(1); setStatus(event.target.value as StatusFilter); }}><option value="all">Все статусы</option><option value="active">Активные</option><option value="unsubscribed">Отписанные</option><option value="bounced">Недоставляемые</option><option value="invalid">Некорректные</option></select></label>
-          <label><span className="sr-only">Фильтр по компании</span><select className="input" value={company} onChange={(event) => { setPage(1); setCompany(event.target.value); }}><option value="all">Все компании</option>{companies.map((value) => <option key={value}>{value}</option>)}</select></label>
-          <label><span className="sr-only">Фильтр по городу</span><select className="input" value={city} onChange={(event) => { setPage(1); setCity(event.target.value); }}><option value="all">Все города</option>{cities.map((value) => <option key={value}>{value}</option>)}</select></label>
-          <label><span className="sr-only">Фильтр по команде</span><select className="input" value={team} onChange={(event) => { setPage(1); setTeam(event.target.value); }}><option value="all">Все команды</option>{teams.map((value) => <option key={value}>{value}</option>)}</select></label>
-          <label><span className="sr-only">Фильтр по каналу</span><select className="input" value={channel} onChange={(event) => { setPage(1); setChannel(event.target.value); }}><option value="all">Все каналы</option><option value="email">Есть Email</option><option value="telegram">Есть Telegram</option><option value="vk">Есть ВКонтакте</option><option value="phone">Есть телефон</option></select></label>
-          <label><span className="sr-only">Фильтр по ответственному</span><select className="input" value={owner} onChange={(event) => { setPage(1); setOwner(event.target.value); }}><option value="all">Все ответственные</option>{members.map((member) => <option key={member.id} value={member.id}>{member.displayName}</option>)}</select></label>
-          <button type="button" onClick={exportCsv} disabled={!selectedIds.length && !visible.length} className="btn btn-secondary gap-2"><Download aria-hidden="true" className="size-4" />Экспорт</button>
+        <div className="border-b border-[var(--border)] p-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <label className="relative min-w-0 flex-1"><span className="sr-only">Поиск контактов</span><Search aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--text-subtle)]" /><input className="input pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Найдите по имени, email, компании, должности или тегу" /></label>
+            <button type="button" onClick={() => setFiltersOpen((value) => !value)} aria-expanded={filtersOpen} className={`btn gap-2 ${filtersOpen || activeFilterCount ? "btn-primary" : "btn-secondary"}`}><SlidersHorizontal aria-hidden="true" className="size-4" />Фильтры{activeFilterCount ? ` · ${activeFilterCount}` : ""}</button>
+            <button type="button" onClick={exportCsv} disabled={!selectedIds.length && !visible.length} className="btn btn-secondary gap-2"><Download aria-hidden="true" className="size-4" />Экспорт</button>
+          </div>
+          {filtersOpen ? (
+            <div className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)]/60 p-3">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+                <label><span className="mb-1 block text-[10px] font-semibold text-[var(--text-muted)]">Статус</span><select className="input" value={status} onChange={(event) => { setPage(1); setStatus(event.target.value as StatusFilter); }}><option value="all">Любой статус</option><option value="active">Активные</option><option value="unsubscribed">Отписанные</option><option value="bounced">Недоставляемые</option><option value="invalid">Некорректные</option></select></label>
+                <label><span className="mb-1 block text-[10px] font-semibold text-[var(--text-muted)]">Компания</span><select className="input" value={company} onChange={(event) => { setPage(1); setCompany(event.target.value); }}><option value="all">Любая компания</option>{companies.map((value) => <option key={value}>{value}</option>)}</select></label>
+                <label><span className="mb-1 block text-[10px] font-semibold text-[var(--text-muted)]">Город</span><select className="input" value={city} onChange={(event) => { setPage(1); setCity(event.target.value); }}><option value="all">Любой город</option>{cities.map((value) => <option key={value}>{value}</option>)}</select></label>
+                <label><span className="mb-1 block text-[10px] font-semibold text-[var(--text-muted)]">Команда</span><select className="input" value={team} onChange={(event) => { setPage(1); setTeam(event.target.value); }}><option value="all">Любая команда</option>{teams.map((value) => <option key={value}>{value}</option>)}</select></label>
+                <label><span className="mb-1 block text-[10px] font-semibold text-[var(--text-muted)]">Канал</span><select className="input" value={channel} onChange={(event) => { setPage(1); setChannel(event.target.value); }}><option value="all">Любой канал</option><option value="email">Есть Email</option><option value="telegram">Есть Telegram</option><option value="vk">Есть ВКонтакте</option><option value="phone">Есть телефон</option></select></label>
+                <label><span className="mb-1 block text-[10px] font-semibold text-[var(--text-muted)]">Ответственный</span><select className="input" value={owner} onChange={(event) => { setPage(1); setOwner(event.target.value); }}><option value="all">Любой ответственный</option>{members.map((member) => <option key={member.id} value={member.id}>{member.displayName}</option>)}</select></label>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[10px] text-[var(--text-muted)]"><span>Фильтры применяются сразу. Найдено: <b className="text-[var(--text-strong)]">{filteredCount.toLocaleString("ru-RU")}</b></span>{activeFilterCount || search ? <button type="button" onClick={resetFilters} className="btn btn-ghost btn-sm">Сбросить всё</button> : null}</div>
+            </div>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border)] bg-[var(--surface-subtle)]/65 px-3 py-2.5">
           <button type="button" onClick={toggleAll} disabled={!visible.length} className="btn btn-secondary btn-sm gap-2"><Check aria-hidden="true" className="size-3.5" />{allVisibleSelected ? "Снять выбор страницы" : `Выбрать страницу · ${visible.length}`}</button>
-          {(company !== "all" || city !== "all" || team !== "all" || channel !== "all" || owner !== "all" || sheet !== "all" || status !== "all" || search) ? <button type="button" onClick={() => { setPage(1); setSearch(""); setStatus("all"); setCompany("all"); setCity("all"); setTeam("all"); setChannel("all"); setOwner("all"); setSheet("all"); }} className="btn btn-ghost btn-sm">Сбросить фильтры</button> : null}
+          {activeFilterCount || search ? <button type="button" onClick={resetFilters} className="btn btn-ghost btn-sm">Сбросить фильтры</button> : null}
           <span className="ml-auto text-[10px] text-[var(--text-muted)]">Показано до 100 контактов — браузер больше не загружает всю базу сразу</span>
         </div>
 
