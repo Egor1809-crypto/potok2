@@ -171,11 +171,46 @@ function lineBreaks(value: string) {
   return escapeHtml(value).replaceAll("\n", "<br>");
 }
 
+function emailFontStack(family: EmailBuilderBlockInput["fontFamily"]) {
+  if (family === "Georgia") return "Georgia,'Times New Roman',serif";
+  if (family === "Verdana") return "Verdana,Geneva,sans-serif";
+  if (family === "Trebuchet MS")
+    return "'Trebuchet MS',Arial,sans-serif";
+  return "Arial,Helvetica,sans-serif";
+}
+
+function companionBodyFont(family: EmailBuilderBlockInput["fontFamily"]) {
+  return family === "Georgia"
+    ? "'Trebuchet MS',Arial,sans-serif"
+    : emailFontStack(family);
+}
+
+function paragraphHtml(
+  value: string,
+  family: string,
+  size: number,
+  weight: number,
+  lineHeight: number,
+  tracking: number,
+  color: string,
+) {
+  const paragraphs = value
+    .split(/\n{2,}/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return paragraphs
+    .map(
+      (paragraph, index) =>
+        `<p style="margin:0${index === paragraphs.length - 1 ? "" : " 0 16px"};font-family:${family};font-size:${size}px;font-weight:${weight};line-height:${lineHeight};letter-spacing:${tracking}px;color:${color};">${lineBreaks(paragraph)}</p>`,
+    )
+    .join("");
+}
+
 function blockHtml(block: EmailBuilderBlockInput, accent: string) {
   const background = block.backgroundColor === "transparent"
     ? ""
     : `background-color:${block.backgroundColor};`;
-  const family = block.fontFamily ?? "Arial";
+  const family = emailFontStack(block.fontFamily ?? "Arial");
   const weight = block.fontWeight ?? 400;
   const lineHeight = (block.lineHeight ?? 155) / 100;
   const tracking = block.letterSpacing ?? 0;
@@ -189,7 +224,18 @@ function blockHtml(block: EmailBuilderBlockInput, accent: string) {
       const image = `<img src="${escapeHtml(block.href)}" alt="${escapeHtml(block.content)}" style="display:inline-block;max-width:220px;max-height:88px;width:auto;height:auto;border:0;">`;
       content = block.linkHref ? `<a href="${escapeHtml(block.linkHref)}" style="text-decoration:none;">${image}</a>` : image;
     } else {
-      content = `<div style="margin:0;font-family:${family},sans-serif;font-size:${block.fontSize}px;font-weight:${block.fontWeight ?? 400};line-height:${lineHeight};letter-spacing:${tracking}px;color:${block.textColor};${weight}">${lineBreaks(block.content)}</div>`;
+      content =
+        block.type === "text"
+          ? paragraphHtml(
+              block.content,
+              family,
+              block.fontSize,
+              block.fontWeight ?? 400,
+              lineHeight,
+              tracking,
+              block.textColor,
+            )
+          : `<div style="margin:0;font-family:${family};font-size:${block.fontSize}px;font-weight:${block.fontWeight ?? 400};line-height:${lineHeight};letter-spacing:${tracking}px;color:${block.textColor};${weight}">${lineBreaks(block.content)}</div>`;
     }
   } else if (block.type === "button") {
     const buttonBackground = block.buttonStyle === "outline" ? "transparent" : block.buttonStyle === "soft" ? `${accent}18` : accent;
@@ -211,7 +257,8 @@ function blockHtml(block: EmailBuilderBlockInput, accent: string) {
     content = `<div style="font-family:${family},Helvetica,sans-serif;font-size:${block.fontSize}px;line-height:${lineHeight};color:${block.textColor};">${links ? items.flatMap((item, index) => index % 2 === 0 ? [`<a href="${escapeHtml(items[index + 1])}" style="color:${accent};font-weight:600;text-decoration:none;">${escapeHtml(item)}</a>`] : []).join(" &nbsp;·&nbsp; ") : items.map(escapeHtml).join(" &nbsp;·&nbsp; ")}</div>`;
   } else if (block.type === "hero") {
     const [title = "", subtitle = ""] = block.content.split("|");
-    content = `<div style="padding:28px;border-radius:${block.borderRadius}px;background:${block.backgroundColor === "transparent" ? "#f3f2ff" : block.backgroundColor};"><div style="font-family:${family},Helvetica,sans-serif;font-size:${block.fontSize}px;font-weight:${weight};line-height:${lineHeight};color:${block.textColor};">${lineBreaks(title)}</div><div style="margin-top:12px;font-family:${family},Helvetica,sans-serif;font-size:16px;line-height:1.55;color:${block.textColor};opacity:.78;">${lineBreaks(subtitle)}</div></div>`;
+    const bodyFamily = companionBodyFont(block.fontFamily ?? "Arial");
+    content = `<div style="border-radius:${block.borderRadius}px;"><div style="font-family:${family};font-size:${block.fontSize}px;font-weight:${weight};line-height:${lineHeight};letter-spacing:-.2px;color:${block.textColor};">${lineBreaks(title)}</div>${subtitle ? `<div style="max-width:520px;margin-top:14px;font-family:${bodyFamily};font-size:16px;font-weight:400;line-height:1.5;color:${block.textColor};opacity:.8;">${lineBreaks(subtitle)}</div>` : ""}</div>`;
   } else if (block.type === "quote") {
     const [quote = "", author = ""] = block.content.split("|");
     content = `<blockquote style="margin:0;padding:20px;border-left:4px solid ${accent};border-radius:${block.borderRadius}px;background:${block.backgroundColor === "transparent" ? "#f8f8fb" : block.backgroundColor};font-family:${family},Helvetica,sans-serif;color:${block.textColor};"><div style="font-size:${block.fontSize}px;line-height:${lineHeight};">“${lineBreaks(quote)}”</div><div style="margin-top:10px;font-size:13px;font-weight:700;">${lineBreaks(author)}</div></blockquote>`;
@@ -224,9 +271,9 @@ function blockHtml(block: EmailBuilderBlockInput, accent: string) {
     const [name = "", description = "", price = ""] = block.content.split("|");
     content = `<div style="padding:22px;border:1px solid ${block.borderColor ?? "#e5e7eb"};border-radius:${block.borderRadius}px;background:${block.backgroundColor === "transparent" ? "#ffffff" : block.backgroundColor};font-family:${family},Helvetica,sans-serif;color:${block.textColor};"><div style="font-size:20px;font-weight:700;">${lineBreaks(name)}</div><div style="margin-top:8px;font-size:${block.fontSize}px;line-height:${lineHeight};">${lineBreaks(description)}</div><div style="margin-top:14px;font-size:18px;font-weight:700;">${lineBreaks(price)}</div><a href="${escapeHtml(block.href ?? "")}" style="display:inline-block;margin-top:16px;padding:10px 18px;border-radius:8px;background:${accent};color:#fff;text-decoration:none;font-size:13px;font-weight:700;">${lineBreaks(block.label || "Узнать подробнее")}</a></div>`;
   } else if (block.type === "pattern") {
-    const patternBackground = block.href ? `background="${escapeHtml(block.href)}"` : "";
-    const patternImage = block.href ? `background-image:url('${escapeHtml(block.href)}');background-position:center;background-repeat:no-repeat;background-size:cover;` : "";
-    content = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" ${patternBackground} style="width:100%;${patternImage}background-color:${block.backgroundColor === "transparent" ? `${accent}12` : block.backgroundColor};border-radius:${block.borderRadius}px;"><tr><td align="center" valign="middle" style="height:88px;padding:16px 24px;font-family:${family},sans-serif;font-size:${block.fontSize}px;font-weight:${weight};line-height:${lineHeight};letter-spacing:${tracking}px;color:${block.textColor};text-align:center;">${lineBreaks(block.content)}</td></tr></table>`;
+    content = block.href
+      ? `<img src="${escapeHtml(block.href)}" alt="" role="presentation" width="100%" style="display:block;width:100%;max-width:100%;height:auto;border:0;border-radius:${block.borderRadius}px;background-color:${block.backgroundColor === "transparent" ? `${accent}12` : block.backgroundColor};">`
+      : `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;background-color:${block.backgroundColor === "transparent" ? `${accent}12` : block.backgroundColor};border-radius:${block.borderRadius}px;"><tr><td align="center" valign="middle" style="height:64px;padding:12px 24px;font-family:${family};font-size:${block.fontSize}px;font-weight:${weight};line-height:${lineHeight};letter-spacing:${tracking}px;color:${block.textColor};text-align:center;">${lineBreaks(block.content)}</td></tr></table>`;
   } else if (block.type === "banner") {
     const [title = "", subtitle = ""] = block.content.split("|");
     content = `<div style="padding:24px;border:${block.borderWidth ?? 0}px solid ${block.borderColor ?? accent};border-radius:${block.borderRadius}px;background:${block.backgroundColor === "transparent" ? accent : block.backgroundColor};font-family:${family},sans-serif;color:${block.textColor};"><div style="font-size:${block.fontSize + 8}px;font-weight:700;line-height:1.2;">${lineBreaks(title)}</div><div style="margin-top:8px;font-size:${block.fontSize}px;line-height:${lineHeight};opacity:.8;">${lineBreaks(subtitle)}</div></div>`;
@@ -265,7 +312,7 @@ export function compileEmailDocument(document: EmailBuilderDocumentInput) {
   const backgroundImage = document.backgroundImageUrl
     ? `background-image:url('${escapeHtml(document.backgroundImageUrl)}');background-repeat:no-repeat;background-position:center top;background-size:cover;`
     : "";
-  const html = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="x-apple-disable-message-reformatting"><style>@media only screen and (max-width:680px){.email-outer{padding:12px 8px!important}.email-shell{width:100%!important;max-width:100%!important}.email-block{padding-left:20px!important;padding-right:20px!important}.email-cta{display:block!important;text-align:center!important}.email-columns,.email-columns tbody,.email-columns tr{display:block!important;width:100%!important}.email-column{display:block!important;width:auto!important}.email-column-gap{display:block!important;width:100%!important;height:12px!important}}</style></head><body style="margin:0;padding:0;background:${document.workspaceBackground};"><div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(document.previewText)}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;background:${document.workspaceBackground};"><tr><td class="email-outer" align="center" style="padding:24px 12px;"><table class="email-shell" role="presentation" width="${document.contentWidth}" cellspacing="0" cellpadding="0" background="${document.backgroundImageUrl ? escapeHtml(document.backgroundImageUrl) : ""}" style="width:100%;max-width:${document.contentWidth}px;background-color:${document.bodyBackground};${backgroundImage}${frameCss}overflow:hidden;">${blocks}</table></td></tr></table></body></html>`;
+  const html = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="x-apple-disable-message-reformatting"><style>body,table,td{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}table,td{mso-table-lspace:0;mso-table-rspace:0}@media only screen and (max-width:680px){.email-outer{padding:12px 8px!important}.email-shell{width:100%!important;max-width:100%!important}.email-block{padding-left:20px!important;padding-right:20px!important}.email-cta{display:block!important;text-align:center!important}.email-columns,.email-columns tbody,.email-columns tr{display:block!important;width:100%!important}.email-column{display:block!important;width:auto!important}.email-column-gap{display:block!important;width:100%!important;height:12px!important}}</style><!--[if mso]><style>body,table,td,a{font-family:Arial,Helvetica,sans-serif!important}td{mso-line-height-rule:exactly}</style><![endif]--></head><body style="margin:0;padding:0;background:${document.workspaceBackground};"><div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(document.previewText)}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;background:${document.workspaceBackground};"><tr><td class="email-outer" align="center" style="padding:24px 12px;"><table class="email-shell" role="presentation" width="${document.contentWidth}" cellspacing="0" cellpadding="0" background="${document.backgroundImageUrl ? escapeHtml(document.backgroundImageUrl) : ""}" style="width:100%;max-width:${document.contentWidth}px;background-color:${document.bodyBackground};${backgroundImage}${frameCss}overflow:hidden;">${blocks}</table></td></tr></table></body></html>`;
   if (html.length > 500_000) {
     throw new ApiRequestError("Скомпилированный HTML письма превышает 500 КБ.");
   }

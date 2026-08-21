@@ -43,7 +43,8 @@ const PROTECTED_SITE_ORIGIN = "https://mailflow-outreach.isakovegor820.chatgpt.s
 function previewImageSource(href: string) {
   if (
     href.startsWith(`${PROTECTED_SITE_ORIGIN}/conference-series/`) ||
-    href.startsWith(`${PROTECTED_SITE_ORIGIN}/email-brand/`)
+    href.startsWith(`${PROTECTED_SITE_ORIGIN}/email-brand/`) ||
+    href.startsWith(`${PROTECTED_SITE_ORIGIN}/email-patterns/`)
   ) {
     return href.slice(PROTECTED_SITE_ORIGIN.length);
   }
@@ -735,6 +736,7 @@ function BlockContent({
         <h2
           className="m-0"
           style={{
+            fontFamily: block.fontFamily,
             fontSize: compact ? Math.min(block.fontSize, 29) : block.fontSize,
             fontWeight: block.fontWeight,
             lineHeight: block.lineHeight / 100,
@@ -746,8 +748,10 @@ function BlockContent({
         <p
           className="mb-0 mt-3 whitespace-pre-wrap opacity-75"
           style={{
-            fontSize: Math.max(13, Math.round(block.fontSize * 0.48)),
-            lineHeight: block.lineHeight / 100,
+            fontFamily:
+              block.fontFamily === "Georgia" ? "Trebuchet MS" : block.fontFamily,
+            fontSize: 16,
+            lineHeight: 1.5,
           }}
         >
           {renderTokens(subtitle || "Коротко объясните ценность предложения")}
@@ -929,11 +933,23 @@ function BlockContent({
 
   if (block.type === "pattern") {
     const patternImage = block.href ? previewImageSource(block.href) : undefined;
+    if (patternImage) {
+      return (
+        // This preview intentionally uses the exact public URL emitted into email HTML.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          alt=""
+          aria-hidden="true"
+          className="block h-auto w-full"
+          src={patternImage}
+          style={{ borderRadius: block.borderRadius }}
+        />
+      );
+    }
     return (
       <div
-        className="flex min-h-[88px] items-center justify-center whitespace-pre-line bg-cover bg-center px-5 py-4 text-center font-semibold"
+        className="flex min-h-16 items-center justify-center whitespace-pre-line px-5 py-3 text-center font-semibold"
         style={{
-          backgroundImage: patternImage ? `url(${JSON.stringify(patternImage)})` : undefined,
           backgroundColor:
             block.backgroundColor === "transparent"
               ? `${accentColor}12`

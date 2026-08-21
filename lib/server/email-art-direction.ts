@@ -1,5 +1,34 @@
 export type EmailVisualStyle = "minimal" | "editorial" | "bold" | "premium";
 
+export type EmailTypographyFont =
+  | "Arial"
+  | "Georgia"
+  | "Verdana"
+  | "Trebuchet MS";
+
+export type EmailTypographySystem = {
+  name: string;
+  headingFont: EmailTypographyFont;
+  bodyFont: EmailTypographyFont;
+  heroSize: number;
+  headingSize: number;
+  bodySize: number;
+  heroLineHeight: number;
+  headingLineHeight: number;
+  bodyLineHeight: number;
+  headingWeight: 600 | 700;
+};
+
+export type EmailPatternArtwork = {
+  id: string;
+  name: string;
+  imageUrl: string;
+  alt: string;
+};
+
+const EMAIL_PATTERN_ORIGIN =
+  "https://mailflow-outreach.isakovegor820.chatgpt.site";
+
 export type EmailVisualPalette = {
   accent: string;
   secondaryAccent?: string;
@@ -333,6 +362,100 @@ export function decorativePatternFor(value: string) {
   if (/празд|поздрав|день рожд|юбиле/.test(text))
     return "✦  ·  ✧  ·  ✦  ·  ✧  ·  ✦";
   return "✦  ·  ✦  ·  ✦  ·  ✦";
+}
+
+export function resolveEmailTypography(input: {
+  goal: string;
+  designBrief?: string;
+  visualStyle: EmailVisualStyle;
+}): EmailTypographySystem {
+  const text = `${input.goal}\n${input.designBrief ?? ""}`.toLocaleLowerCase(
+    "ru-RU",
+  );
+  const elegant =
+    input.visualStyle === "premium" ||
+    input.visualStyle === "editorial" ||
+    /свидан|роман|ресторан|свадьб|мод|искусств|галере|театр|культур|люкс|премиаль|чай|кофе/.test(
+      text,
+    );
+  if (elegant) {
+    return {
+      name: "Editorial elegance",
+      headingFont: "Georgia",
+      bodyFont: "Trebuchet MS",
+      heroSize: input.visualStyle === "premium" ? 31 : 30,
+      headingSize: 24,
+      bodySize: 16,
+      heroLineHeight: 118,
+      headingLineHeight: 124,
+      bodyLineHeight: 154,
+      headingWeight: 700,
+    };
+  }
+  if (
+    input.visualStyle === "bold" ||
+    /фестив|молод|игр|ярк|дерзк|запуск|релиз/.test(text)
+  ) {
+    return {
+      name: "Expressive clarity",
+      headingFont: "Trebuchet MS",
+      bodyFont: "Verdana",
+      heroSize: 31,
+      headingSize: 24,
+      bodySize: 15,
+      heroLineHeight: 116,
+      headingLineHeight: 122,
+      bodyLineHeight: 152,
+      headingWeight: 700,
+    };
+  }
+  return {
+    name: "Swiss clarity",
+    headingFont: "Arial",
+    bodyFont: "Arial",
+    heroSize: 29,
+    headingSize: 23,
+    bodySize: 16,
+    heroLineHeight: 120,
+    headingLineHeight: 126,
+    bodyLineHeight: 150,
+    headingWeight: 700,
+  };
+}
+
+export function selectEmailPatternArtwork(
+  value: string,
+  style: EmailVisualStyle,
+): EmailPatternArtwork {
+  const text = value.toLocaleLowerCase("ru-RU");
+  const selected =
+    /свидан|роман|любов|свадьб|ужин|ресторан/.test(text)
+      ? ["romantic-ribbon", "Романтическая лента"]
+      : /чай|кофе|ботан|растен|природ|эко|сад|лес|трав|органик/.test(text)
+        ? ["botanical-herbarium", "Ботанический гербарий"]
+        : /празд|поздрав|день рожд|юбиле|вечерин/.test(text)
+          ? ["celebration-spark", "Праздничное сияние"]
+          : /путеш|маршрут|отел|тур|географ|экспедиц/.test(text)
+            ? ["topographic-lines", "Топографические линии"]
+            : /технолог|данн|цифр|разработ|сервис|saas|продукт/.test(text) ||
+                /(?:^|[^\p{L}])(?:ии|ai)(?:[^\p{L}]|$)/u.test(text)
+              ? ["signal-grid", "Сигнальная сетка"]
+              : /вода|море|океан|спа|здоров|спокой|медитац/.test(text)
+                ? ["water-ripples", "Водная рябь"]
+                : style === "premium"
+                  ? ["quiet-luxury", "Тихая роскошь"]
+                  : style === "editorial"
+                    ? ["editorial-rules", "Редакционные линейки"]
+                    : style === "bold"
+                      ? ["terrazzo-studio", "Студийное терраццо"]
+                      : ["paper-grain", "Бумажная фактура"];
+  const [id, name] = selected;
+  return {
+    id,
+    name,
+    imageUrl: `${EMAIL_PATTERN_ORIGIN}/email-patterns/${id}.jpg`,
+    alt: `Декоративный узор «${name}»`,
+  };
 }
 
 export function fallbackEmailImagePrompt(

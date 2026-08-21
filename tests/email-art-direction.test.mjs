@@ -6,7 +6,9 @@ import {
   distributeEditorialBody,
   fallbackEmailImagePrompt,
   normalizeDisplayHeading,
+  resolveEmailTypography,
   resolveEmailVisualPalette,
+  selectEmailPatternArtwork,
   semanticOverlap,
 } from "../lib/server/email-art-direction.ts";
 
@@ -70,6 +72,39 @@ test("the visual director supplies a themed pattern and image prompt", () => {
   assert.match(prompt, /столик на двоих/);
   assert.match(prompt, /#D64F87/);
   assert.match(prompt, /Без текста/);
+});
+
+test("romantic art direction selects a restrained editorial type system and raster ornament", () => {
+  const typography = resolveEmailTypography({
+    goal: "Приглашение на первое свидание в ресторане",
+    designBrief: "Романтичный минимализм",
+    visualStyle: "minimal",
+  });
+  const artwork = selectEmailPatternArtwork(
+    "Приглашение на первое свидание в ресторане",
+    "minimal",
+  );
+
+  assert.equal(typography.headingFont, "Georgia");
+  assert.equal(typography.bodyFont, "Trebuchet MS");
+  assert.ok(typography.heroSize <= 31);
+  assert.equal(artwork.id, "romantic-ribbon");
+  assert.match(artwork.imageUrl, /\/email-patterns\/romantic-ribbon\.jpg$/);
+});
+
+test("pattern artwork follows the subject instead of showing generic emoji", () => {
+  assert.equal(
+    selectEmailPatternArtwork("Новый ИИ-сервис для аналитики", "minimal").id,
+    "signal-grid",
+  );
+  assert.equal(
+    selectEmailPatternArtwork("Чайная церемония в саду", "minimal").id,
+    "botanical-herbarium",
+  );
+  assert.equal(
+    selectEmailPatternArtwork("Летний фестиваль", "bold").id,
+    "terrazzo-studio",
+  );
 });
 
 test("topic patterns do not mistake ordinary Russian word endings for AI", () => {

@@ -360,9 +360,11 @@ test("pattern gallery offers varied email-safe designs", async () => {
   assert.match(properties, /label="Масштаб"/);
   assert.match(properties, /label="Расстояние"/);
   assert.match(canvas, /whitespace-pre-line/);
-  assert.match(canvas, /backgroundImage: patternImage/);
+  assert.match(canvas, /if \(patternImage\)/);
+  assert.match(canvas, /aria-hidden="true"/);
   assert.match(compiler, /letter-spacing:\$\{tracking\}px/);
-  assert.match(compiler, /background-position:center/);
+  assert.match(compiler, /role="presentation"/);
+  assert.match(compiler, /block\.type === "pattern"/);
 });
 
 test("a new letter starts empty and offers full-email frame presets", async () => {

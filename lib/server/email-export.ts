@@ -30,7 +30,12 @@ function imageSources(document: EmailBuilderDocumentInput) {
   const sources = new Set<string>();
   if (document.backgroundImageUrl) sources.add(document.backgroundImageUrl);
   for (const block of document.blocks) {
-    if ((block.type === "image" || block.type === "logo") && block.href) {
+    if (
+      (block.type === "image" ||
+        block.type === "logo" ||
+        block.type === "pattern") &&
+      block.href
+    ) {
       sources.add(block.href);
     }
   }

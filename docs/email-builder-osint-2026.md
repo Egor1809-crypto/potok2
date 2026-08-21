@@ -77,3 +77,9 @@ UniSender сильнее не из-за «магии дизайна», а бла
 4. Версионность с именованными checkpoints и визуальным diff.
 5. Conditional content и динамические product/document sections.
 6. Экспериментальный контур: варианты не целого письма, а только subject/preheader, opening, proof или CTA с привязкой к метрике.
+
+## Дополнение: типографика и паттерны для email
+
+Исследованы [Hero Patterns](https://heropatterns.com/), [PatternPad](https://patternpad.com/), [Transparent Textures](https://www.transparenttextures.com/) и [Toptal Subtle Patterns](https://www.toptal.com/designers/subtlepatterns/). Они полезны как референсы по геометрии, масштабу, ритму и фактуре, но прямой SVG или CSS-паттерн недостаточно надёжен для массового email: разные версии Outlook и другие почтовые клиенты поддерживают такой декор неодинаково. Поэтому в продукте создана собственная тематическая библиотека из 12 оригинальных JPEG-панелей 1200×240. ИИ выбирает панель по смыслу письма, а HTML отправляет её обычным растровым `img` с резервным цветом фона.
+
+По рекомендациям [Litmus о типографике](https://www.litmus.com/blog/email-typography-fonts) и [web fonts в email](https://www.litmus.com/blog/the-ultimate-guide-to-web-fonts) генератор использует не более двух согласованных гарнитур, обязательные fallback-стеки и живой текст. Введены три системы: Editorial elegance (Georgia + Trebuchet MS), Expressive clarity (Trebuchet MS + Verdana) и Swiss clarity (Arial). Hero ограничен 29–31 px, основной текст — 15–16 px; заголовки, строки и абзацы получают отдельный вертикальный ритм. Для Outlook добавлен MSO-fallback на Arial и фиксированное правило межстрочного интервала.

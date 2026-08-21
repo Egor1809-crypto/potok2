@@ -20,8 +20,11 @@ import {
   distributeEditorialBody,
   fallbackEmailImagePrompt,
   normalizeDisplayHeading,
+  resolveEmailTypography,
   resolveEmailVisualPalette,
+  selectEmailPatternArtwork,
   semanticOverlap,
+  type EmailTypographySystem,
   type EmailVisualPalette,
 } from "./email-art-direction";
 import { parseEmailBuilderDocument } from "./email-document";
@@ -522,6 +525,7 @@ function creativeBlockStyle(
   type: EmailBuilderBlockInput["type"],
   index: number,
   palette: EmailVisualPalette,
+  typography: EmailTypographySystem,
 ) {
   const defaults = blockDefaults(type);
   const display = [
@@ -554,9 +558,9 @@ function creativeBlockStyle(
         ? ("right" as const)
         : ("left" as const),
     paddingTop:
-      type === "hero" ? 48 : type === "pattern" ? 12 : display ? 26 : 18,
+      type === "hero" ? 34 : type === "pattern" ? 6 : display ? 24 : 16,
     paddingBottom:
-      type === "hero" ? 48 : type === "pattern" ? 12 : display ? 26 : 18,
+      type === "hero" ? 34 : type === "pattern" ? 6 : display ? 24 : 16,
     paddingLeft: display ? 34 : 46,
     paddingRight: display ? 34 : 46,
     backgroundColor:
@@ -584,32 +588,38 @@ function creativeBlockStyle(
             : palette.text,
     fontSize:
       type === "hero"
-        ? 42
+        ? typography.heroSize
         : type === "heading"
-          ? 34
+          ? typography.headingSize
           : type === "banner"
             ? 19
             : type === "footer"
               ? 11
-              : 15,
+              : type === "text"
+                ? typography.bodySize
+                : 15,
     borderRadius:
       type === "hero"
         ? 22
         : display || type === "image" || type === "button"
           ? 14
           : 0,
-    fontFamily:
-      type === "quote" || type === "heading"
-        ? ("Georgia" as const)
-        : ("Arial" as const),
+    fontFamily: ["quote", "heading", "hero", "banner"].includes(type)
+      ? typography.headingFont
+      : typography.bodyFont,
     fontWeight:
       type === "heading" || type === "hero" || type === "banner"
-        ? (700 as const)
+        ? typography.headingWeight
         : type === "button"
           ? (600 as const)
           : (400 as const),
-    lineHeight: type === "heading" || type === "hero" ? 112 : 155,
-    letterSpacing: type === "pattern" ? 8 : type === "logo" ? 2 : 0,
+    lineHeight:
+      type === "hero"
+        ? typography.heroLineHeight
+        : type === "heading"
+          ? typography.headingLineHeight
+          : typography.bodyLineHeight,
+    letterSpacing: type === "logo" ? 2 : 0,
     borderWidth:
       type === "quote" || type === "columns" || type === "coupon" ? 1 : 0,
     borderColor: palette.border,
@@ -626,6 +636,7 @@ function creativeBlockStyle(
 function saasEmailBlockStyle(
   type: EmailBuilderBlockInput["type"],
   palette: EmailVisualPalette,
+  typography: EmailTypographySystem,
 ) {
   const defaults = blockDefaults(type);
   const isCard = [
@@ -647,7 +658,7 @@ function saasEmailBlockStyle(
       type === "logo"
         ? 22
         : type === "pattern"
-          ? 10
+          ? 6
         : type === "hero"
           ? 12
           : type === "footer"
@@ -659,7 +670,7 @@ function saasEmailBlockStyle(
       type === "logo"
         ? 10
         : type === "pattern"
-          ? 10
+          ? 6
         : type === "hero"
           ? 18
           : type === "footer"
@@ -691,16 +702,16 @@ function saasEmailBlockStyle(
                 : palette.text,
     fontSize:
       type === "hero"
-        ? 30
+        ? typography.heroSize
         : type === "heading"
-          ? 24
-          : type === "pattern"
-            ? 13
+          ? typography.headingSize
+        : type === "pattern"
+            ? 12
           : type === "footer" || type === "social"
             ? 12
             : type === "button"
               ? 15
-              : 16,
+              : typography.bodySize,
     borderRadius:
       type === "hero"
         ? 8
@@ -711,14 +722,21 @@ function saasEmailBlockStyle(
           : isCard || type === "image"
             ? 8
             : 0,
-    fontFamily: "Arial" as const,
+    fontFamily: heading ? typography.headingFont : typography.bodyFont,
     fontWeight: heading
       ? (700 as const)
       : type === "button"
         ? (600 as const)
         : (400 as const),
-    lineHeight: heading ? 128 : type === "footer" ? 155 : 160,
-    letterSpacing: type === "pattern" ? 4 : 0,
+    lineHeight:
+      type === "hero"
+        ? typography.heroLineHeight
+        : type === "heading"
+          ? typography.headingLineHeight
+          : type === "footer"
+            ? 150
+            : typography.bodyLineHeight,
+    letterSpacing: 0,
     borderWidth: [
       "columns",
       "product",
@@ -742,6 +760,7 @@ function saasEmailBlockStyle(
 function premiumEmailBlockStyle(
   type: EmailBuilderBlockInput["type"],
   palette: EmailVisualPalette,
+  typography: EmailTypographySystem,
 ) {
   const cardTypes = new Set<EmailBuilderBlockInput["type"]>([
     "hero",
@@ -753,7 +772,7 @@ function premiumEmailBlockStyle(
     "document",
     "compliance",
   ]);
-  const base = saasEmailBlockStyle(type, palette);
+  const base = saasEmailBlockStyle(type, palette, typography);
   const isCard = cardTypes.has(type);
   return {
     ...base,
@@ -963,10 +982,19 @@ function parseSuggestion(
   const accentColor = palette.accent;
   const effectiveBodyBackground = palette.body;
   const workspaceBackground = palette.workspace;
+  const typography = resolveEmailTypography({
+    goal: input.goal,
+    designBrief: input.designBrief,
+    visualStyle: input.visualStyle ?? "minimal",
+  });
+  const patternArtwork = selectEmailPatternArtwork(
+    `${input.goal}\n${input.designBrief ?? ""}`,
+    input.visualStyle ?? "minimal",
+  );
   const styleBlock = (type: EmailBuilderBlockInput["type"]) =>
     premium
-      ? premiumEmailBlockStyle(type, palette)
-      : saasEmailBlockStyle(type, palette);
+      ? premiumEmailBlockStyle(type, palette, typography)
+      : saasEmailBlockStyle(type, palette, typography);
   const allowedTypes = new Set<EmailBuilderBlockInput["type"]>([
     "logo",
     "heading",
@@ -1103,7 +1131,7 @@ function parseSuggestion(
               : {}),
         ...(cleanSaas
           ? styleBlock(type)
-          : creativeBlockStyle(type, index, palette)),
+          : creativeBlockStyle(type, index, palette, typography)),
         ...(["hero", "heading", "banner"].includes(type) && content.length > 90
           ? {
               fontSize:
@@ -1141,7 +1169,7 @@ function parseSuggestion(
       href: asset.url,
       ...(cleanSaas
         ? styleBlock(type)
-        : creativeBlockStyle(type, blocks.length, palette)),
+        : creativeBlockStyle(type, blocks.length, palette, typography)),
       widthPercent: asset.kind === "logo" ? 44 : 100,
       borderRadius: asset.kind === "logo" ? 0 : 16,
     };
@@ -1174,7 +1202,7 @@ function parseSuggestion(
       content: suggestion.subject,
       ...(cleanSaas
         ? styleBlock("heading")
-        : creativeBlockStyle("heading", 0, palette)),
+        : creativeBlockStyle("heading", 0, palette, typography)),
     });
   }
   if (
@@ -1190,7 +1218,7 @@ function parseSuggestion(
       href: "https://placehold.co/1200x675/png",
       ...(cleanSaas
         ? styleBlock("image")
-        : creativeBlockStyle("image", blocks.length, palette)),
+        : creativeBlockStyle("image", blocks.length, palette, typography)),
       widthPercent: 100,
       borderRadius: cleanSaas ? 8 : 14,
     };
@@ -1211,27 +1239,35 @@ function parseSuggestion(
     });
   }
   if (wantsPattern) {
-    const patternContent = decorativePatternFor(
-      `${input.goal}\n${input.designBrief ?? ""}`,
-    );
     const existingPattern = blocks.find((block) => block.type === "pattern");
     if (existingPattern) {
-      existingPattern.content = patternContent;
-      existingPattern.href = undefined;
+      existingPattern.content = patternArtwork.alt;
+      existingPattern.href = patternArtwork.imageUrl;
       Object.assign(
         existingPattern,
         cleanSaas
           ? styleBlock("pattern")
-          : creativeBlockStyle("pattern", blocks.indexOf(existingPattern), palette),
+          : creativeBlockStyle(
+              "pattern",
+              blocks.indexOf(existingPattern),
+              palette,
+              typography,
+            ),
       );
     } else {
       const patternBlock = {
         id: `ai-pattern-${crypto.randomUUID()}`,
         type: "pattern" as const,
-        content: patternContent,
+        content: patternArtwork.alt,
+        href: patternArtwork.imageUrl,
         ...(cleanSaas
           ? styleBlock("pattern")
-          : creativeBlockStyle("pattern", blocks.length, palette)),
+          : creativeBlockStyle(
+              "pattern",
+              blocks.length,
+              palette,
+              typography,
+            )),
       };
       const heroIndex = blocks.findIndex(
         (block) => block.type === "hero" || block.type === "heading",
@@ -1246,7 +1282,7 @@ function parseSuggestion(
       content: suggestion.body,
       ...(cleanSaas
         ? styleBlock("text")
-        : creativeBlockStyle("text", blocks.length, palette)),
+        : creativeBlockStyle("text", blocks.length, palette, typography)),
     });
   }
   const primaryHeroIndex = blocks.findIndex((block) => block.type === "hero");
@@ -1383,8 +1419,10 @@ function parseSuggestion(
       502,
     );
   suggestion.document = parsedDocument;
-  suggestion.artDirection ??=
-    `${palette.name}: ${input.visualStyle ?? "minimal"}, акцент ${palette.accent}${palette.secondaryAccent ? ` и ${palette.secondaryAccent}` : ""}, тематическое изображение и один спокойный узор. Типографика, интервалы и декоративные роли собраны в единую email-safe систему.`;
+  suggestion.artDirection =
+    `${palette.name}: ${input.visualStyle ?? "minimal"}, акцент ${palette.accent}${palette.secondaryAccent ? ` и ${palette.secondaryAccent}` : ""}. ` +
+    `${typography.name}: ${typography.headingFont} для заголовков и ${typography.bodyFont} для текста. ` +
+    `${wantsPattern ? `Орнамент «${patternArtwork.name}»` : "Декор без отдельного орнамента"}${wantsImage ? " и тематическое изображение" : ""}; интервалы и роли собраны в единую email-safe систему.`;
   suggestion.contentStrategy ??=
     "Один главный тезис, короткое объяснение ценности, только подтверждённые факты и одно целевое действие без повторов исходного брифа.";
   suggestion.imagePrompts = plannedImagePrompts.filter(
