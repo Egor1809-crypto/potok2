@@ -72,6 +72,18 @@ test("the visual director supplies a themed pattern and image prompt", () => {
   assert.match(prompt, /Без текста/);
 });
 
+test("topic patterns do not mistake ordinary Russian word endings for AI", () => {
+  assert.match(
+    decorativePatternFor("Лимитированная коллекция чая и ботанический стиль"),
+    /❦/,
+  );
+  assert.doesNotMatch(
+    decorativePatternFor("Лимитированная коллекция чая"),
+    /─/,
+  );
+  assert.match(decorativePatternFor("Новый ИИ-сервис для аналитики"), /─/);
+});
+
 test("approved editorial copy replaces every text slot without duplicating raw notes", () => {
   const parts = distributeEditorialBody(
     "Первый авторский абзац.\n\nВторой абзац с деталями.\n\nТретий абзац с действием.",

@@ -129,10 +129,7 @@ export function AiEmailAssistant({
   const [designBrief, setDesignBrief] = useState("");
   const [visualStyle, setVisualStyle] = useState<
     "minimal" | "editorial" | "bold" | "premium"
-  >("editorial");
-  const [visualContent, setVisualContent] = useState<
-    "image-and-pattern" | "image" | "pattern" | "none"
-  >("image-and-pattern");
+  >("minimal");
   const [socialLinks, setSocialLinks] = useState<
     Record<"telegram" | "vk" | "linkedin" | "website", string>
   >({ telegram: "", vk: "", linkedin: "", website: "" });
@@ -259,7 +256,7 @@ export function AiEmailAssistant({
           ctaLabel: ctaLabel.trim() || "Узнать подробнее",
           designBrief: designBrief.trim(),
           visualStyle,
-          visualContent,
+          visualContent: "image-and-pattern",
           socialLinks: [
             ["Telegram", socialLinks.telegram],
             ["ВКонтакте", socialLinks.vk],
@@ -269,12 +266,9 @@ export function AiEmailAssistant({
             url.trim() ? [{ label, url: url.trim() }] : [],
           ),
           includeLogo: assets.some((asset) => asset.kind === "logo"),
-          imageSource:
-            visualContent === "none" || visualContent === "pattern"
-              ? "none"
-              : assets.some((asset) => asset.kind === "photo")
-                ? "none"
-                : "generate",
+          imageSource: assets.some((asset) => asset.kind === "photo")
+            ? "none"
+            : "generate",
           availableAssets: assets.map(({ id, filename, kind, url }) => ({
             id,
             filename,
@@ -435,8 +429,8 @@ export function AiEmailAssistant({
         </h2>
         <p className="mx-auto mt-2 max-w-2xl text-[13px] leading-6 text-text-muted">
           {stage === "prompt"
-            ? "Опишите задачу письма, аудиторию и главное действие. Сначала Поток выяснит недостающие факты, затем предложит одну цельную редакцию."
-            : "Ответьте только по смыслу и предложению, затем выберите одно арт-направление. Это защищает письмо от случайной смеси AI-стилей."}
+            ? "Одним запросом задайте смысл и визуальный характер. Поток сам подготовит текст, палитру, композицию, тематическое изображение и узор."
+            : "Ответьте только на вопросы о недостающих фактах. Дизайн-задача уже зафиксирована и не потеряется."}
         </p>
         <span className="mt-3 inline-flex rounded-full border border-border bg-surface px-3 py-1 text-[10px] font-medium text-text-muted">
           {configured === null
@@ -485,6 +479,58 @@ export function AiEmailAssistant({
               Серый текст рядом с курсором — предлагаемое продолжение. Нажмите
               Enter или Tab, чтобы принять его.
             </span>
+          </div>
+          <FormField
+            label="Стиль и визуальное направление"
+            htmlFor="ai-email-design-brief"
+            hint="Пишите свободно: цвета, настроение, фактуры, степень минимализма и что точно не использовать."
+          >
+            <Textarea
+              id="ai-email-design-brief"
+              value={designBrief}
+              onChange={(event) => setDesignBrief(event.target.value)}
+              rows={4}
+              placeholder="Например: лёгкий минимализм, тёплая природная палитра, тонкий ботанический узор, атмосферное фото по теме, без типичных AI-градиентов."
+            />
+          </FormField>
+          <FormField
+            label="Основа композиции"
+            hint="Это стартовая система. Конкретные цвета и настроение берутся из поля выше."
+          >
+            <div
+              className="grid gap-2 sm:grid-cols-2"
+              role="radiogroup"
+              aria-label="Основа композиции письма"
+            >
+              {(
+                [
+                  ["minimal", "Чистый минимализм", "Спокойный ритм, точная типографика, одно действие"],
+                  ["editorial", "Редакционная колонка", "Живой голос, строгая верстка, меньше карточек"],
+                  ["premium", "Тихая премиальность", "Глубокий контраст, тонкие линии и дорогие пропорции"],
+                  ["bold", "Выразительный выпуск", "Сильный контраст для запуска или события"],
+                ] as const
+              ).map(([value, label, description]) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={visualStyle === value}
+                  onClick={() => setVisualStyle(value)}
+                  className="rounded-xl border border-border bg-surface p-3 text-left outline-none transition hover:border-primary/35 focus-visible:ring-2 focus-visible:ring-primary/30 aria-checked:border-primary aria-checked:bg-primary-subtle/60"
+                >
+                  <strong className="block text-[11px] text-text-strong">
+                    {label}
+                  </strong>
+                  <span className="mt-1 block text-[9px] leading-4 text-text-muted">
+                    {description}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </FormField>
+          <div className="rounded-xl border border-success/20 bg-success-subtle px-4 py-3 text-[11px] leading-5 text-text-muted">
+            <strong className="text-text-strong">Полная дизайнерская редакция включена всегда:</strong>{" "}
+            новый текст, палитра, композиция, тематическое изображение и email-safe узор.
           </div>
           {detectedUrl ? (
             <div className="flex items-center gap-2 rounded-xl border border-primary/20 bg-primary-subtle/40 px-3 py-2.5 text-[11px]">
@@ -565,101 +611,12 @@ export function AiEmailAssistant({
           <section className="grid gap-4 rounded-2xl border border-primary/20 bg-primary-subtle/25 p-4 sm:p-5">
             <div>
               <strong className="text-[13px] text-text-strong">
-                Дизайн, кнопка и социальные сети
+                Кнопка и социальные сети
               </strong>
               <p className="mb-0 mt-1 text-[10px] leading-4 text-text-muted">
-                Эти поля не являются подсказкой: Поток перенесёт их в
-                кликабельные элементы готового письма.
+                Стиль уже зафиксирован на первом шаге. Здесь нужны только точные ссылки для готового письма.
               </p>
             </div>
-            <FormField label="Арт-направление" hint="Не палитра ради палитры, а правила типографики, плотности и композиции.">
-              <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Арт-направление письма">
-                {(
-                  [
-                    ["editorial", "Редакционная колонка", "Живой голос, строгий ритм, меньше карточек"],
-                    ["minimal", "Executive brief", "Сдержанный B2B, факты и одно действие"],
-                    ["premium", "Тихая премиальность", "Тёмная основа, тёплый акцент, тонкие линии"],
-                    ["bold", "Выразительный выпуск", "Контрастная композиция для запуска или события"],
-                  ] as const
-                ).map(([value, label, description]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    role="radio"
-                    aria-checked={visualStyle === value}
-                    onClick={() => setVisualStyle(value)}
-                    className="rounded-xl border border-border bg-surface p-3 text-left outline-none transition hover:border-primary/35 focus-visible:ring-2 focus-visible:ring-primary/30 aria-checked:border-primary aria-checked:bg-primary-subtle/60"
-                  >
-                    <strong className="block text-[11px] text-text-strong">{label}</strong>
-                    <span className="mt-1 block text-[9px] leading-4 text-text-muted">{description}</span>
-                  </button>
-                ))}
-              </div>
-            </FormField>
-            <FormField
-              label="Визуальные материалы"
-              hint="Это обязательная часть макета, а не необязательная рекомендация модели."
-            >
-              <div
-                className="grid gap-2 sm:grid-cols-2"
-                role="radiogroup"
-                aria-label="Визуальные материалы письма"
-              >
-                {(
-                  [
-                    [
-                      "image-and-pattern",
-                      "Изображение + узор",
-                      "ИИ создаст тематическую иллюстрацию и спокойный декоративный ритм",
-                    ],
-                    [
-                      "image",
-                      "Только изображение",
-                      "Один сильный визуальный акцент без дополнительного декора",
-                    ],
-                    [
-                      "pattern",
-                      "Только узор",
-                      "Лёгкий email-safe орнамент без генерации фотографии",
-                    ],
-                    [
-                      "none",
-                      "Без визуалов",
-                      "Только типографика, интервалы и цветовая система",
-                    ],
-                  ] as const
-                ).map(([value, label, description]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    role="radio"
-                    aria-checked={visualContent === value}
-                    onClick={() => setVisualContent(value)}
-                    className="rounded-xl border border-border bg-surface p-3 text-left outline-none transition hover:border-primary/35 focus-visible:ring-2 focus-visible:ring-primary/30 aria-checked:border-primary aria-checked:bg-primary-subtle/60"
-                  >
-                    <strong className="block text-[11px] text-text-strong">
-                      {label}
-                    </strong>
-                    <span className="mt-1 block text-[9px] leading-4 text-text-muted">
-                      {description}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </FormField>
-            <FormField
-              label="Как должно выглядеть письмо"
-              htmlFor="ai-email-design-brief"
-              hint="Цвет, настроение и ограничения будут превращены в палитру и правила блоков."
-            >
-              <Textarea
-                id="ai-email-design-brief"
-                value={designBrief}
-                onChange={(event) => setDesignBrief(event.target.value)}
-                rows={3}
-                placeholder="Например: минималистично, пудрово-розовый цвет, тонкий романтический узор, без скруглённых карточек."
-              />
-            </FormField>
             <div className="grid gap-4 md:grid-cols-2">
               <FormField
                 label="Текст основной кнопки"
@@ -796,9 +753,8 @@ export function AiEmailAssistant({
               </div>
             ) : (
               <p className="mt-2 text-[10px] text-text-subtle">
-                Необязательно. Если в исходном запросе не сказано «без
-                изображений», ИИ создаст одну предметную иллюстрацию по смыслу
-                письма.
+                Необязательно. Без загрузки Поток сам создаст тематическое
+                изображение через NavyAI и поместит его в письмо.
               </p>
             )}
           </div>

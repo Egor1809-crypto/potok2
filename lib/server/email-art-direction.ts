@@ -321,7 +321,12 @@ export function decorativePatternFor(value: string) {
   const text = value.toLocaleLowerCase("ru-RU");
   if (/свидан|роман|любов|свадьб|ужин|ресторан|цвет|красот/.test(text))
     return "♡  ·  ✦  ·  ♡  ·  ✦  ·  ♡";
-  if (/технолог|данн|цифр|ии|ai|разработ|сервис|продукт/.test(text))
+  if (/чай|кофе|ботан|растен|природ|эко|сад|лес|трав|органик/.test(text))
+    return "❦  ·  ◦  ·  ❦  ·  ◦  ·  ❦";
+  if (
+    /технолог|данн|цифр|разработ|сервис|продукт/.test(text) ||
+    /(?:^|[^\p{L}])(?:ии|ai)(?:[^\p{L}]|$)/u.test(text)
+  )
     return "◦  ─  ◦  ─  ◦  ─  ◦";
   if (/событ|встреч|конференц|вебинар|приглаш/.test(text))
     return "✦  ·  ◇  ·  ✦  ·  ◇  ·  ✦";

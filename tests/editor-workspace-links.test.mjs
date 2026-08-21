@@ -86,7 +86,7 @@ test("AI briefs preserve design, CTA and social links in emails and presentation
   ]);
 
   for (const label of [
-    "Как должно выглядеть письмо",
+    "Стиль и визуальное направление",
     "Текст основной кнопки",
     "HTTPS-ссылка кнопки",
     "Telegram",

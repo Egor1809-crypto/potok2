@@ -91,24 +91,27 @@ function requestedVisualStyle(
   goal: string,
   raw: unknown,
 ): NonNullable<EmailAiRequest["visualStyle"]> {
-  if (
-    (["minimal", "editorial", "bold", "premium"] as const).includes(
-      raw as never,
-    )
-  )
-    return raw as NonNullable<EmailAiRequest["visualStyle"]>;
   const text = goal.toLocaleLowerCase("ru-RU");
-  if (
-    /editorial|журнал|газет|постер|брутал|эксперимент|breaking news/.test(text)
-  )
-    return "editorial";
-  if (/ярк|дерзк|bold|неон|контрастн/.test(text)) return "bold";
   if (
     /премиаль|премиум|люкс|luxury|дорог|элит|золот|black\s*(?:and|&)\s*gold|ч[её]рн[^\n]{0,40}золот/.test(
       text,
     )
   )
     return "premium";
+  if (/ярк|дерзк|bold|неон|контрастн/.test(text)) return "bold";
+  if (
+    /editorial|редакцион|журнал|газет|постер|брутал|эксперимент|breaking news/.test(
+      text,
+    )
+  )
+    return "editorial";
+  if (/минимал|minimal|чистый|сдержанн/.test(text)) return "minimal";
+  if (
+    (["minimal", "editorial", "bold", "premium"] as const).includes(
+      raw as never,
+    )
+  )
+    return raw as NonNullable<EmailAiRequest["visualStyle"]>;
   return "minimal";
 }
 
@@ -279,15 +282,21 @@ function parseRequest(value: unknown): EmailAiRequest {
       object.visualStyle,
     ),
     visualContent:
-      object.visualContent === "image" ||
-      object.visualContent === "pattern" ||
-      object.visualContent === "none"
-        ? object.visualContent
-        : "image-and-pattern",
+      action === "design"
+        ? "image-and-pattern"
+        : object.visualContent === "image" ||
+            object.visualContent === "pattern" ||
+            object.visualContent === "none"
+          ? object.visualContent
+          : "image-and-pattern",
     imageSource:
-      object.imageSource === "none" || object.imageSource === "generate"
-        ? object.imageSource
-        : "internet",
+      action === "design"
+        ? availableAssets?.some((asset) => asset.kind === "photo")
+          ? "none"
+          : "generate"
+        : object.imageSource === "none" || object.imageSource === "generate"
+          ? object.imageSource
+          : "internet",
     availableAssets,
     briefAnswers,
   };
@@ -1374,6 +1383,10 @@ function parseSuggestion(
       502,
     );
   suggestion.document = parsedDocument;
+  suggestion.artDirection ??=
+    `${palette.name}: ${input.visualStyle ?? "minimal"}, акцент ${palette.accent}${palette.secondaryAccent ? ` и ${palette.secondaryAccent}` : ""}, тематическое изображение и один спокойный узор. Типографика, интервалы и декоративные роли собраны в единую email-safe систему.`;
+  suggestion.contentStrategy ??=
+    "Один главный тезис, короткое объяснение ценности, только подтверждённые факты и одно целевое действие без повторов исходного брифа.";
   suggestion.imagePrompts = plannedImagePrompts.filter(
     (planned) =>
       (planned.kind === "logo" || input.imageSource !== "none") &&

@@ -163,8 +163,8 @@ test("AI design remains a separate version until the user chooses it", async () 
   assert.match(assistant, /Сравнение редакций/);
   assert.match(assistant, /Продолжить с моим/);
   assert.match(assistant, /Заменить на вариант ИИ/);
-  assert.match(assistant, /одну цельную редакцию/);
-  assert.match(assistant, /ИИ создаст одну предметную иллюстрацию/);
+  assert.match(assistant, /Поток сам подготовит текст, палитру, композицию, тематическое изображение и узор/);
+  assert.match(assistant, /сам создаст тематическое/);
   assert.match(server, /api\.openverse\.org/);
   assert.match(server, /license_type/);
   assert.match(server, /aspect_ratio/);
@@ -184,11 +184,15 @@ test("AI brief asks follow-up questions and accepts dragged user images", async 
     readFile(new URL("../lib/server/email-ai.ts", import.meta.url), "utf8"),
   ]);
   assert.match(assistant, /Продолжить — уточнить детали/);
-  assert.match(assistant, /Ответьте только по смыслу и предложению/);
-  assert.match(assistant, /выберите одно арт-направление/);
+  assert.match(assistant, /Стиль и визуальное направление/);
+  assert.match(assistant, /Полная дизайнерская редакция включена всегда/);
+  assert.ok(
+    assistant.indexOf("Стиль и визуальное направление") <
+      assistant.indexOf("2 · Уточнения"),
+  );
   assert.match(assistant, /Перетащите изображение сюда/);
-  assert.match(assistant, /visualContent === "none"/);
-  assert.match(assistant, /Изображение \+ узор/);
+  assert.match(assistant, /visualContent: "image-and-pattern"/);
+  assert.doesNotMatch(assistant, /setVisualContent/);
   assert.match(assistant, /: "generate"/);
   assert.match(assistant, /prepareImageFile/);
   assert.match(assistant, /setQuestions\(fallbackBriefQuestions\(goal\)\)/);
@@ -202,6 +206,8 @@ test("AI brief asks follow-up questions and accepts dragged user images", async 
   assert.match(server, /frameStyle: cleanSaas \? "hairline"/);
   assert.match(server, /availableAssets/);
   assert.match(server, /Не спрашивай цвета/);
+  assert.match(server, /action === "design"/);
+  assert.match(server, /\? "image-and-pattern"/);
   assert.match(server, /suggestion: fallbackBriefQuestions\(input\.goal\)/);
   assert.match(server, /createEditorialCopy/);
   assert.match(server, /сырьё и ограничения, а не текст для копирования/);
