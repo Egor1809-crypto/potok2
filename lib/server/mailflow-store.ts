@@ -608,7 +608,7 @@ export async function getWorkspaceSnapshot(
   };
 }
 
-async function campaignSummaryRecords(options: { scheduledOnly?: boolean } = {}): Promise<CampaignRecord[]> {
+async function campaignSummaryRecords(options: { scheduledOnly?: boolean; limit?: number } = {}): Promise<CampaignRecord[]> {
   const rows = await getDb().select({
     id: campaigns.id,
     workspaceId: campaigns.workspaceId,
@@ -643,7 +643,8 @@ async function campaignSummaryRecords(options: { scheduledOnly?: boolean } = {})
     .where(options.scheduledOnly
       ? and(eq(campaigns.workspaceId, WORKSPACE_ID), isNotNull(campaigns.scheduledAt))
       : eq(campaigns.workspaceId, WORKSPACE_ID))
-    .orderBy(desc(campaigns.updatedAt));
+    .orderBy(desc(campaigns.updatedAt))
+    .limit(options.limit ?? 250);
   // List, dashboard and analytics screens never need every recipient id. Large
   // campaigns can contain thousands of ids, so do not pull those JSON blobs
   // into Worker memory for lightweight summaries.
@@ -694,14 +695,25 @@ export async function getWorkspaceBootstrap(request: Request) {
     };
   }
   if (scope === "campaign-list" || scope === "history" || scope === "dashboard") {
-    const [campaignRecords, segmentRows, integrationRows, planRows, jobRows, eventRows, statsRows, templateCountRows, memberRows] = await Promise.all([
-      campaignSummaryRecords(),
+    const latestCampaignIds = db.select({ id: campaigns.id })
+      .from(campaigns)
+      .where(eq(campaigns.workspaceId, WORKSPACE_ID))
+      .orderBy(desc(campaigns.updatedAt))
+      .limit(250);
+    const [campaignRecords, segmentRows, integrationRows, planRows, jobRows, eventRows, statsRows, campaignStatsRows, templateCountRows, memberRows] = await Promise.all([
+      campaignSummaryRecords({ limit: 250 }),
       db.select().from(segments).where(eq(segments.workspaceId, WORKSPACE_ID)).orderBy(desc(segments.updatedAt)),
       db.select().from(integrations).where(eq(integrations.workspaceId, WORKSPACE_ID)).orderBy(integrations.providerId),
-      scope === "campaign-list" ? db.select().from(deliveryPlans) : Promise.resolve([]),
+      scope === "campaign-list"
+        ? db.select().from(deliveryPlans).where(inArray(deliveryPlans.campaignId, latestCampaignIds))
+        : Promise.resolve([]),
       scope === "history" ? db.select().from(deliveryJobs).where(eq(deliveryJobs.workspaceId, WORKSPACE_ID)).orderBy(desc(deliveryJobs.createdAt)).limit(WORKSPACE_HISTORY_LIMIT) : Promise.resolve([]),
       scope === "history" ? db.select().from(campaignEvents).where(eq(campaignEvents.workspaceId, WORKSPACE_ID)).orderBy(desc(campaignEvents.occurredAt)).limit(WORKSPACE_HISTORY_LIMIT) : Promise.resolve([]),
       db.select({ total: sql<number>`count(*)`, active: sql<number>`coalesce(sum(case when ${contacts.status} = 'active' then 1 else 0 end), 0)` }).from(contacts).where(eq(contacts.workspaceId, WORKSPACE_ID)),
+      db.select({
+        total: sql<number>`count(*)`,
+        active: sql<number>`coalesce(sum(case when ${campaigns.status} in ('ready', 'scheduled', 'sending') then 1 else 0 end), 0)`,
+      }).from(campaigns).where(eq(campaigns.workspaceId, WORKSPACE_ID)),
       db.select({ total: sql<number>`count(*)` }).from(emailTemplates).where(eq(emailTemplates.workspaceId, WORKSPACE_ID)),
       db.select().from(participants).where(and(eq(participants.workspaceId, WORKSPACE_ID), eq(participants.status, "active"))).orderBy(participants.createdAt),
     ]);
@@ -721,8 +733,8 @@ export async function getWorkspaceBootstrap(request: Request) {
         totalContacts: Number(statsRows[0]?.total ?? 0),
         activeContacts: Number(statsRows[0]?.active ?? 0),
         totalSegments: segmentRows.length,
-        totalCampaigns: campaignRecords.length,
-        activeCampaigns: campaignRecords.filter((campaign) => ["ready", "scheduled", "sending"].includes(campaign.status)).length,
+        totalCampaigns: Number(campaignStatsRows[0]?.total ?? 0),
+        activeCampaigns: Number(campaignStatsRows[0]?.active ?? 0),
         connectedIntegrations: integrationRecords.filter((integration) => integration.status === "connected").length,
         unisenderLifetime: sumUniSenderLifetimeMetrics(campaignRecords),
         unisenderByParticipant: sumUniSenderMetricsByParticipant(campaignRecords, memberRows),
