@@ -46,6 +46,7 @@ test("AI briefs preserve design, CTA and social links in emails and presentation
   const [
     emailUi,
     emailAi,
+    emailArt,
     emailCompiler,
     presentationUi,
     presentationAi,
@@ -59,6 +60,10 @@ test("AI briefs preserve design, CTA and social links in emails and presentation
       "utf8",
     ),
     readFile(new URL("../lib/server/email-ai.ts", import.meta.url), "utf8"),
+    readFile(
+      new URL("../lib/server/email-art-direction.ts", import.meta.url),
+      "utf8",
+    ),
     readFile(
       new URL("../lib/server/email-document.ts", import.meta.url),
       "utf8",
@@ -93,12 +98,12 @@ test("AI briefs preserve design, CTA and social links in emails and presentation
   assert.match(emailAi, /designBrief/);
   assert.match(emailAi, /socialLinks/);
   assert.match(emailAi, /function premiumEmailBlockStyle/);
-  assert.match(emailAi, /#C6A15B/);
-  assert.match(emailAi, /#11110F/);
+  assert.match(emailArt, /#C6A15B/);
+  assert.match(emailArt, /#11110F/);
   assert.match(emailAi, /input\.visualStyle === "premium"/);
   assert.match(
     emailAi,
-    /Не возвращай белое, голубое, фиолетовое или стандартное светлое SaaS-оформление/,
+    /Не заменяй явно запрошенный цвет стандартным голубым или фиолетовым/,
   );
   assert.match(
     emailCompiler,

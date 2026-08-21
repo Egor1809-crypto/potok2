@@ -57,7 +57,7 @@ function nextPromptSuggestion(value: string) {
     return ". Срок или дата — укажите, если они важны";
   if (!/https:\/\//.test(normalized))
     return ". Ссылка главной кнопки — https://…";
-  return ". Если нужен необычный стиль, укажите его отдельно; иначе будет чистый современный email";
+  return ". Выберите арт-направление ниже — ИИ не будет смешивать стили";
 }
 
 function fallbackBriefQuestions(goal: string) {
@@ -127,6 +127,12 @@ export function AiEmailAssistant({
   const [ctaLabel, setCtaLabel] = useState("Узнать подробнее");
   const [ctaUrl, setCtaUrl] = useState("");
   const [designBrief, setDesignBrief] = useState("");
+  const [visualStyle, setVisualStyle] = useState<
+    "minimal" | "editorial" | "bold" | "premium"
+  >("editorial");
+  const [visualContent, setVisualContent] = useState<
+    "image-and-pattern" | "image" | "pattern" | "none"
+  >("image-and-pattern");
   const [socialLinks, setSocialLinks] = useState<
     Record<"telegram" | "vk" | "linkedin" | "website", string>
   >({ telegram: "", vk: "", linkedin: "", website: "" });
@@ -252,6 +258,8 @@ export function AiEmailAssistant({
             [...goal.matchAll(/https:\/\/[^\s]+/g)].map((item) => item[0])[0],
           ctaLabel: ctaLabel.trim() || "Узнать подробнее",
           designBrief: designBrief.trim(),
+          visualStyle,
+          visualContent,
           socialLinks: [
             ["Telegram", socialLinks.telegram],
             ["ВКонтакте", socialLinks.vk],
@@ -261,11 +269,12 @@ export function AiEmailAssistant({
             url.trim() ? [{ label, url: url.trim() }] : [],
           ),
           includeLogo: assets.some((asset) => asset.kind === "logo"),
-          imageSource: /без (?:фото|изображений)|только узор/i.test(goal)
-            ? "none"
-            : assets.some((asset) => asset.kind === "photo")
+          imageSource:
+            visualContent === "none" || visualContent === "pattern"
               ? "none"
-              : "generate",
+              : assets.some((asset) => asset.kind === "photo")
+                ? "none"
+                : "generate",
           availableAssets: assets.map(({ id, filename, kind, url }) => ({
             id,
             filename,
@@ -426,8 +435,8 @@ export function AiEmailAssistant({
         </h2>
         <p className="mx-auto mt-2 max-w-2xl text-[13px] leading-6 text-text-muted">
           {stage === "prompt"
-            ? "Опишите задачу письма, аудиторию и главное действие. Если стиль не указан, Поток создаст аккуратный современный SaaS-email."
-            : "Ответьте на вопросы по смыслу и предложению. Визуальную систему ИИ подберёт автоматически, если вы не задали её в описании."}
+            ? "Опишите задачу письма, аудиторию и главное действие. Сначала Поток выяснит недостающие факты, затем предложит одну цельную редакцию."
+            : "Ответьте только по смыслу и предложению, затем выберите одно арт-направление. Это защищает письмо от случайной смеси AI-стилей."}
         </p>
         <span className="mt-3 inline-flex rounded-full border border-border bg-surface px-3 py-1 text-[10px] font-medium text-text-muted">
           {configured === null
@@ -563,17 +572,92 @@ export function AiEmailAssistant({
                 кликабельные элементы готового письма.
               </p>
             </div>
+            <FormField label="Арт-направление" hint="Не палитра ради палитры, а правила типографики, плотности и композиции.">
+              <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Арт-направление письма">
+                {(
+                  [
+                    ["editorial", "Редакционная колонка", "Живой голос, строгий ритм, меньше карточек"],
+                    ["minimal", "Executive brief", "Сдержанный B2B, факты и одно действие"],
+                    ["premium", "Тихая премиальность", "Тёмная основа, тёплый акцент, тонкие линии"],
+                    ["bold", "Выразительный выпуск", "Контрастная композиция для запуска или события"],
+                  ] as const
+                ).map(([value, label, description]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    role="radio"
+                    aria-checked={visualStyle === value}
+                    onClick={() => setVisualStyle(value)}
+                    className="rounded-xl border border-border bg-surface p-3 text-left outline-none transition hover:border-primary/35 focus-visible:ring-2 focus-visible:ring-primary/30 aria-checked:border-primary aria-checked:bg-primary-subtle/60"
+                  >
+                    <strong className="block text-[11px] text-text-strong">{label}</strong>
+                    <span className="mt-1 block text-[9px] leading-4 text-text-muted">{description}</span>
+                  </button>
+                ))}
+              </div>
+            </FormField>
+            <FormField
+              label="Визуальные материалы"
+              hint="Это обязательная часть макета, а не необязательная рекомендация модели."
+            >
+              <div
+                className="grid gap-2 sm:grid-cols-2"
+                role="radiogroup"
+                aria-label="Визуальные материалы письма"
+              >
+                {(
+                  [
+                    [
+                      "image-and-pattern",
+                      "Изображение + узор",
+                      "ИИ создаст тематическую иллюстрацию и спокойный декоративный ритм",
+                    ],
+                    [
+                      "image",
+                      "Только изображение",
+                      "Один сильный визуальный акцент без дополнительного декора",
+                    ],
+                    [
+                      "pattern",
+                      "Только узор",
+                      "Лёгкий email-safe орнамент без генерации фотографии",
+                    ],
+                    [
+                      "none",
+                      "Без визуалов",
+                      "Только типографика, интервалы и цветовая система",
+                    ],
+                  ] as const
+                ).map(([value, label, description]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    role="radio"
+                    aria-checked={visualContent === value}
+                    onClick={() => setVisualContent(value)}
+                    className="rounded-xl border border-border bg-surface p-3 text-left outline-none transition hover:border-primary/35 focus-visible:ring-2 focus-visible:ring-primary/30 aria-checked:border-primary aria-checked:bg-primary-subtle/60"
+                  >
+                    <strong className="block text-[11px] text-text-strong">
+                      {label}
+                    </strong>
+                    <span className="mt-1 block text-[9px] leading-4 text-text-muted">
+                      {description}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </FormField>
             <FormField
               label="Как должно выглядеть письмо"
               htmlFor="ai-email-design-brief"
-              hint="Опишите палитру, узоры, рамки, плотность, настроение и допустимые изображения."
+              hint="Цвет, настроение и ограничения будут превращены в палитру и правила блоков."
             >
               <Textarea
                 id="ai-email-design-brief"
                 value={designBrief}
                 onChange={(event) => setDesignBrief(event.target.value)}
                 rows={3}
-                placeholder="Например: сиреневый акцент, тонкий геометрический узор в hero, светлые карточки и много воздуха."
+                placeholder="Например: минималистично, пудрово-розовый цвет, тонкий романтический узор, без скруглённых карточек."
               />
             </FormField>
             <div className="grid gap-4 md:grid-cols-2">
@@ -760,7 +844,7 @@ export function AiEmailAssistant({
                 <WandSparkles aria-hidden="true" className="size-4" />
               )}
               {busy
-                ? "ИИ проектирует письмо…"
+                ? "ИИ редактирует текст, строит дизайн и создаёт визуалы…"
                 : "Создать дизайнерскую редакцию"}
             </Button>
           </div>
@@ -788,6 +872,7 @@ function DesignReport({
       .filter((block) =>
         [
           "hero",
+          "image",
           "banner",
           "pattern",
           "quote",
@@ -886,7 +971,7 @@ function EmailPreview({
         <iframe
           title={label}
           srcDoc={html}
-          sandbox=""
+          sandbox="allow-same-origin"
           className="h-[520px] w-full bg-white"
         />
       ) : (

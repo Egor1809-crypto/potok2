@@ -346,6 +346,7 @@ export type EmailAiRequest = {
   brandName?: string;
   includeLogo?: boolean;
   visualStyle?: "minimal" | "editorial" | "bold" | "premium";
+  visualContent?: "image-and-pattern" | "image" | "pattern" | "none";
   imageSource?: "internet" | "generate" | "none";
   availableAssets?: Array<
     Pick<EmailAssetRecord, "id" | "filename" | "kind" | "url">

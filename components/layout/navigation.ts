@@ -2,6 +2,7 @@ import {
   BarChart3,
   ContactRound,
   FolderOpen,
+  Gauge,
   Images,
   LayoutDashboard,
   LayoutTemplate,
@@ -67,6 +68,7 @@ export const productNavigation: ProductNavGroup[] = [
         keywords: ["редактор", "создать", "типограф", "ии"],
         children: [
           { label: "Конструктор писем", description: "Блоки, оформление и ИИ", href: "/email-builder?new=1", icon: PenLine, exact: true, keywords: ["письмо", "email", "блоки", "типограф"] },
+          { label: "Арт-директор писем", description: "Проверка текста, дизайна и конверсии", href: "/email-builder?new=1&director=1", icon: Gauge, exact: true, keywords: ["аудит", "проверка", "дизайн", "текст", "конверсия"] },
           { label: "Конструктор презентаций", description: "Редактируемые слайды и ИИ", href: "/presentations?new=1", icon: Presentation, exact: true, keywords: ["презентация", "слайды", "pptx"] },
           { label: "Конструктор изображений", description: "Генерация визуалов по описанию", href: "/image-studio?view=create", icon: Images, exact: true, keywords: ["фото", "картинка", "визуал", "обложка", "ии"] },
         ],

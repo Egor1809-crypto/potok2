@@ -12,6 +12,7 @@ import {
 import Link from "next/link";
 import {
   Blocks,
+  Gauge,
   Library,
   PenTool,
   SlidersHorizontal,
@@ -51,6 +52,8 @@ import { EmailExportMenu } from "./EmailExportMenu";
 import { EmailCanvas } from "./EmailCanvas";
 import { PropertiesPanel } from "./PropertiesPanel";
 import { AiEmailAssistant } from "./AiEmailAssistant";
+import { CreativeDirectorPanel } from "./CreativeDirectorPanel";
+import { analyzeEmailQuality } from "./email-design-director";
 import {
   cloneBlock,
   createBlankDocument,
@@ -73,6 +76,7 @@ export type EmailBuilderViewProps = {
 
 type EmailBuilderWorkspaceProps = EmailBuilderViewProps & {
   initialDocument: BuilderDocument;
+  initialDirectorOpen?: boolean;
   handoffStorageKey?: string;
   handoffToken?: string;
   mode: "campaign" | "template";
@@ -515,6 +519,7 @@ export function EmailBuilderView(props: EmailBuilderViewProps) {
         campaignName={resolvedCampaignName}
         continueHref={resolvedContinueHref}
         initialDocument={initialDocument}
+        initialDirectorOpen={query.get("director") === "1"}
         handoffStorageKey={handoffStorageKey}
         handoffToken={handoffToken}
         mode={campaignMode ? "campaign" : "template"}
@@ -529,6 +534,7 @@ function EmailBuilderWorkspace({
   campaignName: initialCampaignName = "Новый email-шаблон",
   continueHref = "/templates",
   initialDocument,
+  initialDirectorOpen = false,
   handoffStorageKey,
   handoffToken,
   mode,
@@ -573,6 +579,7 @@ function EmailBuilderWorkspace({
       ? "start"
       : "manual",
   );
+  const [directorOpen, setDirectorOpen] = useState(initialDirectorOpen);
   const editRevisionRef = useRef(0);
   const savingTemplateRef = useRef(false);
 
@@ -580,6 +587,10 @@ function EmailBuilderWorkspace({
   const selectedBlock =
     document.blocks.find((block) => block.id === selectedBlockId) ??
     document.blocks[0];
+  const qualityReport = useMemo(
+    () => analyzeEmailQuality(document),
+    [document],
+  );
 
   const markDirty = useCallback(() => {
     editRevisionRef.current += 1;
@@ -644,6 +655,22 @@ function EmailBuilderWorkspace({
       blocks.splice(to, 0, moved);
       return { ...current, blocks };
     });
+  };
+
+  const reorderBlock = (blockId: string, targetBlockId: string) => {
+    if (blockId === targetBlockId) return;
+    mutateDocument((current) => {
+      const blocks = [...current.blocks];
+      const from = blocks.findIndex((block) => block.id === blockId);
+      if (from < 0) return current;
+      const [moved] = blocks.splice(from, 1);
+      const target = blocks.findIndex((block) => block.id === targetBlockId);
+      if (target < 0) return current;
+      blocks.splice(target, 0, moved);
+      return { ...current, blocks };
+    });
+    setSelectedBlockId(blockId);
+    toast.info("Композиция обновлена", "Блок перемещён в новую позицию.");
   };
 
   const duplicateBlock = (blockId: string) => {
@@ -1000,6 +1027,52 @@ function EmailBuilderWorkspace({
         </button>
       </div>
 
+      <button
+        type="button"
+        onClick={() => setDirectorOpen(true)}
+        className="group flex w-full items-center gap-3 border-b border-primary/15 bg-[linear-gradient(90deg,rgba(108,72,255,.10),rgba(214,79,135,.08),rgba(79,131,214,.08))] px-4 py-3 text-left outline-none transition hover:bg-primary-subtle/55 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30 sm:px-6"
+      >
+        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary text-white shadow-[var(--shadow-xs)]">
+          <Gauge aria-hidden="true" className="size-4" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <strong className="block text-[12px] text-text-strong">
+            Арт-директор проверит письмо целиком
+          </strong>
+          <span className="mt-0.5 block text-[10px] leading-4 text-text-muted">
+            Оценит текст, дизайн, конверсию и мобильную версию — затем исправит слабые места одним действием.
+          </span>
+        </span>
+        <span
+          className={cn(
+            "shrink-0 rounded-lg px-2.5 py-1.5 font-mono text-[11px] font-semibold",
+            qualityReport.score >= 80
+              ? "bg-success-subtle text-success"
+              : qualityReport.score >= 55
+                ? "bg-warning-subtle text-warning"
+                : "bg-danger-subtle text-danger",
+          )}
+          aria-label={`Оценка письма ${qualityReport.score} из 100`}
+        >
+          {qualityReport.score}/100
+        </span>
+        <span className="hidden text-[11px] font-semibold text-primary group-hover:underline sm:block">
+          Открыть
+        </span>
+      </button>
+
+      <CreativeDirectorPanel
+        open={directorOpen}
+        onOpenChange={setDirectorOpen}
+        document={document}
+        onApply={(next, message) => {
+          mutateDocument(() => next);
+          setSelectedBlockId(next.blocks[0]?.id ?? "");
+          setCreationMode("manual");
+          toast.success("Арт-директор", message);
+        }}
+      />
+
       {creationMode === "start" ? (
         <section
           className="min-h-0 flex-1 overflow-y-auto bg-surface-subtle/55 px-5 py-10 sm:px-8 sm:py-14"
@@ -1195,10 +1268,14 @@ function EmailBuilderWorkspace({
               onMove={moveBlock}
               onDuplicate={duplicateBlock}
               onDelete={deleteBlock}
+              onReorder={reorderBlock}
               onInlineEdit={(blockId, content) =>
                 updateBlock(blockId, { content })
               }
-              onOpenBlocks={() => setMobilePanel("blocks")}
+              onOpenBlocks={(afterBlockId) => {
+                if (afterBlockId) setSelectedBlockId(afterBlockId);
+                setMobilePanel("blocks");
+              }}
               className={cn(
                 "min-h-0",
                 mobilePanel === "canvas" ? "flex" : "hidden",

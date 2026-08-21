@@ -163,7 +163,7 @@ test("AI design remains a separate version until the user chooses it", async () 
   assert.match(assistant, /Сравнение редакций/);
   assert.match(assistant, /Продолжить с моим/);
   assert.match(assistant, /Заменить на вариант ИИ/);
-  assert.match(assistant, /аккуратный современный SaaS-email/);
+  assert.match(assistant, /одну цельную редакцию/);
   assert.match(assistant, /ИИ создаст одну предметную иллюстрацию/);
   assert.match(server, /api\.openverse\.org/);
   assert.match(server, /license_type/);
@@ -184,17 +184,18 @@ test("AI brief asks follow-up questions and accepts dragged user images", async 
     readFile(new URL("../lib/server/email-ai.ts", import.meta.url), "utf8"),
   ]);
   assert.match(assistant, /Продолжить — уточнить детали/);
-  assert.match(assistant, /Ответьте на вопросы по смыслу и предложению/);
-  assert.match(assistant, /Визуальную систему ИИ подберёт автоматически/);
+  assert.match(assistant, /Ответьте только по смыслу и предложению/);
+  assert.match(assistant, /выберите одно арт-направление/);
   assert.match(assistant, /Перетащите изображение сюда/);
-  assert.match(assistant, /imageSource: \/без/);
+  assert.match(assistant, /visualContent === "none"/);
+  assert.match(assistant, /Изображение \+ узор/);
   assert.match(assistant, /: "generate"/);
   assert.match(assistant, /prepareImageFile/);
   assert.match(assistant, /setQuestions\(fallbackBriefQuestions\(goal\)\)/);
   assert.match(assistant, /setStage\("questions"\)/);
   assert.match(assistant, /if \(!value\.trim\(\)\) return ""/);
   assert.match(assistant, /createImageBitmap/);
-  assert.match(server, /clean modern SaaS email/);
+  assert.match(server, /Арт-направление — чистый минимализм/);
   assert.match(server, /classifyEmailType/);
   assert.match(server, /saasEmailBlockStyle/);
   assert.match(server, /contentWidth: cleanSaas \? 620/);
@@ -212,6 +213,7 @@ test("AI brief asks follow-up questions and accepts dragged user images", async 
   assert.match(server, /contentStrategy/);
   assert.match(assistant, /Сравнение редакций/);
   assert.match(assistant, /какой контекст использовал/);
+  assert.match(assistant, /sandbox="allow-same-origin"/);
   assert.doesNotMatch(assistant, /Основной цвет/);
   assert.doesNotMatch(assistant, /Фоновый цвет/);
 });
@@ -633,7 +635,9 @@ test("NavyAI uses its supported chat endpoint and a working structured-output fa
   assert.match(server, /gemini-2\.5-flash-lite/);
   assert.match(server, /choices/);
   assert.match(server, /response_format/);
-  assert.match(server, /\(\?:responses\|chat\\\/completions\)/);
+  assert.match(server, /imageEndpoint/);
+  assert.match(server, /gpt-image-1\.5/);
+  assert.match(server, /storeGeneratedEmailAssetBytes/);
 });
 
 test("decor library contains thirty supplied image motifs and twenty-eight email frames", async () => {

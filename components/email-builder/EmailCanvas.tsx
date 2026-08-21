@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
   Copy,
   Globe2,
+  GripVertical,
   Image as ImageIcon,
   Linkedin,
   Plus,
@@ -30,8 +32,9 @@ type EmailCanvasProps = {
   onMove: (blockId: string, direction: -1 | 1) => void;
   onDuplicate: (blockId: string) => void;
   onDelete: (blockId: string) => void;
+  onReorder: (blockId: string, targetBlockId: string) => void;
   onInlineEdit: (blockId: string, content: string) => void;
-  onOpenBlocks: () => void;
+  onOpenBlocks: (afterBlockId?: string) => void;
   className?: string;
 };
 
@@ -55,11 +58,14 @@ export function EmailCanvas({
   onMove,
   onDuplicate,
   onDelete,
+  onReorder,
   onInlineEdit,
   onOpenBlocks,
   className,
 }: EmailCanvasProps) {
   const isMobile = previewMode === "mobile";
+  const [draggedBlockId, setDraggedBlockId] = useState("");
+  const [dropTargetId, setDropTargetId] = useState("");
 
   return (
     <section
@@ -135,7 +141,7 @@ export function EmailCanvas({
                 <iframe
                   title="Предпросмотр готового HTML-письма"
                   srcDoc={document.rawHtml}
-                  sandbox="allow-popups allow-popups-to-escape-sandbox"
+                  sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
                   className={cn("block w-full border-0 bg-white", isMobile ? "h-[720px]" : "h-[900px]")}
                 />
               </div>
@@ -177,6 +183,24 @@ export function EmailCanvas({
                 onMove={(direction) => onMove(block.id, direction)}
                 onDuplicate={() => onDuplicate(block.id)}
                 onDelete={() => onDelete(block.id)}
+                dragging={draggedBlockId === block.id}
+                dropTarget={dropTargetId === block.id}
+                onDragStart={() => setDraggedBlockId(block.id)}
+                onDragOver={() => {
+                  if (draggedBlockId && draggedBlockId !== block.id)
+                    setDropTargetId(block.id);
+                }}
+                onDrop={() => {
+                  if (draggedBlockId && draggedBlockId !== block.id)
+                    onReorder(draggedBlockId, block.id);
+                  setDraggedBlockId("");
+                  setDropTargetId("");
+                }}
+                onDragEnd={() => {
+                  setDraggedBlockId("");
+                  setDropTargetId("");
+                }}
+                onInsertAfter={() => onOpenBlocks(block.id)}
                 onInlineEdit={(content) => onInlineEdit(block.id, content)}
               />
             )) : null}
@@ -217,6 +241,13 @@ function CanvasBlock({
   onMove,
   onDuplicate,
   onDelete,
+  dragging,
+  dropTarget,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
+  onInsertAfter,
   onInlineEdit,
 }: {
   block: BuilderBlock;
@@ -229,6 +260,13 @@ function CanvasBlock({
   onMove: (direction: -1 | 1) => void;
   onDuplicate: () => void;
   onDelete: () => void;
+  dragging: boolean;
+  dropTarget: boolean;
+  onDragStart: () => void;
+  onDragOver: () => void;
+  onDrop: () => void;
+  onDragEnd: () => void;
+  onInsertAfter: () => void;
   onInlineEdit: (content: string) => void;
 }) {
   const horizontalPadding = compact ? 24 : 46;
@@ -236,6 +274,7 @@ function CanvasBlock({
     block.backgroundColor === "transparent" ? undefined : block.backgroundColor;
 
   return (
+    <>
     <div
       role="button"
       tabIndex={0}
@@ -247,8 +286,20 @@ function CanvasBlock({
           onSelect();
         }
       }}
+      onDragOver={(event) => {
+        if (!dragging) {
+          event.preventDefault();
+          onDragOver();
+        }
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        onDrop();
+      }}
       className={cn(
         "group relative cursor-pointer outline-none transition-shadow",
+        dragging && "opacity-45",
+        dropTarget && "shadow-[inset_0_3px_0_var(--primary)]",
         selected
           ? "z-10 shadow-[inset_0_0_0_2px_var(--primary)]"
           : "hover:shadow-[inset_0_0_0_1px_rgba(91,85,231,0.38)] focus-visible:shadow-[inset_0_0_0_2px_var(--primary)]",
@@ -279,6 +330,22 @@ function CanvasBlock({
           onClick={(event) => event.stopPropagation()}
           onKeyDown={(event) => event.stopPropagation()}
         >
+          <IconButton
+            label="Перетащить блок"
+            size="sm"
+            variant="ghost"
+            className="cursor-grab active:cursor-grabbing"
+            draggable
+            onDragStart={(event) => {
+              event.stopPropagation();
+              event.dataTransfer.effectAllowed = "move";
+              event.dataTransfer.setData("text/plain", block.id);
+              onDragStart();
+            }}
+            onDragEnd={onDragEnd}
+          >
+            <GripVertical aria-hidden="true" className="size-3.5" />
+          </IconButton>
           <IconButton
             label="Переместить блок вверх"
             size="sm"
@@ -340,6 +407,26 @@ function CanvasBlock({
         />
       </div>
     </div>
+    <div
+      className="group/add relative z-20 flex h-0 w-full justify-center"
+      aria-hidden={!selected}
+    >
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onInsertAfter();
+        }}
+        className={cn(
+          "relative z-20 -translate-y-1/2 items-center gap-1 rounded-full border border-primary/25 bg-surface px-2.5 py-1 text-[9px] font-semibold text-primary shadow-[var(--shadow-sm)] outline-none transition hover:bg-primary hover:text-white focus-visible:flex focus-visible:ring-2 focus-visible:ring-primary/30",
+          selected ? "flex" : "hidden group-hover/add:flex",
+        )}
+      >
+        <Plus aria-hidden="true" className="size-3" />
+        Добавить ниже
+      </button>
+    </div>
+    </>
   );
 }
 
