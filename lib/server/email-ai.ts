@@ -32,6 +32,7 @@ import {
   storeGeneratedEmailAsset,
   storeGeneratedEmailAssetBytes,
 } from "./email-asset-store";
+import { storePublicDomainFallbackImage } from "./public-domain-image-store";
 
 const ACTIONS = new Set<EmailAiAction>([
   "brief",
@@ -1688,8 +1689,27 @@ async function generateDesignImages(
         "Email AI visual generation failed",
         error instanceof Error ? error.message : "unknown error",
       );
+      let recovered = false;
+      if (block && image.kind === "photo") {
+        try {
+          const fallback = await storePublicDomainFallbackImage(
+            request,
+            image.prompt || image.alt,
+            "Тематическая иллюстрация из открытой библиотеки",
+          );
+          if (fallback) {
+            block.href = fallback.url;
+            recovered = true;
+          }
+        } catch (fallbackError) {
+          console.warn(
+            "Email public-domain visual fallback failed",
+            fallbackError instanceof Error ? fallbackError.message : "unknown error",
+          );
+        }
+      }
       // Never leave an expiring provider URL or placeholder in a finished email.
-      if (block)
+      if (block && !recovered)
         suggestion.document.blocks = suggestion.document.blocks.filter(
           (item) => item.id !== block.id,
         );
@@ -1745,7 +1765,7 @@ async function searchCommonsImage(search: string, used: Set<string>) {
     page_size: "20",
   }).toString();
   const response = await fetch(url, {
-    headers: { "User-Agent": "Поток/1.0 (info@tech-pravo.ru)" },
+    headers: { "User-Agent": "Potok/1.0 (info@tech-pravo.ru)" },
   });
   if (!response.ok) return undefined;
   const body = asObject(await response.json());
@@ -1831,7 +1851,7 @@ export async function generateEmailSuggestion(
       try {
         const response = await fetch(url, {
           redirect: "follow",
-          headers: { "User-Agent": "Поток/1.0" },
+          headers: { "User-Agent": "Potok/1.0" },
         });
         if (
           !response.ok ||

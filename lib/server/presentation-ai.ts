@@ -7,6 +7,12 @@ import {
   type PresentationPatternId,
 } from "@/data/presentation-patterns";
 import { presentationTheme } from "@/data/presentation-templates";
+import {
+  normalizePresentationBody,
+  normalizePresentationBullet,
+  normalizePresentationEyebrow,
+  normalizePresentationTitle,
+} from "@/lib/presentation-content-quality";
 import type {
   PresentationAiRequest,
   PresentationAiResponse,
@@ -28,6 +34,7 @@ import {
   storeGeneratedEmailAsset,
   storeGeneratedEmailAssetBytes,
 } from "./email-asset-store";
+import { storePublicDomainFallbackImage } from "./public-domain-image-store";
 
 const THEMES = new Set<PresentationThemeId>([
   "atelier",
@@ -305,12 +312,13 @@ function parseSlides(
     if (!candidate || typeof candidate !== "object" || Array.isArray(candidate))
       return [];
     const object = candidate as Record<string, unknown>;
-    const title = optionalModelText(
+    const rawTitle = optionalModelText(
       object.title,
       `Заголовок слайда ${index + 1}`,
       300,
     );
-    if (!title) return [];
+    if (!rawTitle) return [];
+    const title = normalizePresentationTitle(rawTitle);
     const suggestedLayouts: PresentationSlideLayout[] = [
       "statement",
       "split",
@@ -354,7 +362,7 @@ function parseSlides(
           .slice(0, 8)
           .flatMap((item) =>
             typeof item === "string" && item.trim()
-              ? [item.trim().slice(0, 240)]
+              ? [normalizePresentationBullet(item)]
               : [],
           )
       : [];
@@ -362,21 +370,23 @@ function parseSlides(
       {
         id: newId("slide"),
         layout,
-        eyebrow:
+        eyebrow: normalizePresentationEyebrow(
           optionalModelText(
             object.eyebrow,
             `Надзаголовок слайда ${index + 1}`,
             120,
           ) ??
-          (index === 0
-            ? "ПРЕЗЕНТАЦИЯ"
-            : index === expectedCount - 1
-              ? "ВЫВОД"
-              : `РАЗДЕЛ ${String(index).padStart(2, "0")}`),
+            (index === 0
+              ? "ПРЕЗЕНТАЦИЯ"
+              : index === expectedCount - 1
+                ? "ВЫВОД"
+                : `РАЗДЕЛ ${String(index).padStart(2, "0")}`),
+        ),
         title,
-        body:
+        body: normalizePresentationBody(
           optionalModelText(object.body, `Текст слайда ${index + 1}`, 1_500) ??
-          "",
+            "",
+        ),
         bullets,
         ...(patternId ? { patternId } : {}),
         ...(themeId ? { themeId } : {}),
@@ -626,6 +636,22 @@ async function generatePresentationImages(
           "Presentation AI visual generation failed",
           error instanceof Error ? error.message : "unknown error",
         );
+        try {
+          const fallback = await storePublicDomainFallbackImage(
+            request,
+            slide.imagePrompt || slide.title,
+            `Тематическая иллюстрация презентации ${index + 1}`,
+          );
+          if (fallback) {
+            slide.assetId = fallback.id;
+            slide.imageUrl = fallback.url;
+          }
+        } catch (fallbackError) {
+          console.warn(
+            "Presentation public-domain visual fallback failed",
+            fallbackError instanceof Error ? fallbackError.message : "unknown error",
+          );
+        }
       }
     }),
   );
