@@ -26,7 +26,19 @@ export type EmailFrameStyle =
   | "blueprint"
   | "poster"
   | "postcard"
-  | "focus";
+  | "focus"
+  | "inner-rule"
+  | "editorial-corner"
+  | "spine-double"
+  | "marquee"
+  | "notebook"
+  | "gallery-mat"
+  | "terminal"
+  | "legal-docket"
+  | "festive-thread"
+  | "wave-edge"
+  | "minimalist-lift"
+  | "embossed";
 
 export type EmailFramePreset = {
   id: EmailFrameStyle;
@@ -64,6 +76,18 @@ export const emailFramePresets: EmailFramePreset[] = [
   { id: "poster", name: "Постер", description: "Толстый контрастный край", radius: 0 },
   { id: "postcard", name: "Открытка", description: "Мягкий край и смещение", radius: 22 },
   { id: "focus", name: "Фокус", description: "Акцентные верх и низ", radius: 8 },
+  { id: "inner-rule", name: "Внутренняя линейка", description: "Два тихих контура", radius: 10 },
+  { id: "editorial-corner", name: "Редакторский угол", description: "Акцент сверху и слева", radius: 0 },
+  { id: "spine-double", name: "Двойной корешок", description: "Книжная линия слева", radius: 4 },
+  { id: "marquee", name: "Маркиза", description: "Ритм сверху и снизу", radius: 0 },
+  { id: "notebook", name: "Записная книжка", description: "Поля и внутренний штрих", radius: 8 },
+  { id: "gallery-mat", name: "Галерейное паспарту", description: "Широкое спокойное поле", radius: 0 },
+  { id: "terminal", name: "Терминал", description: "Технический светящийся край", radius: 6 },
+  { id: "legal-docket", name: "Юридическое дело", description: "Строгий корешок документа", radius: 2 },
+  { id: "festive-thread", name: "Праздничная нить", description: "Лёгкий точечный ритм", radius: 16 },
+  { id: "wave-edge", name: "Волнистый край", description: "Мягкая пунктирная окантовка", radius: 24 },
+  { id: "minimalist-lift", name: "Парящий лист", description: "Едва заметная глубина", radius: 12 },
+  { id: "embossed", name: "Тиснение", description: "Тонкий рельефный кант", radius: 8 },
 ];
 
 export function emailFrameCss(style: EmailFrameStyle, color: string, radius: number) {
@@ -95,6 +119,18 @@ export function emailFrameCss(style: EmailFrameStyle, color: string, radius: num
   if (style === "poster") return { ...base, border: `6px solid ${color}` };
   if (style === "postcard") return { ...base, border: `1px solid ${color}`, boxShadow: `7px 9px 0 ${color}24` };
   if (style === "focus") return { ...base, borderTop: `8px solid ${color}`, borderBottom: `8px solid ${color}`, boxShadow: `inset 0 0 0 1px ${color}44` };
+  if (style === "inner-rule") return { ...base, border: `1px solid ${color}`, boxShadow: `inset 0 0 0 4px ${color}18` };
+  if (style === "editorial-corner") return { ...base, borderTop: `3px solid ${color}`, borderLeft: `3px solid ${color}` };
+  if (style === "spine-double") return { ...base, borderLeft: `8px double ${color}`, borderRight: `1px solid ${color}55` };
+  if (style === "marquee") return { ...base, borderTop: `4px dashed ${color}`, borderBottom: `4px dashed ${color}` };
+  if (style === "notebook") return { ...base, border: `1px solid ${color}66`, borderLeft: `10px solid ${color}`, boxShadow: `inset 5px 0 0 ${color}1A` };
+  if (style === "gallery-mat") return { ...base, border: `10px double ${color}88` };
+  if (style === "terminal") return { ...base, border: `2px solid ${color}`, boxShadow: `inset 0 0 18px ${color}24` };
+  if (style === "legal-docket") return { ...base, border: `1px solid ${color}`, borderTop: `6px double ${color}`, borderLeft: `12px solid ${color}` };
+  if (style === "festive-thread") return { ...base, borderTop: `4px dotted ${color}`, borderBottom: `4px dotted ${color}` };
+  if (style === "wave-edge") return { ...base, border: `3px dashed ${color}` };
+  if (style === "minimalist-lift") return { ...base, border: `1px solid ${color}33`, boxShadow: `0 14px 32px ${color}18` };
+  if (style === "embossed") return { ...base, border: `1px solid ${color}88`, boxShadow: `inset 0 0 0 2px ${color}16, inset 0 0 0 5px ${color}0D` };
   return base;
 }
 
@@ -127,5 +163,17 @@ export function emailFrameInlineCss(style: EmailFrameStyle, color: string, radiu
   if (style === "poster") return `${base}border:6px solid ${color};`;
   if (style === "postcard") return `${base}border:1px solid ${color};box-shadow:7px 9px 0 ${color}24;`;
   if (style === "focus") return `${base}border-top:8px solid ${color};border-bottom:8px solid ${color};`;
+  if (style === "inner-rule") return `${base}border:1px solid ${color};box-shadow:inset 0 0 0 4px ${color}18;`;
+  if (style === "editorial-corner") return `${base}border-top:3px solid ${color};border-left:3px solid ${color};`;
+  if (style === "spine-double") return `${base}border-left:8px double ${color};border-right:1px solid ${color}55;`;
+  if (style === "marquee") return `${base}border-top:4px dashed ${color};border-bottom:4px dashed ${color};`;
+  if (style === "notebook") return `${base}border:1px solid ${color}66;border-left:10px solid ${color};`;
+  if (style === "gallery-mat") return `${base}border:10px double ${color}88;`;
+  if (style === "terminal") return `${base}border:2px solid ${color};box-shadow:inset 0 0 18px ${color}24;`;
+  if (style === "legal-docket") return `${base}border:1px solid ${color};border-top:6px double ${color};border-left:12px solid ${color};`;
+  if (style === "festive-thread") return `${base}border-top:4px dotted ${color};border-bottom:4px dotted ${color};`;
+  if (style === "wave-edge") return `${base}border:3px dashed ${color};`;
+  if (style === "minimalist-lift") return `${base}border:1px solid ${color}33;box-shadow:0 14px 32px ${color}18;`;
+  if (style === "embossed") return `${base}border:1px solid ${color}88;box-shadow:inset 0 0 0 2px ${color}16;`;
   return base;
 }

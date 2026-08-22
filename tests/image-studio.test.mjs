@@ -14,6 +14,9 @@ test("image studio uses the real NavyAI image endpoint and durable media store",
   assert.match(server, /storeGeneratedEmailAssetBytes/);
   assert.match(server, /referenceImageSupported: false/);
   assert.match(server, /image-to-image/);
+  for (const style of ["cinematic", "architectural", "botanical", "technical", "luxury", "paper-cut"]) {
+    assert.match(server, new RegExp(style));
+  }
   assert.match(route, /generateStudioImage/);
   assert.match(store, /bucket\(\)\.put/);
   assert.match(store, /getDb\(\)\.insert\(emailAssets\)/);
@@ -33,6 +36,9 @@ test("image studio connects its gallery to download and the email builder", asyn
   assert.match(builder, /createDocumentWithStudioAsset/);
   assert.match(builder, /window\.location\.origin/);
   assert.match(builder, /\/api\/assets\/\$\{encodeURIComponent\(assetId\)\}/);
+  for (const label of ["Кино", "Архитектура", "Ботаника", "Технический", "Тихий люкс", "Бумажная пластика"]) {
+    assert.match(view, new RegExp(label));
+  }
 });
 
 test("image generation authenticates before provider spend and persists abuse controls", async () => {

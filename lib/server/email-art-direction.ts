@@ -45,6 +45,7 @@ type PaletteInput = {
   designBrief?: string;
   visualStyle: EmailVisualStyle;
   primaryColor?: string;
+  secondaryColor?: string;
   modelAccent?: unknown;
   modelBody?: unknown;
   modelWorkspace?: unknown;
@@ -193,25 +194,49 @@ function premiumAccentPalette(accent: string, name: string): EmailVisualPalette 
   };
 }
 
+function twoColorPalette(
+  accent: string,
+  secondaryAccent: string,
+  name = "Два цвета из брифа",
+): EmailVisualPalette {
+  return {
+    ...customAccentPalette(accent),
+    name,
+    secondaryAccent,
+    soft: mixHex(secondaryAccent, "#FFFFFF", 0.88),
+    body: mixHex(accent, "#FFFFFF", 0.97),
+    workspace: mixHex(secondaryAccent, accent, 0.5),
+    border: mixHex(secondaryAccent, accent, 0.5),
+    patternBackground: mixHex(accent, "#FFFFFF", 0.88),
+  };
+}
+
 export function resolveEmailVisualPalette(
   input: PaletteInput,
 ): EmailVisualPalette {
   const brief = `${input.goal}\n${input.designBrief ?? ""}`;
+  const directPrimary = validHex(input.primaryColor)
+    ? normalizedHex(input.primaryColor, "#3157D5")
+    : undefined;
+  const directSecondary = validHex(input.secondaryColor)
+    ? normalizedHex(input.secondaryColor, "#D64F87")
+    : undefined;
+  if (directPrimary && directSecondary)
+    return twoColorPalette(
+      directPrimary,
+      directSecondary,
+      "Два точных цвета пользователя",
+    );
+  if (directPrimary)
+    return input.visualStyle === "premium"
+      ? premiumAccentPalette(directPrimary, "Цвет пользователя")
+      : customAccentPalette(directPrimary);
   const explicitHexes = [...brief.matchAll(/#[0-9a-f]{6}\b/gi)].map(
     (match) => match[0].toUpperCase(),
   );
   if (explicitHexes.length >= 2) {
     const [accent, secondaryAccent] = explicitHexes;
-    return {
-      ...customAccentPalette(accent),
-      name: "Два цвета из брифа",
-      secondaryAccent,
-      soft: mixHex(secondaryAccent, "#FFFFFF", 0.88),
-      body: mixHex(accent, "#FFFFFF", 0.97),
-      workspace: mixHex(secondaryAccent, accent, 0.5),
-      border: mixHex(secondaryAccent, accent, 0.5),
-      patternBackground: mixHex(accent, "#FFFFFF", 0.88),
-    };
+    return twoColorPalette(accent, secondaryAccent);
   }
   const explicitHex = explicitHexes[0];
   if (explicitHex)
@@ -425,16 +450,32 @@ export function selectEmailPatternArtwork(
   style: EmailVisualStyle,
 ): EmailPatternArtwork {
   const text = value.toLocaleLowerCase("ru-RU");
+  const ornamentContext =
+    text
+      .match(/.{0,36}(?:узор|паттерн|орнамент|фактур).{0,36}/giu)
+      ?.join(" ") ?? "";
+  const keywordMatches = (keyword: string, source: string) =>
+    new RegExp(`(?:^|[^\\p{L}\\p{N}])(?:${keyword})`, "iu").test(source);
   const scored = emailPatternLibrary
     .map((pattern) => {
-      const keywordHits = pattern.keywords.filter((keyword) =>
-        new RegExp(keyword, "iu").test(text),
+      const meaningfulKeywords = pattern.keywords.filter(
+        (keyword) => !/^(?:письмо|email|рассыл)$/iu.test(keyword),
+      );
+      const keywordHits = meaningfulKeywords.filter((keyword) =>
+        keywordMatches(keyword, text),
+      ).length;
+      const explicitOrnamentHits = meaningfulKeywords.filter((keyword) =>
+        keywordMatches(keyword, ornamentContext),
       ).length;
       const styleFit = pattern.styles.includes(style) ? 1 : 0;
       const nativePriority = pattern.source === "potok" ? 0.35 : 0;
       return {
         pattern,
-        score: keywordHits * 4 + styleFit + nativePriority,
+        score:
+          keywordHits * 4 +
+          explicitOrnamentHits * 4 +
+          styleFit +
+          nativePriority,
       };
     })
     .sort((left, right) => right.score - left.score);
@@ -468,9 +509,11 @@ export function fallbackEmailImagePrompt(
   palette: EmailVisualPalette,
 ) {
   const text = `${goal} ${subject}`.toLocaleLowerCase("ru-RU");
-  const scene = /свидан|роман|ужин|ресторан/.test(text)
-    ? "элегантный столик на двоих в современном ресторане, мягкий вечерний свет, живые цветы и спокойная интимная атмосфера, без людей"
-    : /конференц|вебинар|событ|мероприят/.test(text)
+  const scene = /завтрак|бранч/.test(text)
+    ? "камерный деловой завтрак до прихода гостей: современный длинный стол, фарфор, стекло, папки для заметок, мягкий утренний свет и спокойная архитектура, без людей"
+    : /свидан|роман|ужин|ресторан/.test(text)
+      ? "элегантный столик на двоих в современном ресторане, мягкий вечерний свет, живые цветы и спокойная интимная атмосфера, без людей"
+      : /конференц|вебинар|событ|мероприят|встреч|приглаш/.test(text)
       ? "современное пространство события перед началом, выразительный свет, аккуратная архитектура и ощущение ожидания"
       : /технолог|данн|цифр|ии|ai|продукт/.test(text)
         ? "один выразительный технологический объект, чистая геометрия, мягкий студийный свет и много свободного пространства"

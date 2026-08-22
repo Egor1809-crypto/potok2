@@ -77,6 +77,30 @@ const monsterSpecs: Array<
   { id: "diamonds-2", name: "Тонкие ромбы", category: "premium", keywords: ["ювелир", "преми", "мод", "коллекц"], styles: ["minimal", "premium"] },
   { id: "hexagon-2", name: "Инженерные соты", category: "technology", keywords: ["инженер", "наук", "технолог", "безопас"], styles: ["minimal", "bold"] },
   { id: "triangles-1", name: "Треугольный ритм", category: "geometry", keywords: ["рост", "стратег", "структур", "динамик"], styles: ["minimal", "bold"] },
+  { id: "waves-2", name: "Морской ритм", category: "texture", keywords: ["море", "вода", "ритм", "спокой", "курорт"], styles: ["minimal", "editorial"] },
+  { id: "waves-6", name: "Текучие контуры", category: "editorial", keywords: ["поток", "движен", "музык", "культур", "истори"], styles: ["editorial", "premium"] },
+  { id: "herringbone-4", name: "Премиальная ёлочка", category: "premium", keywords: ["мод", "ателье", "ткан", "преми", "интерьер"], styles: ["minimal", "premium"] },
+  { id: "flower-2", name: "Лепестковая сетка", category: "romantic", keywords: ["роман", "свадьб", "цвет", "букет", "весн"], styles: ["minimal", "premium"] },
+  { id: "flower-7", name: "Ботаническая розетка", category: "botanical", keywords: ["ботан", "сад", "космет", "натураль", "флорист"], styles: ["editorial", "premium"] },
+  { id: "plus-3", name: "Модульные плюсы", category: "technology", keywords: ["технолог", "модул", "сервис", "медицин", "систем"], styles: ["minimal", "bold"] },
+  { id: "circles-3", name: "Пузырьковая сетка", category: "geometry", keywords: ["сообществ", "связ", "детск", "игр", "креатив"], styles: ["minimal", "bold"] },
+  { id: "diamonds-1", name: "Редакционные ромбы", category: "premium", keywords: ["ювелир", "преми", "коллекц", "мод", "архитект"], styles: ["editorial", "premium"] },
+  { id: "hexagon-4", name: "Сотовый каркас", category: "technology", keywords: ["сеть", "безопас", "инженер", "инфраструкт", "данн"], styles: ["minimal", "bold"] },
+  { id: "squares-and-circles-2", name: "Модуль и орбита", category: "geometry", keywords: ["продукт", "портфолио", "галере", "систем", "дизайн"], styles: ["minimal", "editorial"] },
+  { id: "stars-and-lines-1", name: "Навигационные звёзды", category: "celebration", keywords: ["награ", "празд", "успех", "путеш", "событ"], styles: ["minimal", "premium"] },
+  { id: "triangles-4", name: "Призматическая сетка", category: "geometry", keywords: ["рост", "энерг", "архитект", "стратег", "динамик"], styles: ["bold", "editorial"] },
+  { id: "japanese-pattern-2", name: "Японская решётка", category: "premium", keywords: ["япон", "ази", "ритуал", "чай", "ресторан"], styles: ["editorial", "premium"] },
+  { id: "jigsaw", name: "Связанные элементы", category: "technology", keywords: ["команд", "интеграц", "партн", "экосистем", "процесс"], styles: ["minimal", "bold"] },
+  { id: "octagons-1", name: "Октагональный каркас", category: "geometry", keywords: ["архитект", "структур", "инженер", "преми", "систем"], styles: ["minimal", "editorial"] },
+  { id: "railroad", name: "Маршрутная сетка", category: "editorial", keywords: ["маршрут", "логист", "путеш", "этап", "дорожн"], styles: ["minimal", "editorial"] },
+  { id: "leaves-3", name: "Листовой контур", category: "botanical", keywords: ["эко", "лист", "органик", "космет", "спа"], styles: ["minimal", "premium"] },
+  { id: "pipes", name: "Инженерные каналы", category: "technology", keywords: ["инженер", "данн", "процесс", "инфраструкт", "платформ"], styles: ["minimal", "bold"] },
+  { id: "memphis-5", name: "Мемфис-конструктор", category: "celebration", keywords: ["креатив", "молод", "фестив", "вечерин", "ярк"], styles: ["bold"] },
+  { id: "geometric-2", name: "Современная мозаика", category: "geometry", keywords: ["дизайн", "архитект", "культур", "портфолио", "бренд"], styles: ["bold", "editorial"] },
+  { id: "squiggle-1", name: "Живая линия", category: "editorial", keywords: ["творчеств", "автор", "истори", "креатив", "музык"], styles: ["minimal", "editorial"] },
+  { id: "moroccan-1", name: "Марокканская плитка", category: "premium", keywords: ["марокк", "отел", "ресторан", "путеш", "интерьер"], styles: ["editorial", "premium"] },
+  { id: "interlocked-hexagons-2", name: "Переплетённые соты", category: "technology", keywords: ["сеть", "платформ", "безопас", "партн", "интеграц"], styles: ["minimal", "bold"] },
+  { id: "scales-5", name: "Водная чешуя", category: "texture", keywords: ["вода", "море", "спа", "рыб", "курорт"], styles: ["minimal", "premium"] },
 ];
 
 const monsterPatterns: EmailPatternLibraryItem[] = monsterSpecs.map(
@@ -88,4 +112,3 @@ const monsterPatterns: EmailPatternLibraryItem[] = monsterSpecs.map(
 );
 
 export const emailPatternLibrary = [...nativePatterns, ...monsterPatterns];
-

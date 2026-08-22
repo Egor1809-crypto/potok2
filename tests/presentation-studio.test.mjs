@@ -94,7 +94,7 @@ test("presentation studio exposes real creation, editing and save flows", async 
 });
 
 test("presentation library offers varied scenarios and practical filters", async () => {
-  const [templates, view] = await Promise.all([
+  const [templates, view, catalog] = await Promise.all([
     readFile(
       new URL("../data/presentation-templates.ts", import.meta.url),
       "utf8",
@@ -106,7 +106,10 @@ test("presentation library offers varied scenarios and practical filters", async
       ),
       "utf8",
     ),
+    import("../data/presentation-templates.ts"),
   ]);
+  assert.equal(catalog.presentationTemplates.length, 60);
+  assert.equal(catalog.presentationThemes.length, 27);
   assert.ok((templates.match(/presentation-template-/g) ?? []).length >= 12);
   assert.match(templates, /styleTemplateSpecs/);
   assert.match(templates, /slug: "product-glass"/);
@@ -276,7 +279,7 @@ test("PowerPoint export builds OOXML and only fetches same-origin library assets
     ),
     import("../data/presentation-patterns.ts"),
   ]);
-  assert.equal(patternCatalog.presentationPatternCatalog.length, 42);
+  assert.equal(patternCatalog.presentationPatternCatalog.length, 64);
   assert.match(exporter, /0x04034b50/);
   assert.match(exporter, /presentationml\.presentation\.main\+xml/);
   assert.match(exporter, /slideMasters\/slideMaster1\.xml/);
@@ -318,7 +321,7 @@ test("PowerPoint export builds OOXML and only fetches same-origin library assets
   assert.match(studio, /topography/);
   assert.match(studio, /paper-grain/);
   assert.match(studio, /terrazzo/);
-  assert.match(studio, /42 адаптивных мотива/);
+  assert.match(studio, /64 адаптивных мотива/);
   assert.match(studio, /Инструменты слайда/);
   assert.match(studio, /Добавить на слайд/);
   assert.doesNotMatch(studio, /sticky bottom-0/);

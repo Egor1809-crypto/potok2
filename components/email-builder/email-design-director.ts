@@ -6,7 +6,15 @@ export type EmailDesignSystemId =
   | "executive-brief"
   | "editorial-paper"
   | "quiet-luxury"
-  | "product-signal";
+  | "product-signal"
+  | "monochrome-journal"
+  | "cobalt-precision"
+  | "botanical-calm"
+  | "warm-human"
+  | "data-night"
+  | "gallery-white"
+  | "sunrise-energy"
+  | "civic-trust";
 
 export type EmailDesignSystem = {
   id: EmailDesignSystemId;
@@ -113,6 +121,174 @@ export const emailDesignSystems: EmailDesignSystem[] = [
     radius: 12,
     contentWidth: 640,
     frameStyle: "top-accent",
+  },
+  {
+    id: "monochrome-journal",
+    name: "Monochrome journal",
+    eyebrow: "Интеллектуальная простота",
+    description:
+      "Молочно-белая бумага, почти чёрный текст, тонкие линейки и газетная типографика без лишнего цвета.",
+    bestFor: "Исследования, эссе, авторские колонки, аналитические дайджесты",
+    palette: ["#EFEDE8", "#FCFBF8", "#171717", "#171717"],
+    accentColor: "#171717",
+    bodyBackground: "#FCFBF8",
+    workspaceBackground: "#EFEDE8",
+    textColor: "#171717",
+    mutedColor: "#66625C",
+    cardBackground: "#F5F3EE",
+    borderColor: "#CBC7BE",
+    headingFont: "Georgia",
+    bodyFont: "Arial",
+    radius: 0,
+    contentWidth: 590,
+    frameStyle: "editorial",
+  },
+  {
+    id: "cobalt-precision",
+    name: "Cobalt precision",
+    eyebrow: "Технологичная точность",
+    description:
+      "Светлая инженерная сетка, кобальтовый сигнал и компактная типографика для сложной информации.",
+    bestFor: "SaaS, финтех, инфраструктура, продуктовые релизы",
+    palette: ["#EAF0FF", "#FFFFFF", "#0E1B3D", "#1748D1"],
+    accentColor: "#1748D1",
+    bodyBackground: "#FFFFFF",
+    workspaceBackground: "#EAF0FF",
+    textColor: "#0E1B3D",
+    mutedColor: "#52617E",
+    cardBackground: "#F1F5FF",
+    borderColor: "#C8D5F2",
+    headingFont: "Trebuchet MS",
+    bodyFont: "Arial",
+    radius: 4,
+    contentWidth: 640,
+    frameStyle: "blueprint",
+  },
+  {
+    id: "botanical-calm",
+    name: "Botanical calm",
+    eyebrow: "Естественный ритм",
+    description:
+      "Мягкий шалфей, тёплый кремовый фон и спокойные интервалы для заботливого, человеческого тона.",
+    bestFor: "Wellness, образование, экопроекты, гостиницы и сервис",
+    palette: ["#E7ECE3", "#FBFAF5", "#243128", "#5E765D"],
+    accentColor: "#5E765D",
+    bodyBackground: "#FBFAF5",
+    workspaceBackground: "#E7ECE3",
+    textColor: "#243128",
+    mutedColor: "#667267",
+    cardBackground: "#EFF3EA",
+    borderColor: "#CCD6C7",
+    headingFont: "Georgia",
+    bodyFont: "Arial",
+    radius: 14,
+    contentWidth: 610,
+    frameStyle: "soft",
+  },
+  {
+    id: "warm-human",
+    name: "Warm human",
+    eyebrow: "Тёплый личный голос",
+    description:
+      "Слоновая кость, терракотовый акцент и дружелюбная типографика для писем, которые должны звучать как человек.",
+    bestFor: "Founder letters, сообщества, приглашения, благодарности",
+    palette: ["#F1E8DE", "#FFF9F2", "#35251E", "#C45E3C"],
+    accentColor: "#C45E3C",
+    bodyBackground: "#FFF9F2",
+    workspaceBackground: "#F1E8DE",
+    textColor: "#35251E",
+    mutedColor: "#75655D",
+    cardBackground: "#F9EDE2",
+    borderColor: "#E3CBB9",
+    headingFont: "Georgia",
+    bodyFont: "Arial",
+    radius: 10,
+    contentWidth: 600,
+    frameStyle: "postcard",
+  },
+  {
+    id: "data-night",
+    name: "Data night",
+    eyebrow: "Сигнал в тёмном поле",
+    description:
+      "Глубокий синий фон, светлая типографика и бирюзовый акцент для данных, технологий и сильного запуска.",
+    bestFor: "AI, кибербезопасность, аналитика, developer updates",
+    palette: ["#111827", "#0B1020", "#F2F7FF", "#25C5B4"],
+    accentColor: "#25C5B4",
+    bodyBackground: "#0B1020",
+    workspaceBackground: "#111827",
+    textColor: "#F2F7FF",
+    mutedColor: "#AAB7CA",
+    cardBackground: "#141E32",
+    borderColor: "#2A4055",
+    headingFont: "Trebuchet MS",
+    bodyFont: "Arial",
+    radius: 8,
+    contentWidth: 640,
+    frameStyle: "blueprint",
+  },
+  {
+    id: "gallery-white",
+    name: "Gallery white",
+    eyebrow: "Воздух и изображение",
+    description:
+      "Чистое белое поле, графитовая типографика и едва заметные серые линии — контент получает максимум воздуха.",
+    bestFor: "Портфолио, архитектура, фотография, fashion и культура",
+    palette: ["#F1F1EF", "#FFFFFF", "#202124", "#686B70"],
+    accentColor: "#202124",
+    bodyBackground: "#FFFFFF",
+    workspaceBackground: "#F1F1EF",
+    textColor: "#202124",
+    mutedColor: "#6F7378",
+    cardBackground: "#F8F8F6",
+    borderColor: "#DDDEDC",
+    headingFont: "Arial",
+    bodyFont: "Arial",
+    radius: 0,
+    contentWidth: 660,
+    frameStyle: "side-lines",
+  },
+  {
+    id: "sunrise-energy",
+    name: "Sunrise energy",
+    eyebrow: "Энергия запуска",
+    description:
+      "Тёплый светлый фон, коралловый CTA и янтарные поверхности для динамичных анонсов без рекламного крика.",
+    bestFor: "Запуски, мероприятия, новые коллекции, сезонные кампании",
+    palette: ["#FFF0DE", "#FFF9F0", "#3B221B", "#EF5B37"],
+    accentColor: "#EF5B37",
+    bodyBackground: "#FFF9F0",
+    workspaceBackground: "#FFF0DE",
+    textColor: "#3B221B",
+    mutedColor: "#7A6258",
+    cardBackground: "#FFE8CF",
+    borderColor: "#F1C9A8",
+    headingFont: "Trebuchet MS",
+    bodyFont: "Arial",
+    radius: 16,
+    contentWidth: 620,
+    frameStyle: "top-ribbon",
+  },
+  {
+    id: "civic-trust",
+    name: "Civic trust",
+    eyebrow: "Доверие и ясность",
+    description:
+      "Спокойный сине-серый строй, строгие карточки и доступная типографика для важных решений и уведомлений.",
+    bestFor: "Госсектор, право, медицина, финансы, обязательные уведомления",
+    palette: ["#E9EEF2", "#FFFFFF", "#172734", "#24678A"],
+    accentColor: "#24678A",
+    bodyBackground: "#FFFFFF",
+    workspaceBackground: "#E9EEF2",
+    textColor: "#172734",
+    mutedColor: "#5D6C76",
+    cardBackground: "#F0F5F7",
+    borderColor: "#CAD6DC",
+    headingFont: "Arial",
+    bodyFont: "Arial",
+    radius: 6,
+    contentWidth: 620,
+    frameStyle: "focus",
   },
 ];
 
@@ -233,7 +409,13 @@ export type NarrativeRecipeId =
   | "one-idea"
   | "founder-note"
   | "evidence-first"
-  | "event-arc";
+  | "event-arc"
+  | "problem-solution"
+  | "launch-story"
+  | "invitation-rsvp"
+  | "digest-scan"
+  | "trust-before-action"
+  | "onboarding-path";
 
 export type NarrativeRecipe = {
   id: NarrativeRecipeId;
@@ -279,6 +461,60 @@ export const emailNarrativeRecipes: NarrativeRecipe[] = [
     description:
       "Почему встреча важна → что произойдёт → кому подходит → регистрация. Содержание сильнее декора.",
     sequence: ["Зачем прийти", "Программа", "Для кого", "Регистрация"],
+    designSystem: "product-signal",
+  },
+  {
+    id: "problem-solution",
+    name: "От напряжения к решению",
+    eyebrow: "Продажа через понимание",
+    description:
+      "Узнаваемая проблема → цена бездействия → принцип решения → доказательство → один следующий шаг.",
+    sequence: ["Напряжение", "Последствие", "Решение", "Доказательство", "CTA"],
+    designSystem: "cobalt-precision",
+  },
+  {
+    id: "launch-story",
+    name: "Запуск как история",
+    eyebrow: "Новость с причиной",
+    description:
+      "Что изменилось → почему это важно сейчас → что получает читатель → как попробовать. Не список функций, а переход состояния.",
+    sequence: ["Изменение", "Почему сейчас", "Новая ценность", "Попробовать"],
+    designSystem: "sunrise-energy",
+  },
+  {
+    id: "invitation-rsvp",
+    name: "Приглашение с ответом",
+    eyebrow: "Событие и решение",
+    description:
+      "Образ вечера → причина быть там → конкретика без перегруза → простой RSVP. Визуал поддерживает атмосферу.",
+    sequence: ["Атмосфера", "Зачем прийти", "Детали", "RSVP"],
+    designSystem: "warm-human",
+  },
+  {
+    id: "digest-scan",
+    name: "Дайджест для сканирования",
+    eyebrow: "Быстро понять главное",
+    description:
+      "Редакторский ввод → три приоритетные темы → короткий вывод → спокойная навигация к подробностям.",
+    sequence: ["Редакторский ввод", "Главное", "Ещё два сигнала", "Подробнее"],
+    designSystem: "monochrome-journal",
+  },
+  {
+    id: "trust-before-action",
+    name: "Сначала доверие",
+    eyebrow: "Для важных решений",
+    description:
+      "Контекст → прозрачное объяснение → ограничения и гарантии → действие. Подходит там, где нельзя давить на читателя.",
+    sequence: ["Контекст", "Объяснение", "Гарантии", "Действие"],
+    designSystem: "civic-trust",
+  },
+  {
+    id: "onboarding-path",
+    name: "Путь первого результата",
+    eyebrow: "Онбординг без перегруза",
+    description:
+      "Ожидаемый результат → первый маленький шаг → второй шаг → точка успеха → куда обратиться за помощью.",
+    sequence: ["Результат", "Шаг 1", "Шаг 2", "Готово", "Поддержка"],
     designSystem: "product-signal",
   },
 ];
@@ -356,6 +592,30 @@ const narrativeRoleOrder: Record<
     signature: 70,
     separator: 80,
     legal: 90,
+  },
+  "problem-solution": {
+    brand: 0, opener: 10, context: 20, visual: 25, value: 35, proof: 45,
+    detail: 50, audience: 55, action: 60, signature: 70, separator: 80, legal: 90,
+  },
+  "launch-story": {
+    brand: 0, opener: 10, visual: 16, context: 22, value: 32, proof: 42,
+    detail: 48, audience: 52, action: 60, signature: 70, separator: 80, legal: 90,
+  },
+  "invitation-rsvp": {
+    brand: 0, opener: 10, visual: 14, context: 20, value: 28, detail: 36,
+    audience: 44, proof: 50, action: 60, signature: 70, separator: 80, legal: 90,
+  },
+  "digest-scan": {
+    brand: 0, opener: 10, context: 18, value: 26, proof: 34, detail: 42,
+    visual: 48, audience: 52, action: 60, signature: 70, separator: 80, legal: 90,
+  },
+  "trust-before-action": {
+    brand: 0, opener: 10, context: 18, proof: 28, detail: 36, value: 44,
+    audience: 50, visual: 54, action: 60, signature: 70, separator: 80, legal: 90,
+  },
+  "onboarding-path": {
+    brand: 0, opener: 10, value: 18, context: 24, detail: 32, visual: 38,
+    proof: 46, audience: 52, action: 60, signature: 70, separator: 80, legal: 90,
   },
 };
 

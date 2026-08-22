@@ -131,7 +131,7 @@ export function parseEmailBuilderDocument(
       buttonStyle: block.buttonStyle === "outline" || block.buttonStyle === "soft" ? block.buttonStyle : "solid",
     };
   });
-  const frameStyles = new Set<EmailFrameStyle>(["none", "hairline", "accent", "double", "dashed", "top-bottom", "left-band", "soft", "capsule", "stamp", "offset", "inset", "top-accent", "bottom-accent", "right-band", "editorial", "ticket", "window", "railway", "archive", "corner-cut", "top-ribbon", "side-lines", "luxury", "blueprint", "poster", "postcard", "focus"]);
+  const frameStyles = new Set<EmailFrameStyle>(["none", "hairline", "accent", "double", "dashed", "top-bottom", "left-band", "soft", "capsule", "stamp", "offset", "inset", "top-accent", "bottom-accent", "right-band", "editorial", "ticket", "window", "railway", "archive", "corner-cut", "top-ribbon", "side-lines", "luxury", "blueprint", "poster", "postcard", "focus", "inner-rule", "editorial-corner", "spine-double", "marquee", "notebook", "gallery-mat", "terminal", "legal-docket", "festive-thread", "wave-edge", "minimalist-lift", "embossed"]);
   const frameStyle = frameStyles.has(source.frameStyle as EmailFrameStyle) ? source.frameStyle as EmailFrameStyle : "none";
   const rawHtml = source.rawHtml === undefined
     ? undefined

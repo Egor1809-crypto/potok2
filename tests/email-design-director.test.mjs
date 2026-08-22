@@ -10,8 +10,17 @@ import {
   applyEmailDesignSystem,
   applyEmailQualityFix,
   applyNarrativeRecipe,
+  emailDesignSystems,
+  emailNarrativeRecipes,
   previewNarrativeRecipe,
 } from "../components/email-builder/email-design-director.ts";
+
+test("art director exposes a broad set of coherent systems and dramaturgies", () => {
+  assert.equal(emailDesignSystems.length, 12);
+  assert.equal(emailNarrativeRecipes.length, 10);
+  assert.equal(new Set(emailDesignSystems.map((system) => system.id)).size, 12);
+  assert.equal(new Set(emailNarrativeRecipes.map((recipe) => recipe.id)).size, 10);
+});
 
 function workingDocument() {
   const document = createBlankDocument();

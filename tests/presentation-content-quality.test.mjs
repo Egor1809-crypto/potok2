@@ -31,4 +31,10 @@ test("presentation typography has enforced readable content budgets", () => {
   assert.ok(normalizePresentationBody(longText).length <= 361);
   assert.ok(normalizePresentationBullet(longText).length <= 111);
   assert.equal(normalizePresentationEyebrow("ключевая мысль"), "КЛЮЧЕВАЯ МЫСЛЬ");
+  assert.equal(
+    normalizePresentationTitle(
+      "Пилотируем AI в договорах как систему контроля качества, а не как автоматизацию ради автоматизации",
+    ),
+    "Пилотируем AI в договорах как систему контроля качества",
+  );
 });

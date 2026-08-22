@@ -223,6 +223,18 @@ function isBuilderDocument(value: unknown): value is BuilderDocument {
         "poster",
         "postcard",
         "focus",
+        "inner-rule",
+        "editorial-corner",
+        "spine-double",
+        "marquee",
+        "notebook",
+        "gallery-mat",
+        "terminal",
+        "legal-docket",
+        "festive-thread",
+        "wave-edge",
+        "minimalist-lift",
+        "embossed",
       ].includes(String(value.frameStyle))) &&
     (value.frameColor === undefined || typeof value.frameColor === "string") &&
     (value.frameRadius === undefined || isFiniteNumber(value.frameRadius)) &&

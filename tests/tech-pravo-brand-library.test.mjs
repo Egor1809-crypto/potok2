@@ -49,13 +49,13 @@ test("general email decor adds a large licensed pattern library", async () => {
       "utf8",
     ),
   ]);
-  assert.equal(catalog.emailPatternLibrary.length, 48);
-  assert.match(presets, /78 фонов и орнаментов|emailPatternLibrary/);
+  assert.equal(catalog.emailPatternLibrary.length, 72);
+  assert.match(presets, /102 фона и орнамента|emailPatternLibrary/);
   assert.match(license, /MIT License/);
   const monster = catalog.emailPatternLibrary.filter(
     (pattern) => pattern.source === "pattern-monster",
   );
-  assert.equal(monster.length, 36);
+  assert.equal(monster.length, 60);
   for (const pattern of monster) {
     const filename = pattern.imageUrl.split("/").at(-1);
     const details = await stat(

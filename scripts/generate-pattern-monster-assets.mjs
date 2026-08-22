@@ -15,6 +15,12 @@ const slugs = [
   "stripes-1", "squares-1", "interlocked-hexagons-1", "lanterns-1",
   "lines-4", "scales-2", "memphis-1", "memphis-3", "stars-1",
   "stars-4", "plaid-pattern-1", "diamonds-2", "hexagon-2", "triangles-1",
+  "waves-2", "waves-6", "herringbone-4", "flower-2", "flower-7",
+  "plus-3", "circles-3", "diamonds-1", "hexagon-4",
+  "squares-and-circles-2", "stars-and-lines-1", "triangles-4",
+  "japanese-pattern-2", "jigsaw", "octagons-1", "railroad", "leaves-3",
+  "pipes", "memphis-5", "geometric-2", "squiggle-1", "moroccan-1",
+  "interlocked-hexagons-2", "scales-5",
 ];
 const palettes = [
   ["#FBF7F0", "#A64545", "#D8A68C", "#253146", "#E9DCC9"],

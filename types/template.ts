@@ -72,7 +72,7 @@ export interface EmailTemplate {
   bodyBackground?: string;
   backgroundImageUrl?: string;
   contentWidth?: number;
-  frameStyle?: "none" | "hairline" | "accent" | "double" | "dashed" | "top-bottom" | "left-band" | "soft" | "capsule" | "stamp" | "offset" | "inset" | "top-accent" | "bottom-accent" | "right-band" | "editorial" | "ticket" | "window" | "railway" | "archive" | "corner-cut" | "top-ribbon" | "side-lines" | "luxury" | "blueprint" | "poster" | "postcard" | "focus";
+  frameStyle?: "none" | "hairline" | "accent" | "double" | "dashed" | "top-bottom" | "left-band" | "soft" | "capsule" | "stamp" | "offset" | "inset" | "top-accent" | "bottom-accent" | "right-band" | "editorial" | "ticket" | "window" | "railway" | "archive" | "corner-cut" | "top-ribbon" | "side-lines" | "luxury" | "blueprint" | "poster" | "postcard" | "focus" | "inner-rule" | "editorial-corner" | "spine-double" | "marquee" | "notebook" | "gallery-mat" | "terminal" | "legal-docket" | "festive-thread" | "wave-edge" | "minimalist-lift" | "embossed";
   frameColor?: string;
   frameRadius?: number;
   thumbnailVariant: "editorial" | "minimal" | "bold" | "classic";

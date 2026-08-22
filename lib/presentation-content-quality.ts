@@ -24,7 +24,14 @@ export function normalizePresentationTitle(value: string) {
     .replace(/^(?:презентаци(?:я|ю))\s*[:—-]?\s*/iu, "")
     .replace(/^(?:на\s+тему|про|для)\s*[:—-]?\s*/iu, "")
     .trim();
-  return compactAtWord(capitalize(withoutCommand || normalized), 88);
+  const capitalized = capitalize(withoutCommand || normalized);
+  if (capitalized.length <= 88) return capitalized;
+  for (const separator of [", а не ", " — вместо ", " — даже ", " — один ", ": ", "; "]) {
+    const boundary = capitalized.indexOf(separator);
+    if (boundary >= 38 && boundary <= 88)
+      return capitalized.slice(0, boundary).replace(/[\s,;:—-]+$/u, "");
+  }
+  return compactAtWord(capitalized, 88);
 }
 
 export function normalizePresentationBody(value: string) {

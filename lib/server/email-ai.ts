@@ -91,6 +91,151 @@ function classifyEmailType(value: string): EmailType {
   return "informational";
 }
 
+type EmailCreativeBlueprint = {
+  scenario: EmailType;
+  readerBefore: string;
+  readerAfter: string;
+  narrativeArc: string[];
+  proofPolicy: string;
+  ctaLogic: string;
+  imageRole: string;
+  patternRole: string;
+  recommendedDesignSystems: string[];
+  typeHierarchy: string;
+  avoid: string[];
+};
+
+function emailCreativeBlueprint(
+  input: EmailAiRequest,
+  emailType = classifyEmailType(input.goal),
+): EmailCreativeBlueprint {
+  const scenarios: Record<
+    EmailType,
+    Pick<
+      EmailCreativeBlueprint,
+      | "readerBefore"
+      | "readerAfter"
+      | "narrativeArc"
+      | "proofPolicy"
+      | "ctaLogic"
+      | "imageRole"
+    >
+  > = {
+    informational: {
+      readerBefore: "Не понимает, почему тема заслуживает внимания именно сейчас.",
+      readerAfter: "Понимает главный вывод, ограничения и следующий разумный шаг.",
+      narrativeArc: ["Конкретный контекст", "Одна главная мысль", "Практическое следствие", "Следующий шаг"],
+      proofPolicy: "Доказательство добавляется только из фактов пользователя; при их отсутствии честно объясни логику без чисел.",
+      ctaLogic: "Одна спокойная CTA только если есть ссылка или явно запрошенное действие.",
+      imageRole: "Предметный образ темы или редакционная метафора, которая помогает понять смысл, а не просто украшает письмо.",
+    },
+    welcome: {
+      readerBefore: "Только что присоединился и не знает, с чего начать.",
+      readerAfter: "Видит ближайший полезный результат и понимает первые два шага.",
+      narrativeArc: ["Подтверждение входа", "Обещание первого результата", "Шаг 1", "Шаг 2", "Поддержка"],
+      proofPolicy: "Не обещай скорость или эффект, которых нет в исходных данных; показывай путь через действия.",
+      ctaLogic: "CTA запускает первый маленький шаг, а не отправляет в общий раздел.",
+      imageRole: "Ясная визуальная метафора старта, маршрута или готового состояния без интерфейсного псевдотекста.",
+    },
+    invitation: {
+      readerBefore: "Видит ещё одно приглашение и не решил, стоит ли отвечать.",
+      readerAfter: "Чувствует атмосферу, понимает личную причину прийти и легко отвечает.",
+      narrativeArc: ["Образ встречи", "Почему этот человек важен", "Что произойдёт", "Конкретные детали", "RSVP"],
+      proofPolicy: "Используй только реальные детали; отсутствие даты или места не заполняй выдумкой.",
+      ctaLogic: "Один прямой RSVP с формулировкой, соответствующей степени близости и тону письма.",
+      imageRole: "Атмосферный кадр места, предметов или света; он задаёт настроение, но не заменяет детали приглашения.",
+    },
+    promotion: {
+      readerBefore: "Не уверен, что предложение относится к его задаче и действительно выгодно.",
+      readerAfter: "Понимает ценность, условия и может осознанно перейти к предложению.",
+      narrativeArc: ["Ситуация читателя", "Ценность предложения", "Условия", "Снятие риска", "Действие"],
+      proofPolicy: "Не выдумывай скидку, дедлайн, дефицит или социальное доказательство.",
+      ctaLogic: "CTA называет конкретный результат перехода; избегай давления и искусственной срочности.",
+      imageRole: "Продукт или результат в реалистичном контексте, без баннерного текста и ценников внутри картинки.",
+    },
+    event: {
+      readerBefore: "Не понимает, чем событие отличается от других и зачем выделять время.",
+      readerAfter: "Видит практическую ценность программы, узнаёт себя в аудитории и регистрируется.",
+      narrativeArc: ["Почему тема важна", "Что будет разобрано", "Для кого", "Формат и детали", "Регистрация"],
+      proofPolicy: "Спикеры, программа, дата и цифры берутся только из брифа или проверенного контекста.",
+      ctaLogic: "Одна регистрационная CTA после ценности и конкретики, не раньше.",
+      imageRole: "Сцена, пространство или содержательный объект события; избегай стоковых рукопожатий и пустой аудитории.",
+    },
+    news: {
+      readerBefore: "Имеет мало времени и не знает, что из выпуска действительно важно.",
+      readerAfter: "За минуту понимает приоритеты и выбирает, что читать подробнее.",
+      narrativeArc: ["Редакторский вывод", "Главный сигнал", "Два вторичных сигнала", "Что это меняет", "Подробнее"],
+      proofPolicy: "Каждый факт должен следовать из источника; не превращай заголовки в сенсации.",
+      ctaLogic: "Ссылки вторичны по отношению к редакторскому выводу; не делай несколько конкурирующих кнопок.",
+      imageRole: "Один редакционный визуал для главной темы выпуска, а не иллюстрация каждого пункта.",
+    },
+    notification: {
+      readerBefore: "Не знает, что изменилось и требуется ли действие.",
+      readerAfter: "Понимает изменение, влияние, срок и точное действие — либо что действие не нужно.",
+      narrativeArc: ["Что изменилось", "Кого касается", "Что это означает", "Что сделать", "Куда обратиться"],
+      proofPolicy: "Точность важнее убедительности; не смягчай обязательные ограничения и не добавляй обещаний.",
+      ctaLogic: "CTA только функциональная и однозначная; если действие не требуется, скажи это явно.",
+      imageRole: "Нейтральный символ темы или процесса; изображение не должно снижать серьёзность сообщения.",
+    },
+    product_update: {
+      readerBefore: "Видит список новых функций, но не понимает, что изменится в его работе.",
+      readerAfter: "Понимает новый рабочий сценарий и знает, как проверить пользу на своей задаче.",
+      narrativeArc: ["Прежнее ограничение", "Что изменилось", "Новый сценарий", "Как попробовать", "Где узнать больше"],
+      proofPolicy: "Не приписывай продукту метрики и возможности, которых нет в брифе.",
+      ctaLogic: "CTA ведёт к первому использованию функции или конкретному описанию обновления.",
+      imageRole: "Концептуальный product visual или реальный скриншот из доступных ассетов; без выдуманного UI.",
+    },
+    congratulation: {
+      readerBefore: "Ожидает формальное или шаблонное поздравление.",
+      readerAfter: "Чувствует конкретное человеческое внимание и запоминает отправителя.",
+      narrativeArc: ["Личное обращение", "Конкретный повод", "Тёплое наблюдение", "Пожелание", "Подпись"],
+      proofPolicy: "Не выдумывай историю отношений, достижения или личные детали.",
+      ctaLogic: "По умолчанию без продающей CTA; допустим только естественный ответ или мягкая ссылка.",
+      imageRole: "Авторская праздничная композиция, связанная с поводом; без клипарта, надписей и банального конфетти.",
+    },
+    transactional: {
+      readerBefore: "Хочет быстро подтвердить статус операции и понять, что делать дальше.",
+      readerAfter: "Без сомнений видит статус, ключевые данные, следующий шаг и канал поддержки.",
+      narrativeArc: ["Статус", "Ключевые детали", "Следующее действие", "Безопасность", "Поддержка"],
+      proofPolicy: "Сохраняй точные данные пользователя, не заполняй отсутствующие поля и не добавляй маркетинговые обещания.",
+      ctaLogic: "Только функциональная CTA, необходимая для завершения операции или просмотра деталей.",
+      imageRole: "Обычно изображение не нужно; если пользователь явно просит, используй спокойный функциональный символ.",
+    },
+  };
+  const style = input.visualStyle ?? "minimal";
+  const recommendedDesignSystems =
+    style === "premium"
+      ? ["quiet-luxury", "gallery-white"]
+      : style === "editorial"
+        ? ["editorial-paper", "monochrome-journal"]
+        : style === "bold"
+          ? ["sunrise-energy", "data-night", "cobalt-precision"]
+          : emailType === "welcome" || emailType === "product_update"
+            ? ["product-signal", "cobalt-precision"]
+            : emailType === "notification" || emailType === "transactional"
+              ? ["civic-trust", "executive-brief"]
+              : ["executive-brief", "warm-human", "botanical-calm"];
+  return {
+    scenario: emailType,
+    ...scenarios[emailType],
+    patternRole:
+      input.visualContent === "pattern" ||
+      input.visualContent === "image-and-pattern"
+        ? "Один тематический орнамент создаёт смысловую паузу и поддерживает тему; он не повторяется и не конкурирует с CTA."
+        : "Отдельный орнамент не требуется; ритм создают интервалы, линейки и поверхности.",
+    recommendedDesignSystems,
+    typeHierarchy:
+      "Один H1 до 34 px, H2 20–26 px только при реальной смене раздела, основной текст 15–17 px с line-height 1.5–1.65, служебный текст 12–14 px; максимум две email-safe гарнитуры.",
+    avoid: [
+      "Повтор исходной команды пользователя в заголовке",
+      "Одинаковые карточки для каждого абзаца",
+      "Неподтверждённые факты, даты, цифры и отзывы",
+      "Нейроклише, метакомментарии и инструкции дизайнеру в видимом тексте",
+      "Изображение-заглушка, псевдотекст внутри изображения и случайный орнамент",
+    ],
+  };
+}
+
 function requestedVisualStyle(
   goal: string,
   raw: unknown,
@@ -444,6 +589,7 @@ function fallbackEmailTopic(input: EmailAiRequest) {
 
 function fallbackDesignedSuggestion(input: EmailAiRequest) {
   const emailType = classifyEmailType(input.goal);
+  const creativeBlueprint = emailCreativeBlueprint(input, emailType);
   const topic = fallbackEmailTopic(input);
   const cta = input.ctaLabel || "Узнать подробнее";
   const copy =
@@ -473,12 +619,26 @@ function fallbackDesignedSuggestion(input: EmailAiRequest) {
                 previewText: "Что изменилось, что это означает и требуется ли действие.",
                 body: `Сообщаем важную информацию по теме «${topic}».\n\nПроверьте детали и убедитесь, требуется ли действие с вашей стороны. Если действие необходимо, используйте кнопку ниже; если нет — письмо можно сохранить для справки.\n\nЕсли ситуация отличается от описанной, ответьте на письмо для уточнения.`,
               }
-            : emailType === "product_update"
-              ? {
+              : emailType === "product_update"
+                ? {
                   subject: topic,
                   previewText: "Что изменилось в продукте и как использовать обновление.",
                   body: `Обновление по теме «${topic}» уже доступно. Оно упрощает основной рабочий сценарий и делает следующий шаг понятнее.\n\nНачните с задачи, которая сейчас отнимает больше всего времени, и проверьте результат на ограниченном примере. Так вы оцените пользу без лишнего риска.\n\nОписание и порядок действий доступны по кнопке ниже.`,
                 }
+                : emailType === "news"
+                  ? {
+                      subject: topic,
+                      previewText:
+                        "Главный сигнал выпуска, его значение и то, что стоит проверить дальше.",
+                      body: `Главное в теме «${topic}» — не количество новостей, а изменение, которое влияет на решения читателя. Ниже оставляем только приоритетный сигнал и его практическое значение.\n\nПодтверждённые детали берутся из исходного запроса; если данных недостаточно, письмо не заменяет их предположениями. Это позволяет быстро понять, что уже известно, что остаётся вопросом и где требуется проверка.\n\nЕсли тема относится к вашей работе, переходите к подробностям по ссылке.`,
+                    }
+                  : emailType === "congratulation"
+                    ? {
+                        subject: topic,
+                        previewText:
+                          "Несколько тёплых слов по конкретному поводу — без формального шаблона.",
+                        body: `Поздравляем с поводом, которому посвящено письмо «${topic}». Хочется отметить не общую праздничную дату, а внимание к тому, что уже сделано и что остаётся важным лично для получателя.\n\nПусть следующий этап принесёт больше ясности, спокойствия и поводов гордиться результатом. Спасибо, что остаётесь рядом.`,
+                      }
               : {
                   subject: topic,
                   previewText:
@@ -491,9 +651,9 @@ function fallbackDesignedSuggestion(input: EmailAiRequest) {
       ...copy,
       cta,
       artDirection:
-        "Строгая email-композиция с профессиональной типографикой, тематическим изображением и спокойным смысловым орнаментом.",
+        `Цельная email-система на основе ${creativeBlueprint.recommendedDesignSystems.join(" или ")}: профессиональная типографика, тематическое изображение и один спокойный смысловой орнамент.`,
       contentStrategy:
-        "Конкретный вход, практическая польза, ограничения и одно ясное действие.",
+        `${creativeBlueprint.narrativeArc.join(" → ")}. Переход читателя: ${creativeBlueprint.readerBefore} → ${creativeBlueprint.readerAfter}`,
     }),
     input,
   );
@@ -1054,6 +1214,7 @@ function parseSuggestion(
     designBrief: input.designBrief,
     visualStyle: input.visualStyle ?? "minimal",
     primaryColor: input.primaryColor,
+    secondaryColor: input.secondaryColor,
     modelAccent: design.accentColor,
     modelBody: design.bodyBackground,
     modelWorkspace: design.workspaceBackground ?? input.secondaryColor,
@@ -1593,6 +1754,65 @@ function applyEditorialCopy(
   return suggestion;
 }
 
+function emailDesignQualityIssues(
+  suggestion: EmailAiSuggestion,
+  input: EmailAiRequest,
+) {
+  const document = suggestion.document;
+  if (!document) return ["Нет редактируемого email-документа."];
+  const issues: string[] = [];
+  const opener = document.blocks.find((block) =>
+    ["hero", "heading", "banner"].includes(block.type),
+  );
+  if (opener && semanticOverlap(opener.content, input.goal) >= 0.58)
+    issues.push("Входной заголовок слишком близко копирует пользовательскую команду — сформулируй редакторский тезис.");
+  if (
+    suggestion.subject.trim().toLocaleLowerCase("ru-RU") ===
+    suggestion.previewText.trim().toLocaleLowerCase("ru-RU")
+  )
+    issues.push("Прехедер повторяет тему вместо второго аргумента для открытия.");
+  const meaningful = document.blocks.filter(
+    (block) => !["divider", "spacer", "pattern", "footer"].includes(block.type),
+  );
+  const duplicatePairs = meaningful.filter((block, index) =>
+    meaningful
+      .slice(0, index)
+      .some(
+        (previous) =>
+          previous.type !== "button" &&
+          semanticOverlap(previous.content, block.content) >= 0.72,
+      ),
+  );
+  if (duplicatePairs.length)
+    issues.push("В письме есть повторяющиеся смысловые блоки — оставь каждый тезис только один раз.");
+  const centeredLong = document.blocks.filter(
+    (block) => block.alignment === "center" && block.content.length > 120,
+  ).length;
+  if (centeredLong)
+    issues.push(`У ${centeredLong} длинных блоков центровка мешает чтению — выровняй их влево.`);
+  const fonts = new Set(document.blocks.map((block) => block.fontFamily));
+  if (fonts.size > 2)
+    issues.push(`Использовано ${fonts.size} шрифта — собери иерархию максимум из двух email-safe гарнитур.`);
+  const wantsImage =
+    input.visualContent === "image" ||
+    input.visualContent === "image-and-pattern";
+  const wantsPattern =
+    input.visualContent === "pattern" ||
+    input.visualContent === "image-and-pattern";
+  if (wantsImage && !document.blocks.some((block) => block.type === "image"))
+    issues.push("Запрошено тематическое изображение, но image-блок не спроектирован.");
+  if (wantsPattern && !document.blocks.some((block) => block.type === "pattern"))
+    issues.push("Запрошен орнамент, но pattern-блок не встроен в ритм письма.");
+  if (
+    input.websiteUrl &&
+    !document.blocks.some((block) => block.type === "button")
+  )
+    issues.push("Есть точная ссылка, но отсутствует одно ясное целевое действие.");
+  if (document.blocks.length > 12)
+    issues.push(`Письмо перегружено: ${document.blocks.length} блоков; оставь 5–10 функциональных блоков.`);
+  return issues.slice(0, 8);
+}
+
 async function createEditorialCopy(
   request: Request,
   selected: NonNullable<ReturnType<typeof aiProvider>>,
@@ -1600,13 +1820,14 @@ async function createEditorialCopy(
   linkedContext: string[],
 ) {
   const emailType = classifyEmailType(input.goal);
+  const creativeBlueprint = emailCreativeBlueprint(input, emailType);
   const lengthRule =
     emailType === "invitation" || emailType === "congratulation"
       ? "body — 300–850 знаков и 2–4 коротких абзаца"
       : emailType === "transactional" || emailType === "notification"
         ? "body — 350–1000 знаков и 2–5 коротких абзацев"
         : "body — 650–1500 знаков и 3–6 коротких абзацев";
-  const instructions = `Ты — сильный русскоязычный редактор email-писем. Самостоятельно напиши готовое письмо по задаче пользователя. Ответы на уточнения — это сырьё и ограничения, а не текст для копирования: не перечисляй их, не склеивай дословно и не превращай ответ пользователя в заголовок. Переформулируй задачу как автор, а не как форма-анкета. Преврати исходные данные в связное убедительное повествование с естественными переходами. Структура: конкретный заход для получателя → понятная польза → детали или доказательство → одно действие. Запрещены канцелярит и пустые заходы «в современном мире», «не остаётся в стороне», «рады сообщить», «уникальная возможность», «настоящим письмом», «новый уровень», «откройте для себя», «не упустите возможность», «инновационное решение». Первый абзац сразу говорит о ситуации получателя или сути предложения. Не используй рекламные клише, метакомментарии, риторические вопросы для эффекта и инструкции дизайнеру. Чередуй длину предложений естественно, но не имитируй разговорность междометиями. Допустимы только факты пользователя и общеизвестные связующие формулировки; не выдумывай цифры, клиентов и обещания. Каждый заголовок и каждое предложение начинаются с прописной буквы; соблюдай русскую орфографию и пунктуацию. ${lengthRule}. subject до 90 знаков, previewText до 160, cta до 55. Верни только JSON с subject, previewText, body, cta.`;
+  const instructions = `Ты — сильный русскоязычный редактор email-писем. Самостоятельно напиши готовое письмо по задаче пользователя. creativeBlueprint обязателен: проведи читателя из состояния readerBefore в readerAfter по заданной narrativeArc, соблюдай proofPolicy и ctaLogic. Ответы на уточнения — это сырьё и ограничения, а не текст для копирования: не перечисляй их, не склеивай дословно и не превращай ответ пользователя в заголовок. Переформулируй задачу как автор, а не как форма-анкета. Преврати исходные данные в связное убедительное повествование с естественными переходами. Структура: конкретный заход для получателя → понятная польза → детали или доказательство → одно действие. Запрещены канцелярит и пустые заходы «в современном мире», «не остаётся в стороне», «рады сообщить», «уникальная возможность», «настоящим письмом», «новый уровень», «откройте для себя», «не упустите возможность», «инновационное решение». Первый абзац сразу говорит о ситуации получателя или сути предложения. Не используй рекламные клише, метакомментарии, риторические вопросы для эффекта и инструкции дизайнеру. Чередуй длину предложений естественно, но не имитируй разговорность междометиями. Допустимы только факты пользователя и общеизвестные связующие формулировки; не выдумывай цифры, клиентов и обещания. Каждый заголовок и каждое предложение начинаются с прописной буквы; соблюдай русскую орфографию и пунктуацию. ${lengthRule}. subject до 90 знаков, previewText до 160, cta до 55. Верни только JSON с subject, previewText, body, cta.`;
   const modelInput = {
     userTask: input.goal,
     audience: input.audience,
@@ -1615,6 +1836,7 @@ async function createEditorialCopy(
     desiredLink: input.websiteUrl,
     desiredCtaLabel: input.ctaLabel,
     tone: input.tone,
+    creativeBlueprint,
   };
   const body =
     selected.provider === "navyai"
@@ -1875,6 +2097,7 @@ function emailDesignInstructions(input: EmailAiRequest) {
     designBrief: input.designBrief,
     visualStyle: input.visualStyle ?? "minimal",
     primaryColor: input.primaryColor,
+    secondaryColor: input.secondaryColor,
   });
   const layoutRule =
     input.visualStyle === "editorial"
@@ -1896,9 +2119,9 @@ function emailDesignInstructions(input: EmailAiRequest) {
       : "Не добавляй image.";
   const paletteRule = `Обязательная палитра уже извлечена из пожеланий пользователя: ${requestedPalette.name}; основной акцент ${requestedPalette.accent}${requestedPalette.secondaryAccent ? `, второй обязательный акцент ${requestedPalette.secondaryAccent}` : ""}, мягкий фон ${requestedPalette.soft}, фон письма ${requestedPalette.body}, внешний фон ${requestedPalette.workspace}, основной текст ${requestedPalette.text}. Не заменяй явно запрошенный цвет стандартным голубым или фиолетовым. Если запрошено два цвета, не выбрасывай второй и используй оба в разных визуальных ролях. ${premium ? "Премиальность создают контраст, точная типографика, тонкая рамка и ритм — не огромные заголовки и не декоративная перегрузка." : "Минимализм означает меньше элементов, а не отсутствие арт-дирекции."}`;
   const patternRule = wantsPattern
-    ? `Добавь ровно один узкий pattern-блок в осмысленной точке ритма — после входного hero или перед главным доказательством. Сервер сам подберёт к теме растровый орнамент из библиотеки из 78 email-safe фонов; от тебя требуется правильная позиция и спокойная высота блока. Видимый fallback-content: «${decorativePatternFor(`${input.goal}\n${input.designBrief ?? ""}`)}».`
+      ? `Добавь ровно один узкий pattern-блок в осмысленной точке ритма — после входного hero или перед главным доказательством. Сервер сам подберёт к теме растровый орнамент из библиотеки из 102 email-safe фонов; от тебя требуется правильная позиция и спокойная высота блока. Видимый fallback-content: «${decorativePatternFor(`${input.goal}\n${input.designBrief ?? ""}`)}».`
     : "Не добавляй pattern.";
-  return `Ты — senior email designer, арт-директор и сильный русскоязычный редактор. Твоя задача — по одному пользовательскому брифу собрать законченное профессиональное письмо, в котором текст, композиция, типографика, палитра, орнамент и тематическое изображение работают как одна система. Проектируй именно HTML EMAIL для Gmail, Outlook и Apple Mail — не лендинг, не презентацию, не постер, не журнальную страницу и не новостной сайт. Не копируй узнаваемый интерфейс или стиль конкретного сервиса. authoritativeUserBrief задаёт тему и ограничения, а briefAnswers — только сырьё: нельзя копировать их списком или склеивать дословно. approvedEditorialCopy — утверждённая редакция темы, прехедера, основного текста и действия; сохрани её смысл. detectedEmailType — уже определённый сценарий письма, верни его как emailType и подбери композицию внутри одной email-дизайн-системы.
+  return `Ты — senior email designer, арт-директор и сильный русскоязычный редактор. Твоя задача — по одному пользовательскому брифу собрать законченное профессиональное письмо, в котором текст, композиция, типографика, палитра, орнамент и тематическое изображение работают как одна система. Проектируй именно HTML EMAIL для Gmail, Outlook и Apple Mail — не лендинг, не презентацию, не постер, не журнальную страницу и не новостной сайт. Не копируй узнаваемый интерфейс или стиль конкретного сервиса. authoritativeUserBrief задаёт тему и ограничения, а briefAnswers — только сырьё: нельзя копировать их списком или склеивать дословно. approvedEditorialCopy — утверждённая редакция темы, прехедера, основного текста и действия; сохрани её смысл. detectedEmailType — уже определённый сценарий письма, верни его как emailType. creativeBlueprint — обязательная режиссёрская карта: она описывает состояние читателя до и после письма, порядок смыслов, роль доказательства, CTA, изображения, орнамента и подходящие дизайн-системы. Выбери одну из рекомендованных систем и последовательно держи её палитру, типографику, интервалы, радиусы и характер визуала.
 
 ${layoutRule}
 
@@ -1923,6 +2146,7 @@ export async function generateEmailSuggestion(
   }
   const input = parseRequest(value);
   const detectedEmailType = classifyEmailType(input.goal);
+  const creativeBlueprint = emailCreativeBlueprint(input, detectedEmailType);
   const urls = input.goal.match(/https:\/\/[^\s]+/g) ?? [];
   const linkedContext = await Promise.all(
     urls.slice(0, 2).map(async (url) => {
@@ -1971,6 +2195,7 @@ export async function generateEmailSuggestion(
         }
       : undefined,
     detectedEmailType,
+    creativeBlueprint,
     designPreferences: {
       visualStyle: input.visualStyle,
       visualContent: input.visualContent,
@@ -2288,6 +2513,58 @@ export async function generateEmailSuggestion(
       }
     } else {
       throw error;
+    }
+  }
+  const qualityIssues =
+    input.action === "design"
+      ? emailDesignQualityIssues(suggestion, input)
+      : [];
+  if (qualityIssues.length) {
+    const raw = JSON.parse(String(requestBody.body)) as Record<string, unknown>;
+    const repairInstructions = `${instructions}\nПРЕДЫДУЩИЙ ЧЕРНОВИК ФОРМАЛЬНО ВАЛИДЕН, НО НЕ ПРОШЁЛ РЕДАКТОРСКИЙ КОНТРОЛЬ. Исправь все qualityIssues, сохрани утверждённый смысл approvedEditorialCopy и точные ссылки. Верни заново полный JSON письма без объяснения правок.`;
+    const repairInput = {
+      ...modelInput,
+      qualityIssues,
+      previousDraft: suggestion,
+    };
+    const repairBody =
+      provider.provider === "navyai"
+        ? {
+            ...raw,
+            model: provider.fallbackModel || provider.model,
+            messages: [
+              { role: "system", content: repairInstructions },
+              { role: "user", content: JSON.stringify(repairInput) },
+            ],
+          }
+        : {
+            ...raw,
+            reasoning: { effort: "medium" },
+            instructions: repairInstructions,
+            input: JSON.stringify(repairInput),
+          };
+    try {
+      const repairResponse = await fetch(provider.endpoint, {
+        ...requestBody,
+        body: JSON.stringify(repairBody),
+      });
+      const repairResponseBody: unknown = await repairResponse
+        .json()
+        .catch(() => null);
+      if (repairResponse.ok) {
+        const repairedSuggestion = parseSuggestion(
+          outputText(repairResponseBody),
+          input,
+        );
+        if (
+          emailDesignQualityIssues(repairedSuggestion, input).length <
+          qualityIssues.length
+        )
+          suggestion = repairedSuggestion;
+      }
+    } catch {
+      // Keep the valid first draft; deterministic normalization already applies
+      // the requested palette, typography, image and pattern requirements.
     }
   }
   const designed =

@@ -54,6 +54,22 @@ test("a blue-pink brief produces a visible two-color design system", () => {
   assert.equal(palette.patternBackground, "#FCEBF2");
 });
 
+test("exact user colors override automatic named palettes", () => {
+  const palette = resolveEmailVisualPalette({
+    goal: "Закрытый деловой завтрак",
+    designBrief: "Редакционный кобальтовый журнал с тёплым терракотовым акцентом",
+    visualStyle: "editorial",
+    primaryColor: "#173A67",
+    secondaryColor: "#C96A4A",
+    modelAccent: "#3157D5",
+  });
+
+  assert.equal(palette.name, "Два точных цвета пользователя");
+  assert.equal(palette.accent, "#173A67");
+  assert.equal(palette.secondaryAccent, "#C96A4A");
+  assert.notEqual(palette.workspace, "#3157D5");
+});
+
 test("the visual director supplies a themed pattern and image prompt", () => {
   const palette = resolveEmailVisualPalette({
     goal: "Первое свидание в ресторане",
@@ -104,6 +120,13 @@ test("pattern artwork follows the subject instead of showing generic emoji", () 
   assert.equal(
     selectEmailPatternArtwork("Летний фестиваль", "bold").id,
     "terrazzo-studio",
+  );
+  assert.equal(
+    selectEmailPatternArtwork(
+      "Деловой завтрак. Редакционный журнал и тонкий архитектурный узор",
+      "editorial",
+    ).id,
+    "moroccan-arches",
   );
 });
 

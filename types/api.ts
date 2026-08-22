@@ -301,7 +301,13 @@ export type ImageStudioStyle =
   | "photo"
   | "abstract"
   | "collage"
-  | "three-dimensional";
+  | "three-dimensional"
+  | "cinematic"
+  | "architectural"
+  | "botanical"
+  | "technical"
+  | "luxury"
+  | "paper-cut";
 
 export type ImageStudioAspect = "square" | "landscape" | "portrait" | "banner";
 
@@ -418,7 +424,15 @@ export type PresentationThemeId =
   | "noir"
   | "ocean"
   | "sunrise"
-  | "premium";
+  | "premium"
+  | "linen"
+  | "graphite"
+  | "nordic"
+  | "emerald"
+  | "signal"
+  | "museum"
+  | "paper"
+  | "plum";
 
 export type { PresentationPatternId } from "@/data/presentation-patterns";
 

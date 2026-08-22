@@ -648,7 +648,7 @@ test("NavyAI uses its supported chat endpoint and a working structured-output fa
   assert.match(server, /storeGeneratedEmailAssetBytes/);
 });
 
-test("decor library retains thirty technology motifs, adds general patterns, and twenty-eight email frames", async () => {
+test("decor library retains thirty technology motifs, adds general patterns, and forty email frames", async () => {
   const [patterns, frames, compiler, builder, library] = await Promise.all([
     readFile(
       new URL(
@@ -679,7 +679,7 @@ test("decor library retains thirty technology motifs, adds general patterns, and
   ]);
   const patternNames = patterns.match(/const patternNames = \[([\s\S]*?)\] as const;/)?.[1] ?? "";
   assert.equal((patternNames.match(/"[^"]+"/g) ?? []).length, 30);
-  assert.equal((frames.match(/\{ id: "/g) ?? []).length, 28);
+  assert.equal((frames.match(/\{ id: "/g) ?? []).length, 40);
   for (const category of [
     "Светлые технологии",
     "Тёмные технологии",
@@ -714,7 +714,7 @@ test("decor library retains thirty technology motifs, adds general patterns, and
     assert.match(compiler, new RegExp(`"${id}"`));
     assert.match(builder, new RegExp(`"${id}"`));
   }
-  assert.match(library, /78 фонов и орнаментов/);
+  assert.match(library, /102 фона и орнамента/);
   assert.match(library, /Фоны «Технологий права»/);
 });
 

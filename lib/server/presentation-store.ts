@@ -57,6 +57,14 @@ const THEMES = new Set<PresentationThemeId>([
   "ocean",
   "sunrise",
   "premium",
+  "linen",
+  "graphite",
+  "nordic",
+  "emerald",
+  "signal",
+  "museum",
+  "paper",
+  "plum",
 ]);
 const PATTERNS = new Set<PresentationPatternId>(presentationPatternIds);
 const LAYOUTS = new Set<PresentationSlideLayout>([

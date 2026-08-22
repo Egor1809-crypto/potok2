@@ -374,6 +374,121 @@ function presentationPatternStyle(
       backgroundImage: `radial-gradient(ellipse at 20% 30%, transparent 0 19%, ${accent}18 19.5% 20.5%, transparent 21%), radial-gradient(ellipse at 76% 68%, transparent 0 16%, ${accent}15 16.5% 17.5%, transparent 18%)`,
       backgroundSize: "160px 130px, 190px 150px",
     };
+  if (patternId === "tessellated-plus")
+    return {
+      backgroundImage: `linear-gradient(${accent}1F 0 0), linear-gradient(${accent}1F 0 0)`,
+      backgroundSize: "5px 26px, 26px 5px",
+      backgroundPosition: "13px 2px, 2px 13px",
+    };
+  if (patternId === "stair-steps")
+    return {
+      backgroundImage: `linear-gradient(135deg, ${accent}20 25%, transparent 25% 50%, ${accent}12 50% 75%, transparent 75%)`,
+      backgroundSize: "76px 76px",
+    };
+  if (patternId === "nested-squares")
+    return {
+      backgroundImage: `linear-gradient(${accent}1A 1px, transparent 1px), linear-gradient(90deg, ${accent}1A 1px, transparent 1px), linear-gradient(${accent}0F 1px, transparent 1px), linear-gradient(90deg, ${accent}0F 1px, transparent 1px)`,
+      backgroundSize: "72px 72px, 72px 72px, 24px 24px, 24px 24px",
+    };
+  if (patternId === "split-circles")
+    return {
+      backgroundImage: `radial-gradient(circle at 0 50%, ${accent}24 0 18px, transparent 18.5px), radial-gradient(circle at 100% 50%, transparent 0 17px, ${accent}18 17.5px 19px, transparent 19.5px)`,
+      backgroundSize: "76px 54px",
+      backgroundPosition: "0 0, 0 27px",
+    };
+  if (patternId === "wave-ribbon")
+    return {
+      backgroundImage: `radial-gradient(ellipse at 50% 110%, transparent 0 42%, ${accent}26 42.5% 45%, transparent 45.5% 62%, ${accent}14 62.5% 65%, transparent 65.5%)`,
+      backgroundSize: "180px 92px",
+      backgroundPosition: "right bottom",
+      backgroundRepeat: "repeat-x",
+    };
+  if (patternId === "leaf-canopy")
+    return {
+      backgroundImage: `radial-gradient(ellipse at 10% 0, ${accent}22 0 16%, transparent 16.5%), radial-gradient(ellipse at 32% 0, ${accent}15 0 13%, transparent 13.5%), radial-gradient(ellipse at 86% 100%, ${accent}1C 0 18%, transparent 18.5%)`,
+      backgroundSize: "100% 100%",
+    };
+  if (patternId === "bubble-chain")
+    return {
+      backgroundImage: `radial-gradient(circle at 12px 12px, transparent 0 7px, ${accent}25 7.5px 8.5px, transparent 9px), radial-gradient(circle at 34px 34px, ${accent}14 0 5px, transparent 5.5px)`,
+      backgroundSize: "46px 46px",
+    };
+  if (patternId === "pinstripe")
+    return {
+      backgroundImage: `repeating-linear-gradient(90deg, ${accent}16 0 1px, transparent 1px 18px, ${accent}0B 18px 20px, transparent 20px 42px)`,
+    };
+  if (patternId === "blueprint-grid")
+    return {
+      backgroundImage: `linear-gradient(${accent}22 1px, transparent 1px), linear-gradient(90deg, ${accent}22 1px, transparent 1px), linear-gradient(${accent}0C 1px, transparent 1px), linear-gradient(90deg, ${accent}0C 1px, transparent 1px)`,
+      backgroundSize: "72px 72px, 72px 72px, 18px 18px, 18px 18px",
+    };
+  if (patternId === "radar-sweep")
+    return {
+      backgroundImage: `conic-gradient(from 220deg at 84% 22%, transparent 0 18deg, ${accent}25 18deg 42deg, transparent 42deg), repeating-radial-gradient(circle at 84% 22%, transparent 0 25px, ${accent}18 26px 27px, transparent 28px 50px)`,
+    };
+  if (patternId === "mosaic-tiles")
+    return {
+      backgroundImage: `linear-gradient(45deg, ${accent}18 25%, transparent 25% 75%, ${accent}0E 75%), linear-gradient(-45deg, ${accent}10 25%, transparent 25% 75%, ${accent}20 75%)`,
+      backgroundSize: "54px 54px",
+    };
+  if (patternId === "woven-lines")
+    return {
+      backgroundImage: `repeating-linear-gradient(35deg, transparent 0 9px, ${accent}14 10px 12px, transparent 13px 24px), repeating-linear-gradient(145deg, transparent 0 15px, ${accent}0F 16px 18px, transparent 19px 31px)`,
+    };
+  if (patternId === "zigzag")
+    return {
+      backgroundImage: `linear-gradient(135deg, transparent 44%, ${accent}20 45% 52%, transparent 53%), linear-gradient(45deg, transparent 44%, ${accent}14 45% 52%, transparent 53%)`,
+      backgroundSize: "54px 54px",
+      backgroundPosition: "0 0, 27px 27px",
+    };
+  if (patternId === "solar-orbit")
+    return {
+      backgroundImage: `radial-gradient(circle at 82% 20%, ${accent}45 0 2.5%, transparent 3%), radial-gradient(circle at 82% 20%, transparent 0 9%, ${accent}26 9.3% 9.8%, transparent 10.1% 17%, ${accent}16 17.3% 17.8%, transparent 18.1%)`,
+    };
+  if (patternId === "pixel-grid")
+    return {
+      backgroundImage: `linear-gradient(${accent}2A 0 0), linear-gradient(${accent}13 0 0), linear-gradient(${accent}1B 0 0)`,
+      backgroundSize: "6px 6px, 10px 10px, 4px 4px",
+      backgroundPosition: "8px 8px, 34px 20px, 58px 46px",
+      backgroundRepeat: "repeat",
+    };
+  if (patternId === "prism-facets")
+    return {
+      backgroundImage: `linear-gradient(125deg, transparent 0 58%, ${accent}12 58% 70%, transparent 70%), linear-gradient(35deg, transparent 0 66%, ${accent}20 66% 78%, transparent 78%), linear-gradient(155deg, transparent 0 74%, ${accent}2A 74% 86%, transparent 86%)`,
+    };
+  if (patternId === "ink-blobs")
+    return {
+      backgroundImage: `radial-gradient(ellipse at 92% 12%, ${accent}2D 0 12%, transparent 12.7%), radial-gradient(ellipse at 8% 88%, ${accent}1B 0 14%, transparent 14.7%), radial-gradient(ellipse at 76% 92%, ${accent}10 0 9%, transparent 9.7%)`,
+    };
+  if (patternId === "rope-knot")
+    return {
+      backgroundImage: `radial-gradient(circle at 50% 50%, transparent 0 12px, ${accent}24 12.5px 14px, transparent 14.5px), radial-gradient(circle at 0 0, transparent 0 9px, ${accent}16 9.5px 11px, transparent 11.5px)`,
+      backgroundSize: "54px 54px",
+    };
+  if (patternId === "snowfall")
+    return {
+      backgroundImage: `radial-gradient(circle, ${accent}52 0 1.4px, transparent 1.8px), radial-gradient(circle, ${accent}28 0 2.2px, transparent 2.6px), radial-gradient(circle, ${accent}1A 0 1px, transparent 1.4px)`,
+      backgroundSize: "48px 48px, 88px 88px, 31px 31px",
+      backgroundPosition: "0 0, 17px 29px, 9px 13px",
+    };
+  if (patternId === "festival-flags")
+    return {
+      backgroundImage: `linear-gradient(35deg, transparent 44%, ${accent}2C 45% 66%, transparent 67%), linear-gradient(145deg, transparent 44%, ${accent}18 45% 66%, transparent 67%)`,
+      backgroundSize: "72px 38px",
+      backgroundPosition: "0 0, 36px 0",
+    };
+  if (patternId === "stacked-arches")
+    return {
+      backgroundImage: `repeating-radial-gradient(ellipse at 50% 100%, transparent 0 18px, ${accent}1E 19px 21px, transparent 22px 37px)`,
+      backgroundSize: "84px 66px",
+      backgroundPosition: "right bottom",
+    };
+  if (patternId === "network-nodes")
+    return {
+      backgroundImage: `radial-gradient(circle, ${accent}56 0 2px, transparent 2.5px), linear-gradient(28deg, transparent 49%, ${accent}18 49.5% 50.5%, transparent 51%), linear-gradient(152deg, transparent 49%, ${accent}12 49.5% 50.5%, transparent 51%)`,
+      backgroundSize: "82px 64px, 164px 128px, 164px 128px",
+      backgroundPosition: "11px 8px, 0 0, 41px 32px",
+    };
   const variant =
     [...seed].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 4;
   if (seed && variant === 1) {
@@ -2385,7 +2500,7 @@ export function PresentationStudio() {
                       Библиотека фонов и узоров
                     </p>
                     <p className="mb-2 mt-0.5 text-[9px] leading-3 text-text-subtle">
-                      42 адаптивных мотива в цветах текущего слайда
+                      64 адаптивных мотива в цветах текущего слайда
                     </p>
                     <div className="grid grid-cols-2 gap-2">
                       {presentationPatterns.map((pattern) => (

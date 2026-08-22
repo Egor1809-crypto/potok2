@@ -56,6 +56,14 @@ const THEMES = new Set<PresentationThemeId>([
   "ocean",
   "sunrise",
   "premium",
+  "linen",
+  "graphite",
+  "nordic",
+  "emerald",
+  "signal",
+  "museum",
+  "paper",
+  "plum",
 ]);
 const LAYOUTS = new Set<PresentationSlideLayout>([
   "title",
@@ -215,7 +223,15 @@ function resolvedThemeId(
   const brief = `${input.designBrief ?? ""} ${input.goal}`.toLocaleLowerCase(
     "ru-RU",
   );
-  if (/преми|luxur|дорог|элит|золот|графит/.test(brief)) return "premium";
+  if (/(?:^|[^\p{L}])л[её]н(?:[^\p{L}]|$)|льнян|тканев|ремесл|крафт|натуральн.*материал/u.test(brief)) return "linen";
+  if (/графит|board|совет директор|строг.*т[её]мн/.test(brief)) return "graphite";
+  if (/сканди|север|nordic/.test(brief)) return "nordic";
+  if (/изумруд|emerald/.test(brief)) return "emerald";
+  if (/сигнальн|signal|ярк.*оранж/.test(brief)) return "signal";
+  if (/музей|галере|выстав|куратор|lookbook/.test(brief)) return "museum";
+  if (/бумажн|академ|научн.*защит|аналитическ.*записк/.test(brief)) return "paper";
+  if (/сливов|пудров|plum|beauty|космет/.test(brief)) return "plum";
+  if (/преми|luxur|дорог|элит|золот/.test(brief)) return "premium";
   if (/кино|cinema|dramatic|драмат|film/.test(brief)) return "cinematic";
   if (/неон|cyber|кибер|ярк.*т[её]мн/.test(brief)) return "neon";
   if (/редакц|editorial|журнал|fashion/.test(brief)) return "editorial";
@@ -235,6 +251,138 @@ function resolvedThemeId(
   if (/соврем|modern|минимал|saas|чист|аккурат|воздух/.test(brief))
     return "modern";
   return input.themeId;
+}
+
+type PresentationNarrativeScenario =
+  | "pitch"
+  | "strategy"
+  | "report"
+  | "education"
+  | "event"
+  | "product"
+  | "transformation"
+  | "general";
+
+type PresentationNarrativeBlueprint = {
+  scenario: PresentationNarrativeScenario;
+  audienceTension: string;
+  centralThesis: string;
+  narrativeArc: string[];
+  evidencePolicy: string;
+  compositionRhythm: string[];
+  imageRoles: string[];
+  closingLogic: string;
+  avoid: string[];
+};
+
+function presentationNarrativeBlueprint(
+  input: ReturnType<typeof parseRequest>,
+): PresentationNarrativeBlueprint {
+  const brief = `${input.goal}\n${input.context ?? ""}`.toLocaleLowerCase("ru-RU");
+  const scenario: PresentationNarrativeScenario =
+    /инвест|питч|продаж|коммерческ.*предлож|клиент/.test(brief)
+      ? "pitch"
+      : /стратег|дорожн.*карт|roadmap|приоритет|совет директор/.test(brief)
+        ? "strategy"
+        : /отч[её]т|аналит|исслед|результат|квартал|метрик/.test(brief)
+          ? "report"
+          : /обуч|урок|лекц|курс|воркшоп|семинар|защит.*работ/.test(brief)
+            ? "education"
+            : /мероприят|конференц|форум|программ.*событ|фестив/.test(brief)
+              ? "event"
+              : /продукт|запуск|релиз|saas|сервис|функц/.test(brief)
+                ? "product"
+                : /трансформ|изменен|внедрен|переход|реорганиз/.test(brief)
+                  ? "transformation"
+                  : "general";
+  const blueprints: Record<
+    PresentationNarrativeScenario,
+    Omit<PresentationNarrativeBlueprint, "scenario" | "avoid">
+  > = {
+    pitch: {
+      audienceTension: "Аудитория не уверена, что проблема достаточно важна, решение отличается от альтернатив, а риск следующего шага оправдан.",
+      centralThesis: "Проведи аудиторию от узнаваемого напряжения к проверяемой ценности, доказательству и конкретному решению.",
+      narrativeArc: ["Изменение контекста", "Цена проблемы", "Новый принцип решения", "Как работает", "Доказательство", "Риск и снятие риска", "Запрос"],
+      evidencePolicy: "Рынок, клиенты, рост и ROI — только из подтверждённых данных. Без цифр используй механизм, критерии проверки и честные ограничения.",
+      compositionRhythm: ["Крупный тезис", "Контраст до/после", "Схема механизма", "Доказательство", "План запуска", "Чёткий запрос"],
+      imageRoles: ["Образ проблемы в реальном контексте", "Предметная метафора нового состояния"],
+      closingLogic: "Финал формулирует решение, объём первого шага, владельца и критерий продолжения.",
+    },
+    strategy: {
+      audienceTension: "Участники видят много инициатив, но не понимают, какую ставку выбрать и от чего отказаться.",
+      centralThesis: "Свести контекст к нескольким стратегическим выборам и показать причинную связь между ставкой, действием и контрольным сигналом.",
+      narrativeArc: ["Что изменилось", "Главное противоречие", "Выбор", "Система ставок", "Последовательность", "Риски", "Управленческое решение"],
+      evidencePolicy: "Отделяй известные факты от гипотез; для гипотез задавай сигнал проверки, а не выдуманный прогноз.",
+      compositionRhythm: ["Контекст", "Один выбор", "Матрица приоритетов", "Дорожная карта", "Риск", "Решение"],
+      imageRoles: ["Метафора развилки или направления", "Системный образ взаимосвязанных элементов"],
+      closingLogic: "Закрой презентацию одним приоритетом, первым действием и датой следующей проверки только если дата предоставлена.",
+    },
+    report: {
+      audienceTension: "Аудитория видит данные, но не понимает, какой вывод важен и какое решение из него следует.",
+      centralThesis: "Каждый факт должен обслуживать вывод; отделяй сигнал, объяснение, последствие и действие.",
+      narrativeArc: ["Главный вывод", "Что изменилось", "Почему", "Где отклонение", "Что это означает", "Риск", "Решение"],
+      evidencePolicy: "Никаких сгенерированных значений. Chart, stats и table разрешены только при наличии чисел в контексте.",
+      compositionRhythm: ["Executive summary", "Данные", "Интерпретация", "Сравнение", "Рекомендация", "Следующий цикл"],
+      imageRoles: ["Редакционный образ главного изменения", "Визуальная метафора причины или масштаба"],
+      closingLogic: "Финал отвечает, что продолжать, что изменить и какой сигнал проверять дальше.",
+    },
+    education: {
+      audienceTension: "Слушатель пока не видит цельную модель и не уверен, как применить знание после выступления.",
+      centralThesis: "Построй понимание через вопрос, модель, пример, практическую проверку и перенос в реальную задачу.",
+      narrativeArc: ["Проблемный вопрос", "Интуитивная модель", "Механизм", "Пример", "Практика", "Ошибки", "Перенос"],
+      evidencePolicy: "Не подменяй обучение неподтверждённой статистикой; объясняй причинность и границы применимости.",
+      compositionRhythm: ["Вопрос", "Схема", "Пример", "Пошаговый процесс", "Контраст ошибки", "Шпаргалка"],
+      imageRoles: ["Наглядная предметная аналогия", "Сцена применения знания"],
+      closingLogic: "Последний слайд даёт одну задачу для применения и критерий самопроверки.",
+    },
+    event: {
+      audienceTension: "Аудитория не понимает уникальную ценность события и как провести время с пользой.",
+      centralThesis: "Продай не расписание, а переход участника: с каким вопросом он приходит и с каким результатом уходит.",
+      narrativeArc: ["Главная тема", "Почему сейчас", "Обещание опыта", "Маршрут программы", "Ключевые моменты", "Для кого", "Участие"],
+      evidencePolicy: "Имена, время, место и программа — только из контекста; отсутствие данных не маскируй заглушками.",
+      compositionRhythm: ["Атмосферный вход", "Тезис", "Маршрут", "Герои или темы", "Практическая ценность", "CTA"],
+      imageRoles: ["Атмосфера пространства и масштаба", "Содержательный момент взаимодействия людей"],
+      closingLogic: "Финал фиксирует для кого событие и одно действие для участия.",
+    },
+    product: {
+      audienceTension: "Аудитория видит функции, но не понимает, как продукт меняет её рабочий сценарий.",
+      centralThesis: "Покажи переход от прежнего ограничения к новому способу работы и первому проверяемому результату.",
+      narrativeArc: ["Рабочее напряжение", "Новый принцип", "Сценарий использования", "Ключевые возможности", "Доказательство", "Внедрение", "Попробовать"],
+      evidencePolicy: "Не выдумывай функции и метрики. Если данных мало, показывай механизм и план проверки.",
+      compositionRhythm: ["Проблема", "Большой product statement", "Процесс", "Сравнение", "Use cases", "Старт"],
+      imageRoles: ["Продукт в реальном контексте", "Концептуальная визуализация ключевого механизма"],
+      closingLogic: "Предложи один ограниченный сценарий первого использования и критерий пользы.",
+    },
+    transformation: {
+      audienceTension: "Люди понимают необходимость изменений, но опасаются масштаба, потери контроля и скрытых издержек.",
+      centralThesis: "Разложи изменение на понятные фазы, решения, владельцев, риски и контрольные сигналы.",
+      narrativeArc: ["Почему прежняя модель исчерпана", "Целевое состояние", "Принципы перехода", "Фазы", "Роли", "Риски", "Первый шаг"],
+      evidencePolicy: "Не обещай трансформационный эффект без оснований; показывай зависимости и критерии готовности.",
+      compositionRhythm: ["Контраст состояний", "Принципы", "Roadmap", "Матрица ролей", "Риски", "Решение"],
+      imageRoles: ["Образ перехода между состояниями", "Системная метафора координации"],
+      closingLogic: "Финал фиксирует минимально безопасный шаг и условие перехода к следующей фазе.",
+    },
+    general: {
+      audienceTension: "Аудитория пока не видит, почему тема важна, как она устроена и какое решение требуется.",
+      centralThesis: "Сформулируй один центральный вывод и проведи к нему через контекст, механизм, применение, ограничения и действие.",
+      narrativeArc: ["Сильный вход", "Почему важно", "Как устроено", "Где применять", "Ограничения", "Критерии решения", "Следующий шаг"],
+      evidencePolicy: "Используй только факты пользователя; неизвестное превращай в вопрос или критерий проверки, а не в выдумку.",
+      compositionRhythm: ["Тезис", "Структура", "Практика", "Контраст", "Риск", "Вывод"],
+      imageRoles: ["Редакционный образ центральной идеи", "Предметная метафора практического применения"],
+      closingLogic: "Финал повторяет не тему, а решение и ближайшее действие аудитории.",
+    },
+  };
+  return {
+    scenario,
+    ...blueprints[scenario],
+    avoid: [
+      "Заголовки-рубрики вроде «Возможности», «Риски», «Итоги» и «Наше решение»",
+      "Повтор пользовательской команды или одинакового тезиса на нескольких слайдах",
+      "Более двух одинаковых композиций или узоров подряд",
+      "Неподтверждённые цифры, клиенты, цитаты и обещания результата",
+      "Мелкий текст, параграфы вместо слайдов и декоративные изображения без смысловой роли",
+    ],
+  };
 }
 
 function outputText(value: unknown): string {
@@ -442,33 +590,93 @@ function parseSlides(
   return slides;
 }
 
+function presentationQualityIssues(
+  slides: PresentationSlide[],
+  input: ReturnType<typeof parseRequest>,
+) {
+  const issues: string[] = [];
+  const genericTitle = /^(?:введение|возможности|риски|итоги|выводы|наше решение|решение|проблема|преимущества|следующие шаги|заключение)[.!:—\s]*$/iu;
+  const copiedCommand = /^(?:нужно|надо|сделай|создай|подготовь|разработай|сформируй|презентация (?:о|об|про|для))\b/iu;
+  const titleKeys = slides.map((slide) =>
+    slide.title
+      .toLocaleLowerCase("ru-RU")
+      .replace(/[^\p{L}\p{N}]+/gu, " ")
+      .trim(),
+  );
+  const repeatedTitles = titleKeys.filter(
+    (title, index) => title.length > 8 && titleKeys.indexOf(title) !== index,
+  );
+  const genericTitles = slides.filter((slide) => genericTitle.test(slide.title));
+  const copiedTitles = slides.filter((slide) => copiedCommand.test(slide.title));
+  const truncatedTitles = slides.filter((slide) => slide.title.endsWith("…"));
+  if (slides.length !== input.slideCount)
+    issues.push(`Нужно ровно ${input.slideCount} слайдов, сейчас ${slides.length}.`);
+  if (genericTitles.length)
+    issues.push(`Заменить рубрикаторские заголовки на выводы: ${genericTitles.map((slide) => `«${slide.title}»`).join(", ")}.`);
+  if (repeatedTitles.length)
+    issues.push(`Убрать повторяющиеся заголовки: ${[...new Set(repeatedTitles)].map((title) => `«${title}»`).join(", ")}.`);
+  if (copiedTitles.length)
+    issues.push(`Переформулировать пользовательскую команду как тезис: ${copiedTitles.map((slide) => `«${slide.title}»`).join(", ")}.`);
+  if (truncatedTitles.length)
+    issues.push(`Сократить заголовки по смыслу, а не обрывать многоточием: ${truncatedTitles.map((slide) => `«${slide.title}»`).join(", ")}.`);
+  const distinctLayouts = new Set(slides.map((slide) => slide.layout)).size;
+  const expectedLayoutDiversity = Math.min(5, Math.max(3, Math.ceil(slides.length / 3)));
+  if (distinctLayouts < expectedLayoutDiversity)
+    issues.push(`Композиция монотонна: нужно минимум ${expectedLayoutDiversity} разных layout, сейчас ${distinctLayouts}.`);
+  for (let index = 2; index < slides.length; index += 1) {
+    if (
+      slides[index].layout === slides[index - 1].layout &&
+      slides[index].layout === slides[index - 2].layout
+    ) {
+      issues.push(`Layout «${slides[index].layout}» повторяется три раза подряд у слайда ${index + 1}.`);
+      break;
+    }
+  }
+  const noImages = /без\s+(?:фото|изображ|картин)|только\s+типограф/iu.test(
+    `${input.goal}\n${input.designBrief ?? ""}`,
+  );
+  const imagePrompts = slides.filter((slide) => slide.imagePrompt?.trim()).length;
+  const expectedImages = noImages ? 0 : Math.min(2, Math.max(1, slides.length - 2));
+  if (imagePrompts < expectedImages)
+    issues.push(`Нужно ${expectedImages} предметных imagePrompt для самых визуальных слайдов, сейчас ${imagePrompts}.`);
+  const missingNotes = slides.filter((slide) => !slide.speakerNotes.trim()).length;
+  if (missingNotes > Math.floor(slides.length / 2))
+    issues.push(`У ${missingNotes} слайдов нет полезных заметок выступающего.`);
+  const missingPatterns = slides.filter(
+    (slide) => !slide.patternId || slide.patternId === "auto",
+  ).length;
+  if (missingPatterns > Math.floor(slides.length / 2))
+    issues.push(`У ${missingPatterns} слайдов не выбран осмысленный patternId из библиотеки.`);
+  return issues.slice(0, 8);
+}
+
 const topicPatternPools: Array<{
   pattern: RegExp;
   ids: PresentationPatternId[];
 }> = [
   {
     pattern: /технолог|данн|цифр|ии|ai|saas|разработ|инженер|финтех/i,
-    ids: ["circuit-board", "data-stream", "constellation", "hexagon-net", "soft-grid"],
+    ids: ["circuit-board", "data-stream", "network-nodes", "blueprint-grid", "radar-sweep", "pixel-grid", "constellation", "hexagon-net"],
   },
   {
     pattern: /природ|эко|ботан|сад|еда|здоров|wellness|органич/i,
-    ids: ["organic-cells", "flower-lattice", "contour-flow", "topography", "waves"],
+    ids: ["organic-cells", "leaf-canopy", "wave-ribbon", "ink-blobs", "flower-lattice", "contour-flow", "topography", "waves"],
   },
   {
     pattern: /преми|luxur|дорог|элит|fashion|мод|ювелир|архитект/i,
-    ids: ["gold-frame", "frame-corners", "monogram", "fan-arches", "editorial-lines"],
+    ids: ["gold-frame", "rope-knot", "stacked-arches", "frame-corners", "monogram", "fan-arches", "editorial-lines"],
   },
   {
     pattern: /празд|фестив|детск|игр|креатив|вечерин|развлеч/i,
-    ids: ["memphis", "confetti", "star-field", "bauhaus", "terrazzo"],
+    ids: ["festival-flags", "snowfall", "solar-orbit", "memphis", "confetti", "star-field", "bauhaus", "terrazzo"],
   },
   {
     pattern: /финанс|банк|юрид|отч[её]т|исслед|аналит|консалт|стратег/i,
-    ids: ["editorial-lines", "plaid", "diamond-grid", "barcode", "micro-dots"],
+    ids: ["pinstripe", "woven-lines", "mosaic-tiles", "editorial-lines", "plaid", "diamond-grid", "barcode", "micro-dots"],
   },
   {
     pattern: /путеш|географ|маршрут|город|недвиж|строител/i,
-    ids: ["topography", "contour-flow", "archways", "isometric-cubes", "fan-arches"],
+    ids: ["stair-steps", "stacked-arches", "topography", "contour-flow", "archways", "isometric-cubes", "fan-arches"],
   },
 ];
 
@@ -481,6 +689,10 @@ const defaultPatternPool: PresentationPatternId[] = [
   "micro-dots",
   "frame-corners",
   "contour-flow",
+  "nested-squares",
+  "split-circles",
+  "prism-facets",
+  "tessellated-plus",
 ];
 
 function hashText(value: string) {
@@ -1006,6 +1218,128 @@ function responseSchema(slideCount: number) {
   };
 }
 
+function fallbackNarrativeSlides(
+  input: ReturnType<typeof parseRequest>,
+  summary: string,
+  audience: string,
+  facts: string,
+) {
+  const blueprint = presentationNarrativeBlueprint(input);
+  const titles: Record<PresentationNarrativeScenario, string[]> = {
+    pitch: [
+      "Проблема становится дорогой, когда разрывает ключевой рабочий процесс",
+      "Прежний подход не даёт управлять причиной, а только устраняет последствия",
+      "Новый принцип решения связывает действие с проверяемым результатом",
+      "Ценность раскрывается в одном конкретном сценарии использования",
+      "Доверие создаёт не обещание, а понятный механизм проверки",
+      "Первый шаг должен снижать главный риск решения",
+      "Решение можно принять по заранее согласованным критериям",
+    ],
+    strategy: [
+      "Главное ограничение стратегии — конкуренция инициатив за один ресурс",
+      "Сильная ставка начинается с выбора, от чего команда сознательно отказывается",
+      "Приоритеты работают только как связанная система решений",
+      "Последовательность важнее одновременного запуска всех инициатив",
+      "Каждая ставка требует владельца и наблюдаемого сигнала",
+      "Риски нужно привязать к точкам управленческого контроля",
+      "Следующий цикл начинается с одного приоритета",
+    ],
+    report: [
+      "Главный вывод должен быть понятен до просмотра всех данных",
+      "Изменение важно отделить от случайного колебания",
+      "Причина ценнее самой цифры, потому что определяет действие",
+      "Отклонение становится управляемым после сравнения с контекстом",
+      "Данные должны менять решение, а не просто заполнять слайд",
+      "Неизвестное нужно оформить как гипотезу для проверки",
+      "Следующий отчётный цикл должен проверять выбранный сигнал",
+    ],
+    education: [
+      "Обучение начинается с вопроса, на который слушатель пока не умеет отвечать",
+      "Одна понятная модель собирает разрозненные факты в систему",
+      "Механизм важнее определения, потому что позволяет переносить знание",
+      "Пример показывает границу между пониманием и запоминанием",
+      "Практическая задача превращает идею в навык",
+      "Типичная ошибка помогает увидеть границы метода",
+      "Знание закрепляется через применение к собственной задаче",
+    ],
+    event: [
+      "Событие ценно не расписанием, а изменением состояния участника",
+      "Тема становится актуальной, когда отвечает на вопрос аудитории сейчас",
+      "Программа должна обещать понятный маршрут, а не набор выступлений",
+      "Каждый блок события выполняет отдельную роль в опыте участника",
+      "Ключевые моменты нужно связать с практическим результатом",
+      "Правильная аудитория узнаёт себя до регистрации",
+      "Участие начинается с одного простого действия",
+    ],
+    product: [
+      "Рабочее напряжение точнее объясняет продукт, чем список функций",
+      "Новый принцип меняет способ действия, а не только интерфейс",
+      "Сценарий использования связывает возможность с результатом пользователя",
+      "Ключевые функции должны собираться вокруг одной задачи",
+      "Пользу подтверждает проверяемый процесс, а не рекламное обещание",
+      "Внедрение безопаснее начинать с ограниченного сценария",
+      "Первый результат должен быть достижим без полной перестройки процесса",
+    ],
+    transformation: [
+      "Прежняя модель исчерпана, когда цена координации превышает её пользу",
+      "Целевое состояние нужно описывать через новый способ работы",
+      "Принципы перехода защищают решение от случайного набора инициатив",
+      "Фазы превращают масштабное изменение в управляемую последовательность",
+      "Роли и точки решения важнее общего списка участников",
+      "Главный риск перехода нужно проверять раньше масштабирования",
+      "Безопасный первый шаг создаёт основание для следующей фазы",
+    ],
+    general: [
+      `${summary}: ценность темы раскрывается через конкретную задачу аудитории`,
+      "Сильный вывод начинается с ясных границ известных фактов",
+      "Механизм объясняет, почему результат вообще возможен",
+      "Практическая ценность проявляется в изменении действия",
+      "Ограничения помогают выбрать корректный сценарий",
+      "Критерии проверки отделяют решение от общего ожидания",
+      "Следующий шаг должен быть конкретным и проверяемым",
+    ],
+  };
+  const layouts: PresentationSlideLayout[] = [
+    "statement",
+    "comparison",
+    "process",
+    "split",
+    "bullets",
+    "callout",
+    "statement",
+  ];
+  return blueprint.narrativeArc.map((stage, index) => {
+    const layout = layouts[index % layouts.length];
+    const body =
+      index === 0
+        ? `Для аудитории «${audience}» важно связать тему «${summary}» с реальным напряжением и ценой бездействия.`
+        : index === 1
+          ? facts
+          : index === blueprint.narrativeArc.length - 1
+            ? blueprint.closingLogic
+            : `${stage} раскрывается через причинную связь, конкретный сценарий и наблюдаемый результат — без неподтверждённых обещаний.`;
+    const bullets =
+      layout === "process"
+        ? ["Определить исходное состояние", "Изменить один механизм", "Проверить результат"]
+        : layout === "comparison"
+          ? ["Текущее состояние", "Главное ограничение", "Целевой принцип", "Критерий перехода"]
+          : layout === "bullets"
+            ? ["Что уже известно", "Что остаётся гипотезой", "Как проверить", "Кто принимает решение"]
+            : [];
+    return {
+      layout,
+      eyebrow: normalizePresentationEyebrow(stage),
+      title: normalizePresentationTitle(titles[blueprint.scenario][index] ?? stage),
+      body: normalizePresentationBody(body),
+      bullets: bullets.map(normalizePresentationBullet),
+      speakerNotes: `Роль слайда: ${stage}. ${blueprint.evidencePolicy}`,
+    } satisfies Pick<
+      PresentationSlide,
+      "layout" | "eyebrow" | "title" | "body" | "bullets" | "speakerNotes"
+    >;
+  });
+}
+
 function safeFallbackOutline(input: ReturnType<typeof parseRequest>) {
   const rawSummary =
     input.goal.split(/[.!?\n]/)[0]?.trim() || "Новая презентация";
@@ -1020,7 +1354,7 @@ function safeFallbackOutline(input: ReturnType<typeof parseRequest>) {
   const audience = input.audience || "целевая аудитория";
   const facts =
     input.context?.trim() ||
-    "Подтверждённые данные не указаны; этот слайд нужно дополнить фактами перед показом.";
+    "Числовые и фактические данные не предоставлены, поэтому вывод строится через механизм, ограничения и критерии проверки без выдуманных показателей.";
   const action = input.desiredAction?.trim() || "Согласовать следующий шаг";
   const digitalRubleTopic =
     /цифров(?:ой|ого|ому|ым|ом)\s+рубл|цифров(?:ая|ой)\s+валют.*центральн/i.test(
@@ -1246,8 +1580,9 @@ function safeFallbackOutline(input: ReturnType<typeof parseRequest>) {
         .slice(0, input.slideCount),
     };
   }
-  const middle: Array<
-    Pick<PresentationSlide, "layout" | "eyebrow" | "title" | "body" | "bullets">
+  const commonMiddle: Array<
+    Pick<PresentationSlide, "layout" | "eyebrow" | "title" | "body" | "bullets"> &
+      Partial<Pick<PresentationSlide, "speakerNotes">>
   > = [
     {
       layout: "statement",
@@ -1355,6 +1690,10 @@ function safeFallbackOutline(input: ReturnType<typeof parseRequest>) {
       bullets: [],
     },
   ];
+  const middle = [
+    ...fallbackNarrativeSlides(input, summary, audience, facts),
+    ...commonMiddle,
+  ];
   const middleCount = Math.max(1, input.slideCount - 2);
   const selected = Array.from(
     { length: middleCount },
@@ -1370,12 +1709,15 @@ function safeFallbackOutline(input: ReturnType<typeof parseRequest>) {
         ? `Практический разбор для аудитории: ${input.audience}`
         : "Практический разбор: механизм, возможности, риски и решение",
       bullets: [],
-      speakerNotes: "",
+      speakerNotes:
+        "Начните с центрального напряжения аудитории и назовите один вывод, который она должна унести с собой.",
     },
     ...selected.map((slide) => ({
       ...slide,
       id: newId("slide"),
-      speakerNotes: "",
+      speakerNotes:
+        slide.speakerNotes ||
+        "Свяжите тезис с задачей аудитории и отделите подтверждённый факт от предположения.",
       bullets: [...slide.bullets],
     })),
     {
@@ -1385,7 +1727,8 @@ function safeFallbackOutline(input: ReturnType<typeof parseRequest>) {
       title: action,
       body: `По теме «${summary}» зафиксируйте владельца действия, срок и критерий результата.`,
       bullets: [],
-      speakerNotes: "",
+      speakerNotes:
+        "Завершите одним решением и ближайшим действием. Не пересказывайте предыдущие слайды.",
     },
   ];
   return {
@@ -1423,9 +1766,10 @@ export async function generatePresentationOutline(
   try {
     const selectedThemeId = resolvedThemeId(input);
     const theme = presentationTheme(selectedThemeId);
+    const narrativeBlueprint = presentationNarrativeBlueprint(input);
     const instructions = `Ты — senior presentation designer и стратегический редактор. Создай на русском языке законченную профессиональную презентацию уровня сильной продуктовой/консалтинговой команды, а не набор текстовых карточек и не пересказ анкеты.
 
-Сначала молча определи: тему, реальную задачу аудитории, главный тезис, драматургию и визуальную систему. Затем раскрой тему самостоятельно, используя общеизвестные определения, механизмы, сценарии, возможности, ограничения и риски. Поля пользователя — контекст и ограничения, а не текст для копирования. Не выдумывай конкретные цифры, даты, отзывы, клиентов или результаты; цитаты тоже разрешены только из подтверждённого контекста.
+Сначала внимательно исполни narrativeBlueprint: это обязательная режиссёрская карта конкретного сценария, а не справочная подсказка. Она задаёт напряжение аудитории, центральный тезис, смысловую дугу, правила доказательств, визуальный ритм, роли изображений и логику финала. Затем раскрой тему самостоятельно, используя общеизвестные определения, механизмы, сценарии, возможности, ограничения и риски. Поля пользователя — контекст и ограничения, а не текст для копирования. Не выдумывай конкретные цифры, даты, отзывы, клиентов или результаты; цитаты тоже разрешены только из подтверждённого контекста.
 
 Драматургия: сильный вход → почему тема важна сейчас → как устроено → практические сценарии → ограничения/риски → критерии решения → ясный финал. У каждого слайда один вывод и своя функция. Заголовок должен сообщать вывод, а не называться «Возможности», «Риски» или «Итоги». Не делай agenda и не пиши заглушки «добавьте факты», «нужно показать», «согласуйте пилот».
 
@@ -1446,6 +1790,7 @@ export async function generatePresentationOutline(
         input.desiredAction ||
         "Сформулировать уместный следующий шаг из задачи пользователя",
       presentationTone: input.tone,
+      narrativeBlueprint,
       slideCount: input.slideCount,
       selectedTheme: selectedThemeId,
       visualDesignBrief:
@@ -1573,6 +1918,68 @@ export async function generatePresentationOutline(
         parsed = { name: fallback.name, description: fallback.description };
         slides = fallback.slides;
         usedTopicFallback = true;
+      }
+    }
+    const qualityIssues = usedTopicFallback
+      ? []
+      : presentationQualityIssues(slides, input);
+    if (qualityIssues.length) {
+      const raw = JSON.parse(String(requestBody.body)) as Record<
+        string,
+        unknown
+      >;
+      const repairInstructions = `${instructions}\nПРЕДЫДУЩИЙ ЧЕРНОВИК ФОРМАЛЬНО ВАЛИДЕН, НО НЕ ПРОШЁЛ РЕДАКТОРСКИЙ КОНТРОЛЬ. Исправь перечисленные qualityIssues, сохрани только подтверждённые факты и верни заново полный JSON со всеми ${input.slideCount} слайдами. Не объясняй правки.`;
+      const repairInput = {
+        ...modelInput,
+        qualityIssues,
+        previousDraft: {
+          name: optionalModelText(parsed.name, "Название презентации", 120),
+          description: optionalModelText(
+            parsed.description,
+            "Описание презентации",
+            500,
+          ),
+          slides,
+        },
+      };
+      const repairBody =
+        selected.provider === "navyai"
+          ? {
+              ...raw,
+              model: selected.fallbackModel || selected.model,
+              messages: [
+                { role: "system", content: repairInstructions },
+                { role: "user", content: JSON.stringify(repairInput) },
+              ],
+            }
+          : {
+              ...raw,
+              reasoning: { effort: "medium" },
+              instructions: repairInstructions,
+              input: JSON.stringify(repairInput),
+            };
+      try {
+        const repair = await callPresentationProvider(selected.endpoint, {
+          ...requestBody,
+          body: JSON.stringify(repairBody),
+        });
+        if (repair.response.ok) {
+          const repairedParsed = parseJson(outputText(repair.body));
+          const repairedSlides = parseSlides(
+            repairedParsed.slides,
+            input.slideCount,
+          );
+          if (
+            presentationQualityIssues(repairedSlides, input).length <
+            qualityIssues.length
+          ) {
+            parsed = repairedParsed;
+            slides = repairedSlides;
+          }
+        }
+      } catch {
+        // Keep the valid first draft; deterministic art direction below still
+        // supplies patterns, image roles and readable content budgets.
       }
     }
     slides = applyPresentationArtDirection(
