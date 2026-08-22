@@ -45,7 +45,7 @@ let initialization: Promise<void> | null = null;
 // template-seeding routine in every new isolate made even a simple page load
 // wait several seconds for D1. Keep a durable completion marker instead.
 // Bump this value whenever a runtime-only schema migration is added here.
-const RUNTIME_SCHEMA_VERSION = "runtime-schema-v23-telegram-pdf";
+const RUNTIME_SCHEMA_VERSION = "runtime-schema-v24-presentation-favorites";
 const DEFAULT_SENDER_NAME = "ТехнологИИ Права";
 const DEFAULT_SENDER_EMAIL = "info@tech-pravo.ru";
 
@@ -212,6 +212,13 @@ const schemaStatements = [
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
+  `CREATE TABLE IF NOT EXISTS presentation_favorites (
+    id TEXT PRIMARY KEY NOT NULL,
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    item_type TEXT NOT NULL,
+    item_id TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
   `CREATE TABLE IF NOT EXISTS campaigns (
     id TEXT PRIMARY KEY NOT NULL,
     workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
@@ -341,6 +348,8 @@ const schemaStatements = [
   `CREATE INDEX IF NOT EXISTS idx_ai_request_limits_workspace_scope ON ai_request_limits(workspace_id, scope)`,
   `CREATE INDEX IF NOT EXISTS idx_ai_idempotency_workspace_operation_created ON ai_idempotency(workspace_id, operation, created_at)`,
   `CREATE INDEX IF NOT EXISTS idx_presentation_projects_workspace_updated ON presentation_projects(workspace_id, updated_at)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_presentation_favorites_workspace_item ON presentation_favorites(workspace_id, item_type, item_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_presentation_favorites_workspace_created ON presentation_favorites(workspace_id, created_at)`,
   `CREATE INDEX IF NOT EXISTS idx_campaigns_workspace_status_updated ON campaigns(workspace_id, status, updated_at)`,
   `CREATE INDEX IF NOT EXISTS idx_campaigns_workspace_participant_updated ON campaigns(workspace_id, participant_id, updated_at)`,
   `CREATE INDEX IF NOT EXISTS idx_campaigns_segment ON campaigns(segment_id)`,

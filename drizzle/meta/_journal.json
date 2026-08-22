@@ -120,6 +120,13 @@
       "when": 1787246912865,
       "tag": "0016_windy_chronomancer",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1787391390227,
+      "tag": "0017_sturdy_zeigeist",
+      "breakpoints": true
     }
   ]
 }

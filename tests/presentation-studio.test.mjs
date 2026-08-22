@@ -80,12 +80,17 @@ test("presentation studio exposes real creation, editing and save flows", async 
   assert.match(view, /onDoubleClick/);
   assert.match(view, /Быстро изменить слайд/);
   assert.match(view, /Добавить изображение/);
-  assert.match(view, /backgroundColor: slide\.backgroundColor/);
+  assert.match(view, /slide\.backgroundColor \?\?/);
+  assert.match(view, /slide\.themeId \?\? baseProject\.themeId/);
   assert.match(view, /slidesPanelOpen/);
   assert.match(view, /Скрыть панель слайдов/);
   assert.match(view, /xl:grid-cols-\[148px_minmax\(0,1fr\)_272px\]/);
   assert.match(view, /xl:grid-cols-\[minmax\(0,1fr\)_272px\]/);
   assert.match(view, /aria-label="Дублировать слайд"/);
+  assert.doesNotMatch(view, /Готово — следующий слайд/);
+  assert.doesNotMatch(view, /confirmCurrentSlide/);
+  assert.match(view, /Все слайды доступны/);
+  assert.match(view, /changeSlideTheme/);
 });
 
 test("presentation library offers varied scenarios and practical filters", async () => {
@@ -278,8 +283,9 @@ test("PowerPoint export builds OOXML and only fetches same-origin library assets
   assert.match(exporter, /presentationPatternShapes/);
   assert.match(
     exporter,
-    /slide\.backgroundColor \?\? project\.backgroundColor/,
+    /slide\.backgroundColor \?\?/,
   );
+  assert.match(exporter, /themeId: slide\.themeId \?\? project\.themeId/);
   assert.doesNotMatch(exporter, /new URL\(slide\.imageUrl/);
   assert.match(
     await readFile(
@@ -311,4 +317,27 @@ test("PowerPoint export builds OOXML and only fetches same-origin library assets
     route,
     /application\/vnd\.openxmlformats-officedocument\.presentationml\.presentation/,
   );
+});
+
+test("presentation library persists project and template favorites", async () => {
+  const [schema, database, store, route, studio] = await Promise.all([
+    readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/server/database-init.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/server/presentation-store.ts", import.meta.url), "utf8"),
+    readFile(
+      new URL("../app/api/presentations/favorites/route.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../components/presentations/PresentationStudio.tsx", import.meta.url),
+      "utf8",
+    ),
+  ]);
+  assert.match(schema, /export const presentationFavorites/);
+  assert.match(database, /CREATE TABLE IF NOT EXISTS presentation_favorites/);
+  assert.match(store, /setPresentationFavorite/);
+  assert.match(route, /setPresentationFavorite/);
+  assert.match(studio, /Избранные презентации/);
+  assert.match(studio, /Избранные шаблоны/);
+  assert.match(studio, /\/api\/presentations\/favorites/);
 });

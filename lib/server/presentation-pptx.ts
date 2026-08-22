@@ -1,4 +1,5 @@
 import type { PresentationProjectRecord, PresentationSlide } from "@/types/api";
+import { presentationTheme } from "@/data/presentation-templates";
 
 const SLIDE_WIDTH = 12_192_000;
 const SLIDE_HEIGHT = 6_858_000;
@@ -1063,11 +1064,19 @@ function slideXml(
   slide: PresentationSlide,
   image?: ImageEntry,
 ) {
+  const slideTheme = slide.themeId
+    ? presentationTheme(slide.themeId)
+    : undefined;
   const effectiveProject = {
     ...project,
-    accentColor: slide.accentColor ?? project.accentColor,
-    backgroundColor: slide.backgroundColor ?? project.backgroundColor,
-    textColor: slide.textColor ?? project.textColor,
+    themeId: slide.themeId ?? project.themeId,
+    accentColor:
+      slide.accentColor ?? slideTheme?.accentColor ?? project.accentColor,
+    backgroundColor:
+      slide.backgroundColor ??
+      slideTheme?.backgroundColor ??
+      project.backgroundColor,
+    textColor: slide.textColor ?? slideTheme?.textColor ?? project.textColor,
   };
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:bg><p:bgPr><a:solidFill><a:srgbClr val="${hex(effectiveProject.backgroundColor)}"/></a:solidFill><a:effectLst/></p:bgPr></p:bg><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>${slideShapes(effectiveProject, slide, image)}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
 }

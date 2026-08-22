@@ -436,6 +436,30 @@ export const presentationProjects = sqliteTable(
   ],
 );
 
+export const presentationFavorites = sqliteTable(
+  "presentation_favorites",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    itemType: text("item_type").$type<"project" | "template">().notNull(),
+    itemId: text("item_id").notNull(),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("idx_presentation_favorites_workspace_item").on(
+      table.workspaceId,
+      table.itemType,
+      table.itemId,
+    ),
+    index("idx_presentation_favorites_workspace_created").on(
+      table.workspaceId,
+      table.createdAt,
+    ),
+  ],
+);
+
 export const campaigns = sqliteTable(
   "campaigns",
   {

@@ -1,14 +1,21 @@
 import { and, desc, eq } from "drizzle-orm";
 
 import { getDb } from "@/db";
-import { emailTemplates, presentationProjects } from "@/db/schema";
+import {
+  emailTemplates,
+  presentationFavorites,
+  presentationProjects,
+} from "@/db/schema";
 import {
   defaultPresentationSlides,
+  presentationTemplates,
   presentationTheme,
 } from "@/data/presentation-templates";
 import type {
   DeleteResponse,
   PresentationCreateInput,
+  PresentationFavoriteItemType,
+  PresentationFavoriteMutationResponse,
   PresentationMutationResponse,
   PresentationPatchInput,
   PresentationProjectRecord,
@@ -169,11 +176,19 @@ function parseSlide(value: unknown, index: number): PresentationSlide {
   );
   if (rawPattern && !PATTERNS.has(rawPattern as PresentationPatternId))
     throw new ApiRequestError(`Выберите допустимый узор слайда ${index + 1}.`);
+  const rawTheme = optionalText(
+    object.themeId,
+    `Стиль слайда ${index + 1}`,
+    30,
+  );
+  if (rawTheme && !THEMES.has(rawTheme as PresentationThemeId))
+    throw new ApiRequestError(`Выберите допустимый стиль слайда ${index + 1}.`);
   return {
     id:
       optionalText(object.id, `Идентификатор слайда ${index + 1}`, 160) ||
       newId("slide"),
     layout: rawLayout as PresentationSlideLayout,
+    ...(rawTheme ? { themeId: rawTheme as PresentationThemeId } : {}),
     eyebrow:
       optionalText(object.eyebrow, `Надзаголовок слайда ${index + 1}`, 120) ??
       "",
@@ -492,13 +507,83 @@ export async function listPresentationProjects(
   request: Request,
 ): Promise<PresentationsListResponse> {
   await ensureDatabase(request);
-  const rows = await getDb()
-    .select()
-    .from(presentationProjects)
-    .where(eq(presentationProjects.workspaceId, WORKSPACE_ID))
-    .orderBy(desc(presentationProjects.updatedAt))
-    .limit(100);
-  return { presentations: rows.map(toRecord) };
+  const [rows, favorites] = await Promise.all([
+    getDb()
+      .select()
+      .from(presentationProjects)
+      .where(eq(presentationProjects.workspaceId, WORKSPACE_ID))
+      .orderBy(desc(presentationProjects.updatedAt))
+      .limit(100),
+    getDb()
+      .select({ itemType: presentationFavorites.itemType, itemId: presentationFavorites.itemId })
+      .from(presentationFavorites)
+      .where(eq(presentationFavorites.workspaceId, WORKSPACE_ID)),
+  ]);
+  return {
+    presentations: rows.map(toRecord),
+    favoriteProjectIds: favorites
+      .filter((item) => item.itemType === "project")
+      .map((item) => item.itemId),
+    favoriteTemplateIds: favorites
+      .filter((item) => item.itemType === "template")
+      .map((item) => item.itemId),
+  };
+}
+
+export async function setPresentationFavorite(
+  request: Request,
+  value: unknown,
+): Promise<PresentationFavoriteMutationResponse> {
+  await ensureDatabase(request);
+  const object = asObject(value);
+  const itemType = cleanText(
+    object.itemType,
+    "Тип избранного",
+    20,
+  ) as PresentationFavoriteItemType;
+  if (itemType !== "project" && itemType !== "template")
+    throw new ApiRequestError("Указан неизвестный тип избранного.");
+  const itemId = cleanText(object.itemId, "Элемент избранного", 160);
+  if (itemType === "template") {
+    if (!presentationTemplates.some((template) => template.id === itemId))
+      throw new ApiRequestError("Шаблон презентации не найден.", 404);
+  } else {
+    const [project] = await getDb()
+      .select({ id: presentationProjects.id })
+      .from(presentationProjects)
+      .where(
+        and(
+          eq(presentationProjects.id, itemId),
+          eq(presentationProjects.workspaceId, WORKSPACE_ID),
+        ),
+      )
+      .limit(1);
+    if (!project) throw new ApiRequestError("Презентация не найдена.", 404);
+  }
+  const isFavorite = object.isFavorite === true;
+  if (isFavorite) {
+    await getDb()
+      .insert(presentationFavorites)
+      .values({
+        id: newId("presentation-favorite"),
+        workspaceId: WORKSPACE_ID,
+        itemType,
+        itemId,
+        createdAt: new Date().toISOString(),
+      })
+      .onConflictDoNothing();
+  } else {
+    await getDb()
+      .delete(presentationFavorites)
+      .where(
+        and(
+          eq(presentationFavorites.workspaceId, WORKSPACE_ID),
+          eq(presentationFavorites.itemType, itemType),
+          eq(presentationFavorites.itemId, itemId),
+        ),
+      );
+  }
+  return { itemType, itemId, isFavorite };
 }
 
 export async function getPresentationProject(
@@ -632,5 +717,14 @@ export async function deletePresentationProject(
     )
     .returning({ id: presentationProjects.id });
   if (!result.length) throw new ApiRequestError("Презентация не найдена.", 404);
+  await getDb()
+    .delete(presentationFavorites)
+    .where(
+      and(
+        eq(presentationFavorites.workspaceId, WORKSPACE_ID),
+        eq(presentationFavorites.itemType, "project"),
+        eq(presentationFavorites.itemId, id),
+      ),
+    );
   return { deletedId: id };
 }

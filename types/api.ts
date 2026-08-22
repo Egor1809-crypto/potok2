@@ -449,6 +449,7 @@ export type PresentationSlideLayout =
 export type PresentationSlide = {
   id: string;
   layout: PresentationSlideLayout;
+  themeId?: PresentationThemeId;
   eyebrow: string;
   title: string;
   body: string;
@@ -502,6 +503,16 @@ export type PresentationPatchInput = Partial<PresentationCreateInput> & {
 
 export type PresentationsListResponse = {
   presentations: PresentationProjectRecord[];
+  favoriteProjectIds: string[];
+  favoriteTemplateIds: string[];
+};
+
+export type PresentationFavoriteItemType = "project" | "template";
+
+export type PresentationFavoriteMutationResponse = {
+  itemType: PresentationFavoriteItemType;
+  itemId: string;
+  isFavorite: boolean;
 };
 
 export type PresentationMutationResponse = {

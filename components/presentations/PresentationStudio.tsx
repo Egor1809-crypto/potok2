@@ -14,21 +14,19 @@ import {
   ArrowLeft,
   ArrowUp,
   Check,
-  CheckCircle2,
-  ChevronRight,
   Copy,
   Download,
   FilePlus2,
   LayoutTemplate,
   Mail,
   Image as ImageIcon,
-  LockKeyhole,
   PanelLeftClose,
   PanelLeftOpen,
   Palette,
   Plus,
   Save,
   Sparkles,
+  Star,
   Trash2,
   Type,
 } from "lucide-react";
@@ -318,11 +316,20 @@ function SlidePreview({
   onPickImage?: () => void;
   onOpenQuickEdit?: () => void;
 }) {
+  const slideTheme = slide.themeId
+    ? presentationTheme(slide.themeId)
+    : undefined;
   const project = {
     ...baseProject,
-    accentColor: slide.accentColor ?? baseProject.accentColor,
-    backgroundColor: slide.backgroundColor ?? baseProject.backgroundColor,
-    textColor: slide.textColor ?? baseProject.textColor,
+    themeId: slide.themeId ?? baseProject.themeId,
+    accentColor:
+      slide.accentColor ?? slideTheme?.accentColor ?? baseProject.accentColor,
+    backgroundColor:
+      slide.backgroundColor ??
+      slideTheme?.backgroundColor ??
+      baseProject.backgroundColor,
+    textColor:
+      slide.textColor ?? slideTheme?.textColor ?? baseProject.textColor,
   };
   const inverse =
     project.backgroundColor.toLowerCase() === "#101113"
@@ -1049,7 +1056,15 @@ export function PresentationStudio() {
     null,
   );
   const [selectedSlideId, setSelectedSlideId] = useState<string | null>(null);
-  const [reviewedSlideIds, setReviewedSlideIds] = useState<string[]>([]);
+  const [favoriteProjectIds, setFavoriteProjectIds] = useState<string[]>([]);
+  const [favoriteTemplateIds, setFavoriteTemplateIds] = useState<string[]>([]);
+  const [libraryView, setLibraryView] = useState<
+    "presentations" | "templates" | "favorites"
+  >(
+    requestedView === "templates" || requestedView === "favorites"
+      ? requestedView
+      : "presentations",
+  );
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
@@ -1090,16 +1105,6 @@ export function PresentationStudio() {
   const aiIdempotencyKeyRef = useRef("");
 
   useEffect(() => {
-    if (projectId || requestedView !== "templates") return;
-    const frame = window.requestAnimationFrame(() =>
-      document
-        .getElementById("presentation-template-library")
-        ?.scrollIntoView({ block: "start" }),
-    );
-    return () => window.cancelAnimationFrame(frame);
-  }, [projectId, requestedView]);
-
-  useEffect(() => {
     if (projectId || searchParams.get("create") !== "ai") return;
     const frame = window.requestAnimationFrame(() => setAiOpen(true));
     return () => window.cancelAnimationFrame(frame);
@@ -1134,28 +1139,15 @@ export function PresentationStudio() {
           } else {
             setNotice("");
           }
-          const stored = window.localStorage.getItem(
-            `potok:presentation-review:${body.presentation.id}`,
-          );
-          const parsed = stored ? JSON.parse(stored) : [];
-          const knownIds = new Set(
-            body.presentation.slides.map((slide) => slide.id),
-          );
-          setReviewedSlideIds(
-            Array.isArray(parsed)
-              ? parsed.filter(
-                  (id): id is string =>
-                    typeof id === "string" && knownIds.has(id),
-                )
-              : [],
-          );
         } catch {
-          setReviewedSlideIds([]);
+          setNotice("");
         }
         setDirty(false);
         editRevisionRef.current = 0;
       } else if ("presentations" in body) {
         setPresentations(body.presentations);
+        setFavoriteProjectIds(body.favoriteProjectIds);
+        setFavoriteTemplateIds(body.favoriteTemplateIds);
         setProject(null);
       }
     } catch (caught) {
@@ -1456,9 +1448,44 @@ export function PresentationStudio() {
       setPresentations((current) =>
         current.filter((presentation) => presentation.id !== item.id),
       );
+      setFavoriteProjectIds((current) =>
+        current.filter((id) => id !== item.id),
+      );
     } catch (caught) {
       setError(
         caught instanceof Error ? caught.message : "Презентация не удалена.",
+      );
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const toggleFavorite = async (
+    itemType: "project" | "template",
+    itemId: string,
+  ) => {
+    const ids = itemType === "project" ? favoriteProjectIds : favoriteTemplateIds;
+    const isFavorite = !ids.includes(itemId);
+    setBusy(`favorite-${itemType}-${itemId}`);
+    setError("");
+    try {
+      const response = await fetch("/api/presentations/favorites", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemType, itemId, isFavorite }),
+      });
+      const body = await jsonBody<{ isFavorite: boolean }>(response);
+      if (!response.ok || !("isFavorite" in body))
+        throw new Error(apiError(body, "Избранное не обновлено."));
+      const update = (current: string[]) =>
+        body.isFavorite
+          ? Array.from(new Set([...current, itemId]))
+          : current.filter((id) => id !== itemId);
+      if (itemType === "project") setFavoriteProjectIds(update);
+      else setFavoriteTemplateIds(update);
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Избранное не обновлено.",
       );
     } finally {
       setBusy("");
@@ -1474,24 +1501,6 @@ export function PresentationStudio() {
 
   const updateSlide = (patch: Partial<PresentationSlide>) => {
     if (!project || !selectedSlideId) return;
-    const changedIndex = project.slides.findIndex(
-      (slide) => slide.id === selectedSlideId,
-    );
-    setReviewedSlideIds((current) => {
-      const next = current.filter(
-        (id) =>
-          project.slides.findIndex((slide) => slide.id === id) < changedIndex,
-      );
-      try {
-        window.localStorage.setItem(
-          `potok:presentation-review:${project.id}`,
-          JSON.stringify(next),
-        );
-      } catch {
-        /* review state is optional */
-      }
-      return next;
-    });
     updateProject({
       slides: project.slides.map((slide) =>
         slide.id === selectedSlideId ? { ...slide, ...patch } : slide,
@@ -1506,14 +1515,6 @@ export function PresentationStudio() {
     project && selectedSlide
       ? project.slides.findIndex((slide) => slide.id === selectedSlide.id)
       : 0;
-  const firstUnreviewedIndex = project
-    ? project.slides.findIndex((slide) => !reviewedSlideIds.includes(slide.id))
-    : 0;
-  const unlockedSlideIndex = project
-    ? firstUnreviewedIndex === -1
-      ? project.slides.length - 1
-      : firstUnreviewedIndex
-    : 0;
 
   const saveProject = async () => {
     if (!project) return false;
@@ -1632,49 +1633,15 @@ export function PresentationStudio() {
     setSelectedSlideId(slides[Math.min(index, slides.length - 1)]?.id ?? null);
   };
 
-  const changeTheme = (themeId: PresentationThemeId) => {
+  const changeSlideTheme = (themeId: PresentationThemeId) => {
     const theme = presentationTheme(themeId);
-    updateProject({
+    updateSlide({
       themeId,
       accentColor: theme.accentColor,
       backgroundColor: theme.backgroundColor,
       textColor: theme.textColor,
+      patternId: "auto",
     });
-  };
-
-  const confirmCurrentSlide = async () => {
-    if (!project || !selectedSlide) return;
-    if (!selectedSlide.title.trim()) {
-      setError("Добавьте заголовок-вывод: без него слайд нельзя подтвердить.");
-      return;
-    }
-    if (dirty && !(await saveProject())) return;
-    const index = project.slides.findIndex(
-      (slide) => slide.id === selectedSlide.id,
-    );
-    const nextReviewed = Array.from(
-      new Set([...reviewedSlideIds, selectedSlide.id]),
-    );
-    setReviewedSlideIds(nextReviewed);
-    try {
-      window.localStorage.setItem(
-        `potok:presentation-review:${project.id}`,
-        JSON.stringify(nextReviewed),
-      );
-    } catch {
-      /* review state is optional */
-    }
-    setError("");
-    if (index < project.slides.length - 1) {
-      setSelectedSlideId(project.slides[index + 1].id);
-      setNotice(
-        `Слайд ${index + 1} подтверждён. Теперь проверьте слайд ${index + 2}.`,
-      );
-    } else {
-      setNotice(
-        "Все слайды подтверждены. Презентацию можно скачать или приложить к письму.",
-      );
-    }
   };
 
   const openEmailCampaign = async () => {
@@ -1700,6 +1667,13 @@ export function PresentationStudio() {
           .includes(normalized),
     );
   }, [presentations, query]);
+  const visibleProjects = useMemo(
+    () =>
+      libraryView === "favorites"
+        ? filteredProjects.filter((item) => favoriteProjectIds.includes(item.id))
+        : filteredProjects,
+    [favoriteProjectIds, filteredProjects, libraryView],
+  );
   const filteredEmailTemplates = useMemo(() => {
     const normalized = emailQuery.trim().toLocaleLowerCase("ru-RU");
     return emailTemplates
@@ -1731,6 +1705,15 @@ export function PresentationStudio() {
             .includes(normalized)),
     );
   }, [templateQuery, templateUseCase]);
+  const visiblePresentationTemplates = useMemo(
+    () =>
+      libraryView === "favorites"
+        ? filteredPresentationTemplates.filter((item) =>
+            favoriteTemplateIds.includes(item.id),
+          )
+        : filteredPresentationTemplates,
+    [favoriteTemplateIds, filteredPresentationTemplates, libraryView],
+  );
 
   if (loading)
     return (
@@ -1838,8 +1821,7 @@ export function PresentationStudio() {
                 <div>
                   <strong className="block text-[12px]">Слайды</strong>
                   <span className="text-[9px] text-text-subtle">
-                    {reviewedSlideIds.length} из {project.slides.length}{" "}
-                    подтверждено
+                    {project.slides.length} доступны для редактирования
                   </span>
                 </div>
                 <Button
@@ -1857,27 +1839,17 @@ export function PresentationStudio() {
               </div>
               <div className="flex max-h-48 gap-2 overflow-x-auto pb-1 lg:grid lg:max-h-none lg:min-h-0 lg:flex-1 lg:grid-cols-1 lg:overflow-x-hidden lg:overflow-y-auto lg:pr-1">
                 {project.slides.map((slide, index) => {
-                  const reviewed = reviewedSlideIds.includes(slide.id);
-                  const locked = index > unlockedSlideIndex;
                   return (
                     <button
                       key={slide.id}
                       type="button"
-                      disabled={locked}
                       onClick={() => setSelectedSlideId(slide.id)}
                       aria-pressed={slide.id === selectedSlide.id}
-                      aria-label={`${reviewed ? "Подтверждён" : locked ? "Заблокирован" : "Редактируется"}: слайд ${index + 1}, ${slide.title || layoutLabels[slide.layout]}`}
-                      className="w-36 shrink-0 rounded-lg border border-border bg-surface p-1.5 text-left transition enabled:hover:border-primary/40 disabled:cursor-not-allowed disabled:opacity-45 aria-pressed:border-primary aria-pressed:ring-2 aria-pressed:ring-primary/20 lg:w-auto"
+                      aria-label={`Слайд ${index + 1}: ${slide.title || layoutLabels[slide.layout]}`}
+                      className="w-36 shrink-0 rounded-lg border border-border bg-surface p-1.5 text-left transition hover:border-primary/40 aria-pressed:border-primary aria-pressed:ring-2 aria-pressed:ring-primary/20 lg:w-auto"
                     >
                       <span className="mb-1 flex items-center justify-between px-0.5 text-[9px] text-text-subtle">
-                        <span className="flex items-center gap-1">
-                          {index + 1}
-                          {reviewed ? (
-                            <CheckCircle2 className="size-2.5 text-success" />
-                          ) : locked ? (
-                            <LockKeyhole className="size-2.5" />
-                          ) : null}
-                        </span>
+                        <span>{index + 1}</span>
                         <span>{layoutLabels[slide.layout]}</span>
                       </span>
                       <div className="overflow-hidden rounded-md">
@@ -1921,9 +1893,7 @@ export function PresentationStudio() {
                     className="hidden truncate text-[10px] font-medium text-text-muted md:block"
                     title="Двойной клик по свободной области — быстро изменить слайд"
                   >
-                    {reviewedSlideIds.includes(selectedSlide.id)
-                      ? "Слайд подтверждён"
-                      : "Проверьте содержание и оформление"}
+                    Все слайды доступны · двойной клик — быстрые настройки
                   </span>
                 </div>
                 <div className="flex items-center gap-0.5">
@@ -1991,38 +1961,6 @@ export function PresentationStudio() {
                     onPickImage={() => setSlideImageOpen(true)}
                     onOpenQuickEdit={() => setQuickSlideOpen(true)}
                   />
-                </div>
-              </div>
-              <div className="shrink-0 border-t border-border bg-surface px-4 py-2.5 sm:px-5">
-                <div className="mx-auto flex max-w-[1080px] items-center justify-between gap-4">
-                  <div className="min-w-0 flex-1">
-                    <div className="h-1.5 overflow-hidden rounded-full bg-surface-inset">
-                      <div
-                        className="h-full rounded-full bg-success transition-all"
-                        style={{
-                          width: `${Math.round((reviewedSlideIds.length / project.slides.length) * 100)}%`,
-                        }}
-                      />
-                    </div>
-                    <p className="mb-0 mt-1 text-[10px] text-text-subtle">
-                      Следующий слайд откроется после подтверждения текущего.
-                    </p>
-                  </div>
-                  <Button
-                    onClick={() => void confirmCurrentSlide()}
-                    loading={busy === "save"}
-                    trailingIcon={
-                      selectedSlideIndex < project.slides.length - 1 ? (
-                        <ChevronRight className="size-4" />
-                      ) : (
-                        <Check className="size-4" />
-                      )
-                    }
-                  >
-                    {selectedSlideIndex < project.slides.length - 1
-                      ? "Готово — следующий слайд"
-                      : "Подтвердить презентацию"}
-                  </Button>
                 </div>
               </div>
             </section>
@@ -2259,13 +2197,16 @@ export function PresentationStudio() {
                 </section>
                 <section>
                   <h3 className="mb-2 mt-0 text-[12px] font-semibold">
-                    Оформление
+                    Стиль текущего слайда
                   </h3>
                   <p className="mb-3 mt-0 text-[10px] leading-4 text-text-muted">
-                    Тема задаёт основу всей презентации. Цвета ниже меняют
-                    только активный слайд.
+                    Выбранная тема, палитра и узор применяются только к этому
+                    слайду. Остальные слайды не изменятся.
                   </p>
-                  <ThemeStrip value={project.themeId} onChange={changeTheme} />
+                  <ThemeStrip
+                    value={selectedSlide.themeId ?? project.themeId}
+                    onChange={changeSlideTheme}
+                  />
                   <div className="mt-3">
                     <p className="mb-2 mt-0 text-[11px] font-semibold">
                       Узор слайда
@@ -2288,7 +2229,7 @@ export function PresentationStudio() {
                                 selectedSlide.backgroundColor ??
                                 project.backgroundColor,
                               ...presentationPatternStyle(
-                                project.themeId,
+                                selectedSlide.themeId ?? project.themeId,
                                 selectedSlide.accentColor ??
                                   project.accentColor,
                                 "preview",
@@ -2342,22 +2283,26 @@ export function PresentationStudio() {
                       />
                     </FormField>
                   </div>
-                  {selectedSlide.accentColor ||
+                  {selectedSlide.themeId ||
+                  selectedSlide.accentColor ||
                   selectedSlide.backgroundColor ||
-                  selectedSlide.textColor ? (
+                  selectedSlide.textColor ||
+                  selectedSlide.patternId ? (
                     <Button
                       variant="ghost"
                       size="sm"
                       className="mt-2"
                       onClick={() =>
                         updateSlide({
+                          themeId: undefined,
                           accentColor: undefined,
                           backgroundColor: undefined,
                           textColor: undefined,
+                          patternId: undefined,
                         })
                       }
                     >
-                      Вернуть цвета темы
+                      Вернуть стиль презентации
                     </Button>
                   ) : null}
                 </section>
@@ -2461,7 +2406,10 @@ export function PresentationStudio() {
                   <Palette className="size-4 text-primary" aria-hidden="true" />
                   <strong className="text-[12px]">Фон и узор</strong>
                 </div>
-                <ThemeStrip value={project.themeId} onChange={changeTheme} />
+                <ThemeStrip
+                  value={selectedSlide.themeId ?? project.themeId}
+                  onChange={changeSlideTheme}
+                />
                 <div className="mt-3 grid grid-cols-3 gap-2">
                   <Input
                     aria-label="Акцент активного слайда"
@@ -2598,11 +2546,49 @@ export function PresentationStudio() {
           </div>
         ))}
       </div>
+      <nav
+        className="flex w-fit max-w-full gap-1 overflow-x-auto rounded-xl border border-border bg-surface p-1"
+        aria-label="Разделы библиотеки презентаций"
+      >
+        {[
+          {
+            id: "presentations" as const,
+            label: "Презентации",
+            count: presentations.length,
+          },
+          {
+            id: "templates" as const,
+            label: "Шаблоны",
+            count: presentationTemplates.length,
+          },
+          {
+            id: "favorites" as const,
+            label: "Избранное",
+            count: favoriteProjectIds.length + favoriteTemplateIds.length,
+          },
+        ].map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            aria-pressed={libraryView === item.id}
+            onClick={() => setLibraryView(item.id)}
+            className="flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-[12px] font-semibold text-text-muted transition hover:bg-surface-subtle aria-pressed:bg-primary aria-pressed:text-white"
+          >
+            {item.label}
+            <span className="rounded-full bg-black/5 px-1.5 py-0.5 text-[9px] group-aria-pressed:bg-white/15">
+              {item.count}
+            </span>
+          </button>
+        ))}
+      </nav>
+      {libraryView !== "templates" ? (
       <section>
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 className="m-0 text-[18px] font-semibold tracking-[-0.025em]">
-              Ваши презентации
+              {libraryView === "favorites"
+                ? "Избранные презентации"
+                : "Ваши презентации"}
             </h2>
             <p className="mb-0 mt-1 text-[12px] text-text-muted">
               {presentations.length
@@ -2618,9 +2604,9 @@ export function PresentationStudio() {
             wrapperClassName="w-full sm:w-72"
           />
         </div>
-        {filteredProjects.length ? (
+        {visibleProjects.length ? (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {filteredProjects.map((item) => (
+            {visibleProjects.map((item) => (
               <article
                 key={item.id}
                 className="group overflow-hidden rounded-xl border border-border bg-surface shadow-[var(--shadow-xs)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)]"
@@ -2656,15 +2642,34 @@ export function PresentationStudio() {
                     {sourceLabels[item.sourceType]} ·{" "}
                     {new Date(item.updatedAt).toLocaleDateString("ru-RU")}
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => void deleteProject(item)}
-                    disabled={busy === `delete-${item.id}`}
-                    className="rounded-md p-1.5 text-text-subtle hover:bg-danger-subtle hover:text-danger"
-                    aria-label={`Удалить ${item.name}`}
-                  >
-                    <Trash2 className="size-3.5" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => void toggleFavorite("project", item.id)}
+                      disabled={busy === `favorite-project-${item.id}`}
+                      aria-pressed={favoriteProjectIds.includes(item.id)}
+                      className="rounded-md p-1.5 text-text-subtle transition hover:bg-warning-subtle hover:text-warning aria-pressed:text-warning"
+                      aria-label={`${favoriteProjectIds.includes(item.id) ? "Убрать из избранного" : "Добавить в избранное"}: ${item.name}`}
+                    >
+                      <Star
+                        className="size-3.5"
+                        fill={
+                          favoriteProjectIds.includes(item.id)
+                            ? "currentColor"
+                            : "none"
+                        }
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void deleteProject(item)}
+                      disabled={busy === `delete-${item.id}`}
+                      className="rounded-md p-1.5 text-text-subtle hover:bg-danger-subtle hover:text-danger"
+                      aria-label={`Удалить ${item.name}`}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </div>
                 </div>
               </article>
             ))}
@@ -2673,21 +2678,31 @@ export function PresentationStudio() {
           <div className="rounded-xl border border-dashed border-border-strong bg-surface px-6 py-10 text-center">
             <LayoutTemplate className="mx-auto size-7 text-primary" />
             <h3 className="mb-0 mt-3 text-[14px] font-semibold">
-              {query ? "Ничего не найдено" : "Начните с подходящего сценария"}
+              {query
+                ? "Ничего не найдено"
+                : libraryView === "favorites"
+                  ? "Нет избранных презентаций"
+                  : "Начните с подходящего сценария"}
             </h3>
             <p className="mx-auto mb-0 mt-1 max-w-md text-[12px] text-text-muted">
               {query
                 ? "Измените запрос или очистите поиск."
+                : libraryView === "favorites"
+                  ? "Нажмите на звезду у презентации, чтобы она появилась здесь."
                 : "Выберите шаблон ниже, перенесите письмо или начните с пустой презентации."}
             </p>
           </div>
         )}
       </section>
+      ) : null}
+      {libraryView !== "presentations" ? (
       <section id="presentation-template-library" className="scroll-mt-6">
         <div className="mb-4 flex flex-col justify-between gap-3 lg:flex-row lg:items-end">
           <div>
             <h2 className="m-0 text-[18px] font-semibold tracking-[-0.025em]">
-              Шаблоны презентаций
+              {libraryView === "favorites"
+                ? "Избранные шаблоны"
+                : "Шаблоны презентаций"}
             </h2>
             <p className="mb-0 mt-1 text-[12px] text-text-muted">
               Разные сценарии, композиции и визуальные темы — от строгого отчёта
@@ -2712,11 +2727,11 @@ export function PresentationStudio() {
           </div>
         </div>
         <p className="mb-3 mt-0 text-[10px] text-text-subtle">
-          Найдено: {filteredPresentationTemplates.length} из{" "}
+          Найдено: {visiblePresentationTemplates.length} из{" "}
           {presentationTemplates.length}
         </p>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {filteredPresentationTemplates.map((template) => (
+          {visiblePresentationTemplates.map((template) => (
             <article
               key={template.id}
               className="group overflow-hidden rounded-xl border border-border bg-surface shadow-[var(--shadow-xs)] transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-[var(--shadow-md)]"
@@ -2746,25 +2761,46 @@ export function PresentationStudio() {
                   {template.slides.length} слайдов ·{" "}
                   {presentationTheme(template.themeId).name}
                 </span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => createFromScenario(template)}
-                  loading={busy === template.id}
-                >
-                  Использовать
-                </Button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => void toggleFavorite("template", template.id)}
+                    disabled={busy === `favorite-template-${template.id}`}
+                    aria-pressed={favoriteTemplateIds.includes(template.id)}
+                    className="rounded-md p-2 text-text-subtle transition hover:bg-warning-subtle hover:text-warning aria-pressed:text-warning"
+                    aria-label={`${favoriteTemplateIds.includes(template.id) ? "Убрать из избранного" : "Добавить в избранное"}: ${template.name}`}
+                  >
+                    <Star
+                      className="size-3.5"
+                      fill={
+                        favoriteTemplateIds.includes(template.id)
+                          ? "currentColor"
+                          : "none"
+                      }
+                    />
+                  </button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => createFromScenario(template)}
+                    loading={busy === template.id}
+                  >
+                    Использовать
+                  </Button>
+                </div>
               </div>
             </article>
           ))}
         </div>
-        {!filteredPresentationTemplates.length ? (
+        {!visiblePresentationTemplates.length ? (
           <div className="rounded-xl border border-dashed border-border p-8 text-center text-[12px] text-text-muted">
-            По этим условиям шаблонов нет. Сбросьте поиск или выберите другую
-            задачу.
+            {libraryView === "favorites" && !templateQuery
+              ? "Добавьте шаблоны в избранное — они появятся здесь."
+              : "По этим условиям шаблонов нет. Сбросьте поиск или выберите другую задачу."}
           </div>
         ) : null}
       </section>
+      ) : null}
 
       <Modal
         open={aiOpen}
