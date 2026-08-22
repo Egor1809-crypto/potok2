@@ -89,6 +89,13 @@ test("both AI constructors persist a thematic fallback when image generation fai
   assert.match(presentation, /slide\.imageUrl = fallback\.url/);
   assert.match(email, /storePublicDomainFallbackImage/);
   assert.match(email, /block\.href = fallback\.url/);
+  assert.match(email, /completeFallbackEmailDesign/);
+  assert.match(
+    email,
+    /Email AI provider unavailable; using complete art-directed fallback/,
+  );
+  assert.match(email, /fallbackDesignedSuggestion/);
+  assert.match(email, /input\.action === "design"/);
   assert.match(store, /candidates\.slice\(0, 6\)/);
   assert.match(store, /storeGeneratedEmailAsset/);
 });

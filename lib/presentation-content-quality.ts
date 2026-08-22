@@ -17,10 +17,12 @@ export function normalizePresentationTitle(value: string) {
   const normalized = value.replace(/\s+/g, " ").trim();
   const withoutCommand = normalized
     .replace(
-      /^(?:(?:нужно|надо)\s+)?(?:сделать|создать|подготовить|собрать|разработать)\s+(?:мне\s+)?(?:презентаци(?:ю|я)|слайд(?:ы|ов)?)(?:\s+(?:на\s+тему|о|об|про|для))?\s*[:—-]?\s*/iu,
+      /^(?:(?:нужно|надо)\s+)?(?:сделать|создать|подготовить|собрать|разработать)\s+(?:мне\s+)?(?:презентаци(?:ю|я)|слайд(?:ы|ов)?)\s*[:—-]?\s*/iu,
       "",
     )
-    .replace(/^(?:презентаци(?:я|ю)\s+(?:на\s+тему|о|об|про))\s*[:—-]?\s*/iu, "")
+    .replace(/^(?:на\s+тему|про|для)\s*[:—-]?\s*/iu, "")
+    .replace(/^(?:презентаци(?:я|ю))\s*[:—-]?\s*/iu, "")
+    .replace(/^(?:на\s+тему|про|для)\s*[:—-]?\s*/iu, "")
     .trim();
   return compactAtWord(capitalize(withoutCommand || normalized), 88);
 }

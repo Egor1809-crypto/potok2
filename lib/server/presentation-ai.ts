@@ -561,6 +561,10 @@ function applyPresentationArtDirection(
         : patternId;
     directed.push({
       ...slide,
+      eyebrow: normalizePresentationEyebrow(slide.eyebrow || "РАЗДЕЛ"),
+      title: normalizePresentationTitle(slide.title),
+      body: normalizePresentationBody(slide.body),
+      bullets: slide.bullets.map(normalizePresentationBullet).slice(0, 6),
       themeId: slide.themeId ?? themeId,
       patternId: effectivePattern,
       ...(imageIndexes.has(index)

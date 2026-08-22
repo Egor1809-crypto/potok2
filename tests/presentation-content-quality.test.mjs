@@ -19,6 +19,10 @@ test("presentation titles become slide-ready instead of copying the user command
     normalizePresentationTitle("презентация на тему: работа с клиентами"),
     "Работа с клиентами",
   );
+  assert.equal(
+    normalizePresentationTitle("Создать презентацию о внедрении ИИ в договорную работу"),
+    "О внедрении ИИ в договорную работу",
+  );
 });
 
 test("presentation typography has enforced readable content budgets", () => {

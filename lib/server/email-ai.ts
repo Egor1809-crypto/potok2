@@ -421,6 +421,84 @@ function fallbackBriefQuestions(goal: string): EmailAiSuggestion {
   };
 }
 
+function fallbackEmailTopic(input: EmailAiRequest) {
+  const cleaned = input.goal
+    .replace(/https:\/\/[^\s]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const invitationSubject = /(?:пригласить|приглашение)[\s\S]*?\sна\s+(.+)/iu.exec(
+    cleaned,
+  )?.[1];
+  const withoutCommand = cleaned
+    .replace(
+      /^(?:нужно|надо|хочу|пожалуйста)?\s*(?:сделать|создать|написать|подготовить|отправить|собрать)?\s*(?:письмо|email|рассылку)?\s*(?:о|об|про|для|на тему)?\s*[:—-]?\s*/iu,
+      "",
+    )
+    .trim();
+  return normalizeDisplayHeading(
+    (invitationSubject || withoutCommand || cleaned || "важном обновлении")
+      .replace(/[.!?]+$/u, "")
+      .slice(0, 110),
+  );
+}
+
+function fallbackDesignedSuggestion(input: EmailAiRequest) {
+  const emailType = classifyEmailType(input.goal);
+  const topic = fallbackEmailTopic(input);
+  const cta = input.ctaLabel || "Узнать подробнее";
+  const copy =
+    emailType === "event" || emailType === "invitation"
+      ? {
+          subject: `Приглашение: ${topic}`,
+          previewText:
+            "Главное о формате встречи, практической пользе и следующем шаге.",
+          body: `Приглашаем вас на ${topic.charAt(0).toLocaleLowerCase("ru-RU")}${topic.slice(1)}. В центре встречи — практический разговор по существу: что уже можно применять, где проходят границы и какие риски важно предусмотреть заранее.\n\nМы соберём ключевые вопросы в понятную рамку, разберём рабочие сценарии и оставим время для содержательного обмена опытом. Без неподтверждённых обещаний и лишней теории.\n\nЕсли формат вам подходит, подтвердите участие по кнопке ниже.`,
+        }
+      : emailType === "welcome"
+        ? {
+            subject: `Добро пожаловать: ${topic}`,
+            previewText: "Коротко о том, с чего начать и где найти главное.",
+            body: `Добро пожаловать! Мы подготовили понятный первый маршрут по теме «${topic}».\n\nНачните с ключевого шага, затем переходите к деталям по мере необходимости. Всё важное собрано без перегрузки и лишних действий.\n\nЕсли понадобится помощь, ответьте на это письмо — мы подскажем следующий шаг.`,
+          }
+        : emailType === "promotion"
+          ? {
+              subject: topic,
+              previewText:
+                "Суть предложения, условия и одно понятное действие — без лишнего шума.",
+              body: `Подготовили предложение по теме «${topic}». Оно помогает быстрее перейти от интереса к конкретному результату и не тратить время на второстепенные детали.\n\nПеред решением проверьте условия и выберите подходящий сценарий. Мы не добавляем неподтверждённых обещаний: в письме остаётся только то, что следует из вашего запроса.\n\nПодробности доступны по кнопке ниже.`,
+            }
+          : emailType === "notification" || emailType === "transactional"
+            ? {
+                subject: topic,
+                previewText: "Что изменилось, что это означает и требуется ли действие.",
+                body: `Сообщаем важную информацию по теме «${topic}».\n\nПроверьте детали и убедитесь, требуется ли действие с вашей стороны. Если действие необходимо, используйте кнопку ниже; если нет — письмо можно сохранить для справки.\n\nЕсли ситуация отличается от описанной, ответьте на письмо для уточнения.`,
+              }
+            : emailType === "product_update"
+              ? {
+                  subject: topic,
+                  previewText: "Что изменилось в продукте и как использовать обновление.",
+                  body: `Обновление по теме «${topic}» уже доступно. Оно упрощает основной рабочий сценарий и делает следующий шаг понятнее.\n\nНачните с задачи, которая сейчас отнимает больше всего времени, и проверьте результат на ограниченном примере. Так вы оцените пользу без лишнего риска.\n\nОписание и порядок действий доступны по кнопке ниже.`,
+                }
+              : {
+                  subject: topic,
+                  previewText:
+                    "Ключевой смысл, практическая польза и следующий шаг в одном письме.",
+                  body: `Коротко о главном по теме «${topic}». Мы собрали информацию так, чтобы сначала был понятен смысл, затем — практическая польза и только после этого детали.\n\nОцените, насколько предложенный подход соответствует вашей задаче, какие ограничения важно учесть и кто будет отвечать за следующий шаг. Это помогает принять решение без лишних предположений.\n\nЕсли тема актуальна, продолжите по кнопке ниже.`,
+                };
+  return parseSuggestion(
+    JSON.stringify({
+      emailType,
+      ...copy,
+      cta,
+      artDirection:
+        "Строгая email-композиция с профессиональной типографикой, тематическим изображением и спокойным смысловым орнаментом.",
+      contentStrategy:
+        "Конкретный вход, практическая польза, ограничения и одно ясное действие.",
+    }),
+    input,
+  );
+}
+
 export function parseAiJson(value: string): Record<string, unknown> {
   const normalized = value
     .trim()
@@ -2118,6 +2196,14 @@ export async function generateEmailSuggestion(
         suggestion: fallbackBriefQuestions(input.goal),
       };
     }
+    if (input.action === "design") {
+      return completeFallbackEmailDesign(
+        request,
+        provider,
+        input,
+        editorialCopy,
+      );
+    }
     throw new ApiRequestError(
       "ИИ-помощник временно недоступен. Повторите попытку.",
       502,
@@ -2130,6 +2216,18 @@ export async function generateEmailSuggestion(
         provider: provider.provider,
         suggestion: fallbackBriefQuestions(input.goal),
       };
+    }
+    if (input.action === "design") {
+      console.warn(
+        "Email AI provider unavailable; using complete art-directed fallback",
+        response.status,
+      );
+      return completeFallbackEmailDesign(
+        request,
+        provider,
+        input,
+        editorialCopy,
+      );
     }
     console.error(
       "OpenAI email assistant error",
@@ -2154,31 +2252,40 @@ export async function generateEmailSuggestion(
         string,
         unknown
       >;
-      response = await fetch(provider.endpoint, {
-        ...requestBody,
-        body: JSON.stringify(
-          provider.provider === "navyai"
-            ? {
-                ...rawRetry,
-                model: "gemini-2.5-flash-lite",
-                messages: [
-                  {
-                    role: "system",
-                    content: `${instructions}\nПРЕДЫДУЩАЯ ПОПЫТКА НАРУШИЛА JSON-СХЕМУ. Верни только один валидный JSON-объект без Markdown, вводного текста и комментариев.`,
-                  },
-                  { role: "user", content: JSON.stringify(modelInput) },
-                ],
-              }
-            : {
-                ...rawRetry,
-                reasoning: { effort: "medium" },
-                instructions: `${instructions}\nПРЕДЫДУЩАЯ ПОПЫТКА НАРУШИЛА JSON-СХЕМУ. Верни только один валидный JSON-объект без Markdown, вводного текста и комментариев.`,
-              },
-        ),
-      });
-      const retryBody: unknown = await response.json().catch(() => null);
-      if (!response.ok) throw error;
-      suggestion = parseSuggestion(outputText(retryBody), input);
+      try {
+        response = await fetch(provider.endpoint, {
+          ...requestBody,
+          body: JSON.stringify(
+            provider.provider === "navyai"
+              ? {
+                  ...rawRetry,
+                  model: "gemini-2.5-flash-lite",
+                  messages: [
+                    {
+                      role: "system",
+                      content: `${instructions}\nПРЕДЫДУЩАЯ ПОПЫТКА НАРУШИЛА JSON-СХЕМУ. Верни только один валидный JSON-объект без Markdown, вводного текста и комментариев.`,
+                    },
+                    { role: "user", content: JSON.stringify(modelInput) },
+                  ],
+                }
+              : {
+                  ...rawRetry,
+                  reasoning: { effort: "medium" },
+                  instructions: `${instructions}\nПРЕДЫДУЩАЯ ПОПЫТКА НАРУШИЛА JSON-СХЕМУ. Верни только один валидный JSON-объект без Markdown, вводного текста и комментариев.`,
+                },
+          ),
+        });
+        const retryBody: unknown = await response.json().catch(() => null);
+        if (!response.ok) throw error;
+        suggestion = parseSuggestion(outputText(retryBody), input);
+      } catch {
+        return completeFallbackEmailDesign(
+          request,
+          provider,
+          input,
+          editorialCopy,
+        );
+      }
     } else {
       throw error;
     }
@@ -2200,6 +2307,34 @@ export async function generateEmailSuggestion(
             : suggestion;
   if (input.action === "design")
     applyEditorialCopy(designed, editorialCopy, input);
+  return {
+    configured: true,
+    provider: provider.provider,
+    suggestion: designed,
+  };
+}
+
+async function completeFallbackEmailDesign(
+  request: Request,
+  provider: NonNullable<ReturnType<typeof aiProvider>>,
+  input: EmailAiRequest,
+  editorialCopy?: EmailAiSuggestion,
+): Promise<EmailAiResponse> {
+  const suggestion = fallbackDesignedSuggestion(input);
+  const designed =
+    input.imageSource === "internet"
+      ? await generateDesignImages(
+          request,
+          provider,
+          await findInternetImages(suggestion),
+          true,
+        )
+      : input.imageSource === "generate"
+        ? await generateDesignImages(request, provider, suggestion)
+        : input.includeLogo
+          ? await generateDesignImages(request, provider, suggestion, true)
+          : suggestion;
+  applyEditorialCopy(designed, editorialCopy, input);
   return {
     configured: true,
     provider: provider.provider,
