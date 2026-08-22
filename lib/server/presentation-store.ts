@@ -11,6 +11,7 @@ import {
   presentationTemplates,
   presentationTheme,
 } from "@/data/presentation-templates";
+import { presentationPatternIds } from "@/data/presentation-patterns";
 import type {
   DeleteResponse,
   PresentationCreateInput,
@@ -57,26 +58,7 @@ const THEMES = new Set<PresentationThemeId>([
   "sunrise",
   "premium",
 ]);
-const PATTERNS = new Set<PresentationPatternId>([
-  "auto",
-  "none",
-  "soft-grid",
-  "editorial-lines",
-  "orbit",
-  "diagonal",
-  "waves",
-  "gold-frame",
-  "aurora-mesh",
-  "topography",
-  "paper-grain",
-  "archways",
-  "confetti",
-  "checker-soft",
-  "sunburst",
-  "halftone",
-  "ribbons",
-  "terrazzo",
-]);
+const PATTERNS = new Set<PresentationPatternId>(presentationPatternIds);
 const LAYOUTS = new Set<PresentationSlideLayout>([
   "title",
   "statement",
@@ -211,6 +193,19 @@ function parseSlide(value: unknown, index: number): PresentationSlide {
     ...(assetId ? { assetId } : {}),
     ...(safeImageUrl(object.imageUrl, assetId)
       ? { imageUrl: safeImageUrl(object.imageUrl, assetId) }
+      : {}),
+    ...(optionalText(
+      object.imagePrompt,
+      `Описание изображения слайда ${index + 1}`,
+      1_200,
+    )
+      ? {
+          imagePrompt: optionalText(
+            object.imagePrompt,
+            `Описание изображения слайда ${index + 1}`,
+            1_200,
+          ),
+        }
       : {}),
     ...(optionalText(object.ctaLabel, `Текст кнопки слайда ${index + 1}`, 100)
       ? {

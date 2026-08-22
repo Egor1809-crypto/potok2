@@ -1,6 +1,11 @@
 import { env } from "cloudflare:workers";
 
 import { getD1 } from "@/db";
+import {
+  presentationPatternCatalog,
+  presentationPatternIds,
+  type PresentationPatternId,
+} from "@/data/presentation-patterns";
 import { presentationTheme } from "@/data/presentation-templates";
 import type {
   PresentationAiRequest,
@@ -19,6 +24,10 @@ import {
   optionalText,
 } from "./api-utils";
 import { ensureDatabase, WORKSPACE_ID } from "./database-init";
+import {
+  storeGeneratedEmailAsset,
+  storeGeneratedEmailAssetBytes,
+} from "./email-asset-store";
 
 const THEMES = new Set<PresentationThemeId>([
   "atelier",
@@ -63,6 +72,9 @@ const GENERATION_LIMIT = 8;
 const IDEMPOTENCY_STALE_MS = 15 * 60 * 1_000;
 const PROVIDER_TIMEOUT_MS = 55_000;
 const MAX_PROVIDER_RESPONSE_BYTES = 1_000_000;
+const PRESENTATION_IMAGE_LIMIT = 2;
+const PRESENTATION_IMAGE_TIMEOUT_MS = 90_000;
+const PATTERNS = new Set<PresentationPatternId>(presentationPatternIds);
 
 function runtime() {
   return env as unknown as {
@@ -70,6 +82,7 @@ function runtime() {
     NAVYAI_BASE_URL?: string;
     NAVYAI_PRESENTATION_MODEL?: string;
     NAVYAI_EMAIL_MODEL?: string;
+    NAVYAI_IMAGE_MODEL?: string;
     OPENAI_API_KEY?: string;
     OPENAI_PRESENTATION_MODEL?: string;
     OPENAI_EMAIL_MODEL?: string;
@@ -88,6 +101,8 @@ function provider() {
         runtime().NAVYAI_EMAIL_MODEL?.trim() ||
         "gpt-5.2",
       fallbackModel: "gemini-2.5-flash-lite",
+      imageEndpoint: `${runtime().NAVYAI_BASE_URL?.trim().replace(/\/$/, "") || "https://api.navy/v1"}/images/generations`,
+      imageModel: runtime().NAVYAI_IMAGE_MODEL?.trim() || "gpt-image-1.5",
     };
   }
   const openAiKey = runtime().OPENAI_API_KEY?.trim();
@@ -101,6 +116,8 @@ function provider() {
           runtime().OPENAI_EMAIL_MODEL?.trim() ||
           "gpt-5.2",
         fallbackModel: undefined,
+        imageEndpoint: "https://api.openai.com/v1/images/generations",
+        imageModel: "gpt-image-1",
       }
     : null;
 }
@@ -316,6 +333,22 @@ function parseSlides(
     const layout = LAYOUTS.has(rawLayout as PresentationSlideLayout)
       ? (rawLayout as PresentationSlideLayout)
       : "statement";
+    const rawPattern = optionalModelText(
+      object.patternId,
+      `Узор слайда ${index + 1}`,
+      40,
+    );
+    const patternId = PATTERNS.has(rawPattern as PresentationPatternId)
+      ? (rawPattern as PresentationPatternId)
+      : undefined;
+    const rawTheme = optionalModelText(
+      object.themeId,
+      `Стиль слайда ${index + 1}`,
+      30,
+    );
+    const themeId = THEMES.has(rawTheme as PresentationThemeId)
+      ? (rawTheme as PresentationThemeId)
+      : undefined;
     const bullets = Array.isArray(object.bullets)
       ? object.bullets
           .slice(0, 8)
@@ -345,6 +378,21 @@ function parseSlides(
           optionalModelText(object.body, `Текст слайда ${index + 1}`, 1_500) ??
           "",
         bullets,
+        ...(patternId ? { patternId } : {}),
+        ...(themeId ? { themeId } : {}),
+        ...(optionalModelText(
+          object.imagePrompt,
+          `Описание изображения слайда ${index + 1}`,
+          1_200,
+        )
+          ? {
+              imagePrompt: optionalModelText(
+                object.imagePrompt,
+                `Описание изображения слайда ${index + 1}`,
+                1_200,
+              ),
+            }
+          : {}),
         speakerNotes:
           optionalModelText(
             object.speakerNotes,
@@ -381,6 +429,206 @@ function parseSlides(
       };
     }
   }
+  return slides;
+}
+
+const topicPatternPools: Array<{
+  pattern: RegExp;
+  ids: PresentationPatternId[];
+}> = [
+  {
+    pattern: /технолог|данн|цифр|ии|ai|saas|разработ|инженер|финтех/i,
+    ids: ["circuit-board", "data-stream", "constellation", "hexagon-net", "soft-grid"],
+  },
+  {
+    pattern: /природ|эко|ботан|сад|еда|здоров|wellness|органич/i,
+    ids: ["organic-cells", "flower-lattice", "contour-flow", "topography", "waves"],
+  },
+  {
+    pattern: /преми|luxur|дорог|элит|fashion|мод|ювелир|архитект/i,
+    ids: ["gold-frame", "frame-corners", "monogram", "fan-arches", "editorial-lines"],
+  },
+  {
+    pattern: /празд|фестив|детск|игр|креатив|вечерин|развлеч/i,
+    ids: ["memphis", "confetti", "star-field", "bauhaus", "terrazzo"],
+  },
+  {
+    pattern: /финанс|банк|юрид|отч[её]т|исслед|аналит|консалт|стратег/i,
+    ids: ["editorial-lines", "plaid", "diamond-grid", "barcode", "micro-dots"],
+  },
+  {
+    pattern: /путеш|географ|маршрут|город|недвиж|строител/i,
+    ids: ["topography", "contour-flow", "archways", "isometric-cubes", "fan-arches"],
+  },
+];
+
+const defaultPatternPool: PresentationPatternId[] = [
+  "aurora-mesh",
+  "editorial-lines",
+  "orbit",
+  "gradient-orbs",
+  "diamond-grid",
+  "micro-dots",
+  "frame-corners",
+  "contour-flow",
+];
+
+function hashText(value: string) {
+  return [...value].reduce(
+    (sum, character) => (sum * 31 + character.charCodeAt(0)) >>> 0,
+    2166136261,
+  );
+}
+
+function presentationPatternFor(
+  input: ReturnType<typeof parseRequest>,
+  slide: PresentationSlide,
+  index: number,
+) {
+  const subject = `${input.goal}\n${input.context ?? ""}\n${input.designBrief ?? ""}`;
+  const pool =
+    topicPatternPools.find((candidate) => candidate.pattern.test(subject))?.ids ??
+    defaultPatternPool;
+  const roleOffset =
+    slide.layout === "title"
+      ? 0
+      : slide.layout === "closing"
+        ? 2
+        : ["stats", "chart", "table", "comparison"].includes(slide.layout)
+          ? 3
+          : 1;
+  return pool[(hashText(`${slide.title}:${index}`) + roleOffset) % pool.length];
+}
+
+function fallbackPresentationImagePrompt(
+  input: ReturnType<typeof parseRequest>,
+  slide: PresentationSlide,
+  themeId: PresentationThemeId,
+) {
+  const visualStyle =
+    input.designBrief ||
+    (themeId === "premium"
+      ? "quiet luxury, dramatic soft light, restrained materials"
+      : themeId === "editorial"
+        ? "editorial art photography, tactile natural textures"
+        : themeId === "neon" || themeId === "violet"
+          ? "cinematic technology editorial, controlled neon accents"
+          : "premium contemporary editorial photography");
+  return `Тема презентации: ${input.goal}. Смысл слайда: ${slide.title}. Создай один предметный визуальный образ, который раскрывает этот тезис, а не буквально иллюстрирует каждое слово. Арт-направление: ${visualStyle}. Горизонтальная композиция 3:2, главный объект в центральных 70%, чистые края и достаточно негативного пространства. Без текста, букв, цифр, логотипов, интерфейсов, мокапов и водяных знаков.`;
+}
+
+function applyPresentationArtDirection(
+  slides: PresentationSlide[],
+  input: ReturnType<typeof parseRequest>,
+  themeId: PresentationThemeId,
+) {
+  const noImages = /без\s+(?:фото|изображ|картин)|только\s+типограф/i.test(
+    `${input.goal}\n${input.designBrief ?? ""}`,
+  );
+  const preferredImageIndexes = [
+    slides.findIndex((slide) => slide.layout === "title"),
+    slides.findIndex((slide, index) =>
+      index > 0 && ["split", "gallery", "callout", "statement"].includes(slide.layout),
+    ),
+    slides.findIndex((slide, index) =>
+      index > 0 && index < slides.length - 1 && !["stats", "chart", "table"].includes(slide.layout),
+    ),
+  ].filter((value, index, values) => value >= 0 && values.indexOf(value) === index);
+  const imageIndexes = new Set(
+    noImages ? [] : preferredImageIndexes.slice(0, PRESENTATION_IMAGE_LIMIT),
+  );
+
+  const directed: PresentationSlide[] = [];
+  slides.forEach((slide, index) => {
+    const patternId =
+      slide.patternId && slide.patternId !== "auto" && slide.patternId !== "none"
+        ? slide.patternId
+        : presentationPatternFor(input, slide, index);
+    const previousPattern = directed.at(-1)?.patternId;
+    const effectivePattern =
+      previousPattern === patternId && directed.at(-2)?.patternId === patternId
+        ? presentationPatternFor(input, slide, index + 7)
+        : patternId;
+    directed.push({
+      ...slide,
+      themeId: slide.themeId ?? themeId,
+      patternId: effectivePattern,
+      ...(imageIndexes.has(index)
+        ? {
+            imagePrompt:
+              slide.imagePrompt ||
+              fallbackPresentationImagePrompt(input, slide, themeId),
+          }
+        : { imagePrompt: undefined }),
+    });
+  });
+  return directed;
+}
+
+async function generatePresentationImages(
+  request: Request,
+  selected: NonNullable<ReturnType<typeof provider>>,
+  slides: PresentationSlide[],
+) {
+  const targets = slides
+    .filter((slide) => slide.imagePrompt && !slide.assetId)
+    .slice(0, PRESENTATION_IMAGE_LIMIT);
+  await Promise.all(
+    targets.map(async (slide, index) => {
+      try {
+        const response = await fetch(selected.imageEndpoint, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${selected.key}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: selected.imageModel,
+            prompt: `${slide.imagePrompt}\nЗаконченное оригинальное изображение для профессиональной презентации. Не добавляй читаемый текст, логотип, интерфейс или водяной знак.`,
+            size: "1536x1024",
+            quality: "high",
+            n: 1,
+          }),
+          signal: AbortSignal.timeout(PRESENTATION_IMAGE_TIMEOUT_MS),
+        });
+        const body = asObject(await response.json());
+        const data = Array.isArray(body.data) ? body.data : [];
+        const first =
+          data[0] && typeof data[0] === "object"
+            ? (data[0] as Record<string, unknown>)
+            : null;
+        if (!response.ok || !first) throw new Error("Image generation failed");
+        const filename = `Иллюстрация презентации ${index + 1}`;
+        const stored =
+          typeof first.url === "string" && first.url.startsWith("https://")
+            ? await storeGeneratedEmailAsset(
+                request,
+                first.url,
+                "photo",
+                filename,
+              )
+            : typeof first.b64_json === "string" && first.b64_json.length > 100
+              ? await storeGeneratedEmailAssetBytes(
+                  request,
+                  Uint8Array.from(atob(first.b64_json), (character) =>
+                    character.charCodeAt(0),
+                  ),
+                  "image/png",
+                  "photo",
+                  filename,
+                )
+              : null;
+        if (!stored) throw new Error("Image provider returned no file");
+        slide.assetId = stored.id;
+        slide.imageUrl = stored.url;
+      } catch (error) {
+        console.warn(
+          "Presentation AI visual generation failed",
+          error instanceof Error ? error.message : "unknown error",
+        );
+      }
+    }),
+  );
   return slides;
 }
 
@@ -672,6 +920,9 @@ function responseSchema(slideCount: number) {
             "title",
             "body",
             "bullets",
+            "themeId",
+            "patternId",
+            "imagePrompt",
             "speakerNotes",
           ],
           properties: {
@@ -702,6 +953,20 @@ function responseSchema(slideCount: number) {
               type: "array",
               maxItems: 8,
               items: { type: "string", maxLength: 240 },
+            },
+            themeId: {
+              type: "string",
+              enum: [...THEMES],
+            },
+            patternId: {
+              type: "string",
+              enum: presentationPatternIds.filter(
+                (pattern) => pattern !== "auto" && pattern !== "none",
+              ),
+            },
+            imagePrompt: {
+              type: ["string", "null"],
+              maxLength: 1_200,
             },
             speakerNotes: { type: "string", maxLength: 3_000 },
           },
@@ -1134,11 +1399,13 @@ export async function generatePresentationOutline(
 
 Драматургия: сильный вход → почему тема важна сейчас → как устроено → практические сценарии → ограничения/риски → критерии решения → ясный финал. У каждого слайда один вывод и своя функция. Заголовок должен сообщать вывод, а не называться «Возможности», «Риски» или «Итоги». Не делай agenda и не пиши заглушки «добавьте факты», «нужно показать», «согласуйте пилот».
 
-Композиция должна меняться осмысленно: title только первый, closing только последний; statement — один тезис; split — текст и изображение; bullets — система; timeline — этапы во времени; process — последовательность действий; comparison — честное сравнение; agenda — структура выступления; gallery — визуальная история; chart и stats — только подтверждённые числа; table — компактная матрица; callout — важное предупреждение или вывод; quote — только предоставленная реальная цитата. Не повторяй layout более двух раз подряд. Для визуальной подачи чередуй крупный тезис, структурный слайд, контраст/сравнение и практический слайд. visualDesignBrief обязателен: он определяет арт-направление, характер узоров, контраст, плотность и ритм. «Премиальный» означает сдержанную типографику, графит/слоновую кость, тонкие линии и золотой акцент — не фиолетовый шаблон и не россыпь одинаковых точек.
+Композиция должна меняться осмысленно: title только первый, closing только последний; statement — один тезис; split — текст и изображение; bullets — система; timeline — этапы во времени; process — последовательность действий; comparison — честное сравнение; agenda — структура выступления; gallery — визуальная история; chart и stats — только подтверждённые числа; table — компактная матрица; callout — важное предупреждение или вывод; quote — только предоставленная реальная цитата. Не повторяй layout более двух раз подряд. Для визуальной подачи чередуй крупный тезис, структурный слайд, контраст/сравнение и практический слайд.
+
+Ты отвечаешь не только за текст, но и за реальную арт-дирекцию каждого слайда. У каждого слайда обязательны themeId и patternId из переданных библиотек. Узоры выбирай по смыслу и роли: технологиям — схемы и потоки данных, аналитике — сетки и редакционные линии, природе — органика и контуры, премиальному продукту — тихие рамки и монограммный ритм. Не ставь один узор на все слайды и не повторяй один patternId более двух раз подряд. Сохраняй целостную дизайн-систему, но меняй визуальный ритм между слайдами. Ровно для двух наиболее визуальных слайдов верни подробный imagePrompt; для остальных imagePrompt=null. ImagePrompt описывает предметную сцену, композицию, свет, материал и связь с тезисом, запрещает текст, логотипы, интерфейсы и водяные знаки. Если пользователь прямо просит без изображений, для всех imagePrompt=null. visualDesignBrief обязателен: он определяет арт-направление, контраст, плотность и ритм. «Премиальный» означает сдержанную типографику, графит/слоновую кость, тонкие линии и золотой акцент — не фиолетовый шаблон и не россыпь одинаковых точек.
 
 Тексты должны помещаться без уменьшения до нечитаемого размера: title до 80 знаков, body до 280 знаков, максимум 4 bullets по 90 знаков. eyebrow — короткая смысловая метка. speakerNotes — 1–3 полезных предложения для выступающего, не повтор текста. Верни ровно ${input.slideCount} слайдов.
 
-Ответ — только один JSON-объект с name, description и slides; у каждого слайда обязательны layout, eyebrow, title, body, bullets, speakerNotes. Никаких Markdown и комментариев.`;
+Ответ — только один JSON-объект с name, description и slides; у каждого слайда обязательны layout, eyebrow, title, body, bullets, themeId, patternId, imagePrompt, speakerNotes. Никаких Markdown и комментариев.`;
     const modelInput = {
       userGoal: input.goal,
       audience: input.audience || "Аудитория указана в задаче пользователя",
@@ -1154,6 +1421,14 @@ export async function generatePresentationOutline(
       visualDesignBrief:
         input.designBrief ||
         "Выразительный, но деловой дизайн с аккуратными узорами и достаточным контрастом",
+      availableThemes: [...THEMES],
+      patternLibrary: presentationPatternCatalog
+        .filter((pattern) => pattern.id !== "auto" && pattern.id !== "none")
+        .map((pattern) => ({
+          id: pattern.id,
+          name: pattern.label,
+          category: pattern.category,
+        })),
       exactAction: {
         label: input.ctaLabel,
         url: input.ctaUrl,
@@ -1270,6 +1545,12 @@ export async function generatePresentationOutline(
         usedTopicFallback = true;
       }
     }
+    slides = applyPresentationArtDirection(
+      slides,
+      input,
+      selectedThemeId,
+    );
+    slides = await generatePresentationImages(request, selected, slides);
     const lastSlide = slides.at(-1);
     if (lastSlide)
       slides[slides.length - 1] = {
@@ -1315,6 +1596,16 @@ export async function generatePresentationOutline(
       const selectedThemeId = resolvedThemeId(input);
       const theme = presentationTheme(selectedThemeId);
       const fallback = safeFallbackOutline(input);
+      fallback.slides = applyPresentationArtDirection(
+        fallback.slides,
+        input,
+        selectedThemeId,
+      );
+      fallback.slides = await generatePresentationImages(
+        request,
+        selected,
+        fallback.slides,
+      );
       const fallbackLast = fallback.slides.at(-1);
       if (fallbackLast)
         fallback.slides[fallback.slides.length - 1] = {

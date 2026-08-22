@@ -2,6 +2,7 @@ import type {
   DeliveryChannelId,
   IntegrationProviderId,
 } from "@/config/integrations";
+import type { PresentationPatternId } from "@/data/presentation-patterns";
 import type { TemplateCategory } from "./template";
 
 export type ApiError = {
@@ -419,25 +420,7 @@ export type PresentationThemeId =
   | "sunrise"
   | "premium";
 
-export type PresentationPatternId =
-  | "auto"
-  | "none"
-  | "soft-grid"
-  | "editorial-lines"
-  | "orbit"
-  | "diagonal"
-  | "waves"
-  | "gold-frame"
-  | "aurora-mesh"
-  | "topography"
-  | "paper-grain"
-  | "archways"
-  | "confetti"
-  | "checker-soft"
-  | "sunburst"
-  | "halftone"
-  | "ribbons"
-  | "terrazzo";
+export type { PresentationPatternId } from "@/data/presentation-patterns";
 
 export type PresentationSlideLayout =
   | "title"
@@ -467,6 +450,7 @@ export type PresentationSlide = {
   speakerNotes: string;
   assetId?: string;
   imageUrl?: string;
+  imagePrompt?: string;
   ctaLabel?: string;
   ctaUrl?: string;
   socialLinks?: Array<{ label: string; url: string }>;

@@ -1,0 +1,3 @@
+Pattern artwork is derived from Pattern Monster (https://pattern.monster/).
+MIT License. Copyright (c) 2020-2023 pattern.monster.
+See https://github.com/catchspider2002/svelte-svg-patterns/blob/master/LICENSE.md

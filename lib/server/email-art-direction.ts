@@ -26,9 +26,6 @@ export type EmailPatternArtwork = {
   alt: string;
 };
 
-const EMAIL_PATTERN_ORIGIN =
-  "https://mailflow-outreach.isakovegor820.chatgpt.site";
-
 export type EmailVisualPalette = {
   accent: string;
   secondaryAccent?: string;
@@ -428,33 +425,39 @@ export function selectEmailPatternArtwork(
   style: EmailVisualStyle,
 ): EmailPatternArtwork {
   const text = value.toLocaleLowerCase("ru-RU");
+  const scored = emailPatternLibrary
+    .map((pattern) => {
+      const keywordHits = pattern.keywords.filter((keyword) =>
+        new RegExp(keyword, "iu").test(text),
+      ).length;
+      const styleFit = pattern.styles.includes(style) ? 1 : 0;
+      const nativePriority = pattern.source === "potok" ? 0.35 : 0;
+      return {
+        pattern,
+        score: keywordHits * 4 + styleFit + nativePriority,
+      };
+    })
+    .sort((left, right) => right.score - left.score);
+  const bestScore = scored[0]?.score ?? 0;
+  const candidates = scored.filter(
+    (candidate) => candidate.score >= Math.max(1, bestScore - 0.01),
+  );
+  const fallbackId =
+    style === "premium"
+      ? "quiet-luxury"
+      : style === "editorial"
+        ? "editorial-rules"
+        : style === "bold"
+          ? "terrazzo-studio"
+          : "paper-grain";
   const selected =
-    /свидан|роман|любов|свадьб|ужин|ресторан/.test(text)
-      ? ["romantic-ribbon", "Романтическая лента"]
-      : /чай|кофе|ботан|растен|природ|эко|сад|лес|трав|органик/.test(text)
-        ? ["botanical-herbarium", "Ботанический гербарий"]
-        : /празд|поздрав|день рожд|юбиле|вечерин/.test(text)
-          ? ["celebration-spark", "Праздничное сияние"]
-          : /путеш|маршрут|отел|тур|географ|экспедиц/.test(text)
-            ? ["topographic-lines", "Топографические линии"]
-            : /технолог|данн|цифр|разработ|сервис|saas|продукт/.test(text) ||
-                /(?:^|[^\p{L}])(?:ии|ai)(?:[^\p{L}]|$)/u.test(text)
-              ? ["signal-grid", "Сигнальная сетка"]
-              : /вода|море|океан|спа|здоров|спокой|медитац/.test(text)
-                ? ["water-ripples", "Водная рябь"]
-                : style === "premium"
-                  ? ["quiet-luxury", "Тихая роскошь"]
-                  : style === "editorial"
-                    ? ["editorial-rules", "Редакционные линейки"]
-                    : style === "bold"
-                      ? ["terrazzo-studio", "Студийное терраццо"]
-                      : ["paper-grain", "Бумажная фактура"];
-  const [id, name] = selected;
+    (bestScore >= 4 ? candidates[0]?.pattern : undefined) ??
+    emailPatternLibrary.find((pattern) => pattern.id === fallbackId)!;
   return {
-    id,
-    name,
-    imageUrl: `${EMAIL_PATTERN_ORIGIN}/email-patterns/${id}.jpg`,
-    alt: `Декоративный узор «${name}»`,
+    id: selected.id,
+    name: selected.name,
+    imageUrl: selected.imageUrl,
+    alt: `Декоративный узор «${selected.name}»`,
   };
 }
 
@@ -485,3 +488,4 @@ export function fallbackEmailImagePrompt(
     : `Главный цветовой акцент ${palette.name} ${palette.accent}`;
   return `${scene}. ${direction}. ${colors}. Горизонтальная композиция для email, объект в центральных 70%, безопасное кадрирование. Без текста, букв, логотипов, интерфейсов и водяных знаков.`;
 }
+import { emailPatternLibrary } from "@/data/email-pattern-library";

@@ -3,6 +3,7 @@ import type {
   PresentationProjectRecord,
   PresentationSlide,
 } from "@/types/api";
+import { presentationPatternDefinition } from "@/data/presentation-patterns";
 import { presentationTheme } from "@/data/presentation-templates";
 
 const SLIDE_WIDTH = 12_192_000;
@@ -151,6 +152,65 @@ function presentationPatternShapes(
             ? rect(id++, `Фрагмент ${index + 1}`, x * EMU, y * EMU, size * 1.8, size, index % 2 ? soft : project.accentColor, true, (index * 17) % 90)
             : ellipse(id++, `Фрагмент ${index + 1}`, x * EMU, y * EMU, size, size, index % 2 ? soft : project.accentColor),
         );
+      }
+    }
+    if (!shapes.length) {
+      const family = presentationPatternDefinition(patternId).family;
+      if (family === "gradient") {
+        shapes.push(
+          ellipse(id++, "Градиент · левое поле", -1.25 * EMU, -1.1 * EMU, 4.8 * EMU, 3.8 * EMU, soft),
+          ellipse(id++, "Градиент · правое поле", 9.5 * EMU, 4.7 * EMU, 4.1 * EMU, 3.2 * EMU, project.accentColor),
+        );
+      } else if (family === "organic" || family === "architecture") {
+        for (let index = 0; index < 6; index += 1) {
+          const size = (2.7 - index * 0.3) * EMU;
+          shapes.push(
+            ellipse(id++, `Контур ${index + 1}`, (9.7 + index * 0.15) * EMU, (-0.25 + index * 0.18) * EMU, size, size, index % 2 ? project.backgroundColor : soft),
+          );
+        }
+      } else if (family === "geometry") {
+        for (let column = 0; column < 7; column += 1) {
+          shapes.push(
+            rect(id++, `Геометрия ${column + 1}`, (8.7 + column * 0.55) * EMU, (0.25 + (column % 3) * 0.72) * EMU, 0.44 * EMU, 0.44 * EMU, column % 2 ? soft : project.accentColor, true, 45),
+          );
+        }
+      } else if (family === "technology") {
+        for (let index = 0; index < 9; index += 1) {
+          const x = (8.55 + (index % 3) * 1.15) * EMU;
+          const y = (0.45 + Math.floor(index / 3) * 0.78) * EMU;
+          shapes.push(
+            rect(id++, `Сеть · линия ${index + 1}`, x, y, 0.92 * EMU, 0.025 * EMU, soft),
+            ellipse(id++, `Сеть · узел ${index + 1}`, x, y - 0.055 * EMU, 0.12 * EMU, 0.12 * EMU, index % 2 ? soft : project.accentColor),
+          );
+        }
+      } else if (family === "editorial") {
+        for (let index = 0; index < 5; index += 1)
+          shapes.push(
+            rect(id++, `Редакционная линейка ${index + 1}`, (0.72 + index * 2.6) * EMU, 0, 0.02 * EMU, SLIDE_HEIGHT, index === 0 ? project.accentColor : soft),
+          );
+      } else if (family === "premium") {
+        shapes.push(
+          rect(id++, "Рамка · верх слева", 0.58 * EMU, 0.45 * EMU, 1.5 * EMU, 0.025 * EMU, project.accentColor),
+          rect(id++, "Рамка · слева сверху", 0.58 * EMU, 0.45 * EMU, 0.025 * EMU, 0.9 * EMU, project.accentColor),
+          rect(id++, "Рамка · низ справа", 10.1 * EMU, 6.28 * EMU, 1.5 * EMU, 0.025 * EMU, project.accentColor),
+          rect(id++, "Рамка · справа снизу", 11.58 * EMU, 5.4 * EMU, 0.025 * EMU, 0.9 * EMU, project.accentColor),
+        );
+      } else if (family === "texture") {
+        for (let row = 0; row < 6; row += 1)
+          for (let column = 0; column < 10; column += 1)
+            shapes.push(
+              ellipse(id++, `Фактура ${row + 1}.${column + 1}`, (9.0 + column * 0.27) * EMU, (0.35 + row * 0.27) * EMU, 0.026 * EMU, 0.026 * EMU, column % 3 ? soft : project.accentColor),
+            );
+      } else if (family === "playful" || family === "celebration") {
+        for (let index = 0; index < 16; index += 1) {
+          const x = ((index * 83) % 1160) / 100;
+          const y = ((index * 47) % 620) / 100;
+          shapes.push(
+            index % 2
+              ? ellipse(id++, `Акцент ${index + 1}`, x * EMU, y * EMU, 0.07 * EMU, 0.07 * EMU, soft)
+              : rect(id++, `Акцент ${index + 1}`, x * EMU, y * EMU, 0.1 * EMU, 0.045 * EMU, project.accentColor, true, (index * 19) % 90),
+          );
+        }
       }
     }
     return { shapes, nextId: id };

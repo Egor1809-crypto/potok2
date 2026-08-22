@@ -1,6 +1,18 @@
+import { emailPatternLibrary } from "@/data/email-pattern-library";
+
 const SITE_ORIGIN = "https://mailflow-outreach.isakovegor820.chatgpt.site";
 
-export type EmailPatternCategory = "light" | "dark" | "networks" | "security" | "systems";
+export type EmailPatternCategory =
+  | "light"
+  | "dark"
+  | "networks"
+  | "security"
+  | "systems"
+  | "editorial"
+  | "organic"
+  | "geometry"
+  | "celebration"
+  | "premium";
 
 export type EmailPatternPreset = {
   id: string;
@@ -27,6 +39,11 @@ export const emailPatternCategoryLabels: Record<EmailPatternCategory, string> = 
   networks: "Сети и данные",
   security: "Безопасность",
   systems: "Системы и инфраструктура",
+  editorial: "Редакционные и фактурные",
+  organic: "Органика и флористика",
+  geometry: "Геометрия и архитектура",
+  celebration: "События и праздники",
+  premium: "Премиальные орнаменты",
 };
 
 const patternNames = [
@@ -51,7 +68,7 @@ const categories: EmailPatternCategory[] = [
   "systems", "dark", "light", "dark", "networks", "dark",
 ];
 
-export const emailPatternPresets: EmailPatternPreset[] = patternNames.map((name, index) => {
+const technologyPatternPresets: EmailPatternPreset[] = patternNames.map((name, index) => {
   const number = index + 1;
   const filename = String(number).padStart(2, "0");
   return {
@@ -65,6 +82,34 @@ export const emailPatternPresets: EmailPatternPreset[] = patternNames.map((name,
     letterSpacing: 0,
   };
 });
+
+const libraryCategory: Record<
+  (typeof emailPatternLibrary)[number]["category"],
+  EmailPatternCategory
+> = {
+  romantic: "organic",
+  botanical: "organic",
+  editorial: "editorial",
+  geometry: "geometry",
+  technology: "networks",
+  celebration: "celebration",
+  premium: "premium",
+  texture: "editorial",
+};
+
+export const emailPatternPresets: EmailPatternPreset[] = [
+  ...technologyPatternPresets,
+  ...emailPatternLibrary.map((pattern) => ({
+    id: `library-${pattern.id}`,
+    name: pattern.name,
+    category: libraryCategory[pattern.category],
+    imageUrl: pattern.imageUrl,
+    textColor: "#172033",
+    content: `Декоративный узор «${pattern.name}»`,
+    fontSize: 16,
+    letterSpacing: 0,
+  })),
+];
 
 const backgroundNames = [
   "Неоновое правосудие", "Светлая Гжель", "Архитектурные волны",

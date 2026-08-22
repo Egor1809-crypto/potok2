@@ -69,7 +69,7 @@ export const blockLibrary: BlockLibraryItem[] = [
   { type: "stats", label: "Показатели", description: "Цифры и результаты", icon: ChartNoAxesColumnIncreasing },
   { type: "product", label: "Карточка", description: "Продукт или услуга", icon: PackageOpen },
   { type: "signature", label: "Подпись", description: "Отправитель и контакты", icon: ContactRound },
-  { type: "pattern", label: "Узор", description: "30 технологических фонов", icon: Shapes },
+  { type: "pattern", label: "Узор", description: "78 фонов и орнаментов", icon: Shapes },
   { type: "banner", label: "Баннер", description: "Яркое объявление", icon: Megaphone },
   { type: "timeline", label: "Этапы", description: "Путь или программа", icon: ListTree },
   { type: "faq", label: "Вопросы", description: "Вопросы и ответы", icon: CircleHelp },
@@ -103,6 +103,16 @@ export function BlockLibrary({
     if (tab === "frame" || tab === "decor") return [];
     return blockLibrary.filter((item) => (tab === "layout" ? layoutTypes.has(item.type) : !layoutTypes.has(item.type)) && (!normalized || `${item.label} ${item.description}`.toLowerCase().includes(normalized)));
   }, [query, tab]);
+  const visiblePatterns = useMemo(() => {
+    const normalized = query.trim().toLocaleLowerCase("ru-RU");
+    return emailPatternPresets.filter(
+      (preset) =>
+        !normalized ||
+        `${preset.name} ${emailPatternCategoryLabels[preset.category]}`
+          .toLocaleLowerCase("ru-RU")
+          .includes(normalized),
+    );
+  }, [query]);
   return (
     <aside
       aria-label="Блоки контента"
@@ -119,7 +129,7 @@ export function BlockLibrary({
         <label className="mt-3 flex h-9 items-center gap-2 rounded-lg border border-border bg-surface-subtle px-3 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10">
           <Search aria-hidden="true" className="size-3.5 text-text-subtle" />
           <span className="sr-only">Найти блок</span>
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Найти блок" className="min-w-0 flex-1 border-0 bg-transparent text-[11px] text-text-strong outline-none placeholder:text-text-subtle" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={tab === "decor" ? "Найти узор" : "Найти блок"} className="min-w-0 flex-1 border-0 bg-transparent text-[11px] text-text-strong outline-none placeholder:text-text-subtle" />
         </label>
         <div className="mt-3 grid grid-cols-2 gap-1 rounded-lg bg-surface-subtle p-1" role="tablist" aria-label="Тип элементов">
           <LibraryTab active={tab === "content"} onClick={() => setTab("content")} icon={AlignJustify}>Контент</LibraryTab>
@@ -178,11 +188,15 @@ export function BlockLibrary({
               ) : null}
             </section>
             <p className="m-0 border-t border-border/70 pt-4 text-[10px] leading-4 text-text-muted">Узор добавится отдельной фоновой плашкой. После добавления замените текст на свой.</p>
-            {(Object.keys(emailPatternCategoryLabels) as Array<keyof typeof emailPatternCategoryLabels>).map((category) => (
+            {(Object.keys(emailPatternCategoryLabels) as Array<keyof typeof emailPatternCategoryLabels>).map((category) => {
+              const categoryPatterns = visiblePatterns.filter(
+                (preset) => preset.category === category,
+              );
+              return categoryPatterns.length ? (
               <section key={category} aria-labelledby={`pattern-${category}`}>
                 <h3 id={`pattern-${category}`} className="mb-2 mt-0 text-[10px] font-semibold text-text-strong">{emailPatternCategoryLabels[category]}</h3>
                 <div className="grid grid-cols-2 gap-2">
-                  {emailPatternPresets.filter((preset) => preset.category === category).map((preset) => (
+                  {categoryPatterns.map((preset) => (
                     <button
                       key={preset.id}
                       type="button"
@@ -204,7 +218,8 @@ export function BlockLibrary({
                   ))}
                 </div>
               </section>
-            ))}
+              ) : null;
+            })}
           </div>
         ) : (
         <div className="grid grid-cols-2 gap-2 lg:grid-cols-1 xl:grid-cols-2">

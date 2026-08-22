@@ -33,3 +33,35 @@ test("brand library ships eleven background templates and thirty extracted patte
     assert.ok(details.size < 90_000, `${name} should stay email-friendly`);
   }
 });
+
+test("general email decor adds a large licensed pattern library", async () => {
+  const [catalog, presets, license] = await Promise.all([
+    import("../data/email-pattern-library.ts"),
+    readFile(
+      new URL("../components/email-builder/pattern-presets.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../public/email-patterns/PATTERN-MONSTER-LICENSE.txt",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ]);
+  assert.equal(catalog.emailPatternLibrary.length, 48);
+  assert.match(presets, /78 фонов и орнаментов|emailPatternLibrary/);
+  assert.match(license, /MIT License/);
+  const monster = catalog.emailPatternLibrary.filter(
+    (pattern) => pattern.source === "pattern-monster",
+  );
+  assert.equal(monster.length, 36);
+  for (const pattern of monster) {
+    const filename = pattern.imageUrl.split("/").at(-1);
+    const details = await stat(
+      new URL(`../public/email-patterns/${filename}`, import.meta.url),
+    );
+    assert.ok(details.size > 30_000, `${filename} should be a real pattern`);
+    assert.ok(details.size < 450_000, `${filename} should stay optimized`);
+  }
+});

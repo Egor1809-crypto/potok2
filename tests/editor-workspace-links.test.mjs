@@ -123,6 +123,8 @@ test("AI briefs preserve design, CTA and social links in emails and presentation
   }
   assert.match(presentationAi, /designBrief/);
   assert.match(presentationAi, /socialLinks/);
+  assert.match(presentationAi, /imagePrompt/);
+  assert.match(presentationAi, /patternId/);
   assert.match(pptx, /TargetMode="External"/);
   assert.match(pptx, /hyperlinkId/);
 });

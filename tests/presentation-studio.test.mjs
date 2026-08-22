@@ -217,8 +217,12 @@ test("AI presentation outline follows a narrative and does not invent evidence",
   assert.match(server, /suggestedLayouts/);
   assert.match(
     server,
-    /обязательны layout, eyebrow, title, body, bullets, speakerNotes/,
+    /обязательны layout, eyebrow, title, body, bullets, themeId, patternId, imagePrompt, speakerNotes/,
   );
+  assert.match(server, /generatePresentationImages/);
+  assert.match(server, /images\/generations/);
+  assert.match(server, /PRESENTATION_IMAGE_LIMIT = 2/);
+  assert.match(server, /patternLibrary/);
   assert.match(
     server,
     /slides\[index\]\.layout !== slides\[index - 1\]\.layout/,
@@ -257,7 +261,7 @@ test("AI presentation outline follows a narrative and does not invent evidence",
 });
 
 test("PowerPoint export builds OOXML and only fetches same-origin library assets", async () => {
-  const [exporter, route, store] = await Promise.all([
+  const [exporter, route, store, patternCatalog] = await Promise.all([
     readFile(
       new URL("../lib/server/presentation-pptx.ts", import.meta.url),
       "utf8",
@@ -270,7 +274,9 @@ test("PowerPoint export builds OOXML and only fetches same-origin library assets
       new URL("../lib/server/presentation-store.ts", import.meta.url),
       "utf8",
     ),
+    import("../data/presentation-patterns.ts"),
   ]);
+  assert.equal(patternCatalog.presentationPatternCatalog.length, 42);
   assert.match(exporter, /0x04034b50/);
   assert.match(exporter, /presentationml\.presentation\.main\+xml/);
   assert.match(exporter, /slideMasters\/slideMaster1\.xml/);
@@ -312,7 +318,7 @@ test("PowerPoint export builds OOXML and only fetches same-origin library assets
   assert.match(studio, /topography/);
   assert.match(studio, /paper-grain/);
   assert.match(studio, /terrazzo/);
-  assert.match(studio, /18 адаптивных мотивов/);
+  assert.match(studio, /42 адаптивных мотива/);
   assert.match(studio, /Инструменты слайда/);
   assert.match(studio, /Добавить на слайд/);
   assert.doesNotMatch(studio, /sticky bottom-0/);
