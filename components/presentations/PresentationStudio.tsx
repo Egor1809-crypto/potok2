@@ -2565,7 +2565,7 @@ export function PresentationStudio() {
   }
 
   return (
-    <div className="grid h-full min-h-0 gap-8 overflow-y-auto overscroll-contain pr-1">
+    <div className="grid h-full min-h-0 auto-rows-max content-start gap-8 overflow-y-auto overscroll-contain pr-1">
       <PageHeader
         eyebrow="ПРЕЗЕНТАЦИИ «ПОТОК»"
         title="Студия презентаций"
@@ -2633,41 +2633,43 @@ export function PresentationStudio() {
           </div>
         ))}
       </div>
-      <nav
-        className="flex w-fit max-w-full gap-1 overflow-x-auto rounded-xl border border-border bg-surface p-1"
-        aria-label="Разделы библиотеки презентаций"
-      >
-        {[
-          {
-            id: "presentations" as const,
-            label: "Презентации",
-            count: presentations.length,
-          },
-          {
-            id: "templates" as const,
-            label: "Шаблоны",
-            count: presentationTemplates.length,
-          },
-          {
-            id: "favorites" as const,
-            label: "Избранное",
-            count: favoriteProjectIds.length + favoriteTemplateIds.length,
-          },
-        ].map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            aria-pressed={libraryView === item.id}
-            onClick={() => setLibraryView(item.id)}
-            className="flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-[12px] font-semibold text-text-muted transition hover:bg-surface-subtle aria-pressed:bg-primary aria-pressed:text-white"
-          >
-            {item.label}
-            <span className="rounded-full bg-black/5 px-1.5 py-0.5 text-[9px] group-aria-pressed:bg-white/15">
-              {item.count}
-            </span>
-          </button>
-        ))}
-      </nav>
+      <div className="min-h-[50px] w-full shrink-0 overflow-x-auto pb-1">
+        <nav
+          className="flex min-h-12 w-max items-center gap-1 rounded-xl border border-border bg-surface p-1"
+          aria-label="Разделы библиотеки презентаций"
+        >
+          {[
+            {
+              id: "presentations" as const,
+              label: "Презентации",
+              count: presentations.length,
+            },
+            {
+              id: "templates" as const,
+              label: "Шаблоны",
+              count: presentationTemplates.length,
+            },
+            {
+              id: "favorites" as const,
+              label: "Избранное",
+              count: favoriteProjectIds.length + favoriteTemplateIds.length,
+            },
+          ].map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              aria-pressed={libraryView === item.id}
+              onClick={() => setLibraryView(item.id)}
+              className="group flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-[12px] font-semibold text-text-muted transition hover:bg-surface-subtle aria-pressed:bg-primary aria-pressed:text-white"
+            >
+              {item.label}
+              <span className="rounded-full bg-black/5 px-1.5 py-0.5 text-[9px] group-aria-pressed:bg-white/15">
+                {item.count}
+              </span>
+            </button>
+          ))}
+        </nav>
+      </div>
       {libraryView !== "templates" ? (
       <section>
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">

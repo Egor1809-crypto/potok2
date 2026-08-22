@@ -123,6 +123,9 @@ test("presentation library offers varied scenarios and practical filters", async
     assert.match(templates, new RegExp(`"${layout}"`));
   }
   assert.match(view, /filteredPresentationTemplates/);
+  assert.match(view, /auto-rows-max content-start/);
+  assert.match(view, /min-h-\[50px\] w-full shrink-0 overflow-x-auto/);
+  assert.match(view, /group flex min-h-10 shrink-0 items-center/);
   assert.match(view, /Найти шаблон/);
   assert.match(view, /Все задачи/);
   assert.match(view, /Действие после презентации/);
