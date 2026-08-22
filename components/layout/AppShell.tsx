@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 import { cn } from "@/components/ui/utils";
 
@@ -21,6 +22,7 @@ export type AppShellProps = {
   contentWidth?: ContentWidth;
   contentClassName?: string;
   viewportLocked?: boolean;
+  desktopSidebarCollapsible?: boolean;
 };
 
 const contentWidths: Record<ContentWidth, string> = {
@@ -36,10 +38,12 @@ export function AppShell({
   contentWidth = "wide",
   contentClassName,
   viewportLocked = false,
+  desktopSidebarCollapsible = false,
 }: AppShellProps) {
   const pathname = usePathname();
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const [commandMenuOpen, setCommandMenuOpen] = useState(false);
+  const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false);
 
   return (
     <div
@@ -64,7 +68,36 @@ export function AppShell({
           viewportLocked ? "h-full min-h-0" : "min-h-screen",
         )}
       >
-        <AppSidebar className="sticky top-0 hidden xl:flex" />
+        {!desktopSidebarCollapsed ? (
+          <AppSidebar className="sticky top-0 hidden xl:flex" />
+        ) : null}
+
+        {desktopSidebarCollapsible ? (
+          <button
+            type="button"
+            aria-label={
+              desktopSidebarCollapsed
+                ? "Показать навигацию платформы"
+                : "Скрыть навигацию платформы"
+            }
+            title={
+              desktopSidebarCollapsed
+                ? "Показать навигацию"
+                : "Скрыть навигацию"
+            }
+            onClick={() => setDesktopSidebarCollapsed((current) => !current)}
+            className={cn(
+              "fixed top-2.5 z-50 hidden size-8 place-items-center rounded-lg border border-border bg-surface text-text-muted shadow-[var(--shadow-sm)] outline-none transition hover:bg-surface-subtle hover:text-text-strong focus-visible:ring-2 focus-visible:ring-primary/30 xl:grid",
+              desktopSidebarCollapsed ? "left-2.5" : "left-[222px]",
+            )}
+          >
+            {desktopSidebarCollapsed ? (
+              <PanelLeftOpen aria-hidden="true" className="size-4" />
+            ) : (
+              <PanelLeftClose aria-hidden="true" className="size-4" />
+            )}
+          </button>
+        ) : null}
 
         <div
           className={cn(

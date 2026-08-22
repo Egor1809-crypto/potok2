@@ -81,6 +81,11 @@ test("presentation studio exposes real creation, editing and save flows", async 
   assert.match(view, /Быстро изменить слайд/);
   assert.match(view, /Добавить изображение/);
   assert.match(view, /backgroundColor: slide\.backgroundColor/);
+  assert.match(view, /slidesPanelOpen/);
+  assert.match(view, /Скрыть панель слайдов/);
+  assert.match(view, /xl:grid-cols-\[148px_minmax\(0,1fr\)_272px\]/);
+  assert.match(view, /xl:grid-cols-\[minmax\(0,1fr\)_272px\]/);
+  assert.match(view, /aria-label="Дублировать слайд"/);
 });
 
 test("presentation library offers varied scenarios and practical filters", async () => {

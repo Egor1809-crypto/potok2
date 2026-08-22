@@ -11,6 +11,7 @@ export default function PresentationsPage() {
       title="Презентации"
       contentWidth="full"
       viewportLocked
+      desktopSidebarCollapsible
       contentClassName="!py-4"
     >
       <PresentationStudio />

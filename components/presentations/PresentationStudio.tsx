@@ -23,6 +23,8 @@ import {
   Mail,
   Image as ImageIcon,
   LockKeyhole,
+  PanelLeftClose,
+  PanelLeftOpen,
   Palette,
   Plus,
   Save,
@@ -1060,6 +1062,7 @@ export function PresentationStudio() {
   const [emailOpen, setEmailOpen] = useState(false);
   const [slideImageOpen, setSlideImageOpen] = useState(false);
   const [quickSlideOpen, setQuickSlideOpen] = useState(false);
+  const [slidesPanelOpen, setSlidesPanelOpen] = useState(true);
   const [aiGoal, setAiGoal] = useState("");
   const [aiAudience, setAiAudience] = useState("");
   const [aiSlideCount, setAiSlideCount] = useState(7);
@@ -1821,8 +1824,16 @@ export function PresentationStudio() {
           </Alert>
         ) : null}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden border border-border bg-surface">
-          <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[164px_minmax(0,1fr)] xl:grid-cols-[164px_minmax(0,1fr)_320px]">
-            <aside className="flex min-h-0 flex-col border-b border-border bg-surface-subtle p-3 lg:border-b-0 lg:border-r">
+          <div
+            className={cn(
+              "grid min-h-0 flex-1 grid-cols-1",
+              slidesPanelOpen
+                ? "lg:grid-cols-[148px_minmax(0,1fr)] xl:grid-cols-[148px_minmax(0,1fr)_272px]"
+                : "lg:grid-cols-[minmax(0,1fr)] xl:grid-cols-[minmax(0,1fr)_272px]",
+            )}
+          >
+            {slidesPanelOpen ? (
+              <aside className="flex min-h-0 flex-col border-b border-border bg-surface-subtle p-2.5 lg:border-b-0 lg:border-r">
               <div className="mb-3 flex items-center justify-between">
                 <div>
                   <strong className="block text-[12px]">Слайды</strong>
@@ -1876,66 +1887,99 @@ export function PresentationStudio() {
                   );
                 })}
               </div>
-            </aside>
+              </aside>
+            ) : null}
             <section className="flex min-w-0 min-h-0 flex-col bg-[#F2F3F5]">
-              <div className="flex items-center justify-between border-b border-border bg-surface/85 px-4 py-2.5">
-                <div>
-                  <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-primary">
-                    Слайд {selectedSlideIndex + 1} из {project.slides.length}
+              <div className="flex min-h-11 items-center justify-between gap-2 border-b border-border bg-surface/90 px-2.5 py-1.5">
+                <div className="flex min-w-0 items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-8 shrink-0"
+                    aria-label={
+                      slidesPanelOpen
+                        ? "Скрыть панель слайдов"
+                        : "Показать панель слайдов"
+                    }
+                    title={
+                      slidesPanelOpen
+                        ? "Скрыть панель слайдов"
+                        : "Показать панель слайдов"
+                    }
+                    onClick={() => setSlidesPanelOpen((current) => !current)}
+                  >
+                    {slidesPanelOpen ? (
+                      <PanelLeftClose className="size-4" />
+                    ) : (
+                      <PanelLeftOpen className="size-4" />
+                    )}
+                  </Button>
+                  <span className="shrink-0 rounded-md bg-primary-subtle px-2 py-1 text-[9px] font-semibold text-primary">
+                    {selectedSlideIndex + 1} / {project.slides.length}
                   </span>
-                  <p className="m-0 text-[12px] font-semibold text-text-strong">
+                  <span
+                    className="hidden truncate text-[10px] font-medium text-text-muted md:block"
+                    title="Двойной клик по свободной области — быстро изменить слайд"
+                  >
                     {reviewedSlideIds.includes(selectedSlide.id)
-                      ? "Подтверждён — можно уточнить"
+                      ? "Слайд подтверждён"
                       : "Проверьте содержание и оформление"}
-                  </p>
-                  <p className="m-0 mt-0.5 text-[9px] text-text-subtle">
-                    Двойной клик по свободной области — быстро изменить слайд
-                  </p>
+                  </span>
                 </div>
-                <div className="hidden items-center gap-1 sm:flex">
+                <div className="flex items-center gap-0.5">
+                  <div className="hidden items-center gap-0.5 sm:flex">
                   <Button
                     variant="ghost"
-                    size="sm"
+                    size="icon"
+                    className="size-8"
+                    aria-label="Переместить слайд выше"
+                    title="Выше"
                     onClick={() => moveSlide(-1)}
-                    leadingIcon={<ArrowUp className="size-3.5" />}
                   >
-                    Выше
+                    <ArrowUp className="size-3.5" />
                   </Button>
                   <Button
                     variant="ghost"
-                    size="sm"
+                    size="icon"
+                    className="size-8"
+                    aria-label="Переместить слайд ниже"
+                    title="Ниже"
                     onClick={() => moveSlide(1)}
-                    leadingIcon={<ArrowDown className="size-3.5" />}
                   >
-                    Ниже
+                    <ArrowDown className="size-3.5" />
                   </Button>
                   <Button
                     variant="ghost"
-                    size="sm"
+                    size="icon"
+                    className="size-8"
+                    aria-label="Дублировать слайд"
+                    title="Дублировать"
                     onClick={duplicateSlide}
-                    leadingIcon={<Copy className="size-3.5" />}
                   >
-                    Дублировать
+                    <Copy className="size-3.5" />
                   </Button>
                   <Button
                     variant="ghost"
-                    size="sm"
+                    size="icon"
+                    className="size-8"
+                    aria-label="Удалить слайд"
+                    title="Удалить"
                     disabled={project.slides.length <= 1}
                     onClick={removeSlide}
-                    leadingIcon={<Trash2 className="size-3.5" />}
                   >
-                    Удалить
+                    <Trash2 className="size-3.5" />
+                  </Button>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-2.5 xl:hidden"
+                    leadingIcon={<Palette className="size-3.5" />}
+                    onClick={() => setQuickSlideOpen(true)}
+                  >
+                    Инструменты
                   </Button>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="xl:hidden"
-                  leadingIcon={<Palette className="size-3.5" />}
-                  onClick={() => setQuickSlideOpen(true)}
-                >
-                  Инструменты
-                </Button>
               </div>
               <div className="grid min-h-0 flex-1 place-items-center overflow-hidden p-4 sm:p-5 xl:p-6">
                 <div className="w-full max-w-[1080px] overflow-hidden border border-border bg-surface shadow-[0_12px_36px_rgb(17_24_39/0.12)]">
@@ -1982,21 +2026,21 @@ export function PresentationStudio() {
                 </div>
               </div>
             </section>
-            <aside className="hidden min-h-0 overflow-hidden border-l border-border bg-surface p-4 xl:block">
-              <div className="grid h-full min-h-0 gap-5 overflow-y-auto pr-1">
-                <div className="sticky top-0 z-10 -mx-4 -mt-4 border-b border-border bg-surface px-4 py-3">
-                  <strong className="block text-[13px]">
+            <aside className="hidden min-h-0 overflow-hidden border-l border-border bg-surface p-3 xl:block">
+              <div className="grid h-full min-h-0 gap-4 overflow-y-auto pr-0.5">
+                <div className="sticky top-0 z-10 -mx-3 -mt-3 border-b border-border bg-surface px-3 py-2">
+                  <strong className="block text-[12px]">
                     Инструменты слайда
                   </strong>
-                  <span className="text-[10px] text-text-subtle">
-                    Композиция, контент, изображения и оформление
+                  <span className="text-[9px] text-text-subtle">
+                    Контент, композиция и оформление
                   </span>
                 </div>
                 <section>
-                  <h3 className="mb-2 mt-0 text-[12px] font-semibold">
+                  <h3 className="mb-1.5 mt-0 text-[11px] font-semibold">
                     Добавить на слайд
                   </h3>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-3 gap-1.5">
                     {[
                       ["Текст", "statement"],
                       ["Список", "bullets"],
@@ -2046,7 +2090,7 @@ export function PresentationStudio() {
                               : {}),
                           });
                         }}
-                        className="rounded-lg border border-border bg-surface px-2 py-2.5 text-[10px] font-semibold transition hover:border-primary/40 hover:bg-primary-subtle"
+                        className="rounded-md border border-border bg-surface px-1.5 py-2 text-[9px] font-semibold transition hover:border-primary/40 hover:bg-primary-subtle"
                       >
                         {label}
                       </button>
