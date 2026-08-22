@@ -24,6 +24,7 @@ import {
   applyNarrativeRecipe,
   emailDesignSystems,
   emailNarrativeRecipes,
+  previewNarrativeRecipe,
   type EmailQualitySeverity,
 } from "./email-design-director";
 
@@ -274,15 +275,22 @@ export function CreativeDirectorPanel({
                     Письмо как аргумент, а не стопка блоков
                   </h3>
                   <p className="mt-1.5 text-[11px] leading-5 text-text-muted">
-                    Режиссёр переставит существующий контент, добавит только недостающие роли и сохранит все ваши факты. Ничего не сочиняет.
+                    Режиссёр определит роль каждого существующего блока и изменит только порядок. Текст, ссылки, изображения и дизайн останутся прежними; недостающие роли будут отмечены, но не заменены заглушками.
                   </p>
                 </div>
                 <div className="mt-5 grid gap-3 xl:grid-cols-2">
-                  {emailNarrativeRecipes.map((recipe) => (
-                    <article
-                      key={recipe.id}
-                      className="rounded-2xl border border-border bg-surface p-4 shadow-[var(--shadow-xs)]"
-                    >
+                  {emailNarrativeRecipes.map((recipe) => {
+                    const preview = previewNarrativeRecipe(document, recipe.id);
+                    const missing = [
+                      !preview.hasOpener ? "нет сильного входа" : "",
+                      !preview.hasProof ? "нет доказательства" : "",
+                      !preview.hasAction ? "нет действия" : "",
+                    ].filter(Boolean);
+                    return (
+                      <article
+                        key={recipe.id}
+                        className="rounded-2xl border border-border bg-surface p-4 shadow-[var(--shadow-xs)]"
+                      >
                       <span className="text-[9px] font-semibold uppercase tracking-[.12em] text-primary">
                         {recipe.eyebrow}
                       </span>
@@ -304,21 +312,41 @@ export function CreativeDirectorPanel({
                           </span>
                         ))}
                       </div>
+                      <div className="mt-4 rounded-lg bg-surface-subtle px-3 py-2.5 text-[9px] leading-4 text-text-muted">
+                        <strong className="font-semibold text-text-strong">
+                          {preview.movedBlocks
+                            ? `Изменит позиции ${preview.movedBlocks} из ${preview.totalBlocks} блоков.`
+                            : "Композиция уже соответствует этому сценарию."}
+                        </strong>
+                        {missing.length ? (
+                          <span className="mt-0.5 block text-warning">
+                            Не хватает: {missing.join(", ")}.
+                          </span>
+                        ) : (
+                          <span className="mt-0.5 block">
+                            Все ключевые роли уже есть в письме.
+                          </span>
+                        )}
+                      </div>
                       <Button
                         variant="secondary"
                         size="sm"
                         className="mt-4 w-full"
+                        disabled={!preview.movedBlocks}
                         onClick={() =>
                           apply(
                             applyNarrativeRecipe(document, recipe.id),
-                            `Применён сценарий «${recipe.name}»`,
+                            `Сценарий «${recipe.name}»: переставлено ${preview.movedBlocks} блоков`,
                           )
                         }
                       >
-                        Пересобрать композицию
+                        {preview.movedBlocks
+                          ? "Перестроить только порядок"
+                          : "Порядок уже выстроен"}
                       </Button>
-                    </article>
-                  ))}
+                      </article>
+                    );
+                  })}
                 </div>
               </div>
             ) : null}

@@ -1,10 +1,6 @@
 import type { EmailBlockType } from "@/types";
 
-import {
-  createBlock,
-  type BuilderBlock,
-  type BuilderDocument,
-} from "./builder-types";
+import type { BuilderBlock, BuilderDocument } from "./builder-types";
 
 export type EmailDesignSystemId =
   | "executive-brief"
@@ -287,28 +283,180 @@ export const emailNarrativeRecipes: NarrativeRecipe[] = [
   },
 ];
 
-function freshBlock(
-  type: EmailBlockType,
-  patch: Partial<BuilderBlock> = {},
-): BuilderBlock {
-  return { ...createBlock(type), ...patch };
+type NarrativeRole =
+  | "brand"
+  | "opener"
+  | "visual"
+  | "context"
+  | "value"
+  | "proof"
+  | "detail"
+  | "audience"
+  | "action"
+  | "signature"
+  | "separator"
+  | "legal";
+
+const narrativeRoleOrder: Record<
+  NarrativeRecipeId,
+  Record<NarrativeRole, number>
+> = {
+  "one-idea": {
+    brand: 0,
+    opener: 10,
+    visual: 15,
+    context: 20,
+    value: 30,
+    proof: 40,
+    detail: 50,
+    audience: 55,
+    action: 60,
+    signature: 70,
+    separator: 80,
+    legal: 90,
+  },
+  "founder-note": {
+    brand: 0,
+    opener: 10,
+    visual: 15,
+    context: 20,
+    value: 30,
+    proof: 40,
+    detail: 45,
+    audience: 48,
+    signature: 55,
+    action: 60,
+    separator: 80,
+    legal: 90,
+  },
+  "evidence-first": {
+    brand: 0,
+    proof: 10,
+    opener: 20,
+    visual: 25,
+    context: 30,
+    value: 40,
+    detail: 50,
+    audience: 55,
+    action: 60,
+    signature: 70,
+    separator: 80,
+    legal: 90,
+  },
+  "event-arc": {
+    brand: 0,
+    opener: 10,
+    visual: 15,
+    context: 20,
+    detail: 30,
+    audience: 40,
+    proof: 45,
+    value: 50,
+    action: 60,
+    signature: 70,
+    separator: 80,
+    legal: 90,
+  },
+};
+
+function narrativeRole(block: BuilderBlock, recipeId: NarrativeRecipeId) {
+  const content = `${block.content} ${block.label ?? ""}`.toLocaleLowerCase(
+    "ru-RU",
+  );
+  if (block.type === "logo") return "brand" as const;
+  if (["hero", "heading", "banner"].includes(block.type))
+    return "opener" as const;
+  if (["image", "video", "pattern"].includes(block.type))
+    return "visual" as const;
+  if (["button", "coupon", "document", "product"].includes(block.type))
+    return "action" as const;
+  if (block.type === "signature") return "signature" as const;
+  if (["footer", "social", "compliance"].includes(block.type))
+    return "legal" as const;
+  if (["divider", "spacer"].includes(block.type))
+    return "separator" as const;
+  if (["stats", "quote", "comparison"].includes(block.type))
+    return "proof" as const;
+  if (block.type === "columns") return "audience" as const;
+  if (["timeline", "faq"].includes(block.type)) return "detail" as const;
+  if (block.type === "checklist")
+    return recipeId === "event-arc" ? ("detail" as const) : ("value" as const);
+  if (/для кого|кому подойд|участник|аудитори|руководител|специалист/.test(content))
+    return "audience" as const;
+  if (/\d|%|факт|данн|исслед|результат|отзыв|доказ|кейс|показател/.test(content))
+    return "proof" as const;
+  if (/зарегистр|запис|ответьте|перейд|оставьте|подтверд|выберите|скачайте/.test(content))
+    return "action" as const;
+  if (/польз|получит|сможет|поможет|эконом|упрост|ценност|выгод/.test(content))
+    return "value" as const;
+  if (block.type === "notice") return "context" as const;
+  return "context" as const;
 }
 
-function narrativeSeeds(document: BuilderDocument) {
-  const body = document.blocks.find((block) => block.type === "text")?.content;
-  const subject =
-    document.subject.trim() && document.subject !== "Тема письма"
-      ? document.subject.trim()
-      : "Сформулируйте одну ясную мысль";
-  const preview =
-    document.previewText.trim() ||
-    "Объясните, почему это важно читателю именно сейчас.";
+function narrativeWeight(
+  blocks: BuilderBlock[],
+  index: number,
+  recipeId: NarrativeRecipeId,
+) {
+  const block = blocks[index];
+  const order = narrativeRoleOrder[recipeId];
+  const role = narrativeRole(block, recipeId);
+  if (role === "legal") {
+    if (block.type === "footer") return order.legal + 2;
+    if (block.type === "compliance") return order.legal + 1;
+    return order.legal;
+  }
+  if (role !== "separator") return order[role];
+
+  const previous = blocks
+    .slice(0, index)
+    .reverse()
+    .find((item) => narrativeRole(item, recipeId) !== "separator");
+  const next = blocks
+    .slice(index + 1)
+    .find((item) => narrativeRole(item, recipeId) !== "separator");
+  const previousWeight = previous
+    ? order[narrativeRole(previous, recipeId)]
+    : undefined;
+  const nextWeight = next ? order[narrativeRole(next, recipeId)] : undefined;
+  if (previousWeight !== undefined && nextWeight !== undefined)
+    return (previousWeight + nextWeight) / 2;
+  if (nextWeight !== undefined) return nextWeight - 0.5;
+  if (previousWeight !== undefined) return previousWeight + 0.5;
+  return order.separator;
+}
+
+function narrativeOrder(
+  document: BuilderDocument,
+  recipeId: NarrativeRecipeId,
+) {
+  return document.blocks
+    .map((block, index) => ({
+      block,
+      index,
+      weight: narrativeWeight(document.blocks, index, recipeId),
+    }))
+    .sort((left, right) => left.weight - right.weight || left.index - right.index)
+    .map((item) => item.block);
+}
+
+export function previewNarrativeRecipe(
+  document: BuilderDocument,
+  recipeId: NarrativeRecipeId,
+) {
+  const ordered = narrativeOrder(document, recipeId);
+  const movedBlocks = ordered.filter(
+    (block, index) => document.blocks[index]?.id !== block.id,
+  ).length;
+  const roles = new Set(
+    document.blocks.map((block) => narrativeRole(block, recipeId)),
+  );
   return {
-    subject,
-    preview,
-    body:
-      body ||
-      "Начните с конкретной ситуации получателя. Затем объясните пользу без рекламных обещаний и общих слов.",
+    movedBlocks,
+    totalBlocks: document.blocks.length,
+    hasOpener: roles.has("opener"),
+    hasAction: roles.has("action"),
+    hasProof: roles.has("proof"),
   };
 }
 
@@ -316,97 +464,12 @@ export function applyNarrativeRecipe(
   document: BuilderDocument,
   recipeId: NarrativeRecipeId,
 ): BuilderDocument {
-  const recipe =
-    emailNarrativeRecipes.find((item) => item.id === recipeId) ??
-    emailNarrativeRecipes[0];
-  const used = new Set<string>();
-  const seed = narrativeSeeds(document);
-  const take = (types: EmailBlockType[], fallback: () => BuilderBlock) => {
-    const found = document.blocks.find(
-      (block) => types.includes(block.type) && !used.has(block.id),
-    );
-    const result = found ?? fallback();
-    used.add(result.id);
-    return result;
-  };
-  const takeOptional = (types: EmailBlockType[]) => {
-    const found = document.blocks.find(
-      (block) => types.includes(block.type) && !used.has(block.id),
-    );
-    if (found) used.add(found.id);
-    return found;
-  };
-  const logo = take(["logo"], () => freshBlock("logo"));
-  const footer = take(["footer"], () => freshBlock("footer"));
-  let ordered: BuilderBlock[];
-
-  if (recipe.id === "founder-note") {
-    const heading = take(["heading", "hero"], () =>
-      freshBlock("heading", { content: seed.subject }),
-    );
-    const body = take(["text"], () => freshBlock("text", { content: seed.body }));
-    const signature = take(["signature"], () => freshBlock("signature"));
-    const action = takeOptional(["button"]);
-    ordered = [logo, heading, body, freshBlock("divider"), signature];
-    if (action) ordered.push(action);
-    ordered.push(footer);
-  } else if (recipe.id === "evidence-first") {
-    const heading = take(["heading", "hero"], () =>
-      freshBlock("heading", { content: seed.subject }),
-    );
-    const proof = take(["stats", "quote", "checklist"], () =>
-      freshBlock("stats", {
-        content: "Факт|Проверяемое доказательство|Вывод|Что это меняет для читателя",
-      }),
-    );
-    const body = take(["text"], () => freshBlock("text", { content: seed.body }));
-    const comparison = take(["comparison", "product", "document"], () =>
-      freshBlock("comparison"),
-    );
-    const action = take(["button", "product", "document"], () =>
-      freshBlock("button"),
-    );
-    ordered = [logo, heading, proof, body, comparison, action, footer];
-  } else if (recipe.id === "event-arc") {
-    const hero = take(["hero", "heading"], () =>
-      freshBlock("hero", { content: `${seed.subject}|${seed.preview}` }),
-    );
-    const reason = take(["text", "notice"], () =>
-      freshBlock("text", { content: seed.body }),
-    );
-    const program = take(["timeline", "checklist"], () => freshBlock("timeline"));
-    const audience = take(["columns", "text", "quote"], () =>
-      freshBlock("columns", {
-        content: "Кому особенно полезно|Какой результат участник унесёт с собой",
-      }),
-    );
-    const action = take(["button", "product"], () => freshBlock("button"));
-    ordered = [logo, hero, reason, program, audience, action, footer];
-  } else {
-    const hero = take(["hero", "heading"], () =>
-      freshBlock("hero", { content: `${seed.subject}|${seed.preview}` }),
-    );
-    const body = take(["text"], () => freshBlock("text", { content: seed.body }));
-    const proof = take(["quote", "stats", "checklist", "comparison"], () =>
-      freshBlock("checklist", {
-        content: "Конкретная польза|Проверяемое доказательство|Понятный следующий шаг",
-      }),
-    );
-    const action = take(["button", "product", "document"], () =>
-      freshBlock("button"),
-    );
-    ordered = [logo, hero, body, proof, action, footer];
-  }
-
-  const remainder = document.blocks.filter(
-    (block) => !used.has(block.id) && block.type !== "spacer",
+  const blocks = narrativeOrder(document, recipeId);
+  const unchanged = blocks.every(
+    (block, index) => block.id === document.blocks[index]?.id,
   );
-  const footerIndex = ordered.findIndex((block) => block.type === "footer");
-  ordered.splice(footerIndex < 0 ? ordered.length : footerIndex, 0, ...remainder);
-  return applyEmailDesignSystem(
-    { ...document, rawHtml: undefined, blocks: ordered },
-    recipe.designSystem,
-  );
+  if (unchanged && !document.rawHtml) return document;
+  return { ...document, rawHtml: undefined, blocks };
 }
 
 export type EmailQualitySeverity = "critical" | "warning" | "suggestion";
