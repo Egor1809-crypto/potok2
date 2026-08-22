@@ -9,7 +9,8 @@ test("contact finder is source-bound, robots-aware, and never auto-persists", as
     readFile(new URL("../components/contact-finder/ContactFinderView.tsx", import.meta.url), "utf8"),
   ]);
 
-  assert.match(server, /SAME_SITE_PAGE_LIMIT = 5/);
+  assert.match(server, /SAME_SITE_PAGE_LIMIT = 12/);
+  assert.match(server, /FETCH_CONCURRENCY = 3/);
   assert.match(server, /robots\.txt/);
   assert.match(server, /robotsAllows/);
   assert.match(server, /url\.origin !== base\.origin/);
@@ -20,6 +21,10 @@ test("contact finder is source-bound, robots-aware, and never auto-persists", as
   assert.match(server, /next\.origin !== origin/);
   assert.match(server, /robots\.txt недоступен — проверка остановлена/);
   assert.match(server, /groupAgents/);
+  assert.match(server, /discoverSitemapLinks/);
+  assert.match(server, /data-\(\?:email\|mail\|contact-email\)/);
+  assert.match(server, /deobfuscateContactText/);
+  assert.match(server, /suggestedNameFromContext/);
   assert.match(server, /REQUEST_LIMIT = 20/);
   assert.match(server, /persisted: false/);
   assert.match(server, /acknowledgedResponsibleUse !== true/);
@@ -34,7 +39,7 @@ test("contact finder is source-bound, robots-aware, and never auto-persists", as
   assert.match(view, /aria-live="polite"/);
   assert.match(view, /clearResults\(\)/);
   assert.match(view, /function contactInputs/);
-  assert.match(view, /до четырёх связанных/);
+  assert.match(view, /Глубокий обход до 12 страниц/);
 });
 
 test("phone-only discoveries can be explicitly stored and deduplicated", async () => {

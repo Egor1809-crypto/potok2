@@ -8,8 +8,9 @@ import type {
   ContactFinderResponse,
 } from "@/types/contact-finder";
 
-const SAME_SITE_PAGE_LIMIT = 5;
-const MAX_SOURCE_BYTES = 1_000_000;
+const SAME_SITE_PAGE_LIMIT = 12;
+const FETCH_CONCURRENCY = 3;
+const MAX_SOURCE_BYTES = 1_500_000;
 const MAX_TEXT_LENGTH = 100_000;
 const FETCH_TIMEOUT_MS = 8_000;
 const USER_AGENT = "Potok-ContactFinder/1.0";
@@ -21,6 +22,7 @@ type Extraction = Omit<ContactFinderCandidate, "id">;
 type RobotsRules = {
   allow: string[];
   disallow: string[];
+  sitemaps: string[];
 };
 
 type DnsJsonResponse = {
@@ -52,6 +54,42 @@ const pagePathHints = [
   "o-kompanii",
   "komanda",
   "podderzhka",
+  "feedback",
+  "leadership",
+  "management",
+  "staff",
+  "people",
+  "experts",
+  "directory",
+  "departments",
+  "branches",
+  "locations",
+  "requisites",
+  "rekvizity",
+  "rukovodstvo",
+  "sotrudniki",
+  "specialisty",
+  "predstavitelstva",
+];
+
+const pageLabelHints = [
+  "контакт",
+  "о компании",
+  "команда",
+  "руководство",
+  "сотрудники",
+  "специалисты",
+  "реквизиты",
+  "офисы",
+  "contact",
+  "about",
+  "team",
+  "leadership",
+  "management",
+  "people",
+  "staff",
+  "directory",
+  "locations",
 ];
 
 function isPrivateIpv4(hostname: string): boolean {
@@ -281,6 +319,34 @@ function suggestedEmailName(email: string, hostname: string): string {
   return generic[local.toLowerCase()] ?? (titleCase(local) || `Контакт ${hostname}`);
 }
 
+function deobfuscateContactText(value: string): string {
+  return value
+    .replace(/\\u0*040|\\x40|%40/gi, "@")
+    .replace(/\\u0*02e|\\x2e|%2e/gi, ".")
+    .replace(
+      /([A-Z0-9._%+-]+)\s*(?:\[\s*at\s*\]|\(\s*at\s*\)|\{\s*at\s*\}|\s+собака\s+)\s*([A-Z0-9.-]+)/gi,
+      "$1@$2",
+    )
+    .replace(
+      /([A-Z0-9-]+)\s*(?:\[\s*dot\s*\]|\(\s*dot\s*\)|\{\s*dot\s*\}|\s+точка\s+)\s*([A-Z]{2,24})(?=\b)/gi,
+      "$1.$2",
+    );
+}
+
+function suggestedNameFromContext(context: string, fallback: string): string {
+  const compact = context.replace(/\s+/g, " ").trim();
+  const role = compact.match(
+    /\b(отдел продаж|коммерческий отдел|служба поддержки|пресс-служба|отдел персонала|при[её]мная|sales team|sales department|customer support|press office|human resources)\b/i,
+  )?.[1];
+  if (role) return `${role.charAt(0).toUpperCase()}${role.slice(1).toLowerCase()}`;
+  const person = compact.match(
+    /\b([А-ЯЁ][а-яё]{1,30}\s+[А-ЯЁ][а-яё]{1,30}(?:\s+[А-ЯЁ][а-яё]{1,30})?|[A-Z][a-z]{1,30}\s+[A-Z][a-z]{1,30})\b/,
+  )?.[1];
+  if (!person) return fallback;
+  const ignored = /^(общий контакт|контактная информация|наша команда|служба поддержки|отдел продаж)$/i;
+  return ignored.test(person) ? fallback : person;
+}
+
 function normalizePhone(value: string): string | null {
   const trimmed = value.replace(/\s+/g, " ").trim();
   const digits = trimmed.replace(/\D/g, "");
@@ -296,7 +362,7 @@ function extractFromText(
   hostname: string,
   html = false,
 ): Extraction[] {
-  const decoded = decodeEntities(input);
+  const decoded = deobfuscateContactText(decodeEntities(input));
   const text = html ? visibleText(decoded) : decoded;
   const results: Extraction[] = [];
   const emailSeen = new Set<string>();
@@ -307,7 +373,14 @@ function extractFromText(
     confidence: "high" | "medium",
     contextOverride?: string,
   ) => {
-    const email = raw.replace(/^mailto:/i, "").split(/[?&#]/)[0].trim().toLowerCase();
+    const email = deobfuscateContactText(raw)
+      .replace(/^mailto:/i, "")
+      .split(/[?&#]/)[0]
+      .trim()
+      .replace(/^[<({]+/, "")
+      .replace(/^\[+/, "")
+      .replace(/[>)}\],;:.]+$/, "")
+      .toLowerCase();
     if (
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
       /\.(png|jpe?g|gif|webp|svg)$/i.test(email) ||
@@ -315,14 +388,19 @@ function extractFromText(
       emailSeen.has(email)
     ) return;
     emailSeen.add(email);
+    const context =
+      contextOverride || nearbyContext(text, Math.min(index, text.length), email.length);
     results.push({
       type: "email",
       value: email,
-      suggestedName: suggestedEmailName(email, hostname),
+      suggestedName: suggestedNameFromContext(
+        context,
+        suggestedEmailName(email, hostname),
+      ),
       confidence,
       sourceUrl,
       sourceLabel,
-      context: contextOverride || nearbyContext(text, Math.min(index, text.length), email.length),
+      context,
     });
   };
   const addPhone = (
@@ -334,14 +412,16 @@ function extractFromText(
     const phone = normalizePhone(raw.replace(/^tel:/i, "").split(/[?&#]/)[0]);
     if (!phone || phoneSeen.has(phone)) return;
     phoneSeen.add(phone);
+    const context =
+      contextOverride || nearbyContext(text, Math.min(index, text.length), raw.length);
     results.push({
       type: "phone",
       value: phone,
-      suggestedName: `Контакт ${hostname}`,
+      suggestedName: suggestedNameFromContext(context, `Контакт ${hostname}`),
       confidence,
       sourceUrl,
       sourceLabel,
-      context: contextOverride || nearbyContext(text, Math.min(index, text.length), raw.length),
+      context,
     });
   };
 
@@ -364,6 +444,28 @@ function extractFromText(
         htmlLinkContext(decoded, index, match[0].length),
       );
     }
+    for (const match of decoded.matchAll(
+      /data-(?:email|mail|contact-email)\s*=\s*["']([^"']+)["']/gi,
+    )) {
+      const index = match.index ?? 0;
+      addEmail(match[1], index, "high", htmlLinkContext(decoded, index, match[0].length));
+    }
+    for (const match of decoded.matchAll(
+      /data-(?:phone|tel|telephone|contact-phone)\s*=\s*["']([^"']+)["']/gi,
+    )) {
+      const index = match.index ?? 0;
+      addPhone(match[1], index, "high", htmlLinkContext(decoded, index, match[0].length));
+    }
+    for (const match of decoded.matchAll(
+      /["'](?:email|contactEmail)["']\s*:\s*["']([^"']+)["']/gi,
+    )) {
+      addEmail(match[1], match.index ?? 0, "high");
+    }
+    for (const match of decoded.matchAll(
+      /["'](?:telephone|phone|contactPhone)["']\s*:\s*["']([^"']+)["']/gi,
+    )) {
+      addPhone(match[1], match.index ?? 0, "high");
+    }
   }
   for (const match of text.matchAll(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,24}/gi)) {
     addEmail(match[0], match.index ?? 0, "medium");
@@ -380,7 +482,7 @@ function extractFromText(
 }
 
 function parseRobots(text: string): RobotsRules {
-  const rules: RobotsRules = { allow: [], disallow: [] };
+  const rules: RobotsRules = { allow: [], disallow: [], sitemaps: [] };
   let groupAgents: string[] = [];
   let groupRules: Array<{ kind: "allow" | "disallow"; value: string }> = [];
   const commitGroup = () => {
@@ -397,6 +499,10 @@ function parseRobots(text: string): RobotsRules {
     if (separator === -1) continue;
     const key = line.slice(0, separator).trim().toLowerCase();
     const value = line.slice(separator + 1).trim();
+    if (key === "sitemap") {
+      rules.sitemaps.push(value);
+      continue;
+    }
     if (key === "user-agent") {
       if (groupRules.length) commitGroup();
       groupAgents.push(value.toLowerCase());
@@ -532,20 +638,42 @@ async function reserveAnalysis(request: Request): Promise<void> {
   }
 }
 
+function contactPageScore(url: URL, label = ""): number {
+  let lowerPath = url.pathname.toLowerCase();
+  try {
+    lowerPath = decodeURIComponent(url.pathname).toLowerCase();
+  } catch {
+    // Keep the encoded pathname when a site publishes malformed escapes.
+  }
+  const lowerLabel = label.toLowerCase();
+  const pathHint = pagePathHints.findIndex((hint) => lowerPath.includes(hint));
+  const labelHint = pageLabelHints.findIndex((hint) => lowerLabel.includes(hint));
+  if (pathHint === -1 && labelHint === -1) return -1;
+  const pathScore = pathHint === -1 ? 0 : 130 - pathHint;
+  const labelScore = labelHint === -1 ? 0 : 110 - labelHint;
+  const depthPenalty = Math.max(0, url.pathname.split("/").filter(Boolean).length - 3) * 4;
+  return Math.max(pathScore, labelScore) - depthPenalty - lowerPath.length / 160;
+}
+
 function discoverSameSiteLinks(html: string, base: URL): URL[] {
   const candidates = new Map<string, { url: URL; score: number }>();
-  for (const match of html.matchAll(/href\s*=\s*["']([^"'#]+)["']/gi)) {
+  for (const match of html.matchAll(
+    /<a\b[^>]*href\s*=\s*["']([^"'#]+)["'][^>]*>([^]*?)<\/a>/gi,
+  )) {
     try {
       const url = new URL(decodeEntities(match[1]), base);
       url.hash = "";
       if (url.origin !== base.origin || url.protocol !== "https:") continue;
-      if (url.search) continue;
+      for (const key of [...url.searchParams.keys()]) {
+        if (/^(utm_|yclid|gclid|fbclid)/i.test(key)) url.searchParams.delete(key);
+      }
+      if ([...url.searchParams.keys()].length) continue;
       if (/\.(pdf|jpe?g|png|gif|svg|zip|docx?|xlsx?)(?:$|\?)/i.test(url.pathname)) continue;
-      const lowerPath = url.pathname.toLowerCase();
-      const hintIndex = pagePathHints.findIndex((hint) => lowerPath.includes(hint));
-      if (hintIndex === -1) continue;
+      const score = contactPageScore(url, visibleText(match[2]));
+      if (score < 0) continue;
       const key = url.toString();
-      candidates.set(key, { url, score: 100 - hintIndex - lowerPath.length / 100 });
+      const current = candidates.get(key);
+      if (!current || score > current.score) candidates.set(key, { url, score });
     } catch {
       // Ignore malformed links from the supplied page.
     }
@@ -554,6 +682,47 @@ function discoverSameSiteLinks(html: string, base: URL): URL[] {
     .sort((left, right) => right.score - left.score)
     .map(({ url }) => url)
     .slice(0, SAME_SITE_PAGE_LIMIT - 1);
+}
+
+async function discoverSitemapLinks(
+  origin: URL,
+  rules: RobotsRules,
+  resolutions: ResolutionCache,
+): Promise<URL[]> {
+  const sitemapUrls = [
+    ...rules.sitemaps,
+    new URL("/sitemap.xml", origin).toString(),
+  ];
+  const candidates = new Map<string, { url: URL; score: number }>();
+  for (const value of [...new Set(sitemapUrls)].slice(0, 2)) {
+    try {
+      const sitemapUrl = assertPublicHttpsUrl(value);
+      if (sitemapUrl.origin !== origin.origin) continue;
+      const response = await safeFetch(sitemapUrl, origin.origin, resolutions);
+      if (!response.ok) continue;
+      const source = await readLimited(response, 600_000);
+      for (const match of source.matchAll(/<loc\b[^>]*>([^<]+)<\/loc>/gi)) {
+        try {
+          const url = assertPublicHttpsUrl(decodeEntities(match[1].trim()));
+          if (url.origin !== origin.origin) continue;
+          const score = contactPageScore(url);
+          if (score < 0) continue;
+          const key = url.toString();
+          const current = candidates.get(key);
+          if (!current || score > current.score) candidates.set(key, { url, score });
+        } catch {
+          // Ignore one malformed sitemap entry without discarding the rest.
+        }
+      }
+    } catch {
+      // Sitemap discovery is an optional accelerator. Page links remain the
+      // authoritative crawl source when a sitemap is absent or malformed.
+    }
+  }
+  return [...candidates.values()]
+    .sort((left, right) => right.score - left.score)
+    .slice(0, SAME_SITE_PAGE_LIMIT - 1)
+    .map(({ url }) => url);
 }
 
 function deduplicate(candidates: Extraction[]): ContactFinderCandidate[] {
@@ -605,7 +774,7 @@ async function robotsFor(
       resolutions,
     );
     if (response.status === 404 || response.status === 410) {
-      return { allow: [], disallow: [] };
+      return { allow: [], disallow: [], sitemaps: [] };
     }
     if (!response.ok) return null;
     return parseRobots(await readLimited(response, 200_000));
@@ -633,44 +802,128 @@ async function analyzeUrl(input: ContactFinderRequest): Promise<ContactFinderRes
   }
   const queue: URL[] = [start];
   const visited = new Set<string>();
+  const queued = new Set<string>([start.toString()]);
+  const sitemapPromise = input.includeSameSitePages
+    ? discoverSitemapLinks(start, rules, resolutions)
+    : Promise.resolve([]);
+  let sitemapMerged = false;
 
   while (queue.length && visited.size < SAME_SITE_PAGE_LIMIT) {
-    const url = queue.shift()!;
-    const key = url.toString();
-    if (visited.has(key)) continue;
-    visited.add(key);
-    const isStart = url.toString() === start.toString();
-    if (!robotsAllows(url, rules)) {
-      pages.push({ url: key, status: "skipped", reason: "Запрещено robots.txt", foundCount: 0 });
-      continue;
+    const batch: URL[] = [];
+    while (
+      queue.length &&
+      batch.length < FETCH_CONCURRENCY &&
+      visited.size + batch.length < SAME_SITE_PAGE_LIMIT
+    ) {
+      const url = queue.shift()!;
+      const key = url.toString();
+      if (visited.has(key) || batch.some((item) => item.toString() === key)) continue;
+      batch.push(url);
     }
-    try {
-      const response = await safeFetch(url, start.origin, resolutions);
-      if (!response.ok) {
-        pages.push({ url: key, status: "skipped", reason: `HTTP ${response.status}`, foundCount: 0 });
-        continue;
-      }
-      const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
-      if (!contentType.includes("text/html") && !contentType.includes("text/plain")) {
-        pages.push({ url: key, status: "skipped", reason: "Формат страницы не поддерживается", foundCount: 0 });
-        continue;
-      }
-      const source = await readLimited(response);
-      const extracted = extractFromText(source, key, pageTitle(source, url.hostname), url.hostname, contentType.includes("html"));
-      found.push(...extracted);
-      pages.push({ url: key, status: "scanned", reason: null, foundCount: extracted.length });
-      if (isStart && input.includeSameSitePages) {
-        for (const link of discoverSameSiteLinks(source, url)) {
-          if (!visited.has(link.toString())) queue.push(link);
+    const outcomes = await Promise.all(
+      batch.map(async (url) => {
+        const key = url.toString();
+        if (!robotsAllows(url, rules)) {
+          return {
+            page: {
+              url: key,
+              status: "skipped" as const,
+              reason: "Запрещено robots.txt",
+              foundCount: 0,
+            },
+            extracted: [] as Extraction[],
+            links: [] as URL[],
+          };
+        }
+        try {
+          const fetched = await safeFetch(url, start.origin, resolutions);
+          if (!fetched.ok) {
+            return {
+              page: {
+                url: key,
+                status: "skipped" as const,
+                reason: `HTTP ${fetched.status}`,
+                foundCount: 0,
+              },
+              extracted: [] as Extraction[],
+              links: [] as URL[],
+            };
+          }
+          const contentType = fetched.headers.get("content-type")?.toLowerCase() ?? "";
+          if (!contentType.includes("text/html") && !contentType.includes("text/plain")) {
+            return {
+              page: {
+                url: key,
+                status: "skipped" as const,
+                reason: "Формат страницы не поддерживается",
+                foundCount: 0,
+              },
+              extracted: [] as Extraction[],
+              links: [] as URL[],
+            };
+          }
+          const source = await readLimited(fetched);
+          const extracted = extractFromText(
+            source,
+            key,
+            pageTitle(source, url.hostname),
+            url.hostname,
+            contentType.includes("html"),
+          );
+          return {
+            page: {
+              url: key,
+              status: "scanned" as const,
+              reason: null,
+              foundCount: extracted.length,
+            },
+            extracted,
+            links: input.includeSameSitePages
+              ? discoverSameSiteLinks(source, url)
+              : [],
+          };
+        } catch (error) {
+          const message = error instanceof ApiRequestError
+            ? error.message
+            : error instanceof Error && error.name === "TimeoutError"
+              ? "Время загрузки истекло"
+              : "Не удалось загрузить страницу";
+          return {
+            page: {
+              url: key,
+              status: "skipped" as const,
+              reason: message,
+              foundCount: 0,
+            },
+            extracted: [] as Extraction[],
+            links: [] as URL[],
+          };
+        }
+      }),
+    );
+    for (let index = 0; index < outcomes.length; index += 1) {
+      const outcome = outcomes[index];
+      const url = batch[index];
+      visited.add(url.toString());
+      pages.push(outcome.page);
+      found.push(...outcome.extracted);
+      for (const link of outcome.links) {
+        const key = link.toString();
+        if (!visited.has(key) && !queued.has(key)) {
+          queued.add(key);
+          queue.push(link);
         }
       }
-    } catch (error) {
-      const message = error instanceof ApiRequestError
-        ? error.message
-        : error instanceof Error && error.name === "TimeoutError"
-          ? "Время загрузки истекло"
-          : "Не удалось загрузить страницу";
-      pages.push({ url: key, status: "skipped", reason: message, foundCount: 0 });
+    }
+    if (!sitemapMerged && input.includeSameSitePages) {
+      sitemapMerged = true;
+      for (const link of await sitemapPromise) {
+        const key = link.toString();
+        if (!visited.has(key) && !queued.has(key)) {
+          queued.add(key);
+          queue.push(link);
+        }
+      }
     }
   }
 

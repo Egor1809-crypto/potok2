@@ -267,7 +267,7 @@ export function ContactFinderView() {
       <PageHeader
         eyebrow="Контакты → проверка → база"
         title="Поиск публичных контактов"
-        description="Найдите деловые email и телефоны на указанном сайте или в тексте. Поток показывает источник каждого результата и ничего не сохраняет без вашего выбора."
+        description="Глубокий парсер находит деловые email и телефоны в страницах, sitemap, структурированных данных и защищённых от спама записях. Поток показывает источник каждого результата и ничего не сохраняет без вашего выбора."
         action={
           <Link href="/contacts" className={buttonVariants({ variant: "outline" })}>
             <UsersRound aria-hidden="true" className="size-4" />
@@ -387,8 +387,8 @@ export function ContactFinderView() {
                   }}
                   label={
                     <span>
-                      Проверить до 5 страниц этого сайта всего
-                      <span className="block text-[11px] text-text-muted">Исходная страница и до четырёх связанных: «Контакты», «О компании» или «Поддержка», с учётом robots.txt.</span>
+                      Глубокий обход до 12 страниц сайта
+                      <span className="block text-[11px] text-text-muted">Парсер проверит исходную страницу, sitemap и связанные разделы «Контакты», «Команда», «Руководство», «О компании» и «Поддержка» с учётом robots.txt.</span>
                     </span>
                   }
                 />
@@ -445,7 +445,8 @@ export function ContactFinderView() {
           <ul className="mt-4 mb-0 space-y-3 pl-0 text-[12px] leading-5 text-text-muted">
             {[
               "Только указанный HTTPS-сайт или вставленный текст.",
-              "До пяти релевантных страниц на том же домене.",
+              "До двенадцати релевантных страниц на том же домене.",
+              "Sitemap, JSON-LD, mailto/tel и антиспам-записи распознаются.",
               "robots.txt и запреты сайта учитываются.",
               "Результаты не сохраняются до явного импорта.",
               "Согласие на email-рассылку не назначается автоматически.",
