@@ -666,7 +666,7 @@ export function ContactsView() {
       <section className="card overflow-hidden">
         <div className="border-b border-[var(--border)] p-3">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-            <label className="relative min-w-0 flex-1"><span className="sr-only">Поиск контактов</span><Search aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--text-subtle)]" /><input className="input pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Найдите по имени, email, компании, должности или тегу" /></label>
+            <label className="relative min-w-0 flex-1"><span className="sr-only">Поиск контактов</span><Search aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--text-subtle)]" /><input className="input input-with-leading-icon" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Найдите по имени, email, компании, должности или тегу" /></label>
             <button type="button" onClick={() => setFiltersOpen((value) => !value)} aria-expanded={filtersOpen} className={`btn gap-2 ${filtersOpen || activeFilterCount ? "btn-primary" : "btn-secondary"}`}><SlidersHorizontal aria-hidden="true" className="size-4" />Фильтры{activeFilterCount ? ` · ${activeFilterCount}` : ""}</button>
             <button type="button" onClick={exportCsv} disabled={!selectedIds.length && !visible.length} className="btn btn-secondary gap-2"><Download aria-hidden="true" className="size-4" />Экспорт</button>
           </div>

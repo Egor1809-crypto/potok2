@@ -305,6 +305,11 @@ test("PowerPoint export builds OOXML and only fetches same-origin library assets
     "utf8",
   );
   assert.match(studio, /presentationPatterns/);
+  assert.match(studio, /aurora-mesh/);
+  assert.match(studio, /topography/);
+  assert.match(studio, /paper-grain/);
+  assert.match(studio, /terrazzo/);
+  assert.match(studio, /18 адаптивных мотивов/);
   assert.match(studio, /Инструменты слайда/);
   assert.match(studio, /Добавить на слайд/);
   assert.doesNotMatch(studio, /sticky bottom-0/);
@@ -317,6 +322,7 @@ test("PowerPoint export builds OOXML and only fetches same-origin library assets
     route,
     /application\/vnd\.openxmlformats-officedocument\.presentationml\.presentation/,
   );
+  assert.match(exporter, /presentationPatternShapes\(project, id, slide\.patternId\)/);
 });
 
 test("presentation library persists project and template favorites", async () => {

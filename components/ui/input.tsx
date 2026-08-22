@@ -55,7 +55,11 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
           type="search"
           value={value}
           defaultValue={defaultValue}
-          className={cn("pr-9 pl-9 [&::-webkit-search-cancel-button]:hidden", className)}
+          className={cn(
+            "input-with-leading-icon [&::-webkit-search-cancel-button]:hidden",
+            onClear && "input-with-trailing-action",
+            className,
+          )}
           {...props}
         />
         {onClear && hasValue && (

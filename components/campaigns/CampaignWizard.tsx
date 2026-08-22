@@ -1648,7 +1648,7 @@ function AudienceStep({
           <div className="mt-3 grid gap-2 rounded-xl border border-border bg-surface-subtle/45 p-3">
             <div className="relative">
               <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-subtle" />
-              <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск по имени, email, компании или должности" className="pl-9" />
+              <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск по имени, email, компании или должности" className="input-with-leading-icon" />
             </div>
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
               <Select value={status} onChange={(event) => setStatus(event.target.value)} options={[{ value: "", label: "Все статусы" }, { value: "active", label: "Активные" }, { value: "unsubscribed", label: "Отписанные" }, { value: "bounced", label: "Недоставляемые" }, { value: "invalid", label: "Некорректные" }]} />

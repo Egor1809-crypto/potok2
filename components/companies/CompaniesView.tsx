@@ -94,7 +94,7 @@ export function CompaniesView() {
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              className="input h-9 w-full pl-9 text-[11px]"
+              className="input input-with-leading-icon h-9 w-full text-[11px]"
               placeholder="Поиск компаний"
             />
           </label>

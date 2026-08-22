@@ -1,4 +1,8 @@
-import type { PresentationProjectRecord, PresentationSlide } from "@/types/api";
+import type {
+  PresentationPatternId,
+  PresentationProjectRecord,
+  PresentationSlide,
+} from "@/types/api";
 import { presentationTheme } from "@/data/presentation-templates";
 
 const SLIDE_WIDTH = 12_192_000;
@@ -35,13 +39,27 @@ function rect(
   h: number,
   fill: string,
   radius = false,
+  rotation = 0,
 ) {
-  return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="${xml(name)}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="${Math.round(x)}" y="${Math.round(y)}"/><a:ext cx="${Math.round(w)}" cy="${Math.round(h)}"/></a:xfrm><a:prstGeom prst="${radius ? "roundRect" : "rect"}"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="${hex(fill)}"/></a:solidFill><a:ln><a:noFill/></a:ln></p:spPr></p:sp>`;
+  return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="${xml(name)}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm${rotation ? ` rot="${Math.round(rotation * 60_000)}"` : ""}><a:off x="${Math.round(x)}" y="${Math.round(y)}"/><a:ext cx="${Math.round(w)}" cy="${Math.round(h)}"/></a:xfrm><a:prstGeom prst="${radius ? "roundRect" : "rect"}"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="${hex(fill)}"/></a:solidFill><a:ln><a:noFill/></a:ln></p:spPr></p:sp>`;
+}
+
+function ellipse(
+  id: number,
+  name: string,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  fill: string,
+) {
+  return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="${xml(name)}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="${Math.round(x)}" y="${Math.round(y)}"/><a:ext cx="${Math.round(w)}" cy="${Math.round(h)}"/></a:xfrm><a:prstGeom prst="ellipse"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="${hex(fill)}"/></a:solidFill><a:ln><a:noFill/></a:ln></p:spPr></p:sp>`;
 }
 
 function presentationPatternShapes(
   project: PresentationProjectRecord,
   startId: number,
+  patternId: PresentationPatternId = "auto",
 ) {
   let id = startId;
   const shapes: string[] = [];
@@ -54,6 +72,89 @@ function presentationPatternShapes(
       : project.themeId === "sunrise"
         ? "#FFE1C7"
         : "#EDE3FA";
+  if (patternId === "none") return { shapes, nextId: id };
+  if (patternId !== "auto") {
+    if (patternId === "soft-grid" || patternId === "checker-soft") {
+      for (let column = 1; column < 9; column += 1)
+        shapes.push(
+          rect(id++, `Сетка · вертикаль ${column}`, column * 1.45 * EMU, 0, 0.018 * EMU, SLIDE_HEIGHT, soft),
+        );
+      for (let row = 1; row < 5; row += 1)
+        shapes.push(
+          rect(id++, `Сетка · горизонталь ${row}`, 0, row * 1.38 * EMU, SLIDE_WIDTH, 0.018 * EMU, soft),
+        );
+      if (patternId === "checker-soft")
+        for (let index = 0; index < 6; index += 1)
+          shapes.push(
+            rect(id++, `Шахматный модуль ${index + 1}`, (8.9 + (index % 3) * 1.05) * EMU, (0.25 + Math.floor(index / 3) * 1.0) * EMU, 0.82 * EMU, 0.72 * EMU, soft),
+          );
+    } else if (patternId === "editorial-lines") {
+      for (let index = 0; index < 4; index += 1)
+        shapes.push(
+          rect(id++, `Редакционная линия ${index + 1}`, (0.72 + index * 2.9) * EMU, 0, 0.025 * EMU, SLIDE_HEIGHT, index === 0 ? project.accentColor : soft),
+        );
+    } else if (patternId === "orbit" || patternId === "topography") {
+      const rings = patternId === "orbit" ? 3 : 5;
+      for (let index = 0; index < rings; index += 1) {
+        const size = (2.9 - index * 0.42) * EMU;
+        shapes.push(
+          ellipse(id++, `${patternId === "orbit" ? "Орбита" : "Топография"} ${index + 1}`, (10.1 + index * 0.21) * EMU, (-0.5 + index * 0.21) * EMU, size, size, index % 2 ? project.backgroundColor : index === 0 ? soft : project.accentColor),
+        );
+      }
+    } else if (patternId === "diagonal" || patternId === "ribbons") {
+      const count = patternId === "ribbons" ? 4 : 2;
+      for (let index = 0; index < count; index += 1)
+        shapes.push(
+          rect(id++, `Лента ${index + 1}`, (8.4 + index * 0.7) * EMU, (-0.4 + index * 0.38) * EMU, 4.9 * EMU, (0.16 + index * 0.08) * EMU, index % 2 ? soft : project.accentColor, true, 36),
+        );
+    } else if (patternId === "waves" || patternId === "archways") {
+      const count = patternId === "waves" ? 4 : 5;
+      for (let index = 0; index < count; index += 1)
+        shapes.push(
+          ellipse(id++, `${patternId === "waves" ? "Волна" : "Арка"} ${index + 1}`, (8.5 + index * 0.72) * EMU, (5.7 - index * 0.14) * EMU, (2.4 - index * 0.18) * EMU, (1.2 + index * 0.2) * EMU, index % 2 ? project.backgroundColor : soft),
+        );
+    } else if (patternId === "gold-frame") {
+      shapes.push(
+        rect(id++, "Рамка · верх", 0.58 * EMU, 0.42 * EMU, 11.05 * EMU, 0.028 * EMU, project.accentColor),
+        rect(id++, "Рамка · низ", 0.58 * EMU, 6.33 * EMU, 11.05 * EMU, 0.028 * EMU, project.accentColor),
+        rect(id++, "Рамка · слева", 0.58 * EMU, 0.42 * EMU, 0.028 * EMU, 5.94 * EMU, project.accentColor),
+        rect(id++, "Рамка · справа", 11.6 * EMU, 0.42 * EMU, 0.028 * EMU, 5.94 * EMU, project.accentColor),
+      );
+    } else if (patternId === "aurora-mesh") {
+      shapes.push(
+        ellipse(id++, "Аврора · левое свечение", -1.2 * EMU, -1.25 * EMU, 5.3 * EMU, 4.2 * EMU, soft),
+        ellipse(id++, "Аврора · правое свечение", 9.3 * EMU, -0.8 * EMU, 4.1 * EMU, 3.4 * EMU, project.accentColor),
+        ellipse(id++, "Аврора · нижнее свечение", 7.6 * EMU, 5.65 * EMU, 4.7 * EMU, 2.1 * EMU, soft),
+      );
+    } else if (patternId === "paper-grain" || patternId === "halftone") {
+      const columns = patternId === "halftone" ? 9 : 12;
+      const rows = patternId === "halftone" ? 6 : 7;
+      for (let row = 0; row < rows; row += 1)
+        for (let column = 0; column < columns; column += 1) {
+          const size = patternId === "halftone" ? (0.035 + column * 0.006) * EMU : 0.025 * EMU;
+          shapes.push(
+            ellipse(id++, `Точка ${row + 1}.${column + 1}`, (patternId === "halftone" ? 8.7 : 0.35) * EMU + column * 0.32 * EMU, 0.35 * EMU + row * 0.32 * EMU, size, size, patternId === "halftone" ? project.accentColor : soft),
+          );
+        }
+    } else if (patternId === "sunburst") {
+      for (let index = 0; index < 7; index += 1)
+        shapes.push(
+          rect(id++, `Солнечный луч ${index + 1}`, (10.5 - index * 0.15) * EMU, (0.3 + index * 0.12) * EMU, 3.1 * EMU, 0.055 * EMU, index % 2 ? soft : project.accentColor, true, 12 + index * 9),
+        );
+    } else if (patternId === "confetti" || patternId === "terrazzo") {
+      for (let index = 0; index < 18; index += 1) {
+        const x = ((index * 71) % 1160) / 100;
+        const y = ((index * 43) % 620) / 100;
+        const size = (patternId === "terrazzo" ? 0.09 + (index % 4) * 0.025 : 0.055 + (index % 3) * 0.022) * EMU;
+        shapes.push(
+          index % 3 === 0
+            ? rect(id++, `Фрагмент ${index + 1}`, x * EMU, y * EMU, size * 1.8, size, index % 2 ? soft : project.accentColor, true, (index * 17) % 90)
+            : ellipse(id++, `Фрагмент ${index + 1}`, x * EMU, y * EMU, size, size, index % 2 ? soft : project.accentColor),
+        );
+      }
+    }
+    return { shapes, nextId: id };
+  }
   if (project.themeId === "atelier") {
     shapes.push(
       rect(
@@ -472,7 +573,7 @@ function slideShapes(
   const contentWidth = image ? 6.75 * EMU : fullWidth;
   let id = 2;
   const shapes: string[] = [];
-  const pattern = presentationPatternShapes(project, id);
+  const pattern = presentationPatternShapes(project, id, slide.patternId);
   shapes.push(...pattern.shapes);
   id = pattern.nextId;
   if (slide.layout !== "closing") {

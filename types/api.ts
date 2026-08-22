@@ -427,7 +427,17 @@ export type PresentationPatternId =
   | "orbit"
   | "diagonal"
   | "waves"
-  | "gold-frame";
+  | "gold-frame"
+  | "aurora-mesh"
+  | "topography"
+  | "paper-grain"
+  | "archways"
+  | "confetti"
+  | "checker-soft"
+  | "sunburst"
+  | "halftone"
+  | "ribbons"
+  | "terrazzo";
 
 export type PresentationSlideLayout =
   | "title"

@@ -92,15 +92,26 @@ const sourceLabels: Record<PresentationProjectRecord["sourceType"], string> = {
 const presentationPatterns: Array<{
   id: PresentationPatternId;
   label: string;
+  category: string;
 }> = [
-  { id: "auto", label: "По композиции" },
-  { id: "none", label: "Без узора" },
-  { id: "soft-grid", label: "Мягкая сетка" },
-  { id: "editorial-lines", label: "Линии" },
-  { id: "orbit", label: "Орбита" },
-  { id: "diagonal", label: "Диагональ" },
-  { id: "waves", label: "Волны" },
-  { id: "gold-frame", label: "Тонкая рамка" },
+  { id: "auto", label: "По композиции", category: "Умный" },
+  { id: "none", label: "Без узора", category: "Чистый" },
+  { id: "aurora-mesh", label: "Аврора", category: "Градиент" },
+  { id: "ribbons", label: "Ленты", category: "Градиент" },
+  { id: "waves", label: "Волны", category: "Органика" },
+  { id: "topography", label: "Топография", category: "Органика" },
+  { id: "archways", label: "Арки", category: "Архитектура" },
+  { id: "orbit", label: "Орбита", category: "Геометрия" },
+  { id: "soft-grid", label: "Мягкая сетка", category: "Геометрия" },
+  { id: "checker-soft", label: "Шахматный ритм", category: "Геометрия" },
+  { id: "diagonal", label: "Диагональ", category: "Геометрия" },
+  { id: "sunburst", label: "Солнечные лучи", category: "Акцент" },
+  { id: "editorial-lines", label: "Редакционные линии", category: "Деловой" },
+  { id: "gold-frame", label: "Тонкая рамка", category: "Премиум" },
+  { id: "paper-grain", label: "Бумага", category: "Фактура" },
+  { id: "halftone", label: "Полутон", category: "Фактура" },
+  { id: "confetti", label: "Конфетти", category: "Игривый" },
+  { id: "terrazzo", label: "Терраццо", category: "Игривый" },
 ];
 
 function apiError(body: unknown, fallback: string) {
@@ -200,6 +211,61 @@ function presentationPatternStyle(
         "calc(100% - 10%) 1px, calc(100% - 10%) 1px, 1px calc(100% - 14%), 1px calc(100% - 14%)",
       backgroundPosition: "center 7%, center 93%, 5% center, 95% center",
       backgroundRepeat: "no-repeat",
+    };
+  if (patternId === "aurora-mesh")
+    return {
+      backgroundImage: `radial-gradient(circle at 12% 18%, ${accent}3D 0 13%, transparent 38%), radial-gradient(circle at 88% 20%, ${accent}24 0 16%, transparent 44%), radial-gradient(circle at 70% 92%, ${accent}32 0 18%, transparent 46%)`,
+      backgroundSize: "100% 100%",
+    };
+  if (patternId === "topography")
+    return {
+      backgroundImage: `repeating-radial-gradient(ellipse at 88% 18%, transparent 0 15px, ${accent}1D 16px 17px, transparent 18px 31px), repeating-radial-gradient(ellipse at 4% 110%, transparent 0 22px, ${accent}13 23px 24px, transparent 25px 41px)`,
+      backgroundSize: "100% 100%",
+    };
+  if (patternId === "paper-grain")
+    return {
+      backgroundImage: `radial-gradient(circle, ${accent}22 0 0.8px, transparent 1px), linear-gradient(135deg, ${accent}08, transparent 42%, ${accent}0B)`,
+      backgroundSize: "7px 7px, 100% 100%",
+    };
+  if (patternId === "archways")
+    return {
+      backgroundImage: `radial-gradient(ellipse at 50% 100%, transparent 0 38%, ${accent}22 38.5% 40%, transparent 40.5% 53%, ${accent}15 53.5% 55%, transparent 55.5%)`,
+      backgroundSize: "28% 88%",
+      backgroundPosition: "right bottom",
+      backgroundRepeat: "repeat-x",
+    };
+  if (patternId === "confetti")
+    return {
+      backgroundImage: `radial-gradient(circle at 14% 18%, ${accent}55 0 2px, transparent 2.5px), radial-gradient(circle at 82% 22%, ${accent}38 0 3px, transparent 3.5px), radial-gradient(circle at 74% 78%, ${accent}42 0 2px, transparent 2.5px), radial-gradient(circle at 22% 86%, ${accent}2E 0 4px, transparent 4.5px), linear-gradient(32deg, transparent 48%, ${accent}2A 49% 51%, transparent 52%)`,
+      backgroundSize: "92px 92px, 128px 128px, 104px 104px, 156px 156px, 74px 74px",
+    };
+  if (patternId === "checker-soft")
+    return {
+      backgroundImage: `linear-gradient(45deg, ${accent}12 25%, transparent 25% 75%, ${accent}12 75%), linear-gradient(45deg, ${accent}12 25%, transparent 25% 75%, ${accent}12 75%)`,
+      backgroundPosition: "0 0, 24px 24px",
+      backgroundSize: "48px 48px",
+    };
+  if (patternId === "sunburst")
+    return {
+      backgroundImage: `conic-gradient(from 205deg at 92% 16%, transparent 0 8deg, ${accent}24 8deg 13deg, transparent 13deg 22deg, ${accent}18 22deg 27deg, transparent 27deg 38deg, ${accent}12 38deg 42deg, transparent 42deg 360deg)`,
+      backgroundSize: "100% 100%",
+    };
+  if (patternId === "halftone")
+    return {
+      backgroundImage: `radial-gradient(circle, ${accent}2F 0 1.2px, transparent 1.6px)`,
+      backgroundSize: "12px 12px",
+      backgroundPosition: "right top",
+    };
+  if (patternId === "ribbons")
+    return {
+      backgroundImage: `linear-gradient(128deg, transparent 0 62%, ${accent}12 62% 70%, transparent 70%), linear-gradient(142deg, transparent 0 72%, ${accent}24 72% 79%, transparent 79%), linear-gradient(155deg, transparent 0 82%, ${accent}36 82% 88%, transparent 88%)`,
+      backgroundSize: "100% 100%",
+    };
+  if (patternId === "terrazzo")
+    return {
+      backgroundImage: `linear-gradient(25deg, transparent 46%, ${accent}2F 47% 52%, transparent 53%), linear-gradient(118deg, transparent 47%, ${accent}1F 48% 53%, transparent 54%), radial-gradient(ellipse, ${accent}29 0 3px, transparent 3.5px)`,
+      backgroundSize: "68px 74px, 96px 88px, 58px 62px",
+      backgroundPosition: "0 0, 24px 18px, 12px 30px",
     };
   const variant =
     [...seed].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 4;
@@ -2208,8 +2274,11 @@ export function PresentationStudio() {
                     onChange={changeSlideTheme}
                   />
                   <div className="mt-3">
-                    <p className="mb-2 mt-0 text-[11px] font-semibold">
-                      Узор слайда
+                    <p className="mb-0 mt-0 text-[11px] font-semibold">
+                      Библиотека фонов и узоров
+                    </p>
+                    <p className="mb-2 mt-0.5 text-[9px] leading-3 text-text-subtle">
+                      18 адаптивных мотивов в цветах текущего слайда
                     </p>
                     <div className="grid grid-cols-2 gap-2">
                       {presentationPatterns.map((pattern) => (
@@ -2237,7 +2306,10 @@ export function PresentationStudio() {
                               ),
                             }}
                           />
-                          {pattern.label}
+                          <span className="block truncate">{pattern.label}</span>
+                          <span className="mt-0.5 block text-[8px] font-normal text-text-subtle">
+                            {pattern.category}
+                          </span>
                         </button>
                       ))}
                     </div>
@@ -2410,6 +2482,21 @@ export function PresentationStudio() {
                   value={selectedSlide.themeId ?? project.themeId}
                   onChange={changeSlideTheme}
                 />
+                <div className="mt-3">
+                  <Select
+                    aria-label="Узор активного слайда"
+                    value={selectedSlide.patternId ?? "auto"}
+                    onChange={(event) =>
+                      updateSlide({
+                        patternId: event.target.value as PresentationPatternId,
+                      })
+                    }
+                    options={presentationPatterns.map((pattern) => ({
+                      value: pattern.id,
+                      label: `${pattern.label} · ${pattern.category}`,
+                    }))}
+                  />
+                </div>
                 <div className="mt-3 grid grid-cols-3 gap-2">
                   <Input
                     aria-label="Акцент активного слайда"

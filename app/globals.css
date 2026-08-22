@@ -463,6 +463,16 @@ a.card:hover {
   color: var(--text-subtle);
 }
 
+/* Keep text clear of leading icons. The base `.input` padding is declared
+   after Tailwind utilities, so icon-bearing fields need an explicit contract. */
+.input.input-with-leading-icon {
+  padding-left: 42px !important;
+}
+
+.input.input-with-trailing-action {
+  padding-right: 42px !important;
+}
+
 .input:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--border-strong) 70%, var(--text-muted));
 }

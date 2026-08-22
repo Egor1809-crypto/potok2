@@ -66,6 +66,16 @@ const PATTERNS = new Set<PresentationPatternId>([
   "diagonal",
   "waves",
   "gold-frame",
+  "aurora-mesh",
+  "topography",
+  "paper-grain",
+  "archways",
+  "confetti",
+  "checker-soft",
+  "sunburst",
+  "halftone",
+  "ribbons",
+  "terrazzo",
 ]);
 const LAYOUTS = new Set<PresentationSlideLayout>([
   "title",
