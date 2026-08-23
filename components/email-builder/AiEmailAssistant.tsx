@@ -383,7 +383,7 @@ export function AiEmailAssistant({
   };
 
   return (
-    <section className="mx-auto grid h-full min-h-0 w-full max-w-4xl gap-6 overflow-y-auto p-5 sm:p-8">
+    <section className="mx-auto grid min-h-0 w-full max-w-4xl flex-1 auto-rows-max content-start gap-6 overflow-y-auto overscroll-contain p-5 pb-24 scrollbar-subtle [scrollbar-gutter:stable] sm:p-8 sm:pb-24">
       <Modal
         open={comparisonOpen}
         onOpenChange={setComparisonOpen}

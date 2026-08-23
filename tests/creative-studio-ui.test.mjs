@@ -38,3 +38,18 @@ test("art director leads the user through diagnosis, style and dramaturgy", asyn
   assert.match(panel, /03 Сюжет/);
   assert.match(panel, /director-stage/);
 });
+
+test("email AI form keeps every choice full-height inside its own scroll area", async () => {
+  const assistant = await readFile(
+    new URL(
+      "../components/email-builder/AiEmailAssistant.tsx",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  assert.match(assistant, /flex-1 auto-rows-max content-start/);
+  assert.match(assistant, /overflow-y-auto overscroll-contain/);
+  assert.match(assistant, /scrollbar-gutter:stable/);
+  assert.match(assistant, /pb-24/);
+  assert.doesNotMatch(assistant, /grid h-full min-h-0 w-full max-w-4xl/);
+});
