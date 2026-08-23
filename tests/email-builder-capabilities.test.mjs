@@ -185,7 +185,10 @@ test("AI brief asks follow-up questions and accepts dragged user images", async 
   ]);
   assert.match(assistant, /Спроектировать письмо с нуля/);
   assert.match(assistant, /Стиль и визуальное направление/);
-  assert.match(assistant, /Полная дизайнерская редакция включена всегда/);
+  assert.match(
+    assistant,
+    /Режим «с нуля»: библиотека физически не передаётся ИИ/,
+  );
   assert.ok(
     assistant.indexOf("Стиль и визуальное направление") <
       assistant.indexOf("2 · Уточнения"),
@@ -202,8 +205,8 @@ test("AI brief asks follow-up questions and accepts dragged user images", async 
   assert.match(server, /Арт-направление — чистый минимализм/);
   assert.match(server, /classifyEmailType/);
   assert.match(server, /saasEmailBlockStyle/);
-  assert.match(server, /contentWidth: cleanSaas \? 620/);
-  assert.match(server, /frameStyle: cleanSaas \? "hairline"/);
+  assert.match(server, /modelDesignNumber\(design\.contentWidth/);
+  assert.match(server, /modelFrameStyle/);
   assert.match(server, /availableAssets/);
   assert.match(server, /Не спрашивай цвета/);
   assert.match(server, /action === "design"/);
@@ -247,7 +250,11 @@ test("email AI can either adapt a real library template or design from scratch",
   assert.match(server, /adaptSuggestionToTemplate/);
   assert.match(server, /templateBlueprint/);
   assert.match(server, /Режим композиции — адаптация библиотечного шаблона/);
-  assert.match(server, /Режим композиции — полностью оригинальная арт-дирекция/);
+  assert.match(server, /Режим композиции — полностью оригинальная генерация/);
+  assert.match(server, /patternArtwork = usesTemplateLibrary/);
+  assert.match(server, /kind: "pattern"/);
+  assert.match(server, /Библиотека шаблонов и готовых паттернов не использовалась/);
+  assert.match(assistant, /Создано с нуля · библиотека не использовалась/);
 });
 
 test("manual controls and export are wired to live updates without popup PDF", async () => {

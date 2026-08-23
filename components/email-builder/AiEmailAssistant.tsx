@@ -187,8 +187,6 @@ export function AiEmailAssistant({
   useEffect(() => {
     if (creativeSource !== "library" || templates.length) return;
     let active = true;
-    setTemplatesLoading(true);
-    setTemplatesError("");
     void fetch("/api/templates", { cache: "no-store" })
       .then(async (response) => {
         const body = (await response.json()) as
@@ -439,6 +437,20 @@ export function AiEmailAssistant({
           <summary className="cursor-pointer px-4 py-3 text-[11px] font-semibold text-text-strong">
             Что изменил ИИ и какой контекст использовал
           </summary>
+          <div className="flex flex-wrap items-center gap-2 border-t border-border px-4 py-3 text-[10px] text-text-muted">
+            <Badge
+              variant={
+                suggestion?.creationMode === "original" ? "success" : "neutral"
+              }
+            >
+              {suggestion?.creationMode === "original"
+                ? "Создано с нуля · библиотека не использовалась"
+                : "Адаптация выбранного шаблона"}
+            </Badge>
+            <span>
+              Режим подтверждён сервером после сборки письма.
+            </span>
+          </div>
           <div className="grid gap-3 border-t border-border p-3 lg:grid-cols-2">
             <DesignReport title="Моя редакция" document={document} />
             <DesignReport
@@ -516,6 +528,12 @@ export function AiEmailAssistant({
             value={creativeSource}
             onChange={(value) => {
               setCreativeSource(value);
+              if (value === "original") {
+                setSelectedTemplateId("");
+              } else if (!templates.length) {
+                setTemplatesLoading(true);
+                setTemplatesError("");
+              }
               setError("");
             }}
             libraryCount={templates.length || 364}
@@ -631,45 +649,52 @@ export function AiEmailAssistant({
               placeholder="Например: лёгкий минимализм, тёплая природная палитра, тонкий ботанический узор, атмосферное фото по теме, без типичных AI-градиентов."
             />
           </FormField>
-          <FormField
-            label="Основа композиции"
-            hint="Это стартовая система. Конкретные цвета и настроение берутся из поля выше."
-          >
-            <div
-              className="grid gap-2 sm:grid-cols-2"
-              role="radiogroup"
-              aria-label="Основа композиции письма"
+          {creativeSource === "library" ? (
+            <FormField
+              label="Характер адаптации"
+              hint="Выбранный шаблон сохранит композицию, а это направление задаст характер новой редакции."
             >
-              {(
-                [
-                  ["minimal", "Чистый минимализм", "Спокойный ритм, точная типографика, одно действие"],
-                  ["editorial", "Редакционная колонка", "Живой голос, строгая верстка, меньше карточек"],
-                  ["premium", "Тихая премиальность", "Глубокий контраст, тонкие линии и дорогие пропорции"],
-                  ["bold", "Выразительный выпуск", "Сильный контраст для запуска или события"],
-                ] as const
-              ).map(([value, label, description]) => (
-                <button
-                  key={value}
-                  type="button"
-                  role="radio"
-                  aria-checked={visualStyle === value}
-                  onClick={() => setVisualStyle(value)}
-                  className="rounded-xl border border-border bg-surface p-3 text-left outline-none transition hover:border-primary/35 focus-visible:ring-2 focus-visible:ring-primary/30 aria-checked:border-primary aria-checked:bg-primary-subtle/60"
-                >
-                  <strong className="block text-[11px] text-text-strong">
-                    {label}
-                  </strong>
-                  <span className="mt-1 block text-[9px] leading-4 text-text-muted">
-                    {description}
-                  </span>
-                </button>
-              ))}
+              <div
+                className="grid gap-2 sm:grid-cols-2"
+                role="radiogroup"
+                aria-label="Характер адаптации письма"
+              >
+                {(
+                  [
+                    ["minimal", "Чистый минимализм", "Спокойный ритм, точная типографика, одно действие"],
+                    ["editorial", "Редакционная колонка", "Живой голос, строгая верстка, меньше карточек"],
+                    ["premium", "Тихая премиальность", "Глубокий контраст, тонкие линии и дорогие пропорции"],
+                    ["bold", "Выразительный выпуск", "Сильный контраст для запуска или события"],
+                  ] as const
+                ).map(([value, label, description]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    role="radio"
+                    aria-checked={visualStyle === value}
+                    onClick={() => setVisualStyle(value)}
+                    className="rounded-xl border border-border bg-surface p-3 text-left outline-none transition hover:border-primary/35 focus-visible:ring-2 focus-visible:ring-primary/30 aria-checked:border-primary aria-checked:bg-primary-subtle/60"
+                  >
+                    <strong className="block text-[11px] text-text-strong">
+                      {label}
+                    </strong>
+                    <span className="mt-1 block text-[9px] leading-4 text-text-muted">
+                      {description}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </FormField>
+          ) : (
+            <div className="rounded-xl border border-success/25 bg-success-subtle px-4 py-3 text-[11px] leading-5 text-text-muted">
+              <strong className="block text-text-strong">
+                Режим «с нуля»: библиотека физически не передаётся ИИ
+              </strong>
+              Модель сама определит композицию, шрифтовую пару, размеры,
+              интервалы, рамку, изображение и создаст отдельный авторский узор
+              из вашего запроса.
             </div>
-          </FormField>
-          <div className="rounded-xl border border-success/20 bg-success-subtle px-4 py-3 text-[11px] leading-5 text-text-muted">
-            <strong className="text-text-strong">Полная дизайнерская редакция включена всегда:</strong>{" "}
-            новый текст, палитра, композиция, тематическое изображение и email-safe узор.
-          </div>
+          )}
           {detectedUrl ? (
             <div className="flex items-center gap-2 rounded-xl border border-primary/20 bg-primary-subtle/40 px-3 py-2.5 text-[11px]">
               <input

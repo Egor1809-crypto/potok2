@@ -388,6 +388,8 @@ export type EmailAiRequest = {
 };
 
 export type EmailAiSuggestion = {
+  /** The server reports the actual composition path used for this result. */
+  creationMode?: "original" | "library";
   emailType?:
     | "informational"
     | "welcome"
@@ -408,7 +410,7 @@ export type EmailAiSuggestion = {
     blockId: string;
     prompt: string;
     alt: string;
-    kind: "photo" | "logo";
+    kind: "photo" | "logo" | "pattern";
   }>;
   questions?: Array<{
     id: string;

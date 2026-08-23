@@ -106,6 +106,10 @@ type EmailCreativeBlueprint = {
   avoid: string[];
 };
 
+function usesTemplateLibrary(input: EmailAiRequest) {
+  return input.creativeSource === "library" && Boolean(input.templateReference);
+}
+
 function emailCreativeBlueprint(
   input: EmailAiRequest,
   emailType = classifyEmailType(input.goal),
@@ -204,8 +208,8 @@ function emailCreativeBlueprint(
     },
   };
   const style = input.visualStyle ?? "minimal";
-  const recommendedDesignSystems =
-    style === "premium"
+  const recommendedDesignSystems = usesTemplateLibrary(input)
+    ? style === "premium"
       ? ["quiet-luxury", "gallery-white"]
       : style === "editorial"
         ? ["editorial-paper", "monochrome-journal"]
@@ -215,7 +219,8 @@ function emailCreativeBlueprint(
             ? ["product-signal", "cobalt-precision"]
             : emailType === "notification" || emailType === "transactional"
               ? ["civic-trust", "executive-brief"]
-              : ["executive-brief", "warm-human", "botanical-calm"];
+              : ["executive-brief", "warm-human", "botanical-calm"]
+    : [];
   return {
     scenario: emailType,
     ...scenarios[emailType],
@@ -533,7 +538,8 @@ function adaptSuggestionToTemplate(
     if (candidate) used.add(candidate.index);
     return candidate?.block;
   };
-  const { rawHtml: _rawHtml, ...templateDocument } = reference.document;
+  const templateDocument = { ...reference.document };
+  delete templateDocument.rawHtml;
   const blocks = templateDocument.blocks.flatMap((templateBlock, index) => {
     const generatedBlock = take(
       templateBlock.type,
@@ -788,7 +794,9 @@ function fallbackDesignedSuggestion(input: EmailAiRequest) {
       ...copy,
       cta,
       artDirection:
-        `Цельная email-система на основе ${creativeBlueprint.recommendedDesignSystems.join(" или ")}: профессиональная типографика, тематическое изображение и один спокойный смысловой орнамент.`,
+        usesTemplateLibrary(input)
+          ? `Цельная email-система на основе ${creativeBlueprint.recommendedDesignSystems.join(" или ")}: профессиональная типографика, тематическое изображение и один спокойный смысловой орнамент.`
+          : "Оригинальная email-система создана без библиотеки: собственная композиция, профессиональная типографика, сгенерированные тематическое изображение и орнамент.",
       contentStrategy:
         `${creativeBlueprint.narrativeArc.join(" → ")}. Переход читателя: ${creativeBlueprint.readerBefore} → ${creativeBlueprint.readerAfter}`,
     }),
@@ -873,6 +881,43 @@ function modelText(value: unknown): string | undefined {
       return object[key].trim();
   }
   return undefined;
+}
+
+const EMAIL_SAFE_FONTS = new Set<EmailTypographySystem["headingFont"]>([
+  "Arial",
+  "Georgia",
+  "Verdana",
+  "Trebuchet MS",
+]);
+
+function modelEmailFont(
+  value: unknown,
+  fallback: EmailTypographySystem["headingFont"],
+) {
+  return typeof value === "string" &&
+    EMAIL_SAFE_FONTS.has(value as EmailTypographySystem["headingFont"])
+    ? (value as EmailTypographySystem["headingFont"])
+    : fallback;
+}
+
+function modelDesignNumber(value: unknown, minimum: number, maximum: number) {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.min(maximum, Math.max(minimum, Math.round(value)))
+    : undefined;
+}
+
+function modelDesignColor(value: unknown) {
+  return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value.trim())
+    ? value.trim().toUpperCase()
+    : undefined;
+}
+
+function originalPatternPrompt(
+  input: EmailAiRequest,
+  subject: string,
+  palette: EmailVisualPalette,
+) {
+  return `Создай уникальный авторский горизонтальный орнамент специально для email «${subject}» по задаче «${input.goal}». Визуальный характер: ${input.designBrief || "выведи из темы и аудитории"}. Палитра ${palette.accent}${palette.secondaryAccent ? `, ${palette.secondaryAccent}` : ""}, ${palette.soft}. Это должна быть самостоятельная графическая работа, а не готовый паттерн, клипарт или библиотечная текстура: широкий спокойный ритм, много воздуха, email-safe контраст, без букв, слов, логотипов, интерфейса и водяных знаков`;
 }
 
 function normalizeCompoundContent(
@@ -1229,6 +1274,7 @@ function parseSuggestion(
     ? (rawEmailType as EmailType)
     : classifyEmailType(input.goal);
   const suggestion: EmailAiSuggestion = {
+    creationMode: usesTemplateLibrary(input) ? "library" : "original",
     emailType,
     subject: normalizeDisplayHeading(cleanText(subject, "Тема", 300)),
     previewText: normalizeDisplayHeading(
@@ -1359,15 +1405,38 @@ function parseSuggestion(
   const accentColor = palette.accent;
   const effectiveBodyBackground = palette.body;
   const workspaceBackground = palette.workspace;
-  const typography = resolveEmailTypography({
+  const resolvedTypography = resolveEmailTypography({
     goal: input.goal,
     designBrief: input.designBrief,
     visualStyle: input.visualStyle ?? "minimal",
   });
-  const patternArtwork = selectEmailPatternArtwork(
-    `${input.goal}\n${input.designBrief ?? ""}`,
-    input.visualStyle ?? "minimal",
-  );
+  const originalComposition = !usesTemplateLibrary(input);
+  const typography: EmailTypographySystem = originalComposition
+    ? {
+        ...resolvedTypography,
+        name: "Авторская типографика ИИ",
+        headingFont: modelEmailFont(
+          design.headingFont,
+          resolvedTypography.headingFont,
+        ),
+        bodyFont: modelEmailFont(design.bodyFont, resolvedTypography.bodyFont),
+        heroSize:
+          modelDesignNumber(design.heroSize, 24, 34) ??
+          resolvedTypography.heroSize,
+        headingSize:
+          modelDesignNumber(design.headingSize, 20, 26) ??
+          resolvedTypography.headingSize,
+        bodySize:
+          modelDesignNumber(design.bodySize, 15, 17) ??
+          resolvedTypography.bodySize,
+      }
+    : resolvedTypography;
+  const patternArtwork = usesTemplateLibrary(input)
+    ? selectEmailPatternArtwork(
+        `${input.goal}\n${input.designBrief ?? ""}`,
+        input.visualStyle ?? "minimal",
+      )
+    : undefined;
   const styleBlock = (type: EmailBuilderBlockInput["type"]) =>
     premium
       ? premiumEmailBlockStyle(type, palette, typography)
@@ -1493,6 +1562,33 @@ function parseSuggestion(
         kind: type === "logo" ? "logo" : "photo",
       });
     }
+    const modelStyle = originalComposition
+      ? {
+          ...(["left", "center", "right"].includes(String(raw.alignment))
+            ? {
+                alignment: raw.alignment as "left" | "center" | "right",
+              }
+            : {}),
+          ...(modelDesignColor(raw.backgroundColor)
+            ? { backgroundColor: modelDesignColor(raw.backgroundColor) }
+            : {}),
+          ...(modelDesignColor(raw.textColor)
+            ? { textColor: modelDesignColor(raw.textColor) }
+            : {}),
+          ...(modelDesignNumber(raw.fontSize, 11, type === "hero" ? 34 : 26)
+            ? { fontSize: modelDesignNumber(raw.fontSize, 11, type === "hero" ? 34 : 26) }
+            : {}),
+          ...(modelDesignNumber(raw.borderRadius, 0, 24) !== undefined
+            ? { borderRadius: modelDesignNumber(raw.borderRadius, 0, 24) }
+            : {}),
+          ...(modelDesignNumber(raw.paddingTop, 4, 48)
+            ? { paddingTop: modelDesignNumber(raw.paddingTop, 4, 48) }
+            : {}),
+          ...(modelDesignNumber(raw.paddingBottom, 4, 48)
+            ? { paddingBottom: modelDesignNumber(raw.paddingBottom, 4, 48) }
+            : {}),
+        }
+      : {};
     return [
       {
         id: blockId,
@@ -1509,6 +1605,7 @@ function parseSuggestion(
         ...(cleanSaas
           ? styleBlock(type)
           : creativeBlockStyle(type, index, palette, typography)),
+        ...modelStyle,
         ...(["hero", "heading", "banner"].includes(type) && content.length > 90
           ? {
               fontSize:
@@ -1617,9 +1714,14 @@ function parseSuggestion(
   }
   if (wantsPattern) {
     const existingPattern = blocks.find((block) => block.type === "pattern");
+    const patternBlockId =
+      existingPattern?.id ?? `ai-pattern-${crypto.randomUUID()}`;
+    const patternContent = patternArtwork?.alt ?? "Авторский орнамент ИИ";
+    const patternHref =
+      patternArtwork?.imageUrl ?? "https://placehold.co/1536x1024/png";
     if (existingPattern) {
-      existingPattern.content = patternArtwork.alt;
-      existingPattern.href = patternArtwork.imageUrl;
+      existingPattern.content = patternContent;
+      existingPattern.href = patternHref;
       Object.assign(
         existingPattern,
         cleanSaas
@@ -1633,10 +1735,10 @@ function parseSuggestion(
       );
     } else {
       const patternBlock = {
-        id: `ai-pattern-${crypto.randomUUID()}`,
+        id: patternBlockId,
         type: "pattern" as const,
-        content: patternArtwork.alt,
-        href: patternArtwork.imageUrl,
+        content: patternContent,
+        href: patternHref,
         ...(cleanSaas
           ? styleBlock("pattern")
           : creativeBlockStyle(
@@ -1650,6 +1752,14 @@ function parseSuggestion(
         (block) => block.type === "hero" || block.type === "heading",
       );
       blocks.splice(heroIndex >= 0 ? heroIndex + 1 : 0, 0, patternBlock);
+    }
+    if (originalComposition) {
+      plannedImagePrompts.push({
+        blockId: patternBlockId,
+        prompt: originalPatternPrompt(input, suggestion.subject, palette),
+        alt: patternContent,
+        kind: "pattern",
+      });
     }
   }
   if (!blocks.some((block) => block.type === "text")) {
@@ -1777,6 +1887,20 @@ function parseSuggestion(
       502,
     );
   }
+  const modelFrameStyle = [
+    "none",
+    "hairline",
+    "accent",
+    "double",
+    "top-bottom",
+    "left-band",
+    "soft",
+    "editorial",
+    "luxury",
+    "gallery-mat",
+  ].includes(String(design.frameStyle))
+    ? (design.frameStyle as NonNullable<EmailBuilderDocumentInput["frameStyle"]>)
+    : undefined;
   const parsedDocument = parseEmailBuilderDocument({
     templateId: "",
     subject: suggestion.subject,
@@ -1784,8 +1908,13 @@ function parseSuggestion(
     accentColor,
     bodyBackground: effectiveBodyBackground,
     workspaceBackground,
-    contentWidth: cleanSaas ? 620 : 640,
-    frameStyle: cleanSaas ? "hairline" : "none",
+    contentWidth:
+      (originalComposition
+        ? modelDesignNumber(design.contentWidth, 560, 680)
+        : undefined) ?? (cleanSaas ? 620 : 640),
+    frameStyle:
+      (originalComposition ? modelFrameStyle : undefined) ??
+      (cleanSaas ? "hairline" : "none"),
     frameColor: premium ? accentColor : palette.border,
     frameRadius: cleanSaas ? 8 : 0,
     blocks,
@@ -1799,12 +1928,15 @@ function parseSuggestion(
   suggestion.artDirection =
     `${palette.name}: ${input.visualStyle ?? "minimal"}, акцент ${palette.accent}${palette.secondaryAccent ? ` и ${palette.secondaryAccent}` : ""}. ` +
     `${typography.name}: ${typography.headingFont} для заголовков и ${typography.bodyFont} для текста. ` +
-    `${wantsPattern ? `Орнамент «${patternArtwork.name}»` : "Декор без отдельного орнамента"}${wantsImage ? " и тематическое изображение" : ""}; интервалы и роли собраны в единую email-safe систему.`;
+    `${wantsPattern ? patternArtwork ? `Орнамент «${patternArtwork.name}»` : "Уникальный орнамент, созданный ИИ для этого письма" : "Декор без отдельного орнамента"}${wantsImage ? " и тематическое изображение" : ""}; интервалы и роли собраны в единую email-safe систему. ` +
+    (originalComposition
+      ? "Библиотека шаблонов и готовых паттернов не использовалась."
+      : "Композиция адаптирована из выбранной библиотечной системы.");
   suggestion.contentStrategy ??=
     "Один главный тезис, короткое объяснение ценности, только подтверждённые факты и одно целевое действие без повторов исходного брифа.";
   suggestion.imagePrompts = plannedImagePrompts.filter(
     (planned) =>
-      (planned.kind === "logo" || input.imageSource !== "none") &&
+      (planned.kind !== "photo" || input.imageSource !== "none") &&
       parsedDocument.blocks.some((block) => block.id === planned.blockId),
   );
   return suggestion;
@@ -2080,6 +2212,8 @@ async function generateDesignImages(
             prompt:
               image.kind === "logo"
                 ? `${image.prompt}. Чистый профессиональный логотип на однотонном светлом фоне, без макета сайта, без водяных знаков.`
+                : image.kind === "pattern"
+                  ? `${image.prompt}. Горизонтальная декоративная композиция с безопасной центральной зоной и спокойными краями, пригодная для узкого pattern-блока HTML-письма.`
                 : `${image.prompt}. Законченное оригинальное изображение, без текста, логотипа, интерфейса и водяных знаков.`,
             size: "1536x1024",
             quality: "high",
@@ -2099,13 +2233,16 @@ async function generateDesignImages(
       const filename =
         image.kind === "logo"
           ? "Логотип, созданный ИИ"
+          : image.kind === "pattern"
+            ? "Авторский орнамент, созданный ИИ"
           : "Тематическая иллюстрация, созданная ИИ";
+      const storedKind = image.kind === "logo" ? "logo" : "photo";
       const stored =
         typeof first.url === "string" && first.url.startsWith("https://")
           ? await storeGeneratedEmailAsset(
               request,
               first.url,
-              image.kind,
+              storedKind,
               filename,
             )
           : typeof first.b64_json === "string" && first.b64_json.length > 100
@@ -2115,7 +2252,7 @@ async function generateDesignImages(
                   character.charCodeAt(0),
                 ),
                 "image/png",
-                image.kind,
+                storedKind,
                 filename,
               )
             : null;
@@ -2126,6 +2263,14 @@ async function generateDesignImages(
         "Email AI visual generation failed",
         error instanceof Error ? error.message : "unknown error",
       );
+      if (suggestion.creationMode === "original") {
+        throw new ApiRequestError(
+          image.kind === "pattern"
+            ? "ИИ не смог создать авторский орнамент с нуля. Повторите генерацию — библиотечная замена не была использована."
+            : "ИИ не смог создать оригинальное изображение с нуля. Повторите генерацию — библиотечная замена не была использована.",
+          502,
+        );
+      }
       let recovered = false;
       if (block && image.kind === "photo") {
         try {
@@ -2236,8 +2381,11 @@ function emailDesignInstructions(input: EmailAiRequest) {
     primaryColor: input.primaryColor,
     secondaryColor: input.secondaryColor,
   });
+  const libraryMode = usesTemplateLibrary(input);
   const layoutRule =
-    input.visualStyle === "editorial"
+    !libraryMode
+      ? "Не используй готовую последовательность блоков и не выбирай именованный пресет. Сначала сам выведи из темы, аудитории и цели уникальную композиционную идею, затем под неё выбери 5–10 блоков. Верни собственные design-токены: headingFont, bodyFont, heroSize, headingSize, bodySize, contentWidth и frameStyle, а для каждого блока — alignment, backgroundColor, textColor, fontSize, borderRadius, paddingTop и paddingBottom. Каждый выбор должен быть частью одной авторской системы, а не вариацией библиотечного макета."
+      : input.visualStyle === "editorial"
       ? "Арт-направление — редакционная колонка: тёплая бумага или белое поле, один киноварный/чернильный акцент, заголовок Georgia, основной текст Arial, тонкие линии и почти без скруглений. Композиция должна напоминать хорошо отредактированное письмо от человека: logo → короткий heading или компактный hero → 1–2 текстовых блока → одно доказательство при наличии фактов → одна CTA → подпись или footer. Не собирай витрину из одинаковых карточек."
       : input.visualStyle === "premium"
         ? "Арт-направление — quiet luxury: почти чёрная основа, тёплое золото, кремовый текст, Georgia в заголовке, тонкие рамки и умеренные отступы. Премиальность создают пропорции и тишина. Структура: маленький logo → компактный hero → короткий текст → не более одного доказательства → одна CTA → footer."
@@ -2254,15 +2402,22 @@ function emailDesignInstructions(input: EmailAiRequest) {
     : input.imageSource === "generate"
       ? "Обязательно добавь ровно один компактный image-блок и предметный imagePrompt без текста на изображении. Изображение должно раскрывать тему письма, а не быть абстрактной заглушкой."
       : "Не добавляй image.";
-  const paletteRule = `Обязательная палитра уже извлечена из пожеланий пользователя: ${requestedPalette.name}; основной акцент ${requestedPalette.accent}${requestedPalette.secondaryAccent ? `, второй обязательный акцент ${requestedPalette.secondaryAccent}` : ""}, мягкий фон ${requestedPalette.soft}, фон письма ${requestedPalette.body}, внешний фон ${requestedPalette.workspace}, основной текст ${requestedPalette.text}. Не заменяй явно запрошенный цвет стандартным голубым или фиолетовым. Если запрошено два цвета, не выбрасывай второй и используй оба в разных визуальных ролях. ${premium ? "Премиальность создают контраст, точная типографика, тонкая рамка и ритм — не огромные заголовки и не декоративная перегрузка." : "Минимализм означает меньше элементов, а не отсутствие арт-дирекции."}`;
+  const paletteRule = libraryMode
+    ? `Обязательная палитра уже извлечена из пожеланий пользователя: ${requestedPalette.name}; основной акцент ${requestedPalette.accent}${requestedPalette.secondaryAccent ? `, второй обязательный акцент ${requestedPalette.secondaryAccent}` : ""}, мягкий фон ${requestedPalette.soft}, фон письма ${requestedPalette.body}, внешний фон ${requestedPalette.workspace}, основной текст ${requestedPalette.text}. Не заменяй явно запрошенный цвет стандартным голубым или фиолетовым. Если запрошено два цвета, не выбрасывай второй и используй оба в разных визуальных ролях. ${premium ? "Премиальность создают контраст, точная типографика, тонкая рамка и ритм — не огромные заголовки и не декоративная перегрузка." : "Минимализм означает меньше элементов, а не отсутствие арт-дирекции."}`
+    : `Самостоятельно создай палитру из смысла и designBrief и верни её в accentColor, bodyBackground и workspaceBackground. Явно названные пользователем цвета обязательны: переведи словесные названия в точные #RRGGBB и распредели их по разным ролям. Не подставляй стандартный голубой или фиолетовый, если пользователь их не просил. Палитра должна быть авторской для этого письма и поддерживать читаемый контраст. ${premium ? "Премиальность создают контраст, точная типографика, тонкая рамка и ритм — не огромные заголовки и не декоративная перегрузка." : "Минимализм означает меньше элементов, а не отсутствие арт-дирекции."}`;
   const patternRule = wantsPattern
-      ? `Добавь ровно один узкий pattern-блок в осмысленной точке ритма — после входного hero или перед главным доказательством. Сервер сам подберёт к теме растровый орнамент из библиотеки из 102 email-safe фонов; от тебя требуется правильная позиция и спокойная высота блока. Видимый fallback-content: «${decorativePatternFor(`${input.goal}\n${input.designBrief ?? ""}`)}».`
+      ? libraryMode
+        ? `Добавь ровно один узкий pattern-блок в осмысленной точке ритма — после входного hero или перед главным доказательством. Сервер подберёт к теме растровый орнамент из библиотеки; от тебя требуется правильная позиция и спокойная высота блока. Видимый fallback-content: «${decorativePatternFor(`${input.goal}\n${input.designBrief ?? ""}`)}».`
+        : "Добавь ровно один pattern-блок в осмысленной точке ритма и напиши для него предметный imagePrompt. Орнамент будет сгенерирован моделью специально для этого письма; нельзя ссылаться на готовый паттерн, библиотечный фон, шаблон или клипарт."
     : "Не добавляй pattern.";
   const sourceRule =
-    input.creativeSource === "library" && input.templateReference
+    libraryMode && input.templateReference
       ? `Режим композиции — адаптация библиотечного шаблона «${input.templateReference.name}». templateBlueprint является обязательным каркасом: сохрани его порядок смысловых ролей, плотность, пропорции и характер типографики, но не копируй старый текст. Заполни этот каркас новым содержанием по задаче пользователя. Допустимо добавить только недостающее тематическое изображение, узор или одну CTA.`
-      : "Режим композиции — полностью оригинальная арт-дирекция. Не воспроизводи готовый шаблон платформы: самостоятельно выбери смысловую структуру и визуальный ритм из creativeBlueprint.";
-  return `Ты — senior email designer, арт-директор и сильный русскоязычный редактор. Твоя задача — по одному пользовательскому брифу собрать законченное профессиональное письмо, в котором текст, композиция, типографика, палитра, орнамент и тематическое изображение работают как одна система. Проектируй именно HTML EMAIL для Gmail, Outlook и Apple Mail — не лендинг, не презентацию, не постер, не журнальную страницу и не новостной сайт. Не копируй узнаваемый интерфейс или стиль конкретного сервиса. authoritativeUserBrief задаёт тему и ограничения, а briefAnswers — только сырьё: нельзя копировать их списком или склеивать дословно. approvedEditorialCopy — утверждённая редакция темы, прехедера, основного текста и действия; сохрани её смысл. detectedEmailType — уже определённый сценарий письма, верни его как emailType. creativeBlueprint — обязательная режиссёрская карта: она описывает состояние читателя до и после письма, порядок смыслов, роль доказательства, CTA, изображения, орнамента и подходящие дизайн-системы. Выбери одну из рекомендованных систем и последовательно держи её палитру, типографику, интервалы, радиусы и характер визуала.
+      : "Режим композиции — полностью оригинальная генерация. Библиотека платформы отключена на уровне запроса: templateBlueprint отсутствует, список готовых дизайн-систем пуст, библиотечные шаблоны и паттерны запрещены. Создай одноразовую дизайн-систему именно для этого брифа и не имитируй знакомый макет платформы.";
+  const blueprintRule = libraryMode
+    ? "creativeBlueprint также содержит подходящие библиотечные дизайн-системы: выбери одну и последовательно держи её визуальную грамматику."
+    : "creativeBlueprint содержит только смысловую режиссуру. В нём намеренно нет готовых дизайн-систем: визуальную систему создай самостоятельно.";
+  return `Ты — senior email designer, арт-директор и сильный русскоязычный редактор. Твоя задача — по одному пользовательскому брифу собрать законченное профессиональное письмо, в котором текст, композиция, типографика, палитра, орнамент и тематическое изображение работают как одна система. Проектируй именно HTML EMAIL для Gmail, Outlook и Apple Mail — не лендинг, не презентацию, не постер, не журнальную страницу и не новостной сайт. Не копируй узнаваемый интерфейс или стиль конкретного сервиса. authoritativeUserBrief задаёт тему и ограничения, а briefAnswers — только сырьё: нельзя копировать их списком или склеивать дословно. approvedEditorialCopy — утверждённая редакция темы, прехедера, основного текста и действия; сохрани её смысл. detectedEmailType — уже определённый сценарий письма, верни его как emailType. creativeBlueprint — обязательная режиссёрская карта: она описывает состояние читателя до и после письма, порядок смыслов, роль доказательства, CTA, изображения и орнамента. ${blueprintRule}
 
 ${sourceRule}
 
@@ -2329,7 +2484,7 @@ export async function generateEmailSuggestion(
       availableAssets: input.availableAssets,
       creativeSource: input.creativeSource,
     },
-    templateBlueprint: input.templateReference
+    templateBlueprint: usesTemplateLibrary(input) && input.templateReference
       ? {
           id: input.templateReference.id,
           isStarter: input.templateReference.isStarter,
@@ -2445,12 +2600,46 @@ export async function generateEmailSuggestion(
                   "accentColor",
                   "bodyBackground",
                   "workspaceBackground",
+                  "headingFont",
+                  "bodyFont",
+                  "heroSize",
+                  "headingSize",
+                  "bodySize",
+                  "contentWidth",
+                  "frameStyle",
                   "blocks",
                 ],
                 properties: {
                   accentColor: { type: "string" },
                   bodyBackground: { type: "string" },
                   workspaceBackground: { type: "string" },
+                  headingFont: {
+                    type: "string",
+                    enum: ["Arial", "Georgia", "Verdana", "Trebuchet MS"],
+                  },
+                  bodyFont: {
+                    type: "string",
+                    enum: ["Arial", "Georgia", "Verdana", "Trebuchet MS"],
+                  },
+                  heroSize: { type: "number", minimum: 24, maximum: 34 },
+                  headingSize: { type: "number", minimum: 20, maximum: 26 },
+                  bodySize: { type: "number", minimum: 15, maximum: 17 },
+                  contentWidth: { type: "number", minimum: 560, maximum: 680 },
+                  frameStyle: {
+                    type: "string",
+                    enum: [
+                      "none",
+                      "hairline",
+                      "accent",
+                      "double",
+                      "top-bottom",
+                      "left-band",
+                      "soft",
+                      "editorial",
+                      "luxury",
+                      "gallery-mat",
+                    ],
+                  },
                   blocks: {
                     type: "array",
                     minItems: 1,
@@ -2464,6 +2653,13 @@ export async function generateEmailSuggestion(
                         "label",
                         "assetId",
                         "imagePrompt",
+                        "alignment",
+                        "backgroundColor",
+                        "textColor",
+                        "fontSize",
+                        "borderRadius",
+                        "paddingTop",
+                        "paddingBottom",
                       ],
                       properties: {
                         type: {
@@ -2501,6 +2697,24 @@ export async function generateEmailSuggestion(
                         label: { type: ["string", "null"] },
                         assetId: { type: ["string", "null"] },
                         imagePrompt: { type: ["string", "null"] },
+                        alignment: {
+                          type: "string",
+                          enum: ["left", "center", "right"],
+                        },
+                        backgroundColor: { type: "string" },
+                        textColor: { type: "string" },
+                        fontSize: { type: "number", minimum: 11, maximum: 34 },
+                        borderRadius: {
+                          type: "number",
+                          minimum: 0,
+                          maximum: 24,
+                        },
+                        paddingTop: { type: "number", minimum: 4, maximum: 48 },
+                        paddingBottom: {
+                          type: "number",
+                          minimum: 4,
+                          maximum: 48,
+                        },
                       },
                     },
                   },
@@ -2745,6 +2959,8 @@ export async function generateEmailSuggestion(
           )
         : input.imageSource === "generate"
           ? await generateDesignImages(request, provider, suggestion)
+          : suggestion.imagePrompts?.some((item) => item.kind === "pattern")
+            ? await generateDesignImages(request, provider, suggestion)
           : input.includeLogo
             ? await generateDesignImages(request, provider, suggestion, true)
             : suggestion;
@@ -2775,6 +2991,8 @@ async function completeFallbackEmailDesign(
         )
       : input.imageSource === "generate"
         ? await generateDesignImages(request, provider, suggestion)
+        : suggestion.imagePrompts?.some((item) => item.kind === "pattern")
+          ? await generateDesignImages(request, provider, suggestion)
         : input.includeLogo
           ? await generateDesignImages(request, provider, suggestion, true)
           : suggestion;
