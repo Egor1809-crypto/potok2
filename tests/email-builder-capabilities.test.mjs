@@ -200,6 +200,13 @@ test("AI brief asks follow-up questions and accepts dragged user images", async 
   assert.match(assistant, /prepareImageFile/);
   assert.match(assistant, /setQuestions\(fallbackBriefQuestions\(goal\)\)/);
   assert.match(assistant, /setStage\("questions"\)/);
+  assert.match(assistant, /Вопрос \{activeQuestionIndex \+ 1\} из/);
+  assert.match(assistant, /Варианты ответа/);
+  assert.match(assistant, /aria-pressed=\{selected\}/);
+  assert.match(assistant, /Можно выбрать несколько вариантов/);
+  assert.match(server, /7–12 микровопросов/);
+  assert.match(server, /minItems: 7/);
+  assert.match(server, /multiple: \{ type: "boolean" \}/);
   assert.match(assistant, /if \(!value\.trim\(\)\) return ""/);
   assert.match(assistant, /createImageBitmap/);
   assert.match(server, /Арт-направление — чистый минимализм/);
@@ -220,6 +227,8 @@ test("AI brief asks follow-up questions and accepts dragged user images", async 
   assert.match(server, /creativeBlockStyle/);
   assert.match(server, /artDirection/);
   assert.match(server, /contentStrategy/);
+  assert.match(server, /ensureOriginalCompositionDepth/);
+  assert.match(server, /минимум два разных содержательных модуля/);
   assert.match(assistant, /Сравнение редакций/);
   assert.match(assistant, /какой контекст использовал/);
   assert.match(assistant, /sandbox="allow-same-origin"/);
@@ -395,9 +404,11 @@ test("pattern gallery offers varied email-safe designs", async () => {
   assert.match(canvas, /whitespace-pre-line/);
   assert.match(canvas, /if \(patternImage\)/);
   assert.match(canvas, /aria-hidden="true"/);
+  assert.match(canvas, /h-\[88px\].*object-cover/);
   assert.match(compiler, /letter-spacing:\$\{tracking\}px/);
   assert.match(compiler, /role="presentation"/);
   assert.match(compiler, /block\.type === "pattern"/);
+  assert.match(compiler, /height="88"/);
 });
 
 test("a new letter starts empty and offers full-email frame presets", async () => {

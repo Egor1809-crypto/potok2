@@ -940,7 +940,7 @@ function BlockContent({
         <img
           alt=""
           aria-hidden="true"
-          className="block h-auto w-full"
+          className="block h-[88px] w-full object-cover"
           src={patternImage}
           style={{ borderRadius: block.borderRadius }}
         />

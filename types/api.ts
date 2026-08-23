@@ -417,6 +417,8 @@ export type EmailAiSuggestion = {
     question: string;
     placeholder: string;
     required: boolean;
+    options?: string[];
+    multiple?: boolean;
   }>;
   artDirection?: string;
   contentStrategy?: string;

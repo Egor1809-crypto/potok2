@@ -350,7 +350,7 @@ function parseRequest(value: unknown): EmailAiRequest {
       })
     : undefined;
   const briefAnswers = Array.isArray(object.briefAnswers)
-    ? object.briefAnswers.slice(0, 8).flatMap((value, index) => {
+    ? object.briefAnswers.slice(0, 12).flatMap((value, index) => {
         if (!value || typeof value !== "object" || Array.isArray(value))
           return [];
         const row = value as Record<string, unknown>;
@@ -644,62 +644,97 @@ function outputText(response: unknown): string {
 
 function fallbackBriefQuestions(goal: string): EmailAiSuggestion {
   const normalized = goal.toLocaleLowerCase("ru-RU");
+  const isEvent = /конференц|вебинар|мероприят|форум|встреч/.test(normalized);
+  const isLegal = /юрист|прав|legal|комплаенс|договор/.test(normalized);
+  const audienceOptions = isLegal
+    ? ["Юристы in-house", "Юридические фирмы", "Комплаенс", "Legal ops", "Госорганы"]
+    : ["Действующие клиенты", "Потенциальные клиенты", "Руководители", "Специалисты", "Партнёры"];
   const candidates = [
-    !/(для кого|аудитор|юрист|руководител|клиент|партн[её]р)/.test(normalized)
-      ? {
-          id: "audience",
-          question:
-            "Кто должен получить письмо и что для них сейчас важнее всего?",
-          placeholder:
-            "Например: управляющие партнёры юридических фирм, которым важно сократить рутину",
-          required: true,
-        }
-      : null,
-    !/(цель|регистрац|купить|заказ|ответ|встреч|скачать|перейти)/.test(
-      normalized,
-    )
-      ? {
-          id: "action",
-          question: "Какое одно действие должен совершить читатель?",
-          placeholder: "Зарегистрироваться, ответить, записаться на встречу…",
-          required: true,
-        }
-      : null,
-    !/(до \d|срок|дат|сентябр|октябр|ноябр|декабр|январ|феврал|март|апрел|ма[йя]|июн|июл|август)/.test(
-      normalized,
-    )
-      ? {
-          id: "timing",
-          question: "Есть ли дата, срок или ограничение по времени?",
-          placeholder: "Например: регистрация до 20 сентября или срока нет",
-          required: false,
-        }
-      : null,
+    {
+      id: "audience_role",
+      question: "Кого приглашаем?",
+      placeholder: "Другая роль или отрасль",
+      required: true,
+      options: audienceOptions,
+      multiple: true,
+    },
+    {
+      id: "audience_level",
+      question: "Какой уровень должности?",
+      placeholder: "Уточните уровень",
+      required: true,
+      options: ["Руководители", "Специалисты", "Смешанная аудитория"],
+      multiple: false,
+    },
     {
       id: "offer",
-      question: "Какую главную ценность или предложение нужно донести?",
-      placeholder:
-        "Конкретная польза для получателя — без рекламных общих слов",
+      question: "Что человек должен получить?",
+      placeholder: "Сформулируйте свой результат",
       required: true,
+      options: isEvent
+        ? ["Готовые сценарии", "Разбор рисков", "Практические кейсы", "Новые контакты"]
+        : ["Понять пользу", "Получить предложение", "Решить задачу", "Узнать об изменениях"],
+      multiple: true,
     },
+    ...(isEvent
+      ? [
+          {
+            id: "program",
+            question: "Какие темы важнее?",
+            placeholder: "Добавьте тему программы",
+            required: false,
+            options: isLegal
+              ? ["Внедрение ИИ", "Риски и комплаенс", "Автоматизация договоров", "Legal ops", "Судебная практика"]
+              : ["Практические кейсы", "Стратегия", "Инструменты", "Разбор ошибок", "Вопросы экспертам"],
+            multiple: true,
+          },
+          {
+            id: "format",
+            question: "Как пройдёт событие?",
+            placeholder: "Другой формат",
+            required: false,
+            options: ["Очно", "Онлайн", "Гибрид"],
+            multiple: false,
+          },
+          {
+            id: "participation",
+            question: "Какие условия участия?",
+            placeholder: "Укажите стоимость или условие",
+            required: false,
+            options: ["Бесплатно", "Платно", "По приглашению", "По регистрации"],
+            multiple: false,
+          },
+        ]
+      : []),
     {
       id: "proof",
-      question:
-        "Какие факты, программа или доказательства должны вызвать доверие?",
-      placeholder:
-        "Спикеры, программа, кейс, цифра, гарантия — только реальные данные",
+      question: "Чем подтвердить обещание?",
+      placeholder: "Добавьте точный факт",
       required: false,
+      options: isEvent
+        ? ["Спикеры", "Программа", "Кейсы", "Партнёры", "Цифры прошлых лет"]
+        : ["Кейс", "Цифра", "Отзыв", "Демонстрация", "Гарантия"],
+      multiple: true,
     },
     {
-      id: "restrictions",
-      question: "Что обязательно упомянуть и чего нельзя обещать?",
-      placeholder:
-        "Юридические ограничения, формулировки, контакты или важные условия",
+      id: "timing",
+      question: "Насколько срочно действовать?",
+      placeholder: "Укажите точную дату или срок",
       required: false,
+      options: ["Сегодня", "В течение недели", "До конкретной даты", "Без срочности"],
+      multiple: false,
     },
-  ]
-    .filter((item): item is NonNullable<typeof item> => Boolean(item))
-    .slice(0, 6);
+    {
+      id: "action",
+      question: "Какое главное действие?",
+      placeholder: "Другое действие",
+      required: true,
+      options: isEvent
+        ? ["Зарегистрироваться", "Получить билет", "Запросить приглашение", "Ответить на письмо"]
+        : ["Перейти на сайт", "Ответить", "Оставить заявку", "Купить", "Скачать"],
+      multiple: false,
+    },
+  ];
   return {
     subject: "",
     previewText: "",
@@ -917,7 +952,7 @@ function originalPatternPrompt(
   subject: string,
   palette: EmailVisualPalette,
 ) {
-  return `Создай уникальный авторский горизонтальный орнамент специально для email «${subject}» по задаче «${input.goal}». Визуальный характер: ${input.designBrief || "выведи из темы и аудитории"}. Палитра ${palette.accent}${palette.secondaryAccent ? `, ${palette.secondaryAccent}` : ""}, ${palette.soft}. Это должна быть самостоятельная графическая работа, а не готовый паттерн, клипарт или библиотечная текстура: широкий спокойный ритм, много воздуха, email-safe контраст, без букв, слов, логотипов, интерфейса и водяных знаков`;
+  return `Создай уникальный авторский горизонтальный орнамент специально для email «${subject}» по задаче «${input.goal}». Визуальный характер: ${input.designBrief || "выведи из темы и аудитории"}. Палитра ${palette.accent}${palette.secondaryAccent ? `, ${palette.secondaryAccent}` : ""}, ${palette.soft}. Только плоская декоративная графика: линии, модульная геометрия, контурные символы или абстрактный ритм. Категорически не фотография, не интерьер, не предметная сцена, не люди, не объёмный рендер и не фон с реалистичным светом. Это должна быть самостоятельная графическая работа, а не готовый паттерн, клипарт или библиотечная текстура: широкий спокойный ритм, много воздуха, email-safe контраст, без букв, слов, логотипов, интерфейса и водяных знаков`;
 }
 
 function normalizeCompoundContent(
@@ -1231,7 +1266,7 @@ function parseSuggestion(
   const object = nested ? asObject(nested) : parsed;
   if (input.action === "brief") {
     const questions = Array.isArray(object.questions)
-      ? object.questions.slice(0, 6).flatMap((value, index) => {
+      ? object.questions.slice(0, 12).flatMap((value, index) => {
           const row = asObject(value);
           const question = optionalText(
             row.question,
@@ -1243,6 +1278,12 @@ function parseSuggestion(
             optionalText(row.id, `Ключ вопроса ${index + 1}`, 60) ??
             `question-${index + 1}`;
           const materiallyRequired = /audience|offer|action|cta|goal/i.test(id);
+          const options = Array.isArray(row.options)
+            ? [...new Set(row.options.flatMap((option) => {
+                const text = optionalText(option, `Вариант ответа ${index + 1}`, 120);
+                return text ? [text] : [];
+              }))].slice(0, 6)
+            : [];
           return [
             {
               id,
@@ -1251,6 +1292,8 @@ function parseSuggestion(
                 optionalText(row.placeholder, `Подсказка ${index + 1}`, 300) ??
                 "Введите ответ",
               required: row.required === true || materiallyRequired,
+              options,
+              multiple: row.multiple === true,
             },
           ];
         })
@@ -1512,7 +1555,7 @@ function parseSuggestion(
     if (
       !type ||
       !allowedTypes.has(type) ||
-      (cleanSaas && !cleanSaasTypes.has(type)) ||
+      (usesTemplateLibrary(input) && cleanSaas && !cleanSaasTypes.has(type)) ||
       (type === "pattern" && !wantsPattern)
     )
       return [];
@@ -2023,6 +2066,152 @@ function applyEditorialCopy(
   return suggestion;
 }
 
+function ensureOriginalCompositionDepth(
+  suggestion: EmailAiSuggestion,
+  input: EmailAiRequest,
+) {
+  const document = suggestion.document;
+  if (!document || usesTemplateLibrary(input)) return suggestion;
+
+  const imageBlocks = document.blocks.filter((block) => block.type === "image");
+  if (imageBlocks.length > 1) {
+    const keepId = imageBlocks[0].id;
+    document.blocks = document.blocks.filter(
+      (block) => block.type !== "image" || block.id === keepId,
+    );
+    suggestion.imagePrompts = suggestion.imagePrompts?.filter(
+      (prompt) => prompt.kind !== "photo" || prompt.blockId === keepId,
+    );
+  }
+
+  const structuredTypes = new Set<EmailBuilderBlockInput["type"]>([
+    "columns",
+    "checklist",
+    "timeline",
+    "stats",
+    "quote",
+    "notice",
+    "comparison",
+    "product",
+    "document",
+    "signature",
+    "compliance",
+  ]);
+  const usedTypes = new Set(
+    document.blocks
+      .filter((block) => structuredTypes.has(block.type))
+      .map((block) => block.type),
+  );
+  if (usedTypes.size >= 2) return suggestion;
+
+  const answer = (pattern: RegExp) =>
+    (input.briefAnswers ?? [])
+      .filter((item) => pattern.test(item.question))
+      .map((item) => item.answer.trim())
+      .filter(Boolean)
+      .join(", ");
+  const audienceRole = answer(/кого|аудитор|роль|отрасл/i);
+  const audienceLevel = answer(/уровень|должност/i);
+  const outcome = answer(/получ|обещан|ценност|результат|унес/i);
+  const program = answer(/тем|программ|сесси/i);
+  const proof = answer(/подтверд|доказ|спик|партн|кейс|цифр/i);
+  const details = answer(/формат|услов|сроч|дат|врем|мест|стоим/i);
+  const action = answer(/действ|cta|кнопк/i);
+  const palette = resolveEmailVisualPalette({
+    goal: input.goal,
+    designBrief: input.designBrief,
+    visualStyle: input.visualStyle ?? "minimal",
+    primaryColor: input.primaryColor,
+    secondaryColor: input.secondaryColor,
+    modelAccent: document.accentColor,
+    modelBody: document.bodyBackground,
+    modelWorkspace: document.workspaceBackground,
+  });
+  const typography = resolveEmailTypography({
+    goal: input.goal,
+    designBrief: input.designBrief,
+    visualStyle: input.visualStyle ?? "minimal",
+  });
+  const blockStyle = (type: EmailBuilderBlockInput["type"]) =>
+    input.visualStyle === "premium"
+      ? premiumEmailBlockStyle(type, palette, typography)
+      : saasEmailBlockStyle(type, palette, typography);
+  const items = (value: string) =>
+    value
+      .split(/[,;•|]+/)
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .slice(0, 6);
+  const candidates: Array<{
+    type: EmailBuilderBlockInput["type"];
+    content: string;
+  }> = [
+    ...(audienceRole || audienceLevel
+      ? [
+          {
+            type: "columns" as const,
+            content: `Для кого: ${audienceRole || audienceLevel}|Уровень: ${audienceLevel || audienceRole}`,
+          },
+        ]
+      : []),
+    ...(program
+      ? [
+          {
+            type: "checklist" as const,
+            content: items(program).join("|"),
+          },
+        ]
+      : []),
+    ...(outcome
+      ? [
+          {
+            type: "checklist" as const,
+            content: items(outcome).join("|"),
+          },
+        ]
+      : []),
+    ...(details && action
+      ? [
+          {
+            type: "notice" as const,
+            content: `Детали участия|${details}|Следующий шаг: ${action}`,
+          },
+        ]
+      : []),
+    ...(proof
+      ? [
+          {
+            type: "notice" as const,
+            content: `Почему стоит доверять|${proof}|Только подтверждённые данные`,
+          },
+        ]
+      : []),
+  ];
+  const insertionIndex = (() => {
+    const boundary = document.blocks.findIndex((block) =>
+      ["button", "social", "divider", "footer"].includes(block.type),
+    );
+    return boundary >= 0 ? boundary : document.blocks.length;
+  })();
+  let offset = 0;
+  for (const candidate of candidates) {
+    if (usedTypes.size >= 2) break;
+    if (!candidate.content || usedTypes.has(candidate.type)) continue;
+    document.blocks.splice(insertionIndex + offset, 0, {
+      id: `ai-support-${candidate.type}-${crypto.randomUUID()}`,
+      type: candidate.type,
+      content: candidate.content,
+      ...blockStyle(candidate.type),
+    });
+    usedTypes.add(candidate.type);
+    offset += 1;
+  }
+  if (usedTypes.size >= 2) {
+    suggestion.artDirection = `${suggestion.artDirection ?? ""} Композиция дополнена разными содержательными модулями по ответам пользователя, без библиотечного шаблона.`.trim();
+  }
+  return suggestion;
+}
+
 function emailDesignQualityIssues(
   suggestion: EmailAiSuggestion,
   input: EmailAiRequest,
@@ -2072,6 +2261,39 @@ function emailDesignQualityIssues(
     issues.push("Запрошено тематическое изображение, но image-блок не спроектирован.");
   if (wantsPattern && !document.blocks.some((block) => block.type === "pattern"))
     issues.push("Запрошен орнамент, но pattern-блок не встроен в ритм письма.");
+  const imageCount = document.blocks.filter(
+    (block) => block.type === "image",
+  ).length;
+  if (imageCount > 1)
+    issues.push(
+      `В письме ${imageCount} фотографических блока — оставь ровно одно тематическое изображение.`,
+    );
+  if (!usesTemplateLibrary(input)) {
+    const structuredTypes = new Set<EmailBuilderBlockInput["type"]>([
+      "columns",
+      "checklist",
+      "timeline",
+      "stats",
+      "quote",
+      "notice",
+      "comparison",
+      "product",
+      "document",
+      "signature",
+      "compliance",
+    ]);
+    const structuredBlocks = document.blocks.filter((block) =>
+      structuredTypes.has(block.type),
+    );
+    if (structuredBlocks.length < 2)
+      issues.push(
+        "Оригинальная композиция слишком примитивна: кроме hero, фотографии и текста нужны минимум два разных содержательных модуля по данным из briefAnswers.",
+      );
+    if (new Set(structuredBlocks.map((block) => block.type)).size < 2)
+      issues.push(
+        "Содержательные модули однообразны — используй два разных типа подачи, например checklist + notice или columns + timeline.",
+      );
+  }
   if (
     input.websiteUrl &&
     !document.blocks.some((block) => block.type === "button")
@@ -2213,7 +2435,7 @@ async function generateDesignImages(
               image.kind === "logo"
                 ? `${image.prompt}. Чистый профессиональный логотип на однотонном светлом фоне, без макета сайта, без водяных знаков.`
                 : image.kind === "pattern"
-                  ? `${image.prompt}. Горизонтальная декоративная композиция с безопасной центральной зоной и спокойными краями, пригодная для узкого pattern-блока HTML-письма.`
+                  ? `${image.prompt}. Горизонтальная декоративная полоса с безопасной центральной зоной и спокойными краями, пригодная для узкого pattern-блока HTML-письма. FLAT VECTOR-LIKE ORNAMENT ONLY. NO PHOTO, NO REALISTIC OBJECTS, NO SCENE, NO PEOPLE.`
                 : `${image.prompt}. Законченное оригинальное изображение, без текста, логотипа, интерфейса и водяных знаков.`,
             size: "1536x1024",
             quality: "high",
@@ -2384,7 +2606,7 @@ function emailDesignInstructions(input: EmailAiRequest) {
   const libraryMode = usesTemplateLibrary(input);
   const layoutRule =
     !libraryMode
-      ? "Не используй готовую последовательность блоков и не выбирай именованный пресет. Сначала сам выведи из темы, аудитории и цели уникальную композиционную идею, затем под неё выбери 5–10 блоков. Верни собственные design-токены: headingFont, bodyFont, heroSize, headingSize, bodySize, contentWidth и frameStyle, а для каждого блока — alignment, backgroundColor, textColor, fontSize, borderRadius, paddingTop и paddingBottom. Каждый выбор должен быть частью одной авторской системы, а не вариацией библиотечного макета."
+      ? "Не используй готовую последовательность блоков и не выбирай именованный пресет. Сначала сам выведи из темы, аудитории и цели уникальную композиционную идею, затем под неё выбери 7–11 блоков. Одних hero + image + text + footer недостаточно. Помимо одного image и одного узкого pattern обязательно спроектируй минимум два разных содержательных модуля из columns, checklist, timeline, stats, quote, notice, comparison, product, document или signature — только там, где для них есть реальные данные из briefAnswers. Для события обычно нужны: сильный вход, ценность, компактная программа/темы, детали участия, доказательство, действие и footer. Изображение — самостоятельный компактный смысловой блок, а не фон письма; pattern — плоская графическая пауза, а не вторая фотография. Верни собственные design-токены: headingFont, bodyFont, heroSize, headingSize, bodySize, contentWidth и frameStyle, а для каждого блока — alignment, backgroundColor, textColor, fontSize, borderRadius, paddingTop и paddingBottom. Каждый выбор должен быть частью одной авторской системы, а не вариацией библиотечного макета."
       : input.visualStyle === "editorial"
       ? "Арт-направление — редакционная колонка: тёплая бумага или белое поле, один киноварный/чернильный акцент, заголовок Georgia, основной текст Arial, тонкие линии и почти без скруглений. Композиция должна напоминать хорошо отредактированное письмо от человека: logo → короткий heading или компактный hero → 1–2 текстовых блока → одно доказательство при наличии фактов → одна CTA → подпись или footer. Не собирай витрину из одинаковых карточек."
       : input.visualStyle === "premium"
@@ -2400,7 +2622,7 @@ function emailDesignInstructions(input: EmailAiRequest) {
   )
     ? "Каждую загруженную фотографию обязательно помести отдельным компактным image-блоком с её assetId."
     : input.imageSource === "generate"
-      ? "Обязательно добавь ровно один компактный image-блок и предметный imagePrompt без текста на изображении. Изображение должно раскрывать тему письма, а не быть абстрактной заглушкой."
+      ? "Обязательно добавь ровно один компактный image-блок и предметный imagePrompt без текста на изображении. Изображение должно раскрывать тему письма, не быть фоном всего письма и не дублироваться другими фотографическими блоками."
       : "Не добавляй image.";
   const paletteRule = libraryMode
     ? `Обязательная палитра уже извлечена из пожеланий пользователя: ${requestedPalette.name}; основной акцент ${requestedPalette.accent}${requestedPalette.secondaryAccent ? `, второй обязательный акцент ${requestedPalette.secondaryAccent}` : ""}, мягкий фон ${requestedPalette.soft}, фон письма ${requestedPalette.body}, внешний фон ${requestedPalette.workspace}, основной текст ${requestedPalette.text}. Не заменяй явно запрошенный цвет стандартным голубым или фиолетовым. Если запрошено два цвета, не выбрасывай второй и используй оба в разных визуальных ролях. ${premium ? "Премиальность создают контраст, точная типографика, тонкая рамка и ритм — не огромные заголовки и не декоративная перегрузка." : "Минимализм означает меньше элементов, а не отсутствие арт-дирекции."}`
@@ -2528,7 +2750,7 @@ export async function generateEmailSuggestion(
   };
   const instructions =
     input.action === "brief"
-      ? "Ты продуктовый стратег. authoritativeUserBrief — главный источник задачи. linkedPageReference служит только справочником для проверки бренда и фактов и никогда не меняет тему, аудиторию, оффер или цель пользователя. Задавай 4–6 конкретных вопросов только о недостающем смысле: аудитория, обещание/оффер, доказательство, обязательные факты, срок и главное действие. Не спрашивай цвета, палитру или визуальный стиль — пользователь пишет их в исходном описании. Не спрашивай то, что уже указано. Каждый вопрос должен заметно влиять на текст будущего письма. Верни вопросы строго по JSON-схеме."
+      ? "Ты продуктовый стратег и проектировщик коротких анкет. authoritativeUserBrief — главный источник задачи. linkedPageReference служит только справочником для проверки бренда и фактов и никогда не меняет тему, аудиторию, оффер или цель пользователя. Подготовь 7–12 микровопросов: каждый спрашивает ровно об одном факте и помещается в одну короткую строку. Нельзя объединять в одном вопросе роль и уровень, дату и место, программу и спикеров, действие и ссылку. Для каждого вопроса предложи 3–6 коротких options в виде готовых фильтров-чипов. Варианты обязательно выводи из темы, отрасли и типа письма пользователя: для юридической конференции предлагай релевантные роли, форматы, результаты и доказательства, а не общие маркетинговые ответы. multiple=true только там, где естественно выбрать несколько вариантов: аудитории, темы программы, выгоды или доказательства. Всегда оставляй возможность собственного ответа через placeholder, но не добавляй option «Другое». Не спрашивай цвета, палитру или визуальный стиль — пользователь пишет их в исходном описании. Не спрашивай то, что уже однозначно указано. Обязательными делай только аудиторию, основной результат и главное действие. Верни вопросы строго по JSON-схеме."
       : input.action === "design"
         ? emailDesignInstructions(input)
         : "Ты редактор деловых email-писем на русском языке. Верни только четыре коротких поля JSON: subject, previewText, body, cta. Никакого HTML, Markdown, таблиц, дизайна или пояснений. body — обычный текст до 1800 символов. subject — до 140 символов, previewText — до 240, cta — до 80. Не выдумывай даты, цифры, ссылки и факты. Сохраняй только переменные {{first_name}}, {{last_name}}, {{company}}, {{position}}, {{city}}. Ответ строго по JSON-схеме.";
@@ -2541,17 +2763,31 @@ export async function generateEmailSuggestion(
           properties: {
             questions: {
               type: "array",
-              minItems: 3,
-              maxItems: 6,
+              minItems: 7,
+              maxItems: 12,
               items: {
                 type: "object",
                 additionalProperties: false,
-                required: ["id", "question", "placeholder", "required"],
+                required: [
+                  "id",
+                  "question",
+                  "placeholder",
+                  "required",
+                  "options",
+                  "multiple",
+                ],
                 properties: {
                   id: { type: "string" },
-                  question: { type: "string" },
+                  question: { type: "string", maxLength: 110 },
                   placeholder: { type: "string" },
                   required: { type: "boolean" },
+                  options: {
+                    type: "array",
+                    minItems: 3,
+                    maxItems: 6,
+                    items: { type: "string", maxLength: 80 },
+                  },
+                  multiple: { type: "boolean" },
                 },
               },
             },
@@ -2849,6 +3085,8 @@ export async function generateEmailSuggestion(
   let suggestion: EmailAiSuggestion;
   try {
     suggestion = parseSuggestion(outputText(responseBody), input);
+    if (input.action === "design")
+      ensureOriginalCompositionDepth(suggestion, input);
   } catch (error) {
     if (input.action === "brief") {
       suggestion = fallbackBriefQuestions(input.goal);
@@ -2883,6 +3121,8 @@ export async function generateEmailSuggestion(
         const retryBody: unknown = await response.json().catch(() => null);
         if (!response.ok) throw error;
         suggestion = parseSuggestion(outputText(retryBody), input);
+        if (input.action === "design")
+          ensureOriginalCompositionDepth(suggestion, input);
       } catch {
         return completeFallbackEmailDesign(
           request,
@@ -2936,6 +3176,7 @@ export async function generateEmailSuggestion(
           outputText(repairResponseBody),
           input,
         );
+        ensureOriginalCompositionDepth(repairedSuggestion, input);
         if (
           emailDesignQualityIssues(repairedSuggestion, input).length <
           qualityIssues.length
@@ -2981,6 +3222,7 @@ async function completeFallbackEmailDesign(
   editorialCopy?: EmailAiSuggestion,
 ): Promise<EmailAiResponse> {
   const suggestion = fallbackDesignedSuggestion(input);
+  ensureOriginalCompositionDepth(suggestion, input);
   const designed =
     input.imageSource === "internet"
       ? await generateDesignImages(

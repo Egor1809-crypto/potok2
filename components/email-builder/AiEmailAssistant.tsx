@@ -38,6 +38,7 @@ import type { BuilderDocument } from "./builder-types";
 
 type Stage = "prompt" | "questions";
 type ComparisonView = "ai" | "current" | "split";
+type BriefQuestion = NonNullable<EmailAiSuggestion["questions"]>[number];
 
 function nextPromptSuggestion(value: string) {
   if (!value.trim()) return "";
@@ -67,46 +68,98 @@ function nextPromptSuggestion(value: string) {
   return ". Выберите арт-направление ниже — ИИ не будет смешивать стили";
 }
 
-function fallbackBriefQuestions(goal: string) {
+function fallbackBriefQuestions(goal: string): BriefQuestion[] {
   const normalized = goal.toLocaleLowerCase("ru-RU");
+  const isEvent = /конференц|вебинар|мероприят|форум|встреч/.test(normalized);
+  const isLegal = /юрист|прав|legal|комплаенс|договор/.test(normalized);
   return [
-    ...(!/(для кого|аудитор|юрист|руководител|клиент|партн[её]р)/.test(
-      normalized,
-    )
-      ? [
-          {
-            id: "audience",
-            question: "Кто должен получить письмо и что для них важно?",
-            placeholder: "Опишите получателей и их основную задачу",
-            required: true,
-          },
-        ]
-      : []),
+    {
+      id: "audience_role",
+      question: "Кого приглашаем?",
+      placeholder: "Другая роль или отрасль",
+      required: true,
+      options: isLegal
+        ? ["Юристы in-house", "Юридические фирмы", "Комплаенс", "Legal ops", "Госорганы"]
+        : ["Действующие клиенты", "Потенциальные клиенты", "Руководители", "Специалисты", "Партнёры"],
+      multiple: true,
+    },
+    {
+      id: "audience_level",
+      question: "Какой уровень должности?",
+      placeholder: "Уточните уровень",
+      required: true,
+      options: ["Руководители", "Специалисты", "Смешанная аудитория"],
+      multiple: false,
+    },
     {
       id: "offer",
-      question: "Какую главную ценность нужно донести?",
-      placeholder: "Что конкретно получит читатель",
+      question: "Что человек должен получить?",
+      placeholder: "Сформулируйте свой результат",
       required: true,
+      options: isEvent
+        ? ["Готовые сценарии", "Разбор рисков", "Практические кейсы", "Новые контакты"]
+        : ["Понять пользу", "Получить предложение", "Решить задачу", "Узнать об изменениях"],
+      multiple: true,
     },
-    {
-      id: "proof",
-      question: "Какие проверенные факты обязательно использовать?",
-      placeholder: "Программа, даты, цифры, кейсы или ограничения",
-      required: false,
-    },
-    ...(!/(цель|регистрац|купить|заказ|ответ|встреч|скачать|перейти)/.test(
-      normalized,
-    )
+    ...(isEvent
       ? [
           {
-            id: "action",
-            question: "Какое одно действие должен совершить читатель?",
-            placeholder: "Перейти, зарегистрироваться, ответить…",
-            required: true,
+            id: "program",
+            question: "Какие темы важнее?",
+            placeholder: "Добавьте тему программы",
+            required: false,
+            options: isLegal
+              ? ["Внедрение ИИ", "Риски и комплаенс", "Автоматизация договоров", "Legal ops", "Судебная практика"]
+              : ["Практические кейсы", "Стратегия", "Инструменты", "Разбор ошибок", "Вопросы экспертам"],
+            multiple: true,
           },
-        ]
+          {
+            id: "format",
+            question: "Как пройдёт событие?",
+            placeholder: "Другой формат",
+            required: false,
+            options: ["Очно", "Онлайн", "Гибрид"],
+            multiple: false,
+          },
+          {
+            id: "participation",
+            question: "Какие условия участия?",
+            placeholder: "Укажите стоимость или условие",
+            required: false,
+            options: ["Бесплатно", "Платно", "По приглашению", "По регистрации"],
+            multiple: false,
+          },
+        ] satisfies BriefQuestion[]
       : []),
-  ].slice(0, 6);
+    {
+      id: "proof",
+      question: "Чем подтвердить обещание?",
+      placeholder: "Добавьте точный факт",
+      required: false,
+      options: isEvent
+        ? ["Спикеры", "Программа", "Кейсы", "Партнёры", "Цифры прошлых лет"]
+        : ["Кейс", "Цифра", "Отзыв", "Демонстрация", "Гарантия"],
+      multiple: true,
+    },
+    {
+      id: "timing",
+      question: "Насколько срочно действовать?",
+      placeholder: "Укажите точную дату или срок",
+      required: false,
+      options: ["Сегодня", "В течение недели", "До конкретной даты", "Без срочности"],
+      multiple: false,
+    },
+    {
+      id: "action",
+      question: "Какое главное действие?",
+      placeholder: "Другое действие",
+      required: true,
+      options: isEvent
+        ? ["Зарегистрироваться", "Получить билет", "Запросить приглашение", "Ответить на письмо"]
+        : ["Перейти на сайт", "Ответить", "Оставить заявку", "Купить", "Скачать"],
+      multiple: false,
+    },
+  ];
 }
 
 export function AiEmailAssistant({
@@ -128,14 +181,11 @@ export function AiEmailAssistant({
   const [provider, setProvider] = useState<EmailAiResponse["provider"]>();
   const [goal, setGoal] = useState("");
   const [useLinkedContext, setUseLinkedContext] = useState(true);
-  const [questions, setQuestions] = useState<
-    Array<{
-      id: string;
-      question: string;
-      placeholder: string;
-      required: boolean;
-    }>
-  >([]);
+  const [questions, setQuestions] = useState<BriefQuestion[]>([]);
+  const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
+  const [answerChoices, setAnswerChoices] = useState<Record<string, string[]>>(
+    {},
+  );
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [ctaLabel, setCtaLabel] = useState("Узнать подробнее");
   const [ctaUrl, setCtaUrl] = useState("");
@@ -165,6 +215,14 @@ export function AiEmailAssistant({
     () => templates.find((template) => template.id === selectedTemplateId),
     [selectedTemplateId, templates],
   );
+  const activeQuestion = questions[activeQuestionIndex];
+  const answerForQuestion = (question: BriefQuestion) =>
+    [...(answerChoices[question.id] ?? []), answers[question.id]?.trim() ?? ""]
+      .filter(Boolean)
+      .join(", ");
+  const answeredQuestions = questions.filter((question) =>
+    answerForQuestion(question),
+  ).length;
 
   useEffect(() => {
     let active = true;
@@ -278,12 +336,16 @@ export function AiEmailAssistant({
         );
       setQuestions(body.suggestion?.questions ?? []);
       setAnswers({});
+      setAnswerChoices({});
+      setActiveQuestionIndex(0);
       setStage("questions");
     } catch {
       // Уточнения не должны зависеть от доступности внешнего ИИ: если провайдер
       // временно не отвечает, пользователь всё равно продолжает сценарий.
       setQuestions(fallbackBriefQuestions(goal));
       setAnswers({});
+      setAnswerChoices({});
+      setActiveQuestionIndex(0);
       setStage("questions");
       setError("");
     } finally {
@@ -345,7 +407,7 @@ export function AiEmailAssistant({
           briefAnswers: questions
             .map((question) => ({
               question: question.question,
-              answer: answers[question.id]?.trim() ?? "",
+              answer: answerForQuestion(question),
             }))
             .filter((item) => item.answer),
         }),
@@ -468,17 +530,17 @@ export function AiEmailAssistant({
             <p className="mb-0 mt-1 whitespace-pre-wrap text-[11px] leading-5 text-text-strong">
               {goal}
             </p>
-            {questions.some((question) => answers[question.id]?.trim()) ? (
+            {questions.some((question) => answerForQuestion(question)) ? (
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {questions
-                  .filter((question) => answers[question.id]?.trim())
+                  .filter((question) => answerForQuestion(question))
                   .map((question) => (
                     <Badge
                       key={question.id}
                       variant="neutral"
                       title={question.question}
                     >
-                      {answers[question.id]}
+                      {answerForQuestion(question)}
                     </Badge>
                   ))}
               </div>
@@ -761,23 +823,175 @@ export function AiEmailAssistant({
               </span>
             ) : null}
           </nav>
-          <div className="grid gap-4 md:grid-cols-2">
-            {questions.map((question) => (
-              <FormField key={question.id} label={question.question}>
+          {activeQuestion ? (
+            <section className="grid gap-5 rounded-2xl border border-primary/20 bg-[linear-gradient(145deg,rgba(124,53,242,.08),rgba(255,255,255,.98)_48%,rgba(40,120,199,.06))] p-4 sm:p-6">
+              <header className="grid gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-text-muted">
+                  <span className="font-semibold text-primary">
+                    Вопрос {activeQuestionIndex + 1} из {questions.length}
+                  </span>
+                  <span>
+                    Готово {answeredQuestions} из {questions.length}
+                  </span>
+                </div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-surface-subtle">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all"
+                    style={{
+                      width: `${Math.max(6, ((activeQuestionIndex + 1) / questions.length) * 100)}%`,
+                    }}
+                  />
+                </div>
+                <div
+                  className="flex flex-wrap gap-1.5"
+                  aria-label="Навигация по уточнениям"
+                >
+                  {questions.map((question, index) => {
+                    const complete = Boolean(answerForQuestion(question));
+                    return (
+                      <button
+                        key={question.id}
+                        type="button"
+                        aria-label={`Вопрос ${index + 1}: ${question.question}`}
+                        aria-current={
+                          index === activeQuestionIndex ? "step" : undefined
+                        }
+                        onClick={() => setActiveQuestionIndex(index)}
+                        className="grid size-7 place-items-center rounded-full border border-border bg-surface text-[9px] font-semibold text-text-muted outline-none transition hover:border-primary/40 hover:text-primary aria-[current=step]:border-primary aria-[current=step]:bg-primary aria-[current=step]:text-white"
+                      >
+                        {complete ? <Check className="size-3" /> : index + 1}
+                      </button>
+                    );
+                  })}
+                </div>
+              </header>
+
+              <div>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <h3 className="m-0 text-[18px] font-semibold leading-7 text-text-strong sm:text-[20px]">
+                    {activeQuestion.question}
+                  </h3>
+                  <Badge
+                    variant={activeQuestion.required ? "accent" : "neutral"}
+                  >
+                    {activeQuestion.required
+                      ? "Нужен ответ"
+                      : "Можно пропустить"}
+                  </Badge>
+                </div>
+                {activeQuestion.multiple ? (
+                  <p className="mb-0 mt-1 text-[10px] text-text-muted">
+                    Можно выбрать несколько вариантов
+                  </p>
+                ) : null}
+              </div>
+
+              {activeQuestion.options?.length ? (
+                <div
+                  className="flex flex-wrap gap-2"
+                  role="group"
+                  aria-label={`Варианты ответа: ${activeQuestion.question}`}
+                >
+                  {activeQuestion.options.map((option) => {
+                    const selected = (
+                      answerChoices[activeQuestion.id] ?? []
+                    ).includes(option);
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        aria-pressed={selected}
+                        onClick={() => {
+                          setAnswerChoices((current) => {
+                            const selectedOptions =
+                              current[activeQuestion.id] ?? [];
+                            return {
+                              ...current,
+                              [activeQuestion.id]: activeQuestion.multiple
+                                ? selected
+                                  ? selectedOptions.filter(
+                                      (item) => item !== option,
+                                    )
+                                  : [...selectedOptions, option]
+                                : [option],
+                            };
+                          });
+                          if (!activeQuestion.multiple) {
+                            if (/action|cta/i.test(activeQuestion.id))
+                              setCtaLabel(option);
+                            setAnswers((current) => ({
+                              ...current,
+                              [activeQuestion.id]: "",
+                            }));
+                            setActiveQuestionIndex((current) =>
+                              Math.min(questions.length - 1, current + 1),
+                            );
+                          }
+                        }}
+                        className="rounded-full border border-border bg-surface px-3.5 py-2 text-[11px] font-medium text-text-muted outline-none transition hover:border-primary/40 hover:text-primary aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-white focus-visible:ring-2 focus-visible:ring-primary/25"
+                      >
+                        {option}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+
+              <FormField
+                label="Свой ответ"
+                htmlFor={`ai-brief-${activeQuestion.id}`}
+                hint="Необязательно, если подходящий вариант уже выбран."
+              >
                 <Input
-                  required={question.required}
-                  value={answers[question.id] ?? ""}
-                  onChange={(event) =>
+                  id={`ai-brief-${activeQuestion.id}`}
+                  value={answers[activeQuestion.id] ?? ""}
+                  onChange={(event) => {
+                    const value = event.target.value;
                     setAnswers((current) => ({
                       ...current,
-                      [question.id]: event.target.value,
-                    }))
-                  }
-                  placeholder={question.placeholder}
+                      [activeQuestion.id]: value,
+                    }));
+                    if (value && !activeQuestion.multiple) {
+                      setAnswerChoices((current) => ({
+                        ...current,
+                        [activeQuestion.id]: [],
+                      }));
+                    }
+                    if (/action|cta/i.test(activeQuestion.id) && value)
+                      setCtaLabel(value);
+                  }}
+                  placeholder={activeQuestion.placeholder}
                 />
               </FormField>
-            ))}
-          </div>
+
+              <div className="flex items-center justify-between gap-2 border-t border-border pt-4">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={activeQuestionIndex === 0}
+                  onClick={() =>
+                    setActiveQuestionIndex((current) =>
+                      Math.max(0, current - 1),
+                    )
+                  }
+                >
+                  Назад
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={activeQuestionIndex === questions.length - 1}
+                  onClick={() =>
+                    setActiveQuestionIndex((current) =>
+                      Math.min(questions.length - 1, current + 1),
+                    )
+                  }
+                >
+                  Следующий вопрос
+                </Button>
+              </div>
+            </section>
+          ) : null}
 
           <section className="grid gap-4 rounded-2xl border border-primary/20 bg-primary-subtle/25 p-4 sm:p-5">
             <div>
@@ -957,7 +1171,7 @@ export function AiEmailAssistant({
                 uploading ||
                 questions.some(
                   (question) =>
-                    question.required && !answers[question.id]?.trim(),
+                    question.required && !answerForQuestion(question),
                 )
               }
               onClick={() => void generate()}

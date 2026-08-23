@@ -54,6 +54,19 @@ test("a blue-pink brief produces a visible two-color design system", () => {
   assert.equal(palette.patternBackground, "#FCEBF2");
 });
 
+test("a graphite-amber brief keeps its requested dark editorial palette", () => {
+  const palette = resolveEmailVisualPalette({
+    goal: "Конференция технологий ИИ и права",
+    designBrief: "Графитовый фон и янтарный акцент",
+    visualStyle: "editorial",
+  });
+
+  assert.equal(palette.name, "Графит + янтарь");
+  assert.equal(palette.accent, "#D69A32");
+  assert.equal(palette.body, "#202328");
+  assert.equal(palette.secondaryAccent, "#30343B");
+});
+
 test("exact user colors override automatic named palettes", () => {
   const palette = resolveEmailVisualPalette({
     goal: "Закрытый деловой завтрак",

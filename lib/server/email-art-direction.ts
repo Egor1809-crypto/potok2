@@ -262,6 +262,24 @@ export function resolveEmailVisualPalette(
     };
   }
 
+  const hasGraphite = /графит|антрацит|charcoal|graphite/i.test(brief);
+  const hasAmber = /янтар|amber|медов|охрист/i.test(brief);
+  if (hasGraphite && hasAmber) {
+    return {
+      name: "Графит + янтарь",
+      accent: "#D69A32",
+      secondaryAccent: "#30343B",
+      patternBackground: "#30343B",
+      soft: "#2A2E34",
+      body: "#202328",
+      workspace: "#141619",
+      text: "#F8F1E5",
+      muted: "#C7BCAA",
+      border: "#4B5058",
+      buttonText: "#1C1E22",
+    };
+  }
+
   const named = namedPalettes.find((item) => item.pattern.test(brief));
   if (named) {
     if (input.visualStyle === "premium")
