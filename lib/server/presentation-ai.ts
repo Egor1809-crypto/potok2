@@ -6,7 +6,10 @@ import {
   presentationPatternIds,
   type PresentationPatternId,
 } from "@/data/presentation-patterns";
-import { presentationTheme } from "@/data/presentation-templates";
+import {
+  presentationTemplates,
+  presentationTheme,
+} from "@/data/presentation-templates";
 import {
   normalizePresentationBody,
   normalizePresentationBullet,
@@ -151,6 +154,8 @@ function parseRequest(
     | "ctaUrl"
     | "designBrief"
     | "socialLinks"
+    | "creativeSource"
+    | "templateId"
   > {
   const object = asObject(value);
   const goal = cleanText(object.goal, "Задача презентации", 4_000);
@@ -196,6 +201,19 @@ function parseRequest(
         return [{ label, url }];
       })
     : undefined;
+  const creativeSource =
+    object.creativeSource === "library" ? "library" : "original";
+  const templateId =
+    creativeSource === "library"
+      ? optionalText(object.templateId, "Шаблон презентации", 160)
+      : undefined;
+  const template = templateId
+    ? presentationTemplates.find((item) => item.id === templateId)
+    : undefined;
+  if (creativeSource === "library" && !template)
+    throw new ApiRequestError(
+      "Выбранный шаблон презентации не найден. Выберите другой.",
+    );
   return {
     goal,
     audience: optionalText(object.audience, "Аудитория", 800),
@@ -205,6 +223,8 @@ function parseRequest(
     ctaUrl,
     designBrief: optionalText(object.designBrief, "Пожелания к дизайну", 1_500),
     socialLinks,
+    creativeSource,
+    templateId,
     tone:
       object.tone === "persuasive" ||
       object.tone === "educational" ||
@@ -212,14 +232,22 @@ function parseRequest(
         ? object.tone
         : "executive",
     slideCount:
-      optionalInteger(object.slideCount, "Количество слайдов", 3, 20) ?? 7,
-    themeId: rawTheme as PresentationThemeId,
+      template?.slides.length ??
+      optionalInteger(object.slideCount, "Количество слайдов", 3, 20) ??
+      7,
+    themeId: template?.themeId ?? (rawTheme as PresentationThemeId),
   };
 }
 
 function resolvedThemeId(
   input: ReturnType<typeof parseRequest>,
 ): PresentationThemeId {
+  if (input.creativeSource === "library" && input.templateId) {
+    const template = presentationTemplates.find(
+      (item) => item.id === input.templateId,
+    );
+    if (template) return template.themeId;
+  }
   const brief = `${input.designBrief ?? ""} ${input.goal}`.toLocaleLowerCase(
     "ru-RU",
   );
@@ -251,6 +279,45 @@ function resolvedThemeId(
   if (/соврем|modern|минимал|saas|чист|аккурат|воздух/.test(brief))
     return "modern";
   return input.themeId;
+}
+
+function selectedPresentationTemplate(input: ReturnType<typeof parseRequest>) {
+  if (input.creativeSource !== "library" || !input.templateId) return undefined;
+  return presentationTemplates.find((item) => item.id === input.templateId);
+}
+
+function applyPresentationTemplateBlueprint(
+  slides: PresentationSlide[],
+  input: ReturnType<typeof parseRequest>,
+) {
+  const template = selectedPresentationTemplate(input);
+  if (!template) return slides;
+  return slides.map((slide, index) => {
+    const reference =
+      template.slides[index] ??
+      template.slides[
+        Math.min(
+          Math.max(1, index % Math.max(2, template.slides.length - 1)),
+          template.slides.length - 1,
+        )
+      ];
+    if (!reference) return slide;
+    return {
+      ...slide,
+      layout:
+        index === 0
+          ? "title"
+          : index === slides.length - 1
+            ? "closing"
+            : reference.layout,
+      themeId: reference.themeId ?? template.themeId,
+      accentColor: reference.accentColor ?? template.accentColor,
+      backgroundColor:
+        reference.backgroundColor ?? template.backgroundColor,
+      textColor: reference.textColor ?? template.textColor,
+      patternId: reference.patternId ?? slide.patternId,
+    };
+  });
 }
 
 type PresentationNarrativeScenario =
@@ -1767,9 +1834,15 @@ export async function generatePresentationOutline(
     const selectedThemeId = resolvedThemeId(input);
     const theme = presentationTheme(selectedThemeId);
     const narrativeBlueprint = presentationNarrativeBlueprint(input);
+    const templateBlueprint = selectedPresentationTemplate(input);
+    const sourceRule = templateBlueprint
+      ? `Режим композиции — адаптация библиотечного сценария «${templateBlueprint.name}». Сохрани последовательность layout, смену плотности, визуальную тему и паттерны templateBlueprint. При этом полностью перепиши старые заголовки, аргументы, факты и заметки под новую задачу. Это новая презентация в проверенной дизайн-системе, а не копия исходного текста.`
+      : "Режим композиции — полностью оригинальная арт-дирекция. Не воспроизводи готовый шаблон библиотеки: самостоятельно спроектируй сюжет, чередование макетов и визуальный ритм по narrativeBlueprint.";
     const instructions = `Ты — senior presentation designer и стратегический редактор. Создай на русском языке законченную профессиональную презентацию уровня сильной продуктовой/консалтинговой команды, а не набор текстовых карточек и не пересказ анкеты.
 
 Сначала внимательно исполни narrativeBlueprint: это обязательная режиссёрская карта конкретного сценария, а не справочная подсказка. Она задаёт напряжение аудитории, центральный тезис, смысловую дугу, правила доказательств, визуальный ритм, роли изображений и логику финала. Затем раскрой тему самостоятельно, используя общеизвестные определения, механизмы, сценарии, возможности, ограничения и риски. Поля пользователя — контекст и ограничения, а не текст для копирования. Не выдумывай конкретные цифры, даты, отзывы, клиентов или результаты; цитаты тоже разрешены только из подтверждённого контекста.
+
+${sourceRule}
 
 Драматургия: сильный вход → почему тема важна сейчас → как устроено → практические сценарии → ограничения/риски → критерии решения → ясный финал. У каждого слайда один вывод и своя функция. Заголовок должен сообщать вывод, а не называться «Возможности», «Риски» или «Итоги». Не делай agenda и не пиши заглушки «добавьте факты», «нужно показать», «согласуйте пилот».
 
@@ -1791,6 +1864,22 @@ export async function generatePresentationOutline(
         "Сформулировать уместный следующий шаг из задачи пользователя",
       presentationTone: input.tone,
       narrativeBlueprint,
+      creativeSource: input.creativeSource,
+      templateBlueprint: templateBlueprint
+        ? {
+            id: templateBlueprint.id,
+            name: templateBlueprint.name,
+            useCase: templateBlueprint.useCase,
+            description: templateBlueprint.description,
+            themeId: templateBlueprint.themeId,
+            slides: templateBlueprint.slides.map((slide) => ({
+              layout: slide.layout,
+              themeId: slide.themeId ?? templateBlueprint.themeId,
+              patternId: slide.patternId ?? "auto",
+              role: slide.eyebrow,
+            })),
+          }
+        : undefined,
       slideCount: input.slideCount,
       selectedTheme: selectedThemeId,
       visualDesignBrief:
@@ -1987,6 +2076,7 @@ export async function generatePresentationOutline(
       input,
       selectedThemeId,
     );
+    slides = applyPresentationTemplateBlueprint(slides, input);
     slides = await generatePresentationImages(request, selected, slides);
     const lastSlide = slides.at(-1);
     if (lastSlide)
@@ -2037,6 +2127,10 @@ export async function generatePresentationOutline(
         fallback.slides,
         input,
         selectedThemeId,
+      );
+      fallback.slides = applyPresentationTemplateBlueprint(
+        fallback.slides,
+        input,
       );
       fallback.slides = await generatePresentationImages(
         request,

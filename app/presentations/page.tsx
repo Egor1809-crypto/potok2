@@ -12,7 +12,7 @@ export default function PresentationsPage() {
       contentWidth="full"
       viewportLocked
       desktopSidebarCollapsible
-      contentClassName="!py-4"
+      contentClassName="!py-3"
     >
       <PresentationStudio />
     </AppShell>

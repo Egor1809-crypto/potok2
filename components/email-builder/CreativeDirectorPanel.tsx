@@ -58,18 +58,34 @@ export function CreativeDirectorPanel({
   const [tab, setTab] = useState<DirectorTab>("audit");
   const [lastApplied, setLastApplied] = useState("");
   const report = useMemo(() => analyzeEmailQuality(document), [document]);
+  const fixableIssues = useMemo(
+    () => report.issues.filter((issue) => issue.fixId && issue.fixLabel),
+    [report.issues],
+  );
 
   const apply = (next: BuilderDocument, message: string) => {
     onApply(next, message);
     setLastApplied(message);
   };
 
+  const applySafeFixes = () => {
+    const next = fixableIssues.reduce(
+      (current, issue) =>
+        issue.fixId ? applyEmailQualityFix(current, issue.fixId) : current,
+      document,
+    );
+    apply(
+      next,
+      `Применено улучшений: ${fixableIssues.length}`,
+    );
+  };
+
   return (
     <Modal
       open={open}
       onOpenChange={onOpenChange}
-      title="Арт-директор письма"
-      description="Не генерирует ещё один шаблон. Находит слабые места, собирает единую визуальную систему и выстраивает аргументацию."
+      title="Арт-директор · редактура целиком"
+      description="Разбор → дизайн-система → драматургия. Каждый шаг объясняет, что изменится, и сохраняет факты, ссылки и изображения."
       size="full"
       contentClassName="!p-0"
       footer={
@@ -86,16 +102,17 @@ export function CreativeDirectorPanel({
         </>
       }
     >
-      <div className="grid min-h-[610px] lg:grid-cols-[310px_minmax(0,1fr)]">
-        <aside className="border-b border-border bg-[#17181d] p-5 text-white lg:border-b-0 lg:border-r">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-5">
+      <div className="director-stage grid min-h-[660px] lg:grid-cols-[318px_minmax(0,1fr)]">
+        <aside className="border-b border-white/10 bg-[radial-gradient(circle_at_20%_0%,rgba(124,92,255,.30),transparent_35%),linear-gradient(180deg,#17181f,#101116)] p-5 text-white lg:border-b-0 lg:border-r">
+          <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.055] p-5 shadow-[0_18px_50px_rgba(0,0,0,.22)]">
+            <span className="absolute -right-8 -top-8 size-28 rounded-full bg-[#8b7cff]/15 blur-2xl" aria-hidden="true" />
             <div className="flex items-end justify-between gap-4">
               <div>
                 <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/45">
                   Качество редакции
                 </span>
                 <div className="mt-2 flex items-baseline gap-1">
-                  <strong className="text-[54px] font-semibold leading-none tracking-[-.07em]">
+                  <strong className="text-[58px] font-semibold leading-none tracking-[-.07em]">
                     {report.score}
                   </strong>
                   <span className="text-[13px] text-white/45">/ 100</span>
@@ -130,13 +147,31 @@ export function CreativeDirectorPanel({
                 </div>
                 <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
                   <span
-                    className="block h-full rounded-full bg-[#8b7cff] transition-[width]"
+                    className="block h-full rounded-full bg-[linear-gradient(90deg,#8b7cff,#d58cff)] transition-[width] duration-500"
                     style={{ width: `${value}%` }}
                   />
                 </div>
               </div>
             ))}
           </div>
+
+          {fixableIssues.length ? (
+            <button
+              type="button"
+              onClick={applySafeFixes}
+              className="mt-5 flex w-full items-center justify-between rounded-xl border border-[#b9b1ff]/30 bg-[linear-gradient(135deg,rgba(139,124,255,.24),rgba(213,140,255,.12))] px-4 py-3 text-left outline-none transition duration-200 hover:-translate-y-0.5 hover:border-[#b9b1ff]/55 hover:bg-[#8b7cff]/25 focus-visible:ring-2 focus-visible:ring-[#8b7cff]"
+            >
+              <span>
+                <strong className="block text-[12px]">
+                  Исправить безопасные замечания
+                </strong>
+                <span className="mt-0.5 block text-[9px] leading-4 text-white/55">
+                  {fixableIssues.length} правок без изменения фактов и ссылок
+                </span>
+              </span>
+              <Sparkles aria-hidden="true" className="size-4 text-[#d8d3ff]" />
+            </button>
+          ) : null}
 
           <button
             type="button"
@@ -147,7 +182,7 @@ export function CreativeDirectorPanel({
                 "Редакционная чистка применена",
               )
             }
-            className="mt-6 flex w-full items-center justify-between rounded-xl border border-[#8b7cff]/35 bg-[#8b7cff]/15 px-4 py-3 text-left outline-none transition hover:bg-[#8b7cff]/22 focus-visible:ring-2 focus-visible:ring-[#8b7cff] disabled:cursor-not-allowed disabled:opacity-45"
+            className="mt-3 flex w-full items-center justify-between rounded-xl border border-white/12 bg-white/[0.055] px-4 py-3 text-left outline-none transition duration-200 hover:-translate-y-0.5 hover:bg-white/[0.09] focus-visible:ring-2 focus-visible:ring-[#8b7cff] disabled:cursor-not-allowed disabled:opacity-45"
           >
             <span>
               <strong className="block text-[12px]">Редакционная чистка</strong>
@@ -162,8 +197,27 @@ export function CreativeDirectorPanel({
           </p>
         </aside>
 
-        <section className="min-w-0 bg-surface">
-          <div className="flex flex-wrap gap-1 border-b border-border bg-surface px-4 py-3 sm:px-6">
+        <section className="min-w-0 bg-[linear-gradient(180deg,var(--surface),var(--surface-subtle))]">
+          <div className="border-b border-border bg-surface px-4 py-4 sm:px-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <span className="text-[8px] font-semibold uppercase tracking-[.16em] text-primary">
+                  Режиссёрский пульт
+                </span>
+                <h3 className="m-0 mt-1 text-[16px] font-semibold tracking-[-.025em] text-text-strong">
+                  Один маршрут вместо набора случайных эффектов
+                </h3>
+              </div>
+              <div className="flex items-center gap-1.5 text-[8px] font-semibold text-text-subtle">
+                <span className="rounded-full bg-primary-subtle px-2 py-1 text-primary">01 Разбор</span>
+                <span>→</span>
+                <span className="rounded-full bg-surface-subtle px-2 py-1">02 Стиль</span>
+                <span>→</span>
+                <span className="rounded-full bg-surface-subtle px-2 py-1">03 Сюжет</span>
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-1 border-b border-border bg-surface/90 px-4 py-2.5 sm:px-6">
             {(
               [
                 ["audit", "Разбор", ScanSearch],
@@ -176,7 +230,7 @@ export function CreativeDirectorPanel({
                 type="button"
                 aria-pressed={tab === value}
                 onClick={() => setTab(value)}
-                className="inline-flex h-9 items-center gap-2 rounded-lg px-3 text-[11px] font-semibold text-text-muted outline-none transition hover:bg-surface-subtle aria-pressed:bg-primary aria-pressed:text-white focus-visible:ring-2 focus-visible:ring-primary/30"
+                className="relative inline-flex h-9 items-center gap-2 rounded-lg px-3 text-[11px] font-semibold text-text-muted outline-none transition hover:bg-surface-subtle aria-pressed:bg-primary-subtle aria-pressed:text-primary focus-visible:ring-2 focus-visible:ring-primary/30 after:absolute after:inset-x-3 after:-bottom-[11px] after:h-0.5 after:scale-x-0 after:rounded-full after:bg-primary after:transition-transform aria-pressed:after:scale-x-100"
               >
                 <Icon aria-hidden="true" className="size-3.5" />
                 {label}
@@ -189,7 +243,7 @@ export function CreativeDirectorPanel({
             ))}
           </div>
 
-          <div className="max-h-[555px] overflow-y-auto p-4 scrollbar-subtle sm:p-6">
+          <div className="max-h-[540px] overflow-y-auto p-4 scrollbar-subtle sm:p-6">
             {tab === "audit" ? (
               <AuditTab
                 report={report}
@@ -212,7 +266,7 @@ export function CreativeDirectorPanel({
                   {emailDesignSystems.map((system) => (
                     <article
                       key={system.id}
-                      className="overflow-hidden rounded-2xl border border-border bg-surface shadow-[var(--shadow-xs)]"
+                      className="group overflow-hidden rounded-2xl border border-border bg-surface shadow-[var(--shadow-xs)] transition duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-[var(--shadow-md)]"
                     >
                       <div
                         className="grid min-h-28 content-between p-4"
@@ -289,7 +343,7 @@ export function CreativeDirectorPanel({
                     return (
                       <article
                         key={recipe.id}
-                        className="rounded-2xl border border-border bg-surface p-4 shadow-[var(--shadow-xs)]"
+                        className="group rounded-2xl border border-border bg-surface p-4 shadow-[var(--shadow-xs)] transition duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-[var(--shadow-md)]"
                       >
                       <span className="text-[9px] font-semibold uppercase tracking-[.12em] text-primary">
                         {recipe.eyebrow}

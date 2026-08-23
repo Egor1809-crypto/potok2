@@ -1,6 +1,6 @@
 import type { EmailBlockType } from "@/types";
 
-import type { BuilderBlock, BuilderDocument } from "./builder-types";
+import { createBlock, type BuilderBlock, type BuilderDocument } from "./builder-types";
 
 export type EmailDesignSystemId =
   | "executive-brief"
@@ -1131,7 +1131,7 @@ export function applyEmailQualityFix(
 ): BuilderDocument {
   if (fixId === "add-footer") {
     if (document.blocks.some((block) => block.type === "footer")) return document;
-    return { ...document, blocks: [...document.blocks, freshBlock("footer")] };
+    return { ...document, blocks: [...document.blocks, createBlock("footer")] };
   }
   if (fixId === "humanize-copy") {
     return {

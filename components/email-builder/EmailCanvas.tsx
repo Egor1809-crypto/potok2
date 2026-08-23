@@ -162,7 +162,7 @@ export function EmailCanvas({
                   </p>
                   <button
                     type="button"
-                    onClick={onOpenBlocks}
+                    onClick={() => onOpenBlocks()}
                     className="mt-4 inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-4 text-[11px] font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
                   >
                     <Plus aria-hidden="true" className="size-3.5" />
@@ -212,7 +212,7 @@ export function EmailCanvas({
             >
               <button
                 type="button"
-                onClick={onOpenBlocks}
+                onClick={() => onOpenBlocks()}
                 className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-dashed border-border-strong px-3 text-[10px] font-medium text-text-muted outline-none transition hover:border-primary/40 hover:bg-primary-subtle/40 hover:text-primary focus-visible:ring-2 focus-visible:ring-primary/30"
               >
                 <Plus aria-hidden="true" className="size-3.5" />

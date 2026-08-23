@@ -33,8 +33,11 @@ const nativePatterns: EmailPatternLibraryItem[] = [
   { id: "signal-grid", name: "Сигнальная сетка", category: "technology", keywords: ["технолог", "данн", "цифр", "разработ", "сервис", "saas", "продукт", "ии", "ai"], styles: ["minimal", "bold"], source: "potok", imageUrl: "" },
   { id: "quiet-luxury", name: "Тихая роскошь", category: "premium", keywords: ["преми", "luxur", "дорог", "элит", "ювелир", "мод"], styles: ["premium"], source: "potok", imageUrl: "" },
   { id: "celebration-spark", name: "Праздничное сияние", category: "celebration", keywords: ["празд", "поздрав", "день рожд", "юбиле", "вечерин"], styles: ["bold", "premium"], source: "potok", imageUrl: "" },
-].map((pattern) => ({
+].map((pattern): EmailPatternLibraryItem => ({
   ...pattern,
+  category: pattern.category as EmailPatternLibraryCategory,
+  styles: pattern.styles as EmailPatternLibraryItem["styles"],
+  source: "potok",
   imageUrl: `${SITE_ORIGIN}/email-patterns/${pattern.id}.jpg`,
 }));
 

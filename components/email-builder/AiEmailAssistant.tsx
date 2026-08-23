@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   Check,
@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import {
+  Alert,
   Badge,
   Button,
   FormField,
@@ -20,12 +21,18 @@ import {
   Select,
   Textarea,
 } from "@/components/ui";
+import {
+  AiCreationModePicker,
+  type AiCreationSource,
+} from "@/components/ai/AiCreationModePicker";
 import type {
   ApiError,
   EmailAiResponse,
   EmailAiSuggestion,
   EmailAssetMutationResponse,
   EmailAssetRecord,
+  EmailTemplateRecord,
+  EmailTemplatesListResponse,
 } from "@/types/api";
 import type { BuilderDocument } from "./builder-types";
 
@@ -111,6 +118,12 @@ export function AiEmailAssistant({
 }) {
   const fileInput = useRef<HTMLInputElement>(null);
   const [stage, setStage] = useState<Stage>("prompt");
+  const [creativeSource, setCreativeSource] =
+    useState<AiCreationSource>("original");
+  const [templates, setTemplates] = useState<EmailTemplateRecord[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [templatesError, setTemplatesError] = useState("");
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [provider, setProvider] = useState<EmailAiResponse["provider"]>();
   const [goal, setGoal] = useState("");
@@ -148,6 +161,10 @@ export function AiEmailAssistant({
   } | null>(null);
   const detectedUrl = goal.match(/https:\/\/[^\s]+/)?.[0] ?? "";
   const promptSuggestion = nextPromptSuggestion(goal);
+  const selectedTemplate = useMemo(
+    () => templates.find((template) => template.id === selectedTemplateId),
+    [selectedTemplateId, templates],
+  );
 
   useEffect(() => {
     let active = true;
@@ -166,6 +183,46 @@ export function AiEmailAssistant({
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (creativeSource !== "library" || templates.length) return;
+    let active = true;
+    setTemplatesLoading(true);
+    setTemplatesError("");
+    void fetch("/api/templates", { cache: "no-store" })
+      .then(async (response) => {
+        const body = (await response.json()) as
+          | EmailTemplatesListResponse
+          | ApiError;
+        if (!response.ok || !("templates" in body))
+          throw new Error(
+            "error" in body ? body.error : "Библиотека не загрузилась.",
+          );
+        if (!active) return;
+        const ordered = [...body.templates].sort(
+          (left, right) =>
+            Number(right.isFavorite) - Number(left.isFavorite) ||
+            Number(right.isStarter) - Number(left.isStarter) ||
+            left.name.localeCompare(right.name, "ru"),
+        );
+        setTemplates(ordered);
+        setSelectedTemplateId((current) => current || ordered[0]?.id || "");
+      })
+      .catch((caught) => {
+        if (active)
+          setTemplatesError(
+            caught instanceof Error
+              ? caught.message
+              : "Библиотека не загрузилась.",
+          );
+      })
+      .finally(() => {
+        if (active) setTemplatesLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [creativeSource, templates.length]);
 
   const upload = async (file: File) => {
     setUploading(true);
@@ -248,6 +305,18 @@ export function AiEmailAssistant({
         },
         body: JSON.stringify({
           action: "design",
+          creativeSource,
+          templateReference:
+            creativeSource === "library" && selectedTemplate
+              ? {
+                  id: selectedTemplate.id,
+                  isStarter: selectedTemplate.isStarter,
+                  name: selectedTemplate.name,
+                  category: selectedTemplate.category,
+                  description: selectedTemplate.description,
+                  document: selectedTemplate.builderDocument,
+                }
+              : undefined,
           goal: useLinkedContext ? goal : goal.replace(/https:\/\/[^\s]+/g, ""),
           tone: "expert",
           websiteUrl:
@@ -442,7 +511,76 @@ export function AiEmailAssistant({
       </header>
 
       {stage === "prompt" ? (
-        <div className="card grid gap-4 p-5 sm:p-7">
+        <div className="card grid gap-5 overflow-hidden border-primary/10 p-5 shadow-[var(--shadow-sm)] sm:p-7">
+          <AiCreationModePicker
+            value={creativeSource}
+            onChange={(value) => {
+              setCreativeSource(value);
+              setError("");
+            }}
+            libraryCount={templates.length || 364}
+            artifact="письмо"
+          />
+          {creativeSource === "library" ? (
+            <section className="grid gap-3 rounded-2xl border border-border bg-surface-subtle/55 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <strong className="block text-[12px] text-text-strong">
+                    Базовый макет
+                  </strong>
+                  <span className="mt-0.5 block text-[9px] leading-4 text-text-muted">
+                    AI сохранит его композиционную логику, но заменит текст,
+                    изображение и детали оформления под новую задачу.
+                  </span>
+                </div>
+                <span className="rounded-full bg-primary-subtle px-2.5 py-1 text-[8px] font-semibold text-primary">
+                  Не копия, а адаптация
+                </span>
+              </div>
+              {templatesError ? (
+                <Alert tone="danger">{templatesError}</Alert>
+              ) : (
+                <Select
+                  aria-label="Шаблон-основа письма"
+                  value={selectedTemplateId}
+                  disabled={templatesLoading || !templates.length}
+                  onChange={(event) =>
+                    setSelectedTemplateId(event.target.value)
+                  }
+                  options={
+                    templates.length
+                      ? templates.map((template) => ({
+                          value: template.id,
+                          label: `${template.isFavorite ? "★ " : ""}${template.name} · ${template.category}`,
+                        }))
+                      : [
+                          {
+                            value: "",
+                            label: templatesLoading
+                              ? "Загружаем библиотеку…"
+                              : "Шаблоны не найдены",
+                          },
+                        ]
+                  }
+                />
+              )}
+              {selectedTemplate ? (
+                <div className="grid gap-2 rounded-xl border border-border bg-surface px-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                  <div className="min-w-0">
+                    <strong className="block truncate text-[11px] text-text-strong">
+                      {selectedTemplate.name}
+                    </strong>
+                    <span className="mt-0.5 block line-clamp-2 text-[9px] leading-4 text-text-muted">
+                      {selectedTemplate.description || selectedTemplate.subject}
+                    </span>
+                  </div>
+                  <span className="text-[9px] text-text-subtle">
+                    {selectedTemplate.builderDocument.blocks.length} блоков
+                  </span>
+                </div>
+              ) : null}
+            </section>
+          ) : null}
           <div className="relative overflow-hidden rounded-xl">
             <div
               aria-hidden="true"
@@ -553,7 +691,11 @@ export function AiEmailAssistant({
             type="button"
             variant="primary"
             size="lg"
-            disabled={busy || goal.trim().length < 8}
+            disabled={
+              busy ||
+              goal.trim().length < 8 ||
+              (creativeSource === "library" && !selectedTemplate)
+            }
             onClick={() => void prepareQuestions()}
           >
             {busy ? (
@@ -564,7 +706,11 @@ export function AiEmailAssistant({
             ) : (
               <Sparkles aria-hidden="true" className="size-4" />
             )}
-            {busy ? "Анализируем задачу…" : "Продолжить — уточнить детали"}
+            {busy
+              ? "Анализируем задачу…"
+              : creativeSource === "library"
+                ? "Адаптировать выбранный шаблон"
+                : "Спроектировать письмо с нуля"}
           </Button>
         </div>
       ) : (

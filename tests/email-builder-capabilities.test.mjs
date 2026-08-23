@@ -183,7 +183,7 @@ test("AI brief asks follow-up questions and accepts dragged user images", async 
     ),
     readFile(new URL("../lib/server/email-ai.ts", import.meta.url), "utf8"),
   ]);
-  assert.match(assistant, /Продолжить — уточнить детали/);
+  assert.match(assistant, /Спроектировать письмо с нуля/);
   assert.match(assistant, /Стиль и визуальное направление/);
   assert.match(assistant, /Полная дизайнерская редакция включена всегда/);
   assert.ok(
@@ -222,6 +222,32 @@ test("AI brief asks follow-up questions and accepts dragged user images", async 
   assert.match(assistant, /sandbox="allow-same-origin"/);
   assert.doesNotMatch(assistant, /Основной цвет/);
   assert.doesNotMatch(assistant, /Фоновый цвет/);
+});
+
+test("email AI can either adapt a real library template or design from scratch", async () => {
+  const [assistant, server, picker] = await Promise.all([
+    readFile(
+      new URL(
+        "../components/email-builder/AiEmailAssistant.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(new URL("../lib/server/email-ai.ts", import.meta.url), "utf8"),
+    readFile(
+      new URL("../components/ai/AiCreationModePicker.tsx", import.meta.url),
+      "utf8",
+    ),
+  ]);
+  assert.match(picker, /Взять систему из библиотеки/);
+  assert.match(picker, /Спроектировать полностью с нуля/);
+  assert.match(assistant, /creativeSource/);
+  assert.match(assistant, /templateReference/);
+  assert.match(assistant, /selectedTemplate\.builderDocument/);
+  assert.match(server, /adaptSuggestionToTemplate/);
+  assert.match(server, /templateBlueprint/);
+  assert.match(server, /Режим композиции — адаптация библиотечного шаблона/);
+  assert.match(server, /Режим композиции — полностью оригинальная арт-дирекция/);
 });
 
 test("manual controls and export are wired to live updates without popup PDF", async () => {

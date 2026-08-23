@@ -965,7 +965,7 @@ function EmailBuilderWorkspace({
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[14px] border border-border bg-surface shadow-[var(--shadow-sm)]">
+    <div className="studio-shell flex h-full min-h-0 flex-col overflow-hidden rounded-[22px] border border-white/70 bg-surface shadow-[0_20px_70px_rgba(25,20,45,.12)]">
       <BuilderTopbar
         campaignName={campaignName}
         onCampaignNameChange={setCampaignNameDirty}
@@ -1006,13 +1006,13 @@ function EmailBuilderWorkspace({
       />
 
       <div
-        className="flex flex-wrap items-center justify-center gap-1 border-b border-border bg-surface px-4 py-2.5"
+        className="studio-modebar flex flex-wrap items-center justify-center gap-1 border-b border-border/80 bg-surface/95 px-4 py-2.5"
         role="tablist"
         aria-label="Способ создания письма"
       >
         <Link
           href="/templates"
-          className="inline-flex h-9 items-center gap-2 rounded-lg px-4 text-[12px] font-semibold text-text-muted outline-none transition hover:bg-surface-subtle hover:text-text-strong focus-visible:ring-2 focus-visible:ring-primary/30"
+          className="inline-flex h-9 items-center gap-2 rounded-xl px-4 text-[11px] font-semibold text-text-muted outline-none transition hover:bg-surface-subtle hover:text-text-strong focus-visible:ring-2 focus-visible:ring-primary/30"
         >
           <Library aria-hidden="true" className="size-4" />
           Выбрать шаблон
@@ -1022,7 +1022,7 @@ function EmailBuilderWorkspace({
           role="tab"
           aria-selected={creationMode === "manual"}
           onClick={() => setCreationMode("manual")}
-          className="inline-flex h-9 items-center gap-2 rounded-lg px-4 text-[12px] font-semibold text-text-muted outline-none transition hover:bg-surface-subtle aria-selected:bg-primary aria-selected:text-white focus-visible:ring-2 focus-visible:ring-primary/30"
+          className="inline-flex h-9 items-center gap-2 rounded-xl px-4 text-[11px] font-semibold text-text-muted outline-none transition hover:bg-surface-subtle aria-selected:bg-primary aria-selected:text-white aria-selected:shadow-[var(--shadow-sm)] focus-visible:ring-2 focus-visible:ring-primary/30"
         >
           <PenTool aria-hidden="true" className="size-4" />
           Собрать вручную
@@ -1032,7 +1032,7 @@ function EmailBuilderWorkspace({
           role="tab"
           aria-selected={creationMode === "ai"}
           onClick={() => setCreationMode("ai")}
-          className="inline-flex h-9 items-center gap-2 rounded-lg px-4 text-[12px] font-semibold text-text-muted outline-none transition hover:bg-surface-subtle aria-selected:bg-primary aria-selected:text-white focus-visible:ring-2 focus-visible:ring-primary/30"
+          className="inline-flex h-9 items-center gap-2 rounded-xl px-4 text-[11px] font-semibold text-text-muted outline-none transition hover:bg-surface-subtle aria-selected:bg-primary aria-selected:text-white aria-selected:shadow-[var(--shadow-sm)] focus-visible:ring-2 focus-visible:ring-primary/30"
         >
           <Sparkles aria-hidden="true" className="size-4" />
           Создать с ИИ
@@ -1042,7 +1042,7 @@ function EmailBuilderWorkspace({
       <button
         type="button"
         onClick={() => setDirectorOpen(true)}
-        className="group flex w-full items-center gap-3 border-b border-primary/15 bg-[linear-gradient(90deg,rgba(108,72,255,.10),rgba(214,79,135,.08),rgba(79,131,214,.08))] px-4 py-3 text-left outline-none transition hover:bg-primary-subtle/55 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30 sm:px-6"
+        className="group flex w-full items-center gap-3 border-b border-primary/15 bg-[linear-gradient(90deg,rgba(108,72,255,.12),rgba(214,79,135,.07)_52%,rgba(79,131,214,.09))] px-4 py-3 text-left outline-none transition duration-200 hover:bg-primary-subtle/65 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30 sm:px-6"
       >
         <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary text-white shadow-[var(--shadow-xs)]">
           <Gauge aria-hidden="true" className="size-4" />
@@ -1261,7 +1261,7 @@ function EmailBuilderWorkspace({
             />
           </div>
 
-          <div className="grid min-h-0 flex-1 lg:grid-cols-[210px_minmax(560px,1fr)_285px] xl:grid-cols-[220px_minmax(680px,1fr)_305px]">
+          <div className="grid min-h-0 flex-1 bg-surface-subtle/30 lg:grid-cols-[210px_minmax(560px,1fr)_285px] xl:grid-cols-[220px_minmax(680px,1fr)_305px]">
             <BlockLibrary
               onAdd={addBlock}
               document={document}

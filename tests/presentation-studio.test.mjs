@@ -263,6 +263,27 @@ test("AI presentation outline follows a narrative and does not invent evidence",
   assert.match(route, /413/);
 });
 
+test("presentation AI supports library-guided and fully original composition", async () => {
+  const [view, server] = await Promise.all([
+    readFile(
+      new URL(
+        "../components/presentations/PresentationStudio.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(new URL("../lib/server/presentation-ai.ts", import.meta.url), "utf8"),
+  ]);
+  assert.match(view, /aiCreativeSource/);
+  assert.match(view, /aiTemplateId/);
+  assert.match(view, /AiCreationModePicker/);
+  assert.match(view, /Управляемая адаптация/);
+  assert.match(server, /selectedPresentationTemplate/);
+  assert.match(server, /applyPresentationTemplateBlueprint/);
+  assert.match(server, /templateBlueprint/);
+  assert.match(server, /Режим композиции — полностью оригинальная арт-дирекция/);
+});
+
 test("PowerPoint export builds OOXML and only fetches same-origin library assets", async () => {
   const [exporter, route, store, patternCatalog] = await Promise.all([
     readFile(

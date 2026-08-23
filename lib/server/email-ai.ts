@@ -6,6 +6,7 @@ import type {
   EmailAiResponse,
   EmailAiSuggestion,
   EmailBuilderBlockInput,
+  EmailBuilderDocumentInput,
 } from "@/types/api";
 
 import {
@@ -402,6 +403,30 @@ function parseRequest(value: unknown): EmailAiRequest {
     "Пожелания к дизайну",
     1_500,
   );
+  const creativeSource =
+    object.creativeSource === "library" ? "library" : "original";
+  let templateReference: EmailAiRequest["templateReference"];
+  if (creativeSource === "library") {
+    const reference = asObject(object.templateReference);
+    const document = parseEmailBuilderDocument(reference.document);
+    if (!document)
+      throw new ApiRequestError(
+        "Выбранный шаблон нельзя использовать как основу. Выберите другой.",
+      );
+    templateReference = {
+      id: cleanText(reference.id, "ID шаблона", 160),
+      isStarter: reference.isStarter === true,
+      name: cleanText(reference.name, "Название шаблона", 300),
+      category: cleanText(
+        reference.category,
+        "Категория шаблона",
+        80,
+      ) as NonNullable<EmailAiRequest["templateReference"]>["category"],
+      description:
+        optionalText(reference.description, "Описание шаблона", 1_000) ?? "",
+      document,
+    };
+  }
   return {
     action,
     tone: tone as EmailAiRequest["tone"],
@@ -448,7 +473,119 @@ function parseRequest(value: unknown): EmailAiRequest {
           : "internet",
     availableAssets,
     briefAnswers,
+    creativeSource,
+    templateReference,
   };
+}
+
+const TEMPLATE_CONTENT_TYPES = new Set<EmailBuilderBlockInput["type"]>([
+  "heading",
+  "text",
+  "button",
+  "columns",
+  "footer",
+  "hero",
+  "quote",
+  "checklist",
+  "stats",
+  "product",
+  "signature",
+  "banner",
+  "timeline",
+  "faq",
+  "coupon",
+  "notice",
+  "comparison",
+  "document",
+  "compliance",
+]);
+
+function adaptSuggestionToTemplate(
+  suggestion: EmailAiSuggestion,
+  input: EmailAiRequest,
+) {
+  const reference = input.templateReference;
+  const generated = suggestion.document;
+  if (input.creativeSource !== "library" || !reference || !generated)
+    return suggestion;
+
+  const generatedBlocks = generated.blocks.map((block, index) => ({
+    block,
+    index,
+  }));
+  const used = new Set<number>();
+  const take = (
+    type: EmailBuilderBlockInput["type"],
+    broad = false,
+  ) => {
+    const exact = generatedBlocks.find(
+      (item) => !used.has(item.index) && item.block.type === type,
+    );
+    const candidate =
+      exact ??
+      (broad
+        ? generatedBlocks.find(
+            (item) =>
+              !used.has(item.index) &&
+              TEMPLATE_CONTENT_TYPES.has(item.block.type),
+          )
+        : undefined);
+    if (candidate) used.add(candidate.index);
+    return candidate?.block;
+  };
+  const { rawHtml: _rawHtml, ...templateDocument } = reference.document;
+  const blocks = templateDocument.blocks.flatMap((templateBlock, index) => {
+    const generatedBlock = take(
+      templateBlock.type,
+      TEMPLATE_CONTENT_TYPES.has(templateBlock.type),
+    );
+    if (!generatedBlock) {
+      if (["divider", "spacer", "pattern"].includes(templateBlock.type))
+        return [{ ...templateBlock }];
+      if (
+        templateBlock.type === "logo" &&
+        !reference.isStarter &&
+        templateBlock.href
+      )
+        return [{ ...templateBlock }];
+      return [];
+    }
+    return [
+      {
+        ...templateBlock,
+        id: `${reference.id}-ai-${index + 1}`,
+        content: generatedBlock.content,
+        ...(generatedBlock.label ? { label: generatedBlock.label } : {}),
+        ...(generatedBlock.href ? { href: generatedBlock.href } : {}),
+        ...(generatedBlock.linkHref
+          ? { linkHref: generatedBlock.linkHref }
+          : {}),
+      },
+    ];
+  });
+  const missingFunctional = generatedBlocks
+    .filter(
+      (item) =>
+        !used.has(item.index) &&
+        ["image", "pattern", "button"].includes(item.block.type) &&
+        !blocks.some((block) => block.type === item.block.type),
+    )
+    .map((item) => item.block);
+  const footerIndex = blocks.findIndex((block) => block.type === "footer");
+  blocks.splice(
+    footerIndex >= 0 ? footerIndex : blocks.length,
+    0,
+    ...missingFunctional,
+  );
+  suggestion.document = {
+    ...templateDocument,
+    templateId: reference.id,
+    subject: suggestion.subject,
+    previewText: suggestion.previewText,
+    blocks,
+  } satisfies EmailBuilderDocumentInput;
+  suggestion.artDirection = `Адаптация системы «${reference.name}»: сохранены композиция, пропорции, рамка и типографическая логика шаблона; содержание, изображение и действие заново собраны под задачу. ${suggestion.artDirection ?? ""}`.trim();
+  return suggestion;
 }
 
 async function safetyIdentifier(request: Request) {
@@ -2121,7 +2258,13 @@ function emailDesignInstructions(input: EmailAiRequest) {
   const patternRule = wantsPattern
       ? `Добавь ровно один узкий pattern-блок в осмысленной точке ритма — после входного hero или перед главным доказательством. Сервер сам подберёт к теме растровый орнамент из библиотеки из 102 email-safe фонов; от тебя требуется правильная позиция и спокойная высота блока. Видимый fallback-content: «${decorativePatternFor(`${input.goal}\n${input.designBrief ?? ""}`)}».`
     : "Не добавляй pattern.";
+  const sourceRule =
+    input.creativeSource === "library" && input.templateReference
+      ? `Режим композиции — адаптация библиотечного шаблона «${input.templateReference.name}». templateBlueprint является обязательным каркасом: сохрани его порядок смысловых ролей, плотность, пропорции и характер типографики, но не копируй старый текст. Заполни этот каркас новым содержанием по задаче пользователя. Допустимо добавить только недостающее тематическое изображение, узор или одну CTA.`
+      : "Режим композиции — полностью оригинальная арт-дирекция. Не воспроизводи готовый шаблон платформы: самостоятельно выбери смысловую структуру и визуальный ритм из creativeBlueprint.";
   return `Ты — senior email designer, арт-директор и сильный русскоязычный редактор. Твоя задача — по одному пользовательскому брифу собрать законченное профессиональное письмо, в котором текст, композиция, типографика, палитра, орнамент и тематическое изображение работают как одна система. Проектируй именно HTML EMAIL для Gmail, Outlook и Apple Mail — не лендинг, не презентацию, не постер, не журнальную страницу и не новостной сайт. Не копируй узнаваемый интерфейс или стиль конкретного сервиса. authoritativeUserBrief задаёт тему и ограничения, а briefAnswers — только сырьё: нельзя копировать их списком или склеивать дословно. approvedEditorialCopy — утверждённая редакция темы, прехедера, основного текста и действия; сохрани её смысл. detectedEmailType — уже определённый сценарий письма, верни его как emailType. creativeBlueprint — обязательная режиссёрская карта: она описывает состояние читателя до и после письма, порядок смыслов, роль доказательства, CTA, изображения, орнамента и подходящие дизайн-системы. Выбери одну из рекомендованных систем и последовательно держи её палитру, типографику, интервалы, радиусы и характер визуала.
+
+${sourceRule}
 
 ${layoutRule}
 
@@ -2184,7 +2327,30 @@ export async function generateEmailSuggestion(
       visualContent: input.visualContent,
       socialLinks: input.socialLinks,
       availableAssets: input.availableAssets,
+      creativeSource: input.creativeSource,
     },
+    templateBlueprint: input.templateReference
+      ? {
+          id: input.templateReference.id,
+          isStarter: input.templateReference.isStarter,
+          name: input.templateReference.name,
+          category: input.templateReference.category,
+          description: input.templateReference.description,
+          frameStyle: input.templateReference.document.frameStyle,
+          contentWidth: input.templateReference.document.contentWidth,
+          palette: {
+            accent: input.templateReference.document.accentColor,
+            body: input.templateReference.document.bodyBackground,
+            workspace: input.templateReference.document.workspaceBackground,
+          },
+          blocks: input.templateReference.document.blocks.map((block) => ({
+            type: block.type,
+            alignment: block.alignment,
+            fontFamily: block.fontFamily,
+            fontSize: block.fontSize,
+          })),
+        }
+      : undefined,
     linkedPageReference: linkedContext.filter(Boolean),
     approvedEditorialCopy: editorialCopy
       ? {
@@ -2584,6 +2750,7 @@ export async function generateEmailSuggestion(
             : suggestion;
   if (input.action === "design")
     applyEditorialCopy(designed, editorialCopy, input);
+  if (input.action === "design") adaptSuggestionToTemplate(designed, input);
   return {
     configured: true,
     provider: provider.provider,
@@ -2612,6 +2779,7 @@ async function completeFallbackEmailDesign(
           ? await generateDesignImages(request, provider, suggestion, true)
           : suggestion;
   applyEditorialCopy(designed, editorialCopy, input);
+  adaptSuggestionToTemplate(designed, input);
   return {
     configured: true,
     provider: provider.provider,

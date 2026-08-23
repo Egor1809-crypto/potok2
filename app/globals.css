@@ -173,6 +173,63 @@ body {
   line-height: 1.55;
 }
 
+@keyframes studio-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.996);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes director-reveal {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.studio-shell {
+  animation: studio-enter 360ms var(--ease-out) both;
+}
+
+.studio-modebar {
+  position: relative;
+  isolation: isolate;
+}
+
+.studio-modebar::after {
+  position: absolute;
+  inset: auto 12% -1px;
+  height: 1px;
+  content: "";
+  background: linear-gradient(90deg, transparent, rgb(124 53 242 / 0.24), transparent);
+}
+
+.director-stage > section {
+  animation: director-reveal 320ms var(--ease-out) both;
+}
+
+.presentation-studio-home > section,
+.presentation-studio-home > div {
+  animation: studio-enter 320ms var(--ease-out) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-shell,
+  .director-stage > section,
+  .presentation-studio-home > section,
+  .presentation-studio-home > div {
+    animation: none;
+  }
+}
+
 button,
 input,
 textarea,

@@ -258,7 +258,19 @@ export type EmailBuilderDocumentInput = {
     | "blueprint"
     | "poster"
     | "postcard"
-    | "focus";
+    | "focus"
+    | "inner-rule"
+    | "editorial-corner"
+    | "spine-double"
+    | "marquee"
+    | "notebook"
+    | "gallery-mat"
+    | "terminal"
+    | "legal-docket"
+    | "festive-thread"
+    | "wave-edge"
+    | "minimalist-lift"
+    | "embossed";
   frameColor?: string;
   frameRadius?: number;
   blocks: EmailBuilderBlockInput[];
@@ -359,6 +371,20 @@ export type EmailAiRequest = {
     Pick<EmailAssetRecord, "id" | "filename" | "kind" | "url">
   >;
   briefAnswers?: Array<{ question: string; answer: string }>;
+  /**
+   * `original` lets the art director invent the composition. `library` keeps
+   * the composition and visual grammar of an existing platform template while
+   * rewriting its content for the user's task.
+   */
+  creativeSource?: "original" | "library";
+  templateReference?: {
+    id: string;
+    isStarter: boolean;
+    name: string;
+    category: TemplateCategory;
+    description: string;
+    document: EmailBuilderDocumentInput;
+  };
 };
 
 export type EmailAiSuggestion = {
@@ -539,6 +565,8 @@ export type PresentationAiRequest = {
   ctaUrl?: string;
   designBrief?: string;
   socialLinks?: Array<{ label: string; url: string }>;
+  creativeSource?: "original" | "library";
+  templateId?: string;
 };
 
 export type PresentationAiResponse = {

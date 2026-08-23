@@ -32,6 +32,10 @@ import {
 } from "lucide-react";
 
 import { ImageAssetPicker } from "@/components/email-builder/ImageAssetPicker";
+import {
+  AiCreationModePicker,
+  type AiCreationSource,
+} from "@/components/ai/AiCreationModePicker";
 import { PageHeader } from "@/components/shared";
 import {
   Alert,
@@ -1367,6 +1371,11 @@ export function PresentationStudio() {
   const [quickSlideOpen, setQuickSlideOpen] = useState(false);
   const [slidesPanelOpen, setSlidesPanelOpen] = useState(true);
   const [aiGoal, setAiGoal] = useState("");
+  const [aiCreativeSource, setAiCreativeSource] =
+    useState<AiCreationSource>("original");
+  const [aiTemplateId, setAiTemplateId] = useState(
+    presentationTemplates[0]?.id ?? "",
+  );
   const [aiAudience, setAiAudience] = useState("");
   const [aiSlideCount, setAiSlideCount] = useState(7);
   const [aiTheme, setAiTheme] = useState<PresentationThemeId>("atelier");
@@ -1635,6 +1644,9 @@ export function PresentationStudio() {
         },
         body: JSON.stringify({
           goal: aiGoal,
+          creativeSource: aiCreativeSource,
+          templateId:
+            aiCreativeSource === "library" ? aiTemplateId : undefined,
           audience: aiAudience,
           context: aiContext,
           desiredAction: aiAction,
@@ -2018,8 +2030,8 @@ export function PresentationStudio() {
 
   if (projectId && project && selectedSlide) {
     return (
-      <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
-        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2 shadow-[var(--shadow-xs)]">
+      <div className="studio-shell flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-[22px] border border-white/70 bg-surface/80 p-2 shadow-[0_20px_70px_rgba(25,20,45,.10)]">
+        <div className="mb-2 flex flex-wrap items-center gap-2 rounded-2xl border border-border/80 bg-surface/95 px-3 py-2 shadow-[var(--shadow-xs)] backdrop-blur-xl">
           <Button
             variant="ghost"
             size="sm"
@@ -2094,7 +2106,7 @@ export function PresentationStudio() {
             {error}
           </Alert>
         ) : null}
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden border border-border bg-surface">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border/80 bg-surface shadow-[var(--shadow-sm)]">
           <div
             className={cn(
               "grid min-h-0 flex-1 grid-cols-1",
@@ -2104,7 +2116,7 @@ export function PresentationStudio() {
             )}
           >
             {slidesPanelOpen ? (
-              <aside className="flex min-h-0 flex-col border-b border-border bg-surface-subtle p-2.5 lg:border-b-0 lg:border-r">
+              <aside className="flex min-h-0 flex-col border-b border-border bg-[linear-gradient(180deg,var(--surface-subtle),var(--surface))] p-2.5 lg:border-b-0 lg:border-r">
               <div className="mb-3 flex items-center justify-between">
                 <div>
                   <strong className="block text-[12px]">Слайды</strong>
@@ -2134,7 +2146,7 @@ export function PresentationStudio() {
                       onClick={() => setSelectedSlideId(slide.id)}
                       aria-pressed={slide.id === selectedSlide.id}
                       aria-label={`Слайд ${index + 1}: ${slide.title || layoutLabels[slide.layout]}`}
-                      className="w-36 shrink-0 rounded-lg border border-border bg-surface p-1.5 text-left transition hover:border-primary/40 aria-pressed:border-primary aria-pressed:ring-2 aria-pressed:ring-primary/20 lg:w-auto"
+                      className="w-36 shrink-0 rounded-xl border border-border bg-surface p-1.5 text-left shadow-[var(--shadow-xs)] transition duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-[var(--shadow-sm)] aria-pressed:border-primary aria-pressed:ring-2 aria-pressed:ring-primary/20 lg:w-auto"
                     >
                       <span className="mb-1 flex items-center justify-between px-0.5 text-[9px] text-text-subtle">
                         <span>{index + 1}</span>
@@ -2149,7 +2161,7 @@ export function PresentationStudio() {
               </div>
               </aside>
             ) : null}
-            <section className="flex min-w-0 min-h-0 flex-col bg-[#F2F3F5]">
+            <section className="flex min-w-0 min-h-0 flex-col bg-[radial-gradient(circle_at_50%_18%,rgba(124,53,242,.07),transparent_28%),#eef0f4]">
               <div className="flex min-h-11 items-center justify-between gap-2 border-b border-border bg-surface/90 px-2.5 py-1.5">
                 <div className="flex min-w-0 items-center gap-2">
                   <Button
@@ -2240,7 +2252,7 @@ export function PresentationStudio() {
                 </div>
               </div>
               <div className="grid min-h-0 flex-1 place-items-center overflow-hidden p-4 sm:p-5 xl:p-6">
-                <div className="w-full max-w-[1080px] overflow-hidden border border-border bg-surface shadow-[0_12px_36px_rgb(17_24_39/0.12)]">
+                <div className="w-full max-w-[1080px] overflow-hidden rounded-xl border border-border/80 bg-surface shadow-[0_22px_65px_rgb(17_24_39/0.16)]">
                   <SlidePreview
                     project={project}
                     slide={selectedSlide}
@@ -2252,8 +2264,8 @@ export function PresentationStudio() {
                 </div>
               </div>
             </section>
-            <aside className="hidden min-h-0 overflow-hidden border-l border-border bg-surface p-3 xl:block">
-              <div className="grid h-full min-h-0 gap-4 overflow-y-auto pr-0.5">
+            <aside className="hidden min-h-0 overflow-hidden border-l border-border bg-surface-subtle/55 p-2.5 xl:block">
+              <div className="grid h-full min-h-0 gap-2.5 overflow-y-auto pr-0.5 [&>section]:rounded-xl [&>section]:border [&>section]:border-border/80 [&>section]:bg-surface [&>section]:p-3 [&>section]:shadow-[var(--shadow-xs)]">
                 <div className="sticky top-0 z-10 -mx-3 -mt-3 border-b border-border bg-surface px-3 py-2">
                   <strong className="block text-[12px]">
                     Инструменты слайда
@@ -2316,7 +2328,7 @@ export function PresentationStudio() {
                               : {}),
                           });
                         }}
-                        className="rounded-md border border-border bg-surface px-1.5 py-2 text-[9px] font-semibold transition hover:border-primary/40 hover:bg-primary-subtle"
+                  className="rounded-lg border border-border bg-surface px-1.5 py-2 text-[9px] font-semibold transition hover:-translate-y-0.5 hover:border-primary/40 hover:bg-primary-subtle hover:shadow-[var(--shadow-xs)]"
                       >
                         {label}
                       </button>
@@ -2787,7 +2799,7 @@ export function PresentationStudio() {
   }
 
   return (
-    <div className="grid h-full min-h-0 auto-rows-max content-start gap-8 overflow-y-auto overscroll-contain pr-1">
+    <div className="presentation-studio-home grid h-full min-h-0 auto-rows-max content-start gap-7 overflow-y-auto overscroll-contain pr-1">
       <PageHeader
         eyebrow="ПРЕЗЕНТАЦИИ «ПОТОК»"
         title="Студия презентаций"
@@ -3167,6 +3179,90 @@ export function PresentationStudio() {
               {aiError}
             </Alert>
           ) : null}
+          <AiCreationModePicker
+            value={aiCreativeSource}
+            onChange={(value) => {
+              aiIdempotencyKeyRef.current = "";
+              setAiCreativeSource(value);
+              if (value === "library") {
+                const template =
+                  presentationTemplates.find(
+                    (item) => item.id === aiTemplateId,
+                  ) ?? presentationTemplates[0];
+                if (template) {
+                  setAiTemplateId(template.id);
+                  setAiSlideCount(template.slides.length);
+                  setAiTheme(template.themeId);
+                }
+              }
+            }}
+            libraryCount={presentationTemplates.length}
+            artifact="презентацию"
+          />
+          {aiCreativeSource === "library" ? (
+            <section className="grid gap-3 rounded-2xl border border-border bg-surface-subtle/55 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <strong className="block text-[12px] text-text-strong">
+                    Сценарий и визуальная система
+                  </strong>
+                  <span className="mt-0.5 block text-[9px] leading-4 text-text-muted">
+                    Структура и ритм сохранятся, а заголовки, аргументы,
+                    изображения и заметки AI соберёт заново.
+                  </span>
+                </div>
+                <span className="rounded-full bg-primary-subtle px-2.5 py-1 text-[8px] font-semibold text-primary">
+                  Управляемая адаптация
+                </span>
+              </div>
+              <Select
+                aria-label="Шаблон-основа презентации"
+                value={aiTemplateId}
+                onChange={(event) => {
+                  aiIdempotencyKeyRef.current = "";
+                  const template = presentationTemplates.find(
+                    (item) => item.id === event.target.value,
+                  );
+                  setAiTemplateId(event.target.value);
+                  if (template) {
+                    setAiSlideCount(template.slides.length);
+                    setAiTheme(template.themeId);
+                  }
+                }}
+                options={presentationTemplates.map((template) => ({
+                  value: template.id,
+                  label: `${template.name} · ${template.useCase}`,
+                }))}
+              />
+              {(() => {
+                const template = presentationTemplates.find(
+                  (item) => item.id === aiTemplateId,
+                );
+                return template ? (
+                  <div className="grid gap-3 rounded-xl border border-border bg-surface p-3 sm:grid-cols-[132px_minmax(0,1fr)_auto] sm:items-center">
+                    <div className="overflow-hidden rounded-lg border border-border">
+                      <SlidePreview
+                        project={template}
+                        slide={template.slides[0]}
+                        compact
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <strong className="block text-[11px] text-text-strong">
+                        {template.name}
+                      </strong>
+                      <span className="mt-0.5 block text-[9px] leading-4 text-text-muted">
+                        {template.description}
+                      </span>
+                    </div>
+                    <span className="text-[9px] text-text-subtle">
+                      {template.slides.length} слайдов
+                    </span>
+                  </div>
+                ) : null;
+              })()}
+            </section>
+          ) : null}
           <FormField
             label="Задача презентации"
             required
@@ -3326,6 +3422,7 @@ export function PresentationStudio() {
             <FormField label="Количество слайдов">
               <Select
                 value={String(aiSlideCount)}
+                disabled={aiCreativeSource === "library"}
                 onChange={(event) => {
                   aiIdempotencyKeyRef.current = "";
                   setAiSlideCount(Number(event.target.value));
@@ -3337,14 +3434,21 @@ export function PresentationStudio() {
               />
             </FormField>
           </div>
-          <FormField label="Визуальная тема">
-            <ThemeStrip
-              value={aiTheme}
-              onChange={(theme) => {
-                aiIdempotencyKeyRef.current = "";
-                setAiTheme(theme);
-              }}
-            />
+            <FormField label="Визуальная тема">
+            {aiCreativeSource === "library" ? (
+              <div className="rounded-xl border border-border bg-surface-subtle px-3 py-2.5 text-[10px] text-text-muted">
+                Тема закреплена выбранным шаблоном. После создания её можно
+                менять отдельно на каждом слайде.
+              </div>
+            ) : (
+              <ThemeStrip
+                value={aiTheme}
+                onChange={(theme) => {
+                  aiIdempotencyKeyRef.current = "";
+                  setAiTheme(theme);
+                }}
+              />
+            )}
           </FormField>
         </div>
       </Modal>
