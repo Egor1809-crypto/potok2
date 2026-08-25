@@ -4,7 +4,9 @@ import { fileURLToPath } from 'node:url';
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
 const img = (name, mime = 'image/jpeg') => `data:${mime};base64,${fs.readFileSync(path.join(dir, 'assets', name)).toString('base64')}`;
-const wide = img('conference-hero-wide.jpg');
+// Template 01 has its own canonical hero. Keep it separate from the generic
+// conference imagery so a rebuild cannot silently replace Manyasha again.
+const manyasha = img('new-series/manyasha-email.jpg');
 const portrait = img('conference-hero-portrait.jpg');
 const banner = img('conference-hero-banner.jpg');
 
@@ -57,7 +59,7 @@ const footerDeadline = () => `<tr><td class="px" style="padding-top:34px"><table
 const t1 = base('Личное приглашение — ТехнологИИ Права','Два дня практики БФЛ, LegalTech и ИИ. Выберите билет до повышения цены.','#07101f',`
 <table role="presentation" class="wrap" cellpadding="0" cellspacing="0"><tr><td align="center"><table role="presentation" class="card" cellpadding="0" cellspacing="0" style="background:#0b172a;color:#fff;border-radius:18px;overflow:hidden">
 <tr><td class="px" style="padding-top:24px;padding-bottom:21px;text-align:center;background:#2e2b36">${logo(286)}</td></tr>
-<tr><td><a href="${links.tickets}" target="_blank"><img src="${wide}" width="640" alt="Маняша — AI-ассистент конференции" style="width:100%;height:auto;display:block;border:0"></a></td></tr>
+<tr><td><a href="${links.tickets}" target="_blank"><img src="${manyasha}" width="640" alt="Маняша — AI-ассистент конференции" style="width:100%;height:auto;display:block;border:0"></a></td></tr>
 <tr><td class="px" style="padding-top:34px"><h1 class="h1">Будущее юридической практики уже стало рабочим инструментом</h1></td></tr>
 <tr><td class="px copy" style="padding-top:22px;color:#d8e4ef">Здравствуйте, {{Имя}}!</td></tr>
 <tr><td class="px copy" style="padding-top:10px;color:#d8e4ef">Приглашаем Вас на флагманскую конференцию «ТехнологИИ Права» — для руководителей юридического бизнеса, практикующих юристов, юристов в сфере БФЛ, арбитражных управляющих и представителей СРО.</td></tr>

@@ -3,12 +3,13 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("conference HTML letters are seeded as editable user templates", async () => {
-  const [generated, database, compiler, preview, personalInvitation] = await Promise.all([
+  const [generated, database, compiler, preview, personalInvitation, manyashaImage] = await Promise.all([
     readFile(new URL("../data/conference-production-templates.generated.ts", import.meta.url), "utf8"),
     readFile(new URL("../lib/server/database-init.ts", import.meta.url), "utf8"),
     readFile(new URL("../lib/server/email-document.ts", import.meta.url), "utf8"),
     readFile(new URL("../components/templates/TemplatePreview.tsx", import.meta.url), "utf8"),
     readFile(new URL("../email-templates/conference/conference-01-personal-invitation.html", import.meta.url), "utf8"),
+    readFile(new URL("../email-templates/conference/assets/new-series/manyasha-email.jpg", import.meta.url)),
   ]);
   assert.equal((generated.match(/"name": "ТП Конференция /g) ?? []).length, 11);
   assert.equal((generated.match(/"rawHtml":/g) ?? []).length, 11);
@@ -66,7 +67,8 @@ test("conference HTML letters are seeded as editable user templates", async () =
   assert.match(database, /conference-production-html-v14-cost-template-hero-replacement/);
   assert.match(database, /conference-production-html-v17-pdf-typography/);
   assert.match(database, /conference-production-html-v18-editable-greeting-logo/);
-  assert.match(database, /runtime-schema-v26-conference-pdf-editable-greeting/);
+  assert.match(database, /conference-production-html-v19-personal-invitation-manyasha/);
+  assert.match(database, /runtime-schema-v27-conference-personal-invitation-manyasha/);
   assert.match(database, /runtime-schema-v\d+-/);
   assert.match(database, /template-user-conference-11-cost-reduction/);
   assert.match(database, /isFavorite: true/);
@@ -75,5 +77,9 @@ test("conference HTML letters are seeded as editable user templates", async () =
   assert.match(preview, /srcDoc=\{template\.emailBodyHtml\}/);
   assert.match(personalInvitation, /<img\b/i);
   assert.match(personalInvitation, /Маняша — AI-ассистент конференции/);
+  assert.ok(
+    personalInvitation.includes(`data:image/jpeg;base64,${manyashaImage.toString("base64")}`),
+    "template 01 must keep the canonical Manyasha hero image",
+  );
   assert.match(personalInvitation, /https:\/\/t\.me\/TechPravoAI/);
 });
