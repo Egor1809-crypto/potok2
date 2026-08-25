@@ -241,6 +241,17 @@ export function TemplatesView() {
     [collection, scope, templates],
   );
 
+  const showFavorites = () => {
+    setScope("all");
+    setCollection("favorites");
+    setCategory("All");
+    setQuery("");
+    setStyle("all");
+    setPalette("all");
+    setDensity("all");
+    setSort("recent");
+  };
+
   const cloneTemplate = async (template: EmailTemplateRecord) => {
     setBusy({ id: template.id, action: "clone" });
     setError(null);
@@ -406,7 +417,7 @@ export function TemplatesView() {
       ) : (
         <div className="space-y-4">
           <div className="inline-flex flex-wrap rounded-xl border border-border bg-surface p-1" role="group" aria-label="Раздел шаблонов">
-            <button type="button" aria-pressed={collection === "favorites"} onClick={() => { setScope("all"); setCollection("favorites"); }} className="rounded-lg px-4 py-2 text-[12px] font-semibold text-text-muted outline-none transition hover:text-text-strong aria-pressed:bg-primary aria-pressed:text-white focus-visible:ring-2 focus-visible:ring-primary/30">
+            <button type="button" aria-pressed={collection === "favorites"} onClick={showFavorites} className="rounded-lg px-4 py-2 text-[12px] font-semibold text-text-muted outline-none transition hover:text-text-strong aria-pressed:bg-primary aria-pressed:text-white focus-visible:ring-2 focus-visible:ring-primary/30">
               ★ Избранное <span className="ml-1 opacity-70">{templates.filter((template) => template.isFavorite).length}</span>
             </button>
             <button type="button" aria-pressed={scope === "all" && collection === "studio"} onClick={() => { setScope("all"); setCollection("studio"); }} className="rounded-lg px-4 py-2 text-[12px] font-semibold text-text-muted outline-none transition hover:text-text-strong aria-pressed:bg-primary aria-pressed:text-white focus-visible:ring-2 focus-visible:ring-primary/30">

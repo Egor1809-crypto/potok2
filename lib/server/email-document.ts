@@ -221,7 +221,8 @@ function blockHtml(block: EmailBuilderBlockInput, accent: string) {
   } else if (block.type === "text" || block.type === "footer" || block.type === "logo" || block.type === "signature") {
     const weight = block.type === "logo" ? "font-weight:700;letter-spacing:.12em;" : "";
     if (block.type === "logo" && block.href) {
-      const image = `<img src="${escapeHtml(block.href)}" alt="${escapeHtml(block.content)}" style="display:inline-block;max-width:220px;max-height:88px;width:auto;height:auto;border:0;">`;
+      const sizedLogo = block.widthPercent !== 100;
+      const image = `<img src="${escapeHtml(block.href)}" alt="${escapeHtml(block.content)}" style="display:inline-block;${sizedLogo ? "width:100%;max-width:520px;" : "max-width:220px;width:auto;"}max-height:110px;height:auto;border:0;">`;
       content = block.linkHref ? `<a href="${escapeHtml(block.linkHref)}" style="text-decoration:none;">${image}</a>` : image;
     } else {
       content =

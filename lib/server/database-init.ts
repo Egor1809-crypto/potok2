@@ -996,6 +996,40 @@ async function seedDatabase(request: Request) {
     });
   }
 
+  const [conferenceBriefTemplateState] = await db
+    .select({ key: systemState.key })
+    .from(systemState)
+    .where(eq(systemState.key, "email-template-library-v17-conference-brief-quality-polish"))
+    .limit(1);
+  if (!conferenceBriefTemplateState) {
+    for (const template of starterEmailTemplateValues().filter((item) => item.id.startsWith("template-v14-conference-brief-"))) {
+      await db.insert(emailTemplates).values({ ...template, workspaceId: WORKSPACE_ID, isFavorite: true }).onConflictDoUpdate({
+        target: emailTemplates.id,
+        set: {
+          name: template.name,
+          nameKey: template.nameKey,
+          description: template.description,
+          category: template.category,
+          subject: template.subject,
+          previewText: template.previewText,
+          builderDocument: template.builderDocument,
+          emailBodyHtml: template.emailBodyHtml,
+          emailBodyText: template.emailBodyText,
+          isFavorite: true,
+          updatedAt: now,
+        },
+      });
+    }
+    await db.insert(systemState).values({
+      key: "email-template-library-v17-conference-brief-quality-polish",
+      value: "seeded",
+      updatedAt: now,
+    }).onConflictDoUpdate({
+      target: systemState.key,
+      set: { value: "seeded", updatedAt: now },
+    });
+  }
+
   const [templateHeadersState] = await db
     .select({ key: systemState.key })
     .from(systemState)
