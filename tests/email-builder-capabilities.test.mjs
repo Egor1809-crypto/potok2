@@ -296,9 +296,17 @@ test("manual controls export a single-page A4 PDF with working links", async () 
   assert.match(exports, /makePdfLinksViewerCompatible/);
   assert.match(exports, /markEditableNamePlaceholders/);
   assert.match(exports, /\{\{\\s\*\(\?:first_name\|имя\|name\)\\s\*\}\}/i);
-  assert.match(exports, /createTextField\("recipient_name"\)/);
+  assert.match(exports, /createTextField\(index === 0 \? "recipient_name"/);
   assert.match(exports, /nameField\.addToPage/);
   assert.match(exports, /nameField\.updateAppearances\(fieldFont\)/);
+  assert.match(exports, /nameField\.acroField\.setDefaultAppearance/);
+  assert.match(exports, /getWidgets\(\)\[0\]\?\.setDefaultAppearance/);
+  assert.match(exports, /PDFName\.of\("DR"\)/);
+  assert.match(exports, /formFonts\.set\(PDFName\.of\(fieldFont\.name\), fieldFont\.ref\)/);
+  assert.match(exports, /placement\.fontSize \* pointsPerMillimeter/);
+  assert.match(exports, /resolveEditableFontKind/);
+  assert.match(exports, /NotoSerif-Regular\.ttf/);
+  assert.match(exports, /\{ subset: false \}/);
   assert.match(exports, /registerFontkit/);
   assert.match(exports, /@pdf-lib\/fontkit/);
   assert.match(exports, /backgroundColor: rgb\(placement\.backgroundColor/);

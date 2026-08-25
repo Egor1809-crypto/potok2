@@ -17,26 +17,32 @@ type EditableNamePlacement = {
   y: number;
   width: number;
   height: number;
+  fontSize: number;
+  fontKind: "sans" | "serif";
   textColor: PdfColor;
   backgroundColor: PdfColor;
 };
 
-const EDITABLE_NAME_FONT_URL = "https://raw.githubusercontent.com/notofonts/noto-fonts/main/hinted/ttf/NotoSans/NotoSans-Regular.ttf";
-let editableNameFontBytesPromise: Promise<ArrayBuffer> | null = null;
+const EDITABLE_NAME_FONT_URLS = {
+  sans: "https://raw.githubusercontent.com/notofonts/noto-fonts/main/hinted/ttf/NotoSans/NotoSans-Regular.ttf",
+  serif: "https://raw.githubusercontent.com/notofonts/noto-fonts/main/hinted/ttf/NotoSerif/NotoSerif-Regular.ttf",
+} as const;
+const editableNameFontBytesPromises = new Map<EditableNamePlacement["fontKind"], Promise<ArrayBuffer>>();
 
-function loadEditableNameFontBytes() {
-  if (!editableNameFontBytesPromise) {
-    editableNameFontBytesPromise = fetch(EDITABLE_NAME_FONT_URL, { cache: "force-cache" })
+function loadEditableNameFontBytes(kind: EditableNamePlacement["fontKind"]) {
+  if (!editableNameFontBytesPromises.has(kind)) {
+    const promise = fetch(EDITABLE_NAME_FONT_URLS[kind], { cache: "force-cache" })
       .then((response) => {
         if (!response.ok) throw new Error("Не удалось загрузить шрифт поля имени.");
         return response.arrayBuffer();
       })
       .catch((error) => {
-        editableNameFontBytesPromise = null;
+        editableNameFontBytesPromises.delete(kind);
         throw error;
       });
+    editableNameFontBytesPromises.set(kind, promise);
   }
-  return editableNameFontBytesPromise;
+  return editableNameFontBytesPromises.get(kind)!;
 }
 
 function parseCssColor(value: string): PdfColor {
@@ -62,6 +68,12 @@ function resolveBackgroundColor(element: HTMLElement): PdfColor {
     current = current.parentElement;
   }
   return { red: 1, green: 1, blue: 1 };
+}
+
+function resolveEditableFontKind(fontFamily: string): EditableNamePlacement["fontKind"] {
+  return /\b(?:georgia|times)\b/i.test(fontFamily) || /(?:^|,)\s*serif(?:,|$)/i.test(fontFamily)
+    ? "serif"
+    : "sans";
 }
 
 function markEditableNamePlaceholders(frameDocument: Document) {
@@ -91,7 +103,6 @@ function markEditableNamePlaceholders(frameDocument: Document) {
         display: "inline-block",
         boxSizing: "border-box",
         whiteSpace: "nowrap",
-        borderBottom: "1px solid currentColor",
         verticalAlign: "baseline",
       });
       markers.push(marker);
@@ -103,8 +114,15 @@ function markEditableNamePlaceholders(frameDocument: Document) {
   }
 
   for (const marker of markers) {
-    const width = Math.max(82, marker.getBoundingClientRect().width);
+    const view = marker.ownerDocument.defaultView;
+    const computed = view?.getComputedStyle(marker);
+    const fontSize = Number.parseFloat(computed?.fontSize ?? "16") || 16;
+    const parsedLineHeight = Number.parseFloat(computed?.lineHeight ?? "");
+    const lineHeight = Number.isFinite(parsedLineHeight) ? parsedLineHeight : fontSize * 1.45;
+    const width = Math.max(92, fontSize * 5.5, marker.getBoundingClientRect().width);
     marker.style.width = `${width}px`;
+    marker.style.height = `${Math.max(lineHeight, fontSize * 1.25)}px`;
+    marker.style.lineHeight = `${Math.max(lineHeight, fontSize * 1.25)}px`;
     marker.textContent = "\u00a0";
   }
   return markers;
@@ -158,38 +176,67 @@ async function makePdfLinksViewerCompatible(pdfBlob: Blob, editableNames: Editab
 
   if (editableNames.length > 0) {
     const form = document.getForm();
-    const nameField = form.createTextField("recipient_name");
     const page = document.getPages()[0];
     const pointsPerMillimeter = 72 / 25.4;
-    let fieldFont;
-    let defaultName = "Имя";
-    try {
-      const { default: fontkit } = await import("@pdf-lib/fontkit");
-      document.registerFontkit(fontkit);
-      fieldFont = await document.embedFont(new Uint8Array(await loadEditableNameFontBytes()), { subset: true });
-    } catch {
-      fieldFont = await document.embedFont(StandardFonts.Helvetica);
-      defaultName = "Name";
+    const fontCache = new Map<EditableNamePlacement["fontKind"], Awaited<ReturnType<typeof document.embedFont>>>();
+    const defaultResourcesName = PDFName.of("DR");
+    const fontsName = PDFName.of("Font");
+    let defaultResources = form.acroForm.dict.lookupMaybe(defaultResourcesName, PDFDict);
+    if (!defaultResources) {
+      defaultResources = document.context.obj({});
+      form.acroForm.dict.set(defaultResourcesName, defaultResources);
     }
-    const firstHeight = editableNames[0].height * pointsPerMillimeter;
-    nameField.setMaxLength(80);
-    nameField.setText(defaultName);
-    for (const placement of editableNames) {
+    let formFonts = defaultResources.lookupMaybe(fontsName, PDFDict);
+    if (!formFonts) {
+      formFonts = document.context.obj({});
+      defaultResources.set(fontsName, formFonts);
+    }
+
+    for (const [index, placement] of editableNames.entries()) {
+      let fieldFont = fontCache.get(placement.fontKind);
+      let defaultName = "Имя";
+      if (!fieldFont) {
+        try {
+          const { default: fontkit } = await import("@pdf-lib/fontkit");
+          document.registerFontkit(fontkit);
+          fieldFont = await document.embedFont(
+            new Uint8Array(await loadEditableNameFontBytes(placement.fontKind)),
+            { subset: false },
+          );
+        } catch {
+          fieldFont = await document.embedFont(
+            placement.fontKind === "serif" ? StandardFonts.TimesRoman : StandardFonts.Helvetica,
+          );
+          defaultName = "Name";
+        }
+        fontCache.set(placement.fontKind, fieldFont);
+        formFonts.set(PDFName.of(fieldFont.name), fieldFont.ref);
+      }
+
+      const nameField = form.createTextField(index === 0 ? "recipient_name" : `recipient_name_${index + 1}`);
       const width = placement.width * pointsPerMillimeter;
       const height = placement.height * pointsPerMillimeter;
+      const fontSize = Math.min(height - 2, Math.max(7, placement.fontSize * pointsPerMillimeter));
+      const textColor = rgb(placement.textColor.red, placement.textColor.green, placement.textColor.blue);
+      const colorOperator = `${placement.textColor.red.toFixed(4)} ${placement.textColor.green.toFixed(4)} ${placement.textColor.blue.toFixed(4)} rg`;
+      const defaultAppearance = `${colorOperator} /${fieldFont.name} ${fontSize.toFixed(2)} Tf`;
+      nameField.setMaxLength(80);
+      nameField.setText(defaultName);
       nameField.addToPage(page, {
         x: placement.x * pointsPerMillimeter,
         y: page.getHeight() - (placement.y + placement.height) * pointsPerMillimeter,
         width,
         height,
         borderWidth: 0,
-        textColor: rgb(placement.textColor.red, placement.textColor.green, placement.textColor.blue),
+        textColor,
         backgroundColor: rgb(placement.backgroundColor.red, placement.backgroundColor.green, placement.backgroundColor.blue),
         font: fieldFont,
       });
+      nameField.setFontSize(fontSize);
+      nameField.acroField.setDefaultAppearance(defaultAppearance);
+      nameField.acroField.getWidgets()[0]?.setDefaultAppearance(defaultAppearance);
+      nameField.updateAppearances(fieldFont);
     }
-    nameField.setFontSize(Math.min(18, Math.max(7, firstHeight * 0.58)));
-    nameField.updateAppearances(fieldFont);
   }
 
   const bytes = Uint8Array.from(await document.save({ useObjectStreams: false }));
@@ -248,13 +295,17 @@ async function renderPdf(html: string) {
     const editableNames = editableNameMarkers.flatMap((marker) => {
       const rect = marker.getBoundingClientRect();
       if (rect.width <= 0 || rect.height <= 0) return [];
-      const textColor = parseCssColor(frame.contentWindow?.getComputedStyle(marker).color ?? "rgb(31, 35, 48)");
+      const computedStyle = frame.contentWindow?.getComputedStyle(marker);
+      const textColor = parseCssColor(computedStyle?.color ?? "rgb(31, 35, 48)");
+      const fontSize = Number.parseFloat(computedStyle?.fontSize ?? "16") || 16;
       const backgroundColor = resolveBackgroundColor(marker);
       return [{
         x: imageX + (rect.left - bodyRect.left) * cssToPdf,
         y: imageY + (rect.top - bodyRect.top) * cssToPdf,
         width: rect.width * cssToPdf,
         height: rect.height * cssToPdf,
+        fontSize: fontSize * cssToPdf,
+        fontKind: resolveEditableFontKind(computedStyle?.fontFamily ?? "Arial"),
         textColor,
         backgroundColor,
       }];
