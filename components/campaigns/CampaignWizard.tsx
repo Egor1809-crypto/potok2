@@ -73,6 +73,7 @@ import type {
   CampaignEvaluation,
   CampaignMutationResponse,
   CampaignRecord,
+  ContactListFacet,
   ContactRecord,
   ContactsListResponse,
   DeliveryPlanRecord,
@@ -161,6 +162,8 @@ const connectionLabels: Record<ConnectionStatus, string> = {
   needs_attention: "Нужна настройка",
   disconnected: "Не подключено",
 };
+
+const DEFAULT_CAMPAIGN_SENDER_EMAIL = "tickets@notify.tech-pravo.ru";
 
 function subscribeToBrowser(onStoreChange: () => void) {
   window.addEventListener("popstate", onStoreChange);
@@ -418,8 +421,13 @@ function CampaignWizardState({
 
   const [apiMode, setApiMode] = React.useState<ApiMode>("loading");
   const [workspaceContacts, setWorkspaceContacts] = React.useState<AudienceContact[]>([]);
+  const [workspaceContactCache, setWorkspaceContactCache] = React.useState<AudienceContact[]>([]);
   const [workspaceContactCount, setWorkspaceContactCount] = React.useState(0);
+  const [workspaceAllContactCount, setWorkspaceAllContactCount] = React.useState(0);
+  const [workspaceContactBases, setWorkspaceContactBases] = React.useState<ContactListFacet[]>([]);
+  const [workspaceContactSheet, setWorkspaceContactSheet] = React.useState("");
   const [workspaceContactsPage, setWorkspaceContactsPage] = React.useState(1);
+  const [workspaceContactsLoading, setWorkspaceContactsLoading] = React.useState(false);
   const [workspaceContactsLoadingMore, setWorkspaceContactsLoadingMore] = React.useState(false);
   const [workspaceMembers, setWorkspaceMembers] = React.useState<ParticipantRecord[]>([]);
   const [workspaceSegments, setWorkspaceSegments] = React.useState<AudienceSegment[]>([]);
@@ -493,7 +501,7 @@ function CampaignWizardState({
     seedDraft?.senderName ?? "",
   );
   const [senderEmail, setSenderEmail] = React.useState(
-    seedDraft?.senderEmail ?? "",
+    seedDraft?.senderEmail ?? DEFAULT_CAMPAIGN_SENDER_EMAIL,
   );
   const [scheduledTimes, setScheduledTimes] = React.useState<string[]>(() => initialScheduledTimes(params, seedDraft));
   const scheduledAt = scheduledTimes[0] ?? null;
@@ -517,6 +525,7 @@ function CampaignWizardState({
   const scheduleSaveTimer = React.useRef<number | null>(null);
   const hydratedCampaignId = React.useRef<string | null>(null);
   const hydratedQueryTemplateId = React.useRef<string | null>(null);
+  const contactBaseRequestId = React.useRef(0);
   const recoveredCampaignId = seedDraft?.campaignId;
 
   // Setter identities are stable; only the source and copy mode alter hydration.
@@ -528,7 +537,7 @@ function CampaignWizardState({
       if (sourceId) bootstrapParams.set("sourceId", sourceId);
       const [response, contactsResponse, templatesResponse, presentationsResponse] = await Promise.all([
         fetch(`/api/workspace?${bootstrapParams.toString()}`, { headers: { Accept: "application/json" } }),
-        fetch("/api/contacts?page=1&pageSize=250&meta=0&delivery=pending", { headers: { Accept: "application/json" }, cache: "no-store" }),
+        fetch("/api/contacts?page=1&pageSize=250&delivery=pending", { headers: { Accept: "application/json" }, cache: "no-store" }),
         fetch("/api/templates", { headers: { Accept: "application/json" } }),
         fetch("/api/presentations", { headers: { Accept: "application/json" } }),
       ]);
@@ -554,7 +563,11 @@ function CampaignWizardState({
       }
       if (Array.isArray(contactsBody.contacts)) {
         setWorkspaceContacts(contactsBody.contacts);
+        setWorkspaceContactCache(contactsBody.contacts);
         setWorkspaceContactCount(contactsBody.filteredCount);
+        setWorkspaceAllContactCount(contactsBody.filteredCount);
+        setWorkspaceContactBases(contactsBody.facets?.sheets ?? []);
+        setWorkspaceContactSheet("");
         setWorkspaceContactsPage(1);
       }
       if (Array.isArray(body.members)) setWorkspaceMembers(body.members);
@@ -621,6 +634,8 @@ function CampaignWizardState({
       setApiMode("online");
     } catch {
       setWorkspaceContacts([]);
+      setWorkspaceContactCache([]);
+      setWorkspaceContactBases([]);
       setWorkspaceMembers([]);
       setWorkspaceSegments([]);
       setWorkspaceTemplates([]);
@@ -636,18 +651,68 @@ function CampaignWizardState({
     return () => window.cancelAnimationFrame(frame);
   }, [loadWorkspace]);
 
+  const selectContactBase = React.useCallback(async (sheet: string) => {
+    const requestId = contactBaseRequestId.current + 1;
+    contactBaseRequestId.current = requestId;
+    setWorkspaceContactSheet(sheet);
+    setWorkspaceContactsLoading(true);
+    setError(null);
+    try {
+      const query = new URLSearchParams({
+        page: "1",
+        pageSize: "250",
+        meta: "0",
+        delivery: "pending",
+      });
+      if (sheet) query.set("sheet", sheet);
+      const response = await fetch(`/api/contacts?${query.toString()}`, {
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      });
+      const body = await response.json() as ContactsListResponse | ApiError;
+      if (!response.ok || !("contacts" in body)) throw new Error("Не удалось открыть выбранную базу контактов.");
+      if (contactBaseRequestId.current !== requestId) return;
+      setWorkspaceContacts(body.contacts);
+      setWorkspaceContactCache((current) => {
+        const byId = new Map(current.map((contact) => [contact.id, contact]));
+        body.contacts.forEach((contact) => byId.set(contact.id, contact));
+        return [...byId.values()];
+      });
+      setWorkspaceContactCount(body.filteredCount);
+      if (!sheet) setWorkspaceAllContactCount(body.filteredCount);
+      setWorkspaceContactsPage(body.page);
+    } catch (reason) {
+      if (contactBaseRequestId.current !== requestId) return;
+      setError(reason instanceof Error ? reason.message : "Не удалось открыть выбранную базу контактов.");
+    } finally {
+      if (contactBaseRequestId.current === requestId) setWorkspaceContactsLoading(false);
+    }
+  }, [setError]);
+
   const loadMorePendingContacts = React.useCallback(async () => {
     if (workspaceContactsLoadingMore || workspaceContacts.length >= workspaceContactCount) return;
     setWorkspaceContactsLoadingMore(true);
     try {
       const nextPage = workspaceContactsPage + 1;
-      const response = await fetch(`/api/contacts?page=${nextPage}&pageSize=250&meta=0&delivery=pending`, {
+      const query = new URLSearchParams({
+        page: String(nextPage),
+        pageSize: "250",
+        meta: "0",
+        delivery: "pending",
+      });
+      if (workspaceContactSheet) query.set("sheet", workspaceContactSheet);
+      const response = await fetch(`/api/contacts?${query.toString()}`, {
         headers: { Accept: "application/json" },
         cache: "no-store",
       });
       const body = await response.json() as ContactsListResponse | ApiError;
       if (!response.ok || !("contacts" in body)) throw new Error("Не удалось загрузить следующую часть базы.");
       setWorkspaceContacts((current) => {
+        const byId = new Map(current.map((contact) => [contact.id, contact]));
+        body.contacts.forEach((contact) => byId.set(contact.id, contact));
+        return [...byId.values()];
+      });
+      setWorkspaceContactCache((current) => {
         const byId = new Map(current.map((contact) => [contact.id, contact]));
         body.contacts.forEach((contact) => byId.set(contact.id, contact));
         return [...byId.values()];
@@ -659,19 +724,26 @@ function CampaignWizardState({
     } finally {
       setWorkspaceContactsLoadingMore(false);
     }
-  }, [setError, workspaceContactCount, workspaceContacts.length, workspaceContactsLoadingMore, workspaceContactsPage]);
+  }, [setError, workspaceContactCount, workspaceContactSheet, workspaceContacts.length, workspaceContactsLoadingMore, workspaceContactsPage]);
 
   const refreshPendingContacts = React.useCallback(async () => {
-    const response = await fetch("/api/contacts?page=1&pageSize=250&meta=0&delivery=pending", {
+    const query = new URLSearchParams({ page: "1", pageSize: "250", meta: "0", delivery: "pending" });
+    if (workspaceContactSheet) query.set("sheet", workspaceContactSheet);
+    const response = await fetch(`/api/contacts?${query.toString()}`, {
       headers: { Accept: "application/json" },
       cache: "no-store",
     });
     if (!response.ok) return;
     const body = await response.json() as ContactsListResponse;
     setWorkspaceContacts(body.contacts);
+    setWorkspaceContactCache((current) => {
+      const byId = new Map(current.map((contact) => [contact.id, contact]));
+      body.contacts.forEach((contact) => byId.set(contact.id, contact));
+      return [...byId.values()];
+    });
     setWorkspaceContactCount(body.filteredCount);
     setWorkspaceContactsPage(1);
-  }, []);
+  }, [workspaceContactSheet]);
 
   React.useEffect(() => {
     if (!shouldApplyTemplateQuery(queryTemplateId, consumedTemplateQueryId) || sourceId || builderResult || templateLoadState !== "ready") return;
@@ -696,18 +768,18 @@ function CampaignWizardState({
   }, [builderResult, consumedTemplateQueryId, queryTemplateId, sourceId, templateLoadState, workspaceTemplates]);
 
   const selectedSegment = workspaceSegments.find((segment) => segment.id === segmentId);
-  const selectedContacts = workspaceContacts.filter((contact) => contactIds.includes(contact.id));
+  const selectedContacts = workspaceContactCache.filter((contact) => contactIds.includes(contact.id));
   const recipientCount = audienceType === "segment"
     ? selectedSegment?.contactCount ?? 0
     : audienceType === "contacts"
-      ? selectedContacts.length
+      ? contactIds.length
       : 0;
   const audienceLabel = audienceType === "segment"
     ? selectedSegment?.name ?? "Сегмент не выбран"
     : audienceType === "contacts"
-      ? selectedContacts.length === 1
+      ? contactIds.length === 1 && selectedContacts[0]
         ? selectedContacts[0].fullName
-        : `Выбрано контактов: ${formatNumber(selectedContacts.length)}`
+        : `Выбрано контактов: ${formatNumber(contactIds.length)}`
       : "Аудитория не выбрана";
 
   const coverage = React.useMemo(() => Object.fromEntries(
@@ -1199,8 +1271,13 @@ function CampaignWizardState({
               selectedSegmentId={segmentId}
               onSegmentChange={setSegmentId}
               contacts={workspaceContacts}
+              contactBases={workspaceContactBases}
+              selectedContactBase={workspaceContactSheet}
+              allContactCount={workspaceAllContactCount}
               totalContactCount={workspaceContactCount}
+              contactsLoading={workspaceContactsLoading}
               loadingMore={workspaceContactsLoadingMore}
+              onContactBaseChange={(value) => void selectContactBase(value)}
               onLoadMore={() => void loadMorePendingContacts()}
               members={workspaceMembers}
               contactIds={contactIds}
@@ -1459,8 +1536,13 @@ function AudienceStep({
   selectedSegmentId,
   onSegmentChange,
   contacts,
+  contactBases,
+  selectedContactBase,
+  allContactCount,
   totalContactCount,
+  contactsLoading,
   loadingMore,
+  onContactBaseChange,
   onLoadMore,
   members,
   contactIds,
@@ -1473,8 +1555,13 @@ function AudienceStep({
   selectedSegmentId: string;
   onSegmentChange: (value: string) => void;
   contacts: AudienceContact[];
+  contactBases: ContactListFacet[];
+  selectedContactBase: string;
+  allContactCount: number;
   totalContactCount: number;
+  contactsLoading: boolean;
   loadingMore: boolean;
+  onContactBaseChange: (value: string) => void;
   onLoadMore: () => void;
   members: ParticipantRecord[];
   contactIds: string[];
@@ -1488,11 +1575,9 @@ function AudienceStep({
   const [team, setTeam] = React.useState("");
   const [channel, setChannel] = React.useState("");
   const [owner, setOwner] = React.useState("");
-  const [sheet, setSheet] = React.useState("");
   const companies = React.useMemo(() => [...new Set(contacts.map((item) => item.companyName).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ru")), [contacts]);
   const cities = React.useMemo(() => [...new Set(contacts.map((item) => item.city).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ru")), [contacts]);
   const teams = React.useMemo(() => [...new Set(contacts.flatMap((item) => item.tags ?? []).filter((tag) => tag.startsWith("Команда: ")).map((tag) => tag.slice(9)))].sort((a, b) => a.localeCompare(b, "ru")), [contacts]);
-  const sheets = React.useMemo(() => [...new Set(contacts.flatMap((item) => item.tags ?? []).filter((tag) => tag.startsWith("Импорт: ") || /^База №\d+$/u.test(tag)))].sort((a, b) => a.localeCompare(b, "ru")), [contacts]);
   const memberById = React.useMemo(() => new Map(members.map((member) => [member.id, member])), [members]);
   const ownerIdFor = React.useCallback((contact: AudienceContact) => contact.responsibleParticipantId ?? contact.createdByParticipantId ?? "", []);
   const ownerBases = React.useMemo(() => {
@@ -1521,7 +1606,6 @@ function AudienceStep({
       if (city && contact.city !== city) return false;
       if (status && contact.status !== status) return false;
       if (team && !(contact.tags ?? []).includes(`Команда: ${team}`)) return false;
-      if (sheet && !(contact.tags ?? []).includes(sheet)) return false;
       if (owner && ownerIdFor(contact) !== owner) return false;
       if (channel === "email" && !contact.email) return false;
       if (channel === "telegram" && !contact.telegramChatId) return false;
@@ -1531,7 +1615,7 @@ function AudienceStep({
       return [contact.fullName, contact.email, contact.phone, contact.companyName, contact.jobTitle, contact.city, ...(contact.tags ?? [])]
         .some((value) => value.toLocaleLowerCase("ru-RU").includes(query));
     });
-  }, [channel, city, company, contacts, owner, ownerIdFor, search, sheet, status, team]);
+  }, [channel, city, company, contacts, owner, ownerIdFor, search, status, team]);
   const filteredIds = React.useMemo(
     () => filteredContacts.map((contact) => contact.id),
     [filteredContacts],
@@ -1540,7 +1624,8 @@ function AudienceStep({
   const filteredIdSet = React.useMemo(() => new Set(filteredIds), [filteredIds]);
   const selectedVisible = filteredIds.filter((id) => selectedIds.has(id)).length;
   const allVisibleSelected = filteredIds.length > 0 && selectedVisible === filteredIds.length;
-  const filtersActive = Boolean(search || company || city || status || team || channel || owner || sheet);
+  const filtersActive = Boolean(search || company || city || status || team || channel || owner);
+  const selectedBase = contactBases.find((base) => base.label === selectedContactBase);
 
   return (
     <div>
@@ -1605,6 +1690,56 @@ function AudienceStep({
       ) : audienceType === "contacts" ? (
         <fieldset className="mt-6">
           <legend className="text-[13px] font-semibold text-text-strong">Контакты рабочего пространства</legend>
+          {contactBases.length > 0 ? (
+            <section className="mt-3 rounded-2xl bg-surface-subtle/70 p-4 shadow-[0_0_0_1px_oklch(0_0_0/0.06),0_1px_2px_-1px_oklch(0_0_0/0.06),0_2px_4px_oklch(0_0_0/0.04)]" aria-labelledby="campaign-contact-bases-title">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 id="campaign-contact-bases-title" className="text-[13px] font-semibold text-text-strong">Базы контактов</h3>
+                  <p className="mt-1 text-[11px] leading-5 text-text-muted">Выберите базу — ниже откроется её список. Отметьте галочками только нужные адреса.</p>
+                </div>
+                <Badge variant="neutral">{formatNumber(contactBases.length)} баз</Badge>
+              </div>
+              <div className="mt-4 flex gap-2 overflow-x-auto pb-1" aria-label="Доступные базы контактов">
+                <button
+                  type="button"
+                  aria-pressed={!selectedContactBase}
+                  aria-controls="campaign-contact-addresses"
+                  onClick={() => onContactBaseChange("")}
+                  className={cn(
+                    "min-h-11 shrink-0 rounded-xl px-3.5 py-2 text-start text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 active:scale-[0.96]",
+                    !selectedContactBase ? "bg-primary text-white" : "bg-white text-text-strong shadow-[0_0_0_1px_oklch(0_0_0/0.08)] hover:bg-primary-subtle/35",
+                  )}
+                >
+                  Все листы баз <span className="ms-1 tabular-nums opacity-75">{formatNumber(allContactCount)}</span>
+                </button>
+                {contactBases.map((base) => {
+                  const selected = selectedContactBase === base.label;
+                  return (
+                    <button
+                      key={base.label}
+                      type="button"
+                      aria-pressed={selected}
+                      aria-controls="campaign-contact-addresses"
+                      onClick={() => onContactBaseChange(base.label)}
+                      className={cn(
+                        "min-h-11 shrink-0 rounded-xl px-3.5 py-2 text-start text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 active:scale-[0.96]",
+                        selected ? "bg-primary text-white" : "bg-white text-text-strong shadow-[0_0_0_1px_oklch(0_0_0/0.08)] hover:bg-primary-subtle/35",
+                      )}
+                    >
+                      {base.label.replace(/^Импорт: /, "")} <span className="ms-1 tabular-nums opacity-75">{formatNumber(base.count)}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-3 text-[10px] text-text-muted" role="status" aria-live="polite">
+                {contactsLoading
+                  ? "Открываем базу и загружаем адреса…"
+                  : selectedBase
+                    ? `Открыта база «${selectedBase.label.replace(/^Импорт: /, "")}» · доступно к новой отправке: ${formatNumber(totalContactCount)}`
+                    : `Показаны все доступные контакты · ${formatNumber(totalContactCount)}`}
+              </p>
+            </section>
+          ) : null}
           {ownerBases.length > 0 ? (
             <section className="mt-3 rounded-xl border border-border bg-white p-3" aria-labelledby="campaign-owner-bases-title">
               <div className="flex flex-wrap items-end justify-between gap-2">
@@ -1625,7 +1760,7 @@ function AudienceStep({
                         <span className="flex items-center gap-2">
                           <i className="size-2.5 rounded-full" style={{ backgroundColor: base.member?.color ?? "#6558E8" }} />
                           <b className="truncate text-[12px] text-text-strong">{base.member?.displayName ?? "Участник команды"}</b>
-                          <span className="ml-auto text-[10px] text-text-muted">{formatNumber(base.total)}</span>
+                          <span className="ms-auto text-[10px] text-text-muted">{formatNumber(base.total)}</span>
                         </span>
                         <span className="mt-2 block text-[9px] text-text-muted">Email {formatNumber(base.email)} · TG {formatNumber(base.telegram)} · VK {formatNumber(base.vk)} · тел. {formatNumber(base.phone)}</span>
                       </button>
@@ -1647,20 +1782,19 @@ function AudienceStep({
           ) : null}
           <div className="mt-3 grid gap-2 rounded-xl border border-border bg-surface-subtle/45 p-3">
             <div className="relative">
-              <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-subtle" />
-              <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск по имени, email, компании или должности" className="input-with-leading-icon" />
+              <Search aria-hidden="true" className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-text-subtle" />
+              <Input aria-label="Поиск контактов" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск по имени, email, компании или должности" className="input-with-leading-icon" />
             </div>
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-              <Select value={status} onChange={(event) => setStatus(event.target.value)} options={[{ value: "", label: "Все статусы" }, { value: "active", label: "Активные" }, { value: "unsubscribed", label: "Отписанные" }, { value: "bounced", label: "Недоставляемые" }, { value: "invalid", label: "Некорректные" }]} />
-              <Select value={company} onChange={(event) => setCompany(event.target.value)} options={[{ value: "", label: "Все компании" }, ...companies.map((value) => ({ value, label: value }))]} />
-              <Select value={city} onChange={(event) => setCity(event.target.value)} options={[{ value: "", label: "Все города" }, ...cities.map((value) => ({ value, label: value }))]} />
-              <Select value={team} onChange={(event) => setTeam(event.target.value)} options={[{ value: "", label: "Все команды" }, ...teams.map((value) => ({ value, label: value }))]} />
-              <Select value={channel} onChange={(event) => setChannel(event.target.value)} options={[{ value: "", label: "Все каналы" }, { value: "email", label: "Есть Email" }, { value: "telegram", label: "Есть Telegram" }, { value: "vk", label: "Есть ВКонтакте" }, { value: "phone", label: "Есть телефон" }]} />
-              <Select value={owner} onChange={(event) => setOwner(event.target.value)} options={[{ value: "", label: "Все ответственные" }, ...members.map((member) => ({ value: member.id, label: member.displayName }))]} />
-              <Select value={sheet} onChange={(event) => setSheet(event.target.value)} options={[{ value: "", label: "Все листы баз" }, ...sheets.map((value) => ({ value, label: value.replace(/^Импорт: /, "") }))]} />
+              <Select aria-label="Статус контакта" value={status} onChange={(event) => setStatus(event.target.value)} options={[{ value: "", label: "Все статусы" }, { value: "active", label: "Активные" }, { value: "unsubscribed", label: "Отписанные" }, { value: "bounced", label: "Недоставляемые" }, { value: "invalid", label: "Некорректные" }]} />
+              <Select aria-label="Компания" value={company} onChange={(event) => setCompany(event.target.value)} options={[{ value: "", label: "Все компании" }, ...companies.map((value) => ({ value, label: value }))]} />
+              <Select aria-label="Город" value={city} onChange={(event) => setCity(event.target.value)} options={[{ value: "", label: "Все города" }, ...cities.map((value) => ({ value, label: value }))]} />
+              <Select aria-label="Команда" value={team} onChange={(event) => setTeam(event.target.value)} options={[{ value: "", label: "Все команды" }, ...teams.map((value) => ({ value, label: value }))]} />
+              <Select aria-label="Канал связи" value={channel} onChange={(event) => setChannel(event.target.value)} options={[{ value: "", label: "Все каналы" }, { value: "email", label: "Есть Email" }, { value: "telegram", label: "Есть Telegram" }, { value: "vk", label: "Есть ВКонтакте" }, { value: "phone", label: "Есть телефон" }]} />
+              <Select aria-label="Ответственный" value={owner} onChange={(event) => setOwner(event.target.value)} options={[{ value: "", label: "Все ответственные" }, ...members.map((member) => ({ value: member.id, label: member.displayName }))]} />
             </div>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-[11px] text-text-muted">Всего к отправке: {formatNumber(totalContactCount)} · загружено: {formatNumber(contacts.length)} · показано: {formatNumber(filteredContacts.length)} · выбрано: {formatNumber(contactIds.length)}</span>
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <span className="text-[11px] text-text-muted" role="status" aria-live="polite">Всего в открытой базе: {formatNumber(totalContactCount)} · загружено: {formatNumber(contacts.length)} · показано: {formatNumber(filteredContacts.length)} · выбрано: {formatNumber(contactIds.length)}</span>
               <div className="flex gap-2">
                 {filtersActive ? (
                   <Button
@@ -1674,7 +1808,6 @@ function AudienceStep({
                       setTeam("");
                       setChannel("");
                       setOwner("");
-                      setSheet("");
                     }}
                   >
                     Сбросить фильтры
@@ -1692,8 +1825,10 @@ function AudienceStep({
               </div>
             </div>
           </div>
-          <div className="mt-3 max-h-80 divide-y divide-border overflow-y-auto rounded-xl border border-border">
-            {filteredContacts.map((contact) => (
+          <div id="campaign-contact-addresses" className="mt-3 max-h-80 divide-y divide-border overflow-y-auto rounded-xl border border-border" aria-busy={contactsLoading}>
+            {contactsLoading ? (
+              <p className="m-0 px-4 py-8 text-center text-[12px] text-text-muted" role="status">Загружаем адреса выбранной базы…</p>
+            ) : filteredContacts.map((contact) => (
               <label key={contact.id} className="flex cursor-pointer items-center gap-3 px-4 py-3 hover:bg-surface-subtle">
                 <input
                   type="checkbox"
@@ -1709,7 +1844,7 @@ function AudienceStep({
                 {contact.status && contact.status !== "active" ? <Badge variant="warning">Недоступен</Badge> : null}
               </label>
             ))}
-            {filteredContacts.length === 0 ? <p className="m-0 px-4 py-8 text-center text-[12px] text-text-muted">По выбранным фильтрам контактов нет.</p> : null}
+            {!contactsLoading && filteredContacts.length === 0 ? <p className="m-0 px-4 py-8 text-center text-[12px] text-text-muted">По выбранным фильтрам контактов нет.</p> : null}
           </div>
           {contacts.length < totalContactCount ? (
             <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-border bg-surface-subtle/45 px-4 py-3">

@@ -45,9 +45,9 @@ let initialization: Promise<void> | null = null;
 // template-seeding routine in every new isolate made even a simple page load
 // wait several seconds for D1. Keep a durable completion marker instead.
 // Bump this value whenever a runtime-only schema migration is added here.
-const RUNTIME_SCHEMA_VERSION = "runtime-schema-v27-conference-personal-invitation-manyasha";
+const RUNTIME_SCHEMA_VERSION = "runtime-schema-v28-contact-bases-and-ticket-sender";
 const DEFAULT_SENDER_NAME = "ТехнологИИ Права";
-const DEFAULT_SENDER_EMAIL = "info@tech-pravo.ru";
+const DEFAULT_SENDER_EMAIL = "tickets@notify.tech-pravo.ru";
 
 const schemaStatements = [
   `CREATE TABLE IF NOT EXISTS workspaces (
@@ -665,7 +665,7 @@ async function seedDatabase(request: Request) {
         enabled: true,
         publicConfig: { senderEmail: DEFAULT_SENDER_EMAIL, listId: "2" },
         checkStatus: "connected",
-        checkMessage: "API-ключ и список «Поток — ТехнологИИ Права» проверены. Отправитель: info@tech-pravo.ru.",
+        checkMessage: `API-ключ и список «Поток — ТехнологИИ Права» проверены. Отправитель: ${DEFAULT_SENDER_EMAIL}.`,
         lastCheckedAt: now,
         updatedAt: now,
       })
@@ -675,7 +675,7 @@ async function seedDatabase(request: Request) {
       ));
     await db.insert(systemState).values({
       key: "unisender-tech-pravo-list-v1",
-      value: "list:2;sender:info@tech-pravo.ru",
+      value: `list:2;sender:${DEFAULT_SENDER_EMAIL}`,
       updatedAt: now,
     }).onConflictDoNothing();
   }
@@ -699,6 +699,54 @@ async function seedDatabase(request: Request) {
     await db.insert(systemState).values({
       key: "workspace-default-sender-tech-pravo-v1",
       value: "applied",
+      updatedAt: now,
+    }).onConflictDoNothing();
+  }
+
+  const [ticketSenderState] = await db
+    .select()
+    .from(systemState)
+    .where(eq(systemState.key, "workspace-default-sender-tickets-v2"))
+    .limit(1);
+  if (!ticketSenderState) {
+    const [uniSenderIntegration] = await db
+      .select({ publicConfig: integrations.publicConfig })
+      .from(integrations)
+      .where(and(
+        eq(integrations.workspaceId, WORKSPACE_ID),
+        eq(integrations.providerId, "unisender"),
+      ))
+      .limit(1);
+    await db.batch([
+      db
+        .update(workspaces)
+        .set({
+          defaultSenderName: DEFAULT_SENDER_NAME,
+          defaultSenderEmail: DEFAULT_SENDER_EMAIL,
+          replyToEmail: DEFAULT_SENDER_EMAIL,
+          updatedAt: now,
+        })
+        .where(eq(workspaces.id, WORKSPACE_ID)),
+      db
+        .update(integrations)
+        .set({
+          publicConfig: {
+            ...(uniSenderIntegration?.publicConfig ?? {}),
+            senderEmail: DEFAULT_SENDER_EMAIL,
+            marketingSenderEmail: DEFAULT_SENDER_EMAIL,
+            transactionalSenderEmail: DEFAULT_SENDER_EMAIL,
+          },
+          checkMessage: `Отправитель по умолчанию: ${DEFAULT_SENDER_EMAIL}.`,
+          updatedAt: now,
+        })
+        .where(and(
+          eq(integrations.workspaceId, WORKSPACE_ID),
+          eq(integrations.providerId, "unisender"),
+        )),
+    ]);
+    await db.insert(systemState).values({
+      key: "workspace-default-sender-tickets-v2",
+      value: DEFAULT_SENDER_EMAIL,
       updatedAt: now,
     }).onConflictDoNothing();
   }

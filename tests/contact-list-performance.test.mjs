@@ -67,12 +67,29 @@ test("large contact payloads are loaded only by workflows that require them", as
   assert.match(store, /include === "contacts" \|\| include === "export"/);
   assert.match(store, /Promise\.resolve\(\[\] as ContactRow\[\]\)/);
   assert.match(wizard, /scope: "campaign-wizard"/);
-  assert.match(wizard, /\/api\/contacts\?page=1&pageSize=250&meta=0/);
+  assert.match(wizard, /\/api\/contacts\?page=1&pageSize=250&delivery=pending/);
+  assert.match(wizard, /setWorkspaceContactBases\(contactsBody\.facets\?\.sheets \?\? \[\]\)/);
+  assert.match(wizard, /query\.set\("sheet", sheet\)/);
   assert.match(wizard, /delivery=pending/);
-  assert.match(wizard, /Всего к отправке:/);
+  assert.match(wizard, /Базы контактов/);
+  assert.match(wizard, /Отметьте галочками только нужные адреса/);
   assert.match(wizard, /Показать ещё 250/);
   assert.doesNotMatch(wizard, /\/api\/workspace\?include=contacts/);
   assert.match(importer, /\/api\/contacts\?scope=endpoints/);
+});
+
+test("campaign wizard defaults to the ticket mailbox and keeps exact contact ids", async () => {
+  const [wizard, databaseInit] = await Promise.all([
+    readFile(new URL("../components/campaigns/CampaignWizard.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/server/database-init.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(wizard, /DEFAULT_CAMPAIGN_SENDER_EMAIL = "tickets@notify\.tech-pravo\.ru"/);
+  assert.match(wizard, /contactIds\.length/);
+  assert.match(wizard, /type="checkbox"/);
+  assert.match(databaseInit, /DEFAULT_SENDER_EMAIL = "tickets@notify\.tech-pravo\.ru"/);
+  assert.match(databaseInit, /workspace-default-sender-tickets-v2/);
+  assert.match(databaseInit, /marketingSenderEmail: DEFAULT_SENDER_EMAIL/);
 });
 
 test("contact filters and ordering have database indexes", async () => {
