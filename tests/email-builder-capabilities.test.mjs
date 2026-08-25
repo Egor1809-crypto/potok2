@@ -266,7 +266,7 @@ test("email AI can either adapt a real library template or design from scratch",
   assert.match(assistant, /Создано с нуля · библиотека не использовалась/);
 });
 
-test("manual controls and export are wired to live updates without popup PDF", async () => {
+test("manual controls export a single-page A4 PDF with working links", async () => {
   const [properties, exports] = await Promise.all([
     readFile(
       new URL(
@@ -289,7 +289,10 @@ test("manual controls and export are wired to live updates without popup PDF", a
   assert.match(exports, /html2canvas/);
   assert.match(exports, /application\/pdf/);
   assert.match(exports, /querySelectorAll<HTMLAnchorElement>\("a\[href\]"\)/);
-  assert.match(exports, /pdf\.link\(link\.x/);
+  assert.match(exports, /Math\.min\(pageWidth \/ contentWidth, pageHeight \/ contentHeight\)/);
+  assert.match(exports, /pdf\.addImage\(imageData, "JPEG", imageX, imageY, imageWidth, imageHeight/);
+  assert.match(exports, /pdf\.link\(left, top, right - left, bottom - top/);
+  assert.doesNotMatch(exports, /pdf\.addPage/);
   assert.match(exports, /makePdfLinksViewerCompatible/);
   assert.match(exports, /PDFName\.of\("Action"\)/);
   assert.match(exports, /Math\.min\(coordinates\[1\], coordinates\[3\]\)/);

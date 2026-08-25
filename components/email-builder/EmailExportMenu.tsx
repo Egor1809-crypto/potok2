@@ -98,10 +98,16 @@ async function renderPdf(html: string) {
     const margin = 10;
     const pageWidth = 210 - margin * 2;
     const pageHeight = 297 - margin * 2;
-    const imageHeight = canvas.height * pageWidth / canvas.width;
+    const contentWidth = canvas.width / renderScale;
+    const contentHeight = canvas.height / renderScale;
+    if (contentWidth <= 0 || contentHeight <= 0) throw new Error("Письмо не удалось разместить на странице A4.");
+    const cssToPdf = Math.min(pageWidth / contentWidth, pageHeight / contentHeight);
+    const imageWidth = contentWidth * cssToPdf;
+    const imageHeight = contentHeight * cssToPdf;
+    const imageX = margin + (pageWidth - imageWidth) / 2;
+    const imageY = margin;
     const imageData = canvas.toDataURL("image/jpeg", 0.94);
     const bodyRect = frameDocument.body.getBoundingClientRect();
-    const cssToPdf = pageWidth / (canvas.width / renderScale);
     const links = Array.from(frameDocument.querySelectorAll<HTMLAnchorElement>("a[href]"))
       .flatMap((anchor) => {
         const rawHref = anchor.getAttribute("href")?.trim();
@@ -115,28 +121,21 @@ async function renderPdf(html: string) {
         if (!["http:", "https:", "mailto:", "tel:"].includes(url.protocol)) return [];
         return Array.from(anchor.getClientRects()).map((rect) => ({
           url: url.href,
-          x: margin + (rect.left - bodyRect.left) * cssToPdf,
-          y: (rect.top - bodyRect.top) * cssToPdf,
+          x: imageX + (rect.left - bodyRect.left) * cssToPdf,
+          y: imageY + (rect.top - bodyRect.top) * cssToPdf,
           width: rect.width * cssToPdf,
           height: rect.height * cssToPdf,
         }));
       })
       .filter((link) => link.width > 0 && link.height > 0);
-    let offset = 0;
-    let page = 0;
-    while (offset < imageHeight) {
-      if (page > 0) pdf.addPage();
-      pdf.addImage(imageData, "JPEG", margin, margin - offset, pageWidth, imageHeight, undefined, "FAST");
-      const pageStart = offset;
-      const pageEnd = offset + pageHeight;
-      for (const link of links) {
-        const top = Math.max(link.y, pageStart);
-        const bottom = Math.min(link.y + link.height, pageEnd);
-        if (bottom <= top) continue;
-        pdf.link(link.x, margin + top - pageStart, link.width, bottom - top, { url: link.url });
-      }
-      offset += pageHeight;
-      page += 1;
+    pdf.addImage(imageData, "JPEG", imageX, imageY, imageWidth, imageHeight, undefined, "FAST");
+    for (const link of links) {
+      const left = Math.max(imageX, link.x);
+      const top = Math.max(imageY, link.y);
+      const right = Math.min(imageX + imageWidth, link.x + link.width);
+      const bottom = Math.min(imageY + imageHeight, link.y + link.height);
+      if (right <= left || bottom <= top) continue;
+      pdf.link(left, top, right - left, bottom - top, { url: link.url });
     }
     return makePdfLinksViewerCompatible(pdf.output("blob"));
   } finally {
@@ -258,7 +257,7 @@ export function EmailExportMenu({ document, name }: { document: BuilderDocument;
           const pdf = await renderPdf(result.html);
           for (let index = 1; index <= copies; index += 1) saveBlob(pdf, "application/pdf", `${filename}${copies > 1 ? `-${index}` : ""}.pdf`);
           const downloadName = `${filename}.pdf`;
-          setDialog({ title: "PDF готов", message: copies === 1 ? "Скачивание началось. Если браузер его остановил, нажмите кнопку ниже." : `Подготовлено файлов: ${copies}. Если браузер остановил загрузки, скачайте первый файл кнопкой ниже.`, download: { url: URL.createObjectURL(pdf), filename: downloadName } });
+          setDialog({ title: "PDF готов", message: copies === 1 ? "Письмо собрано на одной странице A4. Кнопки и ссылки сохранены. Если браузер остановил скачивание, нажмите кнопку ниже." : `Подготовлено файлов: ${copies}. Каждый PDF занимает одну страницу A4 и сохраняет рабочие ссылки. Если браузер остановил загрузки, скачайте первый файл кнопкой ниже.`, download: { url: URL.createObjectURL(pdf), filename: downloadName } });
         }
       }
     } catch (caught) {
@@ -272,7 +271,7 @@ export function EmailExportMenu({ document, name }: { document: BuilderDocument;
   const options = [
     ["html", FileCode2, "HTML", "Автономный файл с изображениями"],
     ["doc", FileText, "Word (.doc)", "Для согласования и правок"],
-    ["pdf", Printer, "PDF", "Фиксированный макет с изображениями"],
+    ["pdf", Printer, "PDF", "Одна страница A4 с рабочими ссылками"],
     ["txt", FileText, "Текст", "Без оформления"],
     ["json", FileJson2, "Исходник «Поток»", "Резервная копия макета"],
   ] as const;
