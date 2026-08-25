@@ -294,6 +294,14 @@ test("manual controls export a single-page A4 PDF with working links", async () 
   assert.match(exports, /pdf\.link\(left, top, right - left, bottom - top/);
   assert.doesNotMatch(exports, /pdf\.addPage/);
   assert.match(exports, /makePdfLinksViewerCompatible/);
+  assert.match(exports, /markEditableNamePlaceholders/);
+  assert.match(exports, /\{\{\\s\*\(\?:first_name\|имя\|name\)\\s\*\}\}/i);
+  assert.match(exports, /createTextField\("recipient_name"\)/);
+  assert.match(exports, /nameField\.addToPage/);
+  assert.match(exports, /nameField\.updateAppearances\(fieldFont\)/);
+  assert.match(exports, /registerFontkit/);
+  assert.match(exports, /@pdf-lib\/fontkit/);
+  assert.match(exports, /backgroundColor: rgb\(placement\.backgroundColor/);
   assert.match(exports, /PDFName\.of\("Action"\)/);
   assert.match(exports, /Math\.min\(coordinates\[1\], coordinates\[3\]\)/);
   assert.match(exports, /\["http:", "https:", "mailto:", "tel:"\]/);

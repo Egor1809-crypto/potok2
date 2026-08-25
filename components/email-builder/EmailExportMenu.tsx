@@ -11,6 +11,105 @@ import type { BuilderDocument } from "./builder-types";
 
 type ExportFormat = "html" | "doc" | "txt" | "json" | "pdf";
 
+type PdfColor = { red: number; green: number; blue: number };
+type EditableNamePlacement = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  textColor: PdfColor;
+  backgroundColor: PdfColor;
+};
+
+const EDITABLE_NAME_FONT_URL = "https://raw.githubusercontent.com/notofonts/noto-fonts/main/hinted/ttf/NotoSans/NotoSans-Regular.ttf";
+let editableNameFontBytesPromise: Promise<ArrayBuffer> | null = null;
+
+function loadEditableNameFontBytes() {
+  if (!editableNameFontBytesPromise) {
+    editableNameFontBytesPromise = fetch(EDITABLE_NAME_FONT_URL, { cache: "force-cache" })
+      .then((response) => {
+        if (!response.ok) throw new Error("Не удалось загрузить шрифт поля имени.");
+        return response.arrayBuffer();
+      })
+      .catch((error) => {
+        editableNameFontBytesPromise = null;
+        throw error;
+      });
+  }
+  return editableNameFontBytesPromise;
+}
+
+function parseCssColor(value: string): PdfColor {
+  const channels = value.match(/[\d.]+/g)?.slice(0, 3).map(Number);
+  if (!channels || channels.length < 3 || channels.some((channel) => !Number.isFinite(channel))) {
+    return { red: 0.12, green: 0.14, blue: 0.2 };
+  }
+  return {
+    red: Math.min(1, Math.max(0, channels[0] / 255)),
+    green: Math.min(1, Math.max(0, channels[1] / 255)),
+    blue: Math.min(1, Math.max(0, channels[2] / 255)),
+  };
+}
+
+function resolveBackgroundColor(element: HTMLElement): PdfColor {
+  const view = element.ownerDocument.defaultView;
+  let current: HTMLElement | null = element;
+  while (current && view) {
+    const value = view.getComputedStyle(current).backgroundColor;
+    const channels = value.match(/[\d.]+/g)?.map(Number) ?? [];
+    const alpha = channels.length >= 4 ? channels[3] : 1;
+    if (value !== "transparent" && alpha > 0.01) return parseCssColor(value);
+    current = current.parentElement;
+  }
+  return { red: 1, green: 1, blue: 1 };
+}
+
+function markEditableNamePlaceholders(frameDocument: Document) {
+  const matcher = /{{\s*(?:first_name|имя|name)\s*}}/gi;
+  const walker = frameDocument.createTreeWalker(frameDocument.body, 4);
+  const textNodes: Text[] = [];
+  let current: Node | null;
+  while ((current = walker.nextNode())) {
+    if (!(current instanceof frameDocument.defaultView!.Text)) continue;
+    if (current.parentElement?.closest("script, style, textarea, title")) continue;
+    if (matcher.test(current.data)) textNodes.push(current);
+    matcher.lastIndex = 0;
+  }
+
+  const markers: HTMLSpanElement[] = [];
+  for (const textNode of textNodes) {
+    const fragment = frameDocument.createDocumentFragment();
+    let cursor = 0;
+    matcher.lastIndex = 0;
+    for (const match of textNode.data.matchAll(matcher)) {
+      const index = match.index ?? 0;
+      fragment.append(frameDocument.createTextNode(textNode.data.slice(cursor, index)));
+      const marker = frameDocument.createElement("span");
+      marker.dataset.pdfEditableName = String(markers.length + 1);
+      marker.textContent = match[0];
+      Object.assign(marker.style, {
+        display: "inline-block",
+        boxSizing: "border-box",
+        whiteSpace: "nowrap",
+        borderBottom: "1px solid currentColor",
+        verticalAlign: "baseline",
+      });
+      markers.push(marker);
+      fragment.append(marker);
+      cursor = index + match[0].length;
+    }
+    fragment.append(frameDocument.createTextNode(textNode.data.slice(cursor)));
+    textNode.replaceWith(fragment);
+  }
+
+  for (const marker of markers) {
+    const width = Math.max(82, marker.getBoundingClientRect().width);
+    marker.style.width = `${width}px`;
+    marker.textContent = "\u00a0";
+  }
+  return markers;
+}
+
 function safeName(value: string) {
   return (value.trim() || "письмо").replace(/[\\/:*?"<>|]+/g, "-").slice(0, 80);
 }
@@ -27,8 +126,8 @@ function saveBlob(content: BlobPart, type: string, filename: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
 }
 
-async function makePdfLinksViewerCompatible(pdfBlob: Blob) {
-  const { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber } = await import("pdf-lib");
+async function makePdfLinksViewerCompatible(pdfBlob: Blob, editableNames: EditableNamePlacement[]) {
+  const { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber, StandardFonts, rgb } = await import("pdf-lib");
   const document = await PDFDocument.load(await pdfBlob.arrayBuffer());
   const annotsName = PDFName.of("Annots");
   const rectName = PDFName.of("Rect");
@@ -55,6 +154,42 @@ async function makePdfLinksViewerCompatible(pdfBlob: Blob) {
       annotation.set(PDFName.of("F"), PDFNumber.of(4));
       annotation.set(PDFName.of("H"), PDFName.of("I"));
     }
+  }
+
+  if (editableNames.length > 0) {
+    const form = document.getForm();
+    const nameField = form.createTextField("recipient_name");
+    const page = document.getPages()[0];
+    const pointsPerMillimeter = 72 / 25.4;
+    let fieldFont;
+    let defaultName = "Имя";
+    try {
+      const { default: fontkit } = await import("@pdf-lib/fontkit");
+      document.registerFontkit(fontkit);
+      fieldFont = await document.embedFont(new Uint8Array(await loadEditableNameFontBytes()), { subset: true });
+    } catch {
+      fieldFont = await document.embedFont(StandardFonts.Helvetica);
+      defaultName = "Name";
+    }
+    const firstHeight = editableNames[0].height * pointsPerMillimeter;
+    nameField.setMaxLength(80);
+    nameField.setText(defaultName);
+    for (const placement of editableNames) {
+      const width = placement.width * pointsPerMillimeter;
+      const height = placement.height * pointsPerMillimeter;
+      nameField.addToPage(page, {
+        x: placement.x * pointsPerMillimeter,
+        y: page.getHeight() - (placement.y + placement.height) * pointsPerMillimeter,
+        width,
+        height,
+        borderWidth: 0,
+        textColor: rgb(placement.textColor.red, placement.textColor.green, placement.textColor.blue),
+        backgroundColor: rgb(placement.backgroundColor.red, placement.backgroundColor.green, placement.backgroundColor.blue),
+        font: fieldFont,
+      });
+    }
+    nameField.setFontSize(Math.min(18, Math.max(7, firstHeight * 0.58)));
+    nameField.updateAppearances(fieldFont);
   }
 
   const bytes = Uint8Array.from(await document.save({ useObjectStreams: false }));
@@ -85,6 +220,8 @@ async function renderPdf(html: string) {
     await new Promise<void>((resolve) => window.setTimeout(resolve, 450));
     await frameDocument.fonts?.ready;
     await Promise.all(Array.from(frameDocument.images).map((image) => image.complete ? Promise.resolve() : new Promise<void>((resolve) => { image.addEventListener("load", () => resolve(), { once: true }); image.addEventListener("error", () => resolve(), { once: true }); window.setTimeout(resolve, 2_500); })));
+    const editableNameMarkers = markEditableNamePlaceholders(frameDocument);
+    await new Promise<void>((resolve) => frame.contentWindow?.requestAnimationFrame(() => resolve()));
     const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import("html2canvas"), import("jspdf")]);
     const canvas = await html2canvas(frameDocument.body, {
       backgroundColor: "#ffffff",
@@ -108,6 +245,20 @@ async function renderPdf(html: string) {
     const imageY = margin;
     const imageData = canvas.toDataURL("image/jpeg", 0.94);
     const bodyRect = frameDocument.body.getBoundingClientRect();
+    const editableNames = editableNameMarkers.flatMap((marker) => {
+      const rect = marker.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return [];
+      const textColor = parseCssColor(frame.contentWindow?.getComputedStyle(marker).color ?? "rgb(31, 35, 48)");
+      const backgroundColor = resolveBackgroundColor(marker);
+      return [{
+        x: imageX + (rect.left - bodyRect.left) * cssToPdf,
+        y: imageY + (rect.top - bodyRect.top) * cssToPdf,
+        width: rect.width * cssToPdf,
+        height: rect.height * cssToPdf,
+        textColor,
+        backgroundColor,
+      }];
+    });
     const links = Array.from(frameDocument.querySelectorAll<HTMLAnchorElement>("a[href]"))
       .flatMap((anchor) => {
         const rawHref = anchor.getAttribute("href")?.trim();
@@ -137,7 +288,7 @@ async function renderPdf(html: string) {
       if (right <= left || bottom <= top) continue;
       pdf.link(left, top, right - left, bottom - top, { url: link.url });
     }
-    return makePdfLinksViewerCompatible(pdf.output("blob"));
+    return makePdfLinksViewerCompatible(pdf.output("blob"), editableNames);
   } finally {
     frame.remove();
   }
@@ -257,7 +408,7 @@ export function EmailExportMenu({ document, name }: { document: BuilderDocument;
           const pdf = await renderPdf(result.html);
           for (let index = 1; index <= copies; index += 1) saveBlob(pdf, "application/pdf", `${filename}${copies > 1 ? `-${index}` : ""}.pdf`);
           const downloadName = `${filename}.pdf`;
-          setDialog({ title: "PDF готов", message: copies === 1 ? "Письмо собрано на одной странице A4. Кнопки и ссылки сохранены. Если браузер остановил скачивание, нажмите кнопку ниже." : `Подготовлено файлов: ${copies}. Каждый PDF занимает одну страницу A4 и сохраняет рабочие ссылки. Если браузер остановил загрузки, скачайте первый файл кнопкой ниже.`, download: { url: URL.createObjectURL(pdf), filename: downloadName } });
+          setDialog({ title: "PDF готов", message: copies === 1 ? "Письмо собрано на одной странице A4. Поле имени можно изменить прямо в PDF, кнопки и ссылки работают. Если браузер остановил скачивание, нажмите кнопку ниже." : `Подготовлено файлов: ${copies}. Каждый PDF занимает одну страницу A4, позволяет изменить имя и сохраняет рабочие ссылки. Если браузер остановил загрузки, скачайте первый файл кнопкой ниже.`, download: { url: URL.createObjectURL(pdf), filename: downloadName } });
         }
       }
     } catch (caught) {
@@ -271,7 +422,7 @@ export function EmailExportMenu({ document, name }: { document: BuilderDocument;
   const options = [
     ["html", FileCode2, "HTML", "Автономный файл с изображениями"],
     ["doc", FileText, "Word (.doc)", "Для согласования и правок"],
-    ["pdf", Printer, "PDF", "Одна страница A4 с рабочими ссылками"],
+    ["pdf", Printer, "PDF", "A4 · редактируемое имя · рабочие ссылки"],
     ["txt", FileText, "Текст", "Без оформления"],
     ["json", FileJson2, "Исходник «Поток»", "Резервная копия макета"],
   ] as const;
