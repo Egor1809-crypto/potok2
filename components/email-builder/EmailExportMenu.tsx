@@ -21,6 +21,7 @@ type EditableNamePlacement = {
   fontKind: "sans" | "serif";
   textColor: PdfColor;
   backgroundColor: PdfColor;
+  defaultText: string;
 };
 
 const EDITABLE_NAME_FONT_URLS = {
@@ -77,7 +78,12 @@ function resolveEditableFontKind(fontFamily: string): EditableNamePlacement["fon
 }
 
 function markEditableNamePlaceholders(frameDocument: Document) {
-  const matcher = /{{\s*(?:first_name|имя|name)\s*}}/gi;
+  const placeholderSource = String.raw`{{\s*(?:first_name|имя|name)\s*}}`;
+  const placeholderMatcher = new RegExp(placeholderSource, "gi");
+  const matcher = new RegExp(
+    `Здравствуйте,\\s*${placeholderSource}!|${placeholderSource},\\s*добрый день\\.|${placeholderSource}`,
+    "gi",
+  );
   const walker = frameDocument.createTreeWalker(frameDocument.body, 4);
   const textNodes: Text[] = [];
   let current: Node | null;
@@ -98,9 +104,11 @@ function markEditableNamePlaceholders(frameDocument: Document) {
       fragment.append(frameDocument.createTextNode(textNode.data.slice(cursor, index)));
       const marker = frameDocument.createElement("span");
       marker.dataset.pdfEditableName = String(markers.length + 1);
-      marker.textContent = match[0];
+      marker.dataset.pdfEditableGreeting = match[0].replace(placeholderMatcher, "Имя");
+      marker.dataset.pdfStandaloneGreeting = textNode.data.trim() === match[0].trim() ? "true" : "false";
+      marker.textContent = marker.dataset.pdfEditableGreeting;
       Object.assign(marker.style, {
-        display: "inline-block",
+        display: marker.dataset.pdfStandaloneGreeting === "true" ? "block" : "inline-block",
         boxSizing: "border-box",
         whiteSpace: "nowrap",
         verticalAlign: "baseline",
@@ -119,7 +127,12 @@ function markEditableNamePlaceholders(frameDocument: Document) {
     const fontSize = Number.parseFloat(computed?.fontSize ?? "16") || 16;
     const parsedLineHeight = Number.parseFloat(computed?.lineHeight ?? "");
     const lineHeight = Number.isFinite(parsedLineHeight) ? parsedLineHeight : fontSize * 1.45;
-    const width = Math.max(92, fontSize * 5.5, marker.getBoundingClientRect().width);
+    const markerRect = marker.getBoundingClientRect();
+    const parentRect = marker.parentElement?.getBoundingClientRect();
+    const availableWidth = parentRect ? Math.max(markerRect.width, parentRect.right - markerRect.left) : markerRect.width;
+    const width = marker.dataset.pdfStandaloneGreeting === "true"
+      ? availableWidth
+      : Math.max(markerRect.width, fontSize * 12);
     marker.style.width = `${width}px`;
     marker.style.height = `${Math.max(lineHeight, fontSize * 1.25)}px`;
     marker.style.lineHeight = `${Math.max(lineHeight, fontSize * 1.25)}px`;
@@ -145,7 +158,7 @@ function saveBlob(content: BlobPart, type: string, filename: string) {
 }
 
 async function makePdfLinksViewerCompatible(pdfBlob: Blob, editableNames: EditableNamePlacement[]) {
-  const { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber, StandardFonts, rgb } = await import("pdf-lib");
+  const { PDFArray, PDFBool, PDFDict, PDFDocument, PDFName, PDFNumber, PDFString, rgb } = await import("pdf-lib");
   const document = await PDFDocument.load(await pdfBlob.arrayBuffer());
   const annotsName = PDFName.of("Annots");
   const rectName = PDFName.of("Rect");
@@ -194,7 +207,6 @@ async function makePdfLinksViewerCompatible(pdfBlob: Blob, editableNames: Editab
 
     for (const [index, placement] of editableNames.entries()) {
       let fieldFont = fontCache.get(placement.fontKind);
-      let defaultName = "Имя";
       if (!fieldFont) {
         try {
           const { default: fontkit } = await import("@pdf-lib/fontkit");
@@ -204,24 +216,21 @@ async function makePdfLinksViewerCompatible(pdfBlob: Blob, editableNames: Editab
             { subset: false },
           );
         } catch {
-          fieldFont = await document.embedFont(
-            placement.fontKind === "serif" ? StandardFonts.TimesRoman : StandardFonts.Helvetica,
-          );
-          defaultName = "Name";
+          throw new Error("Не удалось встроить шрифт для редактируемой строки приветствия.");
         }
         fontCache.set(placement.fontKind, fieldFont);
         formFonts.set(PDFName.of(fieldFont.name), fieldFont.ref);
       }
 
-      const nameField = form.createTextField(index === 0 ? "recipient_name" : `recipient_name_${index + 1}`);
+      const nameField = form.createTextField(index === 0 ? "recipient_greeting" : `recipient_greeting_${index + 1}`);
       const width = placement.width * pointsPerMillimeter;
       const height = placement.height * pointsPerMillimeter;
       const fontSize = Math.min(height - 2, Math.max(7, placement.fontSize * pointsPerMillimeter));
       const textColor = rgb(placement.textColor.red, placement.textColor.green, placement.textColor.blue);
       const colorOperator = `${placement.textColor.red.toFixed(4)} ${placement.textColor.green.toFixed(4)} ${placement.textColor.blue.toFixed(4)} rg`;
       const defaultAppearance = `${colorOperator} /${fieldFont.name} ${fontSize.toFixed(2)} Tf`;
-      nameField.setMaxLength(80);
-      nameField.setText(defaultName);
+      nameField.setMaxLength(120);
+      nameField.setText(placement.defaultText);
       nameField.addToPage(page, {
         x: placement.x * pointsPerMillimeter,
         y: page.getHeight() - (placement.y + placement.height) * pointsPerMillimeter,
@@ -233,10 +242,12 @@ async function makePdfLinksViewerCompatible(pdfBlob: Blob, editableNames: Editab
         font: fieldFont,
       });
       nameField.setFontSize(fontSize);
+      nameField.updateAppearances(fieldFont);
       nameField.acroField.setDefaultAppearance(defaultAppearance);
       nameField.acroField.getWidgets()[0]?.setDefaultAppearance(defaultAppearance);
-      nameField.updateAppearances(fieldFont);
+      if (index === 0) form.acroForm.dict.set(PDFName.of("DA"), PDFString.of(defaultAppearance));
     }
+    form.acroForm.dict.set(PDFName.of("NeedAppearances"), PDFBool.False);
   }
 
   const bytes = Uint8Array.from(await document.save({ useObjectStreams: false }));
@@ -308,6 +319,7 @@ async function renderPdf(html: string) {
         fontKind: resolveEditableFontKind(computedStyle?.fontFamily ?? "Arial"),
         textColor,
         backgroundColor,
+        defaultText: marker.dataset.pdfEditableGreeting ?? "Имя",
       }];
     });
     const links = Array.from(frameDocument.querySelectorAll<HTMLAnchorElement>("a[href]"))
@@ -459,7 +471,7 @@ export function EmailExportMenu({ document, name }: { document: BuilderDocument;
           const pdf = await renderPdf(result.html);
           for (let index = 1; index <= copies; index += 1) saveBlob(pdf, "application/pdf", `${filename}${copies > 1 ? `-${index}` : ""}.pdf`);
           const downloadName = `${filename}.pdf`;
-          setDialog({ title: "PDF готов", message: copies === 1 ? "Письмо собрано на одной странице A4. Поле имени можно изменить прямо в PDF, кнопки и ссылки работают. Если браузер остановил скачивание, нажмите кнопку ниже." : `Подготовлено файлов: ${copies}. Каждый PDF занимает одну страницу A4, позволяет изменить имя и сохраняет рабочие ссылки. Если браузер остановил загрузки, скачайте первый файл кнопкой ниже.`, download: { url: URL.createObjectURL(pdf), filename: downloadName } });
+          setDialog({ title: "PDF готов", message: copies === 1 ? "Письмо собрано на одной странице A4. Нажмите на строку приветствия и замените слово «Имя» — шрифт, цвет и положение сохранятся. Кнопки и ссылки работают." : `Подготовлено файлов: ${copies}. В каждом PDF можно нажать на строку приветствия и заменить слово «Имя»; оформление и рабочие ссылки сохранятся.`, download: { url: URL.createObjectURL(pdf), filename: downloadName } });
         }
       }
     } catch (caught) {
@@ -473,7 +485,7 @@ export function EmailExportMenu({ document, name }: { document: BuilderDocument;
   const options = [
     ["html", FileCode2, "HTML", "Автономный файл с изображениями"],
     ["doc", FileText, "Word (.doc)", "Для согласования и правок"],
-    ["pdf", Printer, "PDF", "A4 · редактируемое имя · рабочие ссылки"],
+    ["pdf", Printer, "PDF", "A4 · редактируемая строка · рабочие ссылки"],
     ["txt", FileText, "Текст", "Без оформления"],
     ["json", FileJson2, "Исходник «Поток»", "Резервная копия макета"],
   ] as const;
