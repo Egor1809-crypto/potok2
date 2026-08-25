@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AlertCircle, Download, FileCode2, FileJson2, FileText, Printer, X } from "lucide-react";
 
@@ -149,7 +149,71 @@ export function EmailExportMenu({ document, name }: { document: BuilderDocument;
   const [busy, setBusy] = useState(false);
   const [dialog, setDialog] = useState<{ title: string; message: string; retryPdf?: boolean; download?: { url: string; filename: string } } | null>(null);
   const [copies, setCopies] = useState(1);
+  const [menuPosition, setMenuPosition] = useState<{ left: number; top: number; maxHeight: number } | null>(null);
+  const menuId = useId();
+  const menuTitleId = useId();
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
+
+  const updateMenuPosition = useCallback(() => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const viewportPadding = 12;
+    const gap = 8;
+    const menuWidth = Math.min(288, window.innerWidth - viewportPadding * 2);
+    const triggerRect = trigger.getBoundingClientRect();
+    const measuredHeight = menuRef.current?.scrollHeight ?? 408;
+    const spaceBelow = window.innerHeight - triggerRect.bottom - gap - viewportPadding;
+    const spaceAbove = triggerRect.top - gap - viewportPadding;
+    const openBelow = spaceBelow >= Math.min(measuredHeight, 320) || spaceBelow >= spaceAbove;
+    const maxHeight = Math.max(180, openBelow ? spaceBelow : spaceAbove);
+    const top = openBelow
+      ? triggerRect.bottom + gap
+      : Math.max(viewportPadding, triggerRect.top - gap - Math.min(measuredHeight, maxHeight));
+    const left = Math.min(
+      Math.max(viewportPadding, triggerRect.right - menuWidth),
+      window.innerWidth - menuWidth - viewportPadding,
+    );
+    setMenuPosition({ left, top, maxHeight });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setMenuPosition(null);
+      return;
+    }
+    updateMenuPosition();
+    const frame = window.requestAnimationFrame(() => {
+      updateMenuPosition();
+      menuRef.current?.querySelector<HTMLElement>("input, button")?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [open, updateMenuPosition]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!triggerRef.current?.contains(target) && !menuRef.current?.contains(target)) setOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setOpen(false);
+      window.requestAnimationFrame(() => triggerRef.current?.focus());
+    };
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", updateMenuPosition, true);
+    window.document.addEventListener("pointerdown", onPointerDown);
+    window.document.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
+      window.document.removeEventListener("pointerdown", onPointerDown);
+      window.document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open, updateMenuPosition]);
 
   useEffect(() => {
     if (!dialog) return;
@@ -215,18 +279,30 @@ export function EmailExportMenu({ document, name }: { document: BuilderDocument;
 
   return <>
     <div className="relative">
-      <Button type="button" variant="secondary" size="sm" disabled={busy} onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-haspopup="menu">
+      <Button ref={triggerRef} type="button" variant="secondary" size="sm" disabled={busy} onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-haspopup="dialog" aria-controls={open ? menuId : undefined}>
         <Download aria-hidden="true" className="size-3.5" /><span className="hidden xl:inline">{busy ? "Готовим…" : "Скачать"}</span>
       </Button>
-      {open ? <div role="menu" className="absolute right-0 top-[calc(100%+8px)] z-50 w-72 rounded-xl border border-border bg-surface p-2 shadow-[var(--shadow-floating)]">
-        <p className="px-2 pb-2 text-[10px] font-semibold uppercase tracking-[.08em] text-text-subtle">Экспорт письма</p>
+    </div>
+
+    {open && typeof window !== "undefined" ? createPortal(
+      <div
+        ref={menuRef}
+        id={menuId}
+        role="dialog"
+        aria-modal="false"
+        aria-labelledby={menuTitleId}
+        className="fixed z-[1200] w-[min(18rem,calc(100vw-24px))] overscroll-contain overflow-y-auto rounded-xl border border-border bg-surface p-2 shadow-[var(--shadow-floating)] outline-none"
+        style={menuPosition ? { left: menuPosition.left, top: menuPosition.top, maxHeight: menuPosition.maxHeight } : { left: 12, top: 12, visibility: "hidden" }}
+      >
+        <p id={menuTitleId} className="px-2 pb-2 text-[10px] font-semibold uppercase tracking-[.08em] text-text-subtle">Экспорт письма</p>
         <label className="mb-2 grid grid-cols-[1fr_42px] items-center gap-2 rounded-lg bg-surface-subtle px-2.5 py-2 text-[10px] text-text-muted"><span>Количество копий<input type="range" min="1" max="20" value={copies} onInput={(event) => setCopies(Number(event.currentTarget.value))} className="mt-1 block w-full accent-primary" /></span><strong className="rounded-md bg-surface py-1 text-center text-primary">{copies}</strong></label>
-        {options.map(([format, Icon, label, hint]) => <button key={format} role="menuitem" type="button" onClick={() => void run(format)} className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
+        {options.map(([format, Icon, label, hint]) => <button key={format} type="button" onClick={() => void run(format)} className="flex min-h-11 w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
           <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary-subtle text-primary"><Icon aria-hidden="true" className="size-4" /></span>
           <span><span className="block text-[11px] font-semibold text-text-strong">{label}</span><span className="block text-[9px] text-text-subtle">{hint}</span></span>
         </button>)}
-      </div> : null}
-    </div>
+      </div>,
+      window.document.body,
+    ) : null}
 
     {dialog && typeof window !== "undefined" ? createPortal(
       <div className="fixed inset-0 z-[1000] grid place-items-center bg-[#211924]/45 p-4 backdrop-blur-[2px]" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setDialog(null); }}>
