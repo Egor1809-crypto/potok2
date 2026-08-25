@@ -1471,7 +1471,25 @@ function styleTemplate(spec: StyleTemplateSpec): PresentationStarterTemplate {
   );
 }
 
+const techPravoConferenceTemplate = starter(
+  "presentation-template-tech-pravo-conference-2026",
+  "ТехнологИИ Права · Конференция 2026",
+  "Готовая 14-слайдовая презентация конференции 25–26 сентября 2026 года.",
+  "Конференции",
+  "graphite",
+  Array.from({ length: 14 }, (_, index) => ({
+    ...slide(
+      `tech-pravo-conference-2026-${index + 1}`,
+      "gallery",
+      `Слайд ${index + 1}`,
+    ),
+    imageUrl: `/presentation-templates/tech-pravo-conference-2026/slide-${String(index + 1).padStart(2, "0")}.png`,
+    fullBleedImage: true,
+  })),
+);
+
 export const presentationTemplates: PresentationStarterTemplate[] = [
+  techPravoConferenceTemplate,
   ...corePresentationTemplates,
   ...styleTemplateSpecs.map(styleTemplate),
 ];

@@ -116,6 +116,21 @@ function assetIdFromImageUrl(value: unknown) {
 function safeImageUrl(value: unknown, assetId?: string) {
   const resolvedId = assetId ?? assetIdFromImageUrl(value);
   if (resolvedId) return `/api/assets/${encodeURIComponent(resolvedId)}`;
+  if (typeof value === "string") {
+    try {
+      const parsed = new URL(value.trim(), "https://mailflow.local");
+      if (
+        parsed.origin === "https://mailflow.local" &&
+        /^\/presentation-templates\/[a-z0-9/_-]+\.(?:png|jpe?g|webp)$/i.test(
+          parsed.pathname,
+        )
+      ) {
+        return parsed.pathname;
+      }
+    } catch {
+      // Fall through to the shared validation error below.
+    }
+  }
   if (value === undefined || value === "") return undefined;
   throw new ApiRequestError(
     "Для слайда можно выбрать только изображение из общей медиатеки Поток.",
@@ -202,6 +217,7 @@ function parseSlide(value: unknown, index: number): PresentationSlide {
     ...(safeImageUrl(object.imageUrl, assetId)
       ? { imageUrl: safeImageUrl(object.imageUrl, assetId) }
       : {}),
+    ...(object.fullBleedImage === true ? { fullBleedImage: true } : {}),
     ...(optionalText(
       object.imagePrompt,
       `Описание изображения слайда ${index + 1}`,

@@ -622,6 +622,20 @@ function slideShapes(
   slide: PresentationSlide,
   image?: ImageEntry,
 ) {
+  if (slide.fullBleedImage && image) {
+    return [
+      picture(
+        2,
+        "Полноэкранный слайд",
+        "rId2",
+        image,
+        0,
+        0,
+        13.333333 * EMU,
+        7.5 * EMU,
+      ),
+    ];
+  }
   const accent = project.accentColor;
   const background = project.backgroundColor;
   const text = project.textColor;
@@ -1246,15 +1260,23 @@ async function loadImage(
   request: Request,
   slide: PresentationSlide,
 ): Promise<ImageEntry | undefined> {
-  if (!slide.assetId || !slide.imageUrl) return undefined;
+  if (!slide.imageUrl) return undefined;
   try {
     const requestUrl = new URL(request.url);
-    const url = new URL(
-      `/api/assets/${encodeURIComponent(slide.assetId)}`,
-      requestUrl.origin,
-    );
-    const expectedPath = `/api/assets/${encodeURIComponent(slide.assetId)}`;
-    if (url.origin !== requestUrl.origin || url.pathname !== expectedPath)
+    const expectedPath = slide.assetId
+      ? `/api/assets/${encodeURIComponent(slide.assetId)}`
+      : slide.imageUrl;
+    const url = new URL(expectedPath, requestUrl.origin);
+    const isPresentationTemplate =
+      !slide.assetId &&
+      /^\/presentation-templates\/[a-z0-9/_-]+\.(?:png|jpe?g|webp)$/i.test(
+        url.pathname,
+      );
+    if (
+      url.origin !== requestUrl.origin ||
+      (!isPresentationTemplate &&
+        url.pathname !== `/api/assets/${encodeURIComponent(slide.assetId ?? "")}`)
+    )
       return undefined;
     const response = await fetch(url, {
       headers: { Accept: "image/png,image/jpeg,image/gif" },

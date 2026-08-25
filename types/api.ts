@@ -494,6 +494,7 @@ export type PresentationSlide = {
   speakerNotes: string;
   assetId?: string;
   imageUrl?: string;
+  fullBleedImage?: boolean;
   imagePrompt?: string;
   ctaLabel?: string;
   ctaUrl?: string;

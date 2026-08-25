@@ -723,6 +723,22 @@ function SlidePreview({
         ),
       }}
     >
+      {slide.fullBleedImage && image ? (
+        editable ? (
+          <button
+            type="button"
+            onClick={onPickImage}
+            className="absolute inset-0 z-20 h-full w-full overflow-hidden text-left"
+            aria-label="Заменить изображение слайда"
+          >
+            {image}
+          </button>
+        ) : (
+          <div className="absolute inset-0 z-20 h-full w-full overflow-hidden">
+            {image}
+          </div>
+        )
+      ) : null}
       <div
         className={cn(
           "absolute rounded-full",
