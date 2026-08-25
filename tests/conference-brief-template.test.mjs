@@ -13,6 +13,7 @@ test("brief conference invitation uses three sales-focused sentences and is seed
   assert.equal(template.id, "template-v14-conference-brief-invitation");
   assert.match(templates, /\.\.\.conferenceBriefTemplates/);
   assert.match(database, /email-template-library-v17-conference-brief-quality-polish/);
+  assert.match(database, /runtime-schema-v29-conference-brief-favorite/);
 
   const [logo, heroImage] = template.blocks;
   assert.equal(logo.type, "logo");

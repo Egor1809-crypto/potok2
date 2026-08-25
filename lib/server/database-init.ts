@@ -45,7 +45,7 @@ let initialization: Promise<void> | null = null;
 // template-seeding routine in every new isolate made even a simple page load
 // wait several seconds for D1. Keep a durable completion marker instead.
 // Bump this value whenever a runtime-only schema migration is added here.
-const RUNTIME_SCHEMA_VERSION = "runtime-schema-v28-contact-bases-and-ticket-sender";
+const RUNTIME_SCHEMA_VERSION = "runtime-schema-v29-conference-brief-favorite";
 const DEFAULT_SENDER_NAME = "ТехнологИИ Права";
 const DEFAULT_SENDER_EMAIL = "tickets@notify.tech-pravo.ru";
 
