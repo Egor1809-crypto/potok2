@@ -13,7 +13,7 @@ test("brief conference invitation uses three sales-focused sentences and is seed
   assert.equal(template.id, "template-v14-conference-brief-invitation");
   assert.match(templates, /\.\.\.conferenceBriefTemplates/);
   assert.match(database, /email-template-library-v19-conference-brief-brand-pink-stats/);
-  assert.match(database, /runtime-schema-v29-conference-brief-favorite/);
+  assert.match(database, /runtime-schema-v30-conference-brief-refresh/);
 
   const [logo, heroImage] = template.blocks;
   assert.equal(logo.type, "logo");
@@ -31,7 +31,7 @@ test("brief conference invitation uses three sales-focused sentences and is seed
   assert.match(`${template.previewText} ${copy}`, /30\+ спикеров/);
   assert.doesNotMatch(`${template.previewText} ${copy}`, /80\+ спикеров/);
   assert.equal(
-    template.blocks.find((block) => block.type === "stats")?.borderColor,
+    template.blocks.find((block) => block.type === "stats")?.accentColor,
     "#FF3B94",
   );
   const sentences = copy.match(/[^.!?]+[.!?]+/g) ?? [];

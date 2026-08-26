@@ -48,6 +48,7 @@ export interface EmailBlock {
   paddingRight?: number;
   backgroundColor?: string;
   textColor?: string;
+  accentColor?: string;
   fontSize?: number;
   borderRadius?: number;
   fontFamily?: "Arial" | "Georgia" | "Verdana" | "Trebuchet MS";

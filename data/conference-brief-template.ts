@@ -81,7 +81,7 @@ export const conferenceBriefTemplates: EmailTemplate[] = [
         alignment: "center",
         backgroundColor: "#F7F4FC",
         textColor: "#4D5B6D",
-        borderColor: "#FF3B94",
+        accentColor: "#FF3B94",
         fontSize: 13,
         borderRadius: 12,
         paddingTop: 14,
