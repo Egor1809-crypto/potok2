@@ -45,7 +45,7 @@ let initialization: Promise<void> | null = null;
 // template-seeding routine in every new isolate made even a simple page load
 // wait several seconds for D1. Keep a durable completion marker instead.
 // Bump this value whenever a runtime-only schema migration is added here.
-const RUNTIME_SCHEMA_VERSION = "runtime-schema-v30-conference-brief-refresh";
+const RUNTIME_SCHEMA_VERSION = "runtime-schema-v31-conference-brief-subject";
 const DEFAULT_SENDER_NAME = "ТехнологИИ Права";
 const DEFAULT_SENDER_EMAIL = "tickets@notify.tech-pravo.ru";
 
@@ -999,7 +999,7 @@ async function seedDatabase(request: Request) {
   const [conferenceBriefTemplateState] = await db
     .select({ key: systemState.key })
     .from(systemState)
-    .where(eq(systemState.key, "email-template-library-v19-conference-brief-brand-pink-stats"))
+    .where(eq(systemState.key, "email-template-library-v20-conference-brief-clean-subject"))
     .limit(1);
   if (!conferenceBriefTemplateState) {
     for (const template of starterEmailTemplateValues().filter((item) => item.id.startsWith("template-v14-conference-brief-"))) {
@@ -1021,7 +1021,7 @@ async function seedDatabase(request: Request) {
       });
     }
     await db.insert(systemState).values({
-      key: "email-template-library-v19-conference-brief-brand-pink-stats",
+      key: "email-template-library-v20-conference-brief-clean-subject",
       value: "seeded",
       updatedAt: now,
     }).onConflictDoUpdate({

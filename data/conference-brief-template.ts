@@ -12,7 +12,7 @@ export const conferenceBriefTemplates: EmailTemplate[] = [
     category: "Events",
     description:
       "Короткое продающее приглашение: три предложения, ключевые факты и одно действие.",
-    subject: "{{first_name}}, выберите формат участия в «ТехнологИИ Права»",
+    subject: "Выберите формат участия в конференции «ТехнологИИ Права»",
     previewText:
       "30+ спикеров, выставка технологий и один маршрут без параллельных залов.",
     accentColor: "#20DDE5",
