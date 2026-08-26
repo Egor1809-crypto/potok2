@@ -999,7 +999,7 @@ async function seedDatabase(request: Request) {
   const [conferenceBriefTemplateState] = await db
     .select({ key: systemState.key })
     .from(systemState)
-    .where(eq(systemState.key, "email-template-library-v17-conference-brief-quality-polish"))
+    .where(eq(systemState.key, "email-template-library-v18-conference-brief-speaker-count"))
     .limit(1);
   if (!conferenceBriefTemplateState) {
     for (const template of starterEmailTemplateValues().filter((item) => item.id.startsWith("template-v14-conference-brief-"))) {
@@ -1021,7 +1021,7 @@ async function seedDatabase(request: Request) {
       });
     }
     await db.insert(systemState).values({
-      key: "email-template-library-v17-conference-brief-quality-polish",
+      key: "email-template-library-v18-conference-brief-speaker-count",
       value: "seeded",
       updatedAt: now,
     }).onConflictDoUpdate({
