@@ -227,7 +227,7 @@ function TemplateMiniBlock({ block, accentColor }: { block: TemplateMiniBlockVal
     return <div style={commonStyle}><div className="grid h-24 place-items-center rounded-lg bg-gradient-to-br from-black/[0.04] to-black/[0.12]"><ImageIcon aria-hidden="true" className="size-5 opacity-35" /></div></div>;
   }
   if (block.type === "stats") {
-    return <div className="grid grid-cols-2 gap-2" style={commonStyle}>{[0, 2].map((index) => <div key={index} className="rounded-md border border-black/[0.06] p-3 text-center"><strong className="block text-[16px]" style={{ color: accentColor }}>{parts[index]}</strong><span className="text-[7px] opacity-65">{parts[index + 1]}</span></div>)}</div>;
+    return <div className="grid grid-cols-2 gap-2" style={commonStyle}>{[0, 2].map((index) => <div key={index} className="rounded-md border border-black/[0.06] p-3 text-center"><strong className="block text-[16px]" style={{ color: block.borderColor ?? accentColor }}>{parts[index]}</strong><span className="text-[7px] opacity-65">{parts[index + 1]}</span></div>)}</div>;
   }
   if (block.type === "columns") {
     return <div className="grid grid-cols-2 gap-2" style={commonStyle}>{parts.slice(0, 2).map((part, index) => <div key={index} className="whitespace-pre-line rounded-md border border-black/10 p-3 text-[8px] leading-[1.45]">{part}</div>)}</div>;

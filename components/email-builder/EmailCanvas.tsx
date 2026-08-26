@@ -838,7 +838,7 @@ function BlockContent({
           >
             <strong
               className="block text-[26px]"
-              style={{ color: accentColor }}
+              style={{ color: block.borderColor ?? accentColor }}
             >
               {renderTokens(items[index] || "—")}
             </strong>
