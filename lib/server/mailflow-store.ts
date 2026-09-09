@@ -641,7 +641,7 @@ async function campaignSummaryRecords(options: { scheduledOnly?: boolean; limit?
     updatedAt: campaigns.updatedAt,
   }).from(campaigns)
     .where(options.scheduledOnly
-      ? and(eq(campaigns.workspaceId, WORKSPACE_ID), isNotNull(campaigns.scheduledAt))
+      ? and(eq(campaigns.workspaceId, WORKSPACE_ID), isNotNull(campaigns.scheduledAt), sql`${campaigns.status} <> 'completed'`)
       : eq(campaigns.workspaceId, WORKSPACE_ID))
     .orderBy(desc(campaigns.updatedAt))
     .limit(options.limit ?? 250);
@@ -684,6 +684,23 @@ export async function getWorkspaceBootstrap(request: Request) {
     return { ...base, campaigns: campaignRows.map(toCampaign), deliveryPlans: planRows.map(toDeliveryPlan), deliveryJobs: jobRows.map(toDeliveryJob), events: eventRows.map(toCampaignEvent) };
   }
   if (scope === "calendar") {
+    // Reconcile a bounded batch before reading the calendar. Provider delivery
+    // can finish after dispatch, without anyone opening campaign analytics.
+    const pendingRows = await db.select({ id: campaigns.id })
+      .from(campaigns)
+      .where(and(
+        eq(campaigns.workspaceId, WORKSPACE_ID),
+        eq(campaigns.status, "sending"),
+        isNotNull(campaigns.scheduledAt),
+        lte(campaigns.scheduledAt, new Date().toISOString()),
+        lte(campaigns.updatedAt, new Date(Date.now() - 30_000).toISOString()),
+        sql`exists (select 1 from ${deliveryJobs} where ${deliveryJobs.campaignId} = ${campaigns.id}
+          and json_extract(${deliveryJobs.providerExternalIds}, '$.unisender') is not null)`,
+      ))
+      .orderBy(asc(campaigns.updatedAt))
+      .limit(3);
+    // A provider outage must not prevent viewing saved plans or hide them.
+    await Promise.allSettled(pendingRows.map(({ id }) => syncCampaignDelivery(request, id)));
     const [campaignRecords, segmentRows] = await Promise.all([
       campaignSummaryRecords({ scheduledOnly: true }),
       db.select().from(segments).where(eq(segments.workspaceId, WORKSPACE_ID)).orderBy(desc(segments.updatedAt)),

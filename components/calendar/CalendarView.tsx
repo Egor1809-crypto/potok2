@@ -163,7 +163,7 @@ export function CalendarView() {
         <div className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_240px_200px_auto]">
           <div className="relative"><Filter className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-subtle" /><Input className="pl-9" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Тема, название или группа" aria-label="Поиск по теме" /></div>
           <Select value={group} onChange={(event) => setGroup(event.target.value)} aria-label="Группа получателей" options={[{ value: "", label: "Все группы" }, ...groups.map((value) => ({ value, label: value }))]} />
-          <Select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="Статус рассылки" options={[{ value: "", label: "Все статусы" }, { value: "scheduled", label: "Запланированные" }, { value: "completed", label: "Завершённые" }, { value: "blocked", label: "Нужно исправить" }]} />
+          <Select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="Статус рассылки" options={[{ value: "", label: "Все статусы" }, { value: "scheduled", label: "Запланированные" }, { value: "sending", label: "Отправляются" }, { value: "blocked", label: "Нужно исправить" }]} />
           <Button variant="ghost" onClick={() => { setQuery(""); setGroup(""); setStatus(""); }}>Сбросить</Button>
         </div>
       </section>
@@ -213,7 +213,6 @@ export function CalendarView() {
                   {items.map((campaign) => (
                     <Link key={campaign.id} href={`/campaigns/${campaign.id}`} className={cn(
                       "block rounded-lg border border-primary/15 bg-white/85 p-1.5 shadow-[0_1px_2px_rgba(17,24,39,0.04)] hover:border-primary/40",
-                      campaign.status === "completed" && "border-success/25 bg-success-subtle/50",
                       campaign.status === "blocked" && "border-warning/30 bg-warning-subtle/60",
                       campaign.status === "cancelled" && "border-border bg-surface-subtle opacity-70",
                       campaign.id === targetCampaignId && "border-primary bg-primary/[0.09] ring-1 ring-primary/25",
