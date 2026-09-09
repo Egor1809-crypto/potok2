@@ -1,3 +1,4 @@
+import { assessCommunications, enforceCommunications, recordCommunicationTouches } from "./communication-store";
 import { and, asc, desc, eq, inArray, isNotNull, lte, or, sql, type SQL } from "drizzle-orm";
 import { getD1, getDb } from "@/db";
 import {
@@ -2962,6 +2963,17 @@ async function audienceForCampaign(
     : [];
 }
 
+export async function checkCommunicationAudience(request: Request, payload: unknown) {
+  await ensureDatabase(request);
+  const p = asObject(payload);
+  const ids = optionalStringArray(p.contactIds, "Контакты", 20000) ?? [];
+  const segmentId = typeof p.segmentId === "string" ? p.segmentId : null;
+  const selectedChannels = Array.isArray(p.channels) ? [...new Set(p.channels.filter((c): c is DeliveryChannelId => c === "email" || c === "telegram" || c === "vk"))] : ["email" as const];
+  if (!selectedChannels.length) throw new ApiRequestError("Выберите канал.");
+  const audience = await audienceForCampaign({ audienceType: p.audienceType === "segment" ? "segment" : "contacts", contactIds: ids, segmentId } as CampaignRecord);
+  return assessCommunications(audience, selectedChannels, p.purpose === "transactional" ? "transactional" : "marketing", typeof p.scheduledAt === "string" && p.scheduledAt ? parseIsoDate(p.scheduledAt, "Дата отправки") ?? undefined : undefined);
+}
+
 async function versionHash(snapshot: CampaignVersionSnapshot): Promise<string> {
   const value = JSON.stringify(snapshot);
   const digest = await crypto.subtle.digest(
@@ -3179,7 +3191,10 @@ async function evaluateLaunch(
     allIntegrationRecords(),
   ]);
   const audience = await audienceForCampaign(campaign);
-  const blockers: string[] = [];
+  const communicationCheck = await enforceCommunications(audience, plans.map(p => p.channel), campaign.purpose, campaign.scheduledAt ?? new Date().toISOString(), campaignId);
+  const blockers: string[] = communicationCheck.blockedIds.length
+    ? [`Проверка контактов: ${communicationCheck.blockedIds.length} адресатов требуют исключения или подтверждения основания. Откройте «Проверка аудитории» в мастере.`]
+    : [];
   const eligibleByChannel: CampaignEvaluation["eligibleByChannel"] = {};
   if (campaign.purpose === "transactional" && audience.length !== 1) {
     blockers.push("Сервисное письмо отправляется строго одному получателю. Для массовой аудитории выберите рекламную рассылку.");
@@ -3349,10 +3364,10 @@ async function evaluateLaunch(
     },
   );
   const updated = await campaignBundle(campaignId);
-  const canScheduleAtProvider = status === "scheduled" &&
-    updated.campaign.purpose === "marketing" &&
-    updated.plans.length > 0 &&
-    updated.plans.every((plan) => plan.channel === "email" && plan.providerId === "unisender");
+  // Keep scheduled recipients in Potok until due time so consent withdrawals
+  // and incoming replies can still stop their next automatic message.
+  const canScheduleAtProvider = false;
+
   if (canScheduleAtProvider && updated.campaign.scheduledAt && readyVersion) {
     const armed = await dispatchCampaign(
       request,
@@ -3856,6 +3871,9 @@ async function dispatchCampaign(
     );
   }
 
+  const communicationCheck = await enforceCommunications(freshAudience, current.plans.map(p => p.channel), current.campaign.purpose, new Date().toISOString(), campaignId);
+  if (communicationCheck.blockedIds.length) return blockDispatch(campaignId, `Отправка приостановлена: ${communicationCheck.blockedIds.length} контактов не прошли проверку основания или ответили. Проверьте аудиторию.`);
+
   const eligibleByPlan = new Map<string, ContactRecord[]>();
   for (const plan of current.plans) {
     const integration = integrationsNow.find(
@@ -4007,6 +4025,8 @@ async function dispatchCampaign(
     const rows = (
       await db.select().from(deliveryOutbox).where(eq(deliveryOutbox.jobId, jobId))
     ).map(toDeliveryOutbox);
+    const lastCheck = await enforceCommunications(await audienceForCampaign(current.campaign), current.plans.map(p => p.channel), current.campaign.purpose, new Date().toISOString(), campaignId);
+    if (lastCheck.blockedIds.length) throw new ApiRequestError("Адресат ответил или основание изменилось: внешняя отправка приостановлена.",409);
     const manualRows = rows.filter(
       (row) =>
         integrationProviders.find((provider) => provider.id === row.providerId)
@@ -4141,6 +4161,7 @@ async function dispatchCampaign(
       updatedAt: completedAt,
     })
     .where(eq(campaigns.id, campaignId));
+  if (!schedulingAtProvider) await recordCommunicationTouches(campaignId).catch(() => undefined);
   if (acceptedRows.length && !schedulingAtProvider) {
     for (const contactIdChunk of chunksOf(acceptedContactIds, 40)) {
       await db

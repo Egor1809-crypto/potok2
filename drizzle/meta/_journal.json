@@ -127,6 +127,13 @@
       "when": 1787391390227,
       "tag": "0017_sturdy_zeigeist",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1788956788510,
+      "tag": "0018_open_jack_flag",
+      "breakpoints": true
     }
   ]
 }

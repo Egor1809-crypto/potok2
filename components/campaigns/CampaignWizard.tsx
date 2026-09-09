@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { CampaignCommunicationCheck } from "@/components/communications/CampaignCommunicationCheck";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -1407,6 +1408,8 @@ function CampaignWizardState({
               minimumScheduledAt={minimumScheduledAt}
             />
           ) : null}
+
+          <CampaignCommunicationCheck audienceType={audienceType} contactIds={contactIds} segmentId={segmentId} channels={channels} purpose={purpose} scheduledAt={scheduledAt} onUseContacts={(ids) => { setAudienceType("contacts"); setContactIds(ids); setEvaluation(null); }} />
 
           {error ? <Alert tone="danger" title="Нужно исправить" className="mt-6">{error}</Alert> : null}
           {notice ? <Alert tone="success" title="Готово" className="mt-6">{notice}</Alert> : null}

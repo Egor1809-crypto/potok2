@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   LayoutTemplate,
   Megaphone,
+  MessagesSquare,
   PenLine,
   Presentation,
   ScanSearch,
@@ -105,6 +106,13 @@ export const productNavigation: ProductNavGroup[] = [
   {
     label: "Проверка и отправка",
     items: [
+      {
+        label: "Коммуникации",
+        description: "Нагрузка, паспорта данных, ответы и задачи",
+        href: "/communications",
+        icon: MessagesSquare,
+        keywords: ["согласие", "нагрузка", "ответы", "задачи", "паспорт"],
+      },
       {
         label: "Рассылка писем",
         description: "Кампании, тесты и история отправки",

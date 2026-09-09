@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ContactCommunicationPanel } from "@/components/communications/ContactCommunicationPanel";
 import {
   Building2,
   Check,
@@ -76,8 +77,8 @@ export function ContactDrawer({
           id: "email",
           label: "Рекламный Email",
           address: contact.email || "Адрес не указан",
-          ready: Boolean(contact.email && contact.status === "active"),
-          reason: !contact.email ? "Email не указан" : contact.status !== "active" ? "Контакт недоступен" : "Готов к рекламной отправке",
+          ready: Boolean(contact.email && contact.emailConsent && contact.status === "active"),
+          reason: !contact.email ? "Email не указан" : contact.status !== "active" ? "Контакт недоступен" : "Основание проверяется в паспорте данных",
           Icon: Mail,
         },
         {
@@ -191,6 +192,8 @@ export function ContactDrawer({
               ))}
             </div>
           </section>
+
+          {stored ? <ContactCommunicationPanel key={contact.id} contactId={contact.id} /> : null}
 
           <section className="mt-8 rounded-xl bg-[var(--surface-subtle)] p-4">
             <div className="flex gap-3"><ShieldCheck aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-[var(--text-muted)]" /><div><h2 className="text-[11px] font-semibold">Состояние данных</h2><p className="mt-1 text-[10px] leading-5 text-[var(--text-muted)]">Контакт обновлён {dateFormatter.format(new Date(updatedAt))}. Перед запуском кампания повторно проверит статус и согласия.</p></div></div>

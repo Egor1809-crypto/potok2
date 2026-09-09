@@ -689,3 +689,55 @@ export const campaignEvents = sqliteTable(
     ),
   ],
 );
+
+// Communication controls: append-only evidence and immutable message timestamps.
+export const communicationConsents = sqliteTable("communication_consents", {
+  id: text("id").primaryKey(), workspaceId: text("workspace_id").notNull(),
+  contactId: text("contact_id").notNull(), endpoint: text("endpoint").notNull(),
+  channel: text("channel").notNull(), purpose: text("purpose").notNull(),
+  kind: text("kind").notNull(), source: text("source").notNull(),
+  obtainedAt: text("obtained_at").notNull(), expiresAt: text("expires_at"),
+  version: text("version").notNull(), statement: text("statement").notNull(),
+  operator: text("operator").notNull(), digest: text("digest").notNull(),
+  actorId: text("actor_id").notNull(), createdAt: text("created_at").notNull(),
+}, (t) => [index("idx_consent_endpoint_date").on(t.workspaceId, t.endpoint, t.channel, t.purpose, t.createdAt)]);
+export const communicationHolds = sqliteTable("communication_holds", {
+  id: text("id").primaryKey(), workspaceId: text("workspace_id").notNull(),
+  endpoint: text("endpoint").notNull(), channel: text("channel").notNull(),
+  reason: text("reason").notNull(), untilAt: text("until_at"),
+  active: integer("active").notNull().default(1), actorId: text("actor_id").notNull(),
+  createdAt: text("created_at").notNull(), resolvedAt: text("resolved_at"),
+}, (t) => [index("idx_hold_endpoint").on(t.workspaceId, t.endpoint, t.channel, t.active)]);
+export const communicationMessages = sqliteTable("communication_messages", {
+  id: text("id").primaryKey(), workspaceId: text("workspace_id").notNull(),
+  contactId: text("contact_id").notNull(), campaignId: text("campaign_id"),
+  externalId: text("external_id").notNull(), sender: text("sender").notNull(),
+  subject: text("subject").notNull(), body: text("body").notNull(),
+  category: text("category").notNull(), confidence: integer("confidence").notNull(),
+  classifier: text("classifier").notNull(), quote: text("quote").notNull(),
+  suggestedDate: text("suggested_date"), suggestedAction: text("suggested_action"),
+  receivedAt: text("received_at").notNull(), actorId: text("actor_id").notNull(),
+  reviewed: integer("reviewed").notNull().default(0),
+}, (t) => [uniqueIndex("idx_message_external").on(t.workspaceId, t.externalId), index("idx_message_received").on(t.workspaceId, t.receivedAt)]);
+export const communicationTasks = sqliteTable("communication_tasks", {
+  id: text("id").primaryKey(), workspaceId: text("workspace_id").notNull(),
+  messageId: text("message_id").notNull(), contactId: text("contact_id").notNull(),
+  assignedTo: text("assigned_to").notNull(), title: text("title").notNull(),
+  dueDate: text("due_date"), status: text("status").notNull().default("proposed"),
+  createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(),
+}, (t) => [uniqueIndex("idx_task_message").on(t.workspaceId, t.messageId)]);
+export const communicationPolicy = sqliteTable("communication_policy", {
+  workspaceId: text("workspace_id").primaryKey(), windowDays: integer("window_days").notNull().default(14),
+  contactLimit: integer("contact_limit").notNull().default(9), companyLimit: integer("company_limit").notNull().default(3),
+  autoTasks: integer("auto_tasks").notNull().default(0), updatedAt: text("updated_at").notNull(), actorId: text("actor_id").notNull(),
+});
+export const communicationAudit = sqliteTable("communication_audit", {
+  id: text("id").primaryKey(), workspaceId: text("workspace_id").notNull(),
+  actorId: text("actor_id").notNull(), action: text("action").notNull(),
+  entityId: text("entity_id").notNull(), details: text("details").notNull(), createdAt: text("created_at").notNull(),
+}, (t) => [index("idx_communication_audit_entity").on(t.workspaceId, t.entityId, t.createdAt)]);
+export const communicationTouches = sqliteTable("communication_touches", {
+  id: text("id").primaryKey(), workspaceId: text("workspace_id").notNull(), contactId: text("contact_id").notNull(),
+  endpoint: text("endpoint").notNull(), companyKey: text("company_key").notNull(), channel: text("channel").notNull(),
+  campaignId: text("campaign_id").notNull(), actorId: text("actor_id").notNull(), occurredAt: text("occurred_at").notNull(),
+}, (t) => [index("idx_touches_endpoint_time").on(t.workspaceId, t.endpoint, t.occurredAt), index("idx_touches_company_time").on(t.workspaceId, t.companyKey, t.occurredAt)]);
