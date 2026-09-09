@@ -1261,7 +1261,7 @@ function CampaignWizardState({
         <Stepper steps={steps} currentStep={currentStep} aria-label="Этапы создания рассылки" />
       </section>
 
-      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="grid min-w-0 grid-cols-1 items-start gap-5 2xl:grid-cols-[minmax(0,1fr)_300px]">
         <section className="card min-w-0 p-5 sm:p-7">
           {currentStep === 0 ? (
             <AudienceStep
@@ -1688,7 +1688,7 @@ function AudienceStep({
           })}
         </div>
       ) : audienceType === "contacts" ? (
-        <fieldset className="mt-6">
+        <fieldset className="mt-6 min-w-0">
           <legend className="text-[13px] font-semibold text-text-strong">Контакты рабочего пространства</legend>
           {contactBases.length > 0 ? (
             <section className="mt-3 rounded-2xl bg-surface-subtle/70 p-4 shadow-[0_0_0_1px_oklch(0_0_0/0.06),0_1px_2px_-1px_oklch(0_0_0/0.06),0_2px_4px_oklch(0_0_0/0.04)]" aria-labelledby="campaign-contact-bases-title">
@@ -1699,14 +1699,14 @@ function AudienceStep({
                 </div>
                 <Badge variant="neutral">{formatNumber(contactBases.length)} баз</Badge>
               </div>
-              <div className="mt-4 flex gap-2 overflow-x-auto pb-1" aria-label="Доступные базы контактов">
+              <div className="mt-4 flex min-w-0 max-w-full gap-2 overflow-x-auto overscroll-x-contain p-1 pb-3" aria-label="Доступные базы контактов">
                 <button
                   type="button"
                   aria-pressed={!selectedContactBase}
                   aria-controls="campaign-contact-addresses"
                   onClick={() => onContactBaseChange("")}
                   className={cn(
-                    "min-h-11 shrink-0 rounded-xl px-3.5 py-2 text-start text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 active:scale-[0.96]",
+                    "min-h-11 max-w-full shrink-0 whitespace-normal break-words rounded-xl px-3.5 py-2 text-start text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 active:scale-[0.96]",
                     !selectedContactBase ? "bg-primary text-white" : "bg-white text-text-strong shadow-[0_0_0_1px_oklch(0_0_0/0.08)] hover:bg-primary-subtle/35",
                   )}
                 >
@@ -1722,7 +1722,7 @@ function AudienceStep({
                       aria-controls="campaign-contact-addresses"
                       onClick={() => onContactBaseChange(base.label)}
                       className={cn(
-                        "min-h-11 shrink-0 rounded-xl px-3.5 py-2 text-start text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 active:scale-[0.96]",
+                        "min-h-11 max-w-full shrink-0 whitespace-normal break-words rounded-xl px-3.5 py-2 text-start text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 active:scale-[0.96]",
                         selected ? "bg-primary text-white" : "bg-white text-text-strong shadow-[0_0_0_1px_oklch(0_0_0/0.08)] hover:bg-primary-subtle/35",
                       )}
                     >
@@ -1749,13 +1749,13 @@ function AudienceStep({
                 </div>
                 {owner ? <Button variant="ghost" size="sm" onClick={() => setOwner("")}>Показать все базы</Button> : null}
               </div>
-              <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 {ownerBases.map((base) => {
                   const baseIds = contacts.filter((contact) => ownerIdFor(contact) === base.participantId).map((contact) => contact.id);
                   const allBaseSelected = baseIds.length > 0 && baseIds.every((id) => selectedIds.has(id));
                   const selectedBaseCount = baseIds.filter((id) => selectedIds.has(id)).length;
                   return (
-                    <article key={base.participantId} className={cn("rounded-xl border p-3", owner === base.participantId ? "border-primary/45 bg-primary-subtle/50" : "border-border bg-surface") }>
+                    <article key={base.participantId} className={cn("min-w-0 rounded-xl border p-3", owner === base.participantId ? "border-primary/45 bg-primary-subtle/50" : "border-border bg-surface") }>
                       <button type="button" onClick={() => setOwner((current) => current === base.participantId ? "" : base.participantId)} aria-pressed={owner === base.participantId} className="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
                         <span className="flex items-center gap-2">
                           <i className="size-2.5 rounded-full" style={{ backgroundColor: base.member?.color ?? "#6558E8" }} />
@@ -1767,7 +1767,7 @@ function AudienceStep({
                       <Button
                         variant={allBaseSelected ? "outline" : "primary"}
                         size="sm"
-                        className="mt-3 w-full"
+                        className="mt-3 h-auto min-h-8 w-full whitespace-normal"
                         onClick={() => onSetContacts(allBaseSelected
                           ? contactIds.filter((id) => !baseIds.includes(id))
                           : [...new Set([...contactIds, ...baseIds])])}
@@ -1785,7 +1785,7 @@ function AudienceStep({
               <Search aria-hidden="true" className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-text-subtle" />
               <Input aria-label="Поиск контактов" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск по имени, email, компании или должности" className="input-with-leading-icon" />
             </div>
-            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid min-w-0 gap-2 sm:grid-cols-2">
               <Select aria-label="Статус контакта" value={status} onChange={(event) => setStatus(event.target.value)} options={[{ value: "", label: "Все статусы" }, { value: "active", label: "Активные" }, { value: "unsubscribed", label: "Отписанные" }, { value: "bounced", label: "Недоставляемые" }, { value: "invalid", label: "Некорректные" }]} />
               <Select aria-label="Компания" value={company} onChange={(event) => setCompany(event.target.value)} options={[{ value: "", label: "Все компании" }, ...companies.map((value) => ({ value, label: value }))]} />
               <Select aria-label="Город" value={city} onChange={(event) => setCity(event.target.value)} options={[{ value: "", label: "Все города" }, ...cities.map((value) => ({ value, label: value }))]} />
@@ -1795,7 +1795,7 @@ function AudienceStep({
             </div>
             <div className="flex flex-wrap items-center justify-between gap-4">
               <span className="text-[11px] text-text-muted" role="status" aria-live="polite">Всего в открытой базе: {formatNumber(totalContactCount)} · загружено: {formatNumber(contacts.length)} · показано: {formatNumber(filteredContacts.length)} · выбрано: {formatNumber(contactIds.length)}</span>
-              <div className="flex gap-2">
+              <div className="flex min-w-0 flex-wrap gap-2">
                 {filtersActive ? (
                   <Button
                     variant="ghost"
@@ -1847,7 +1847,7 @@ function AudienceStep({
             {!contactsLoading && filteredContacts.length === 0 ? <p className="m-0 px-4 py-8 text-center text-[12px] text-text-muted">По выбранным фильтрам контактов нет.</p> : null}
           </div>
           {contacts.length < totalContactCount ? (
-            <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-border bg-surface-subtle/45 px-4 py-3">
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface-subtle/45 px-4 py-3">
               <p className="m-0 text-[11px] text-text-muted">Осталось загрузить: {formatNumber(totalContactCount - contacts.length)}. Уже отправленные контакты исключены.</p>
               <Button type="button" variant="outline" size="sm" disabled={loadingMore} onClick={onLoadMore}>
                 {loadingMore ? "Загружаем…" : "Показать ещё 250"}
@@ -2345,8 +2345,8 @@ function CampaignSummary({
   blockers: string[];
 }) {
   return (
-    <aside className="card p-5 xl:sticky xl:top-5" aria-label="Сводка рассылки">
-      <div className="flex items-center justify-between gap-3">
+    <aside className="card min-w-0 p-5" aria-label="Сводка рассылки">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-[15px] font-semibold text-text-strong">Сводка</h2>
         <Badge variant={blockers.length === 0 ? "success" : "warning"} dot>{blockers.length === 0 ? "Готово" : `Нужно исправить: ${blockers.length}`}</Badge>
       </div>
@@ -2378,7 +2378,7 @@ function SummaryRow({ icon, label, value }: { icon: React.ReactNode; label: stri
       <dt className="grid size-8 shrink-0 place-items-center rounded-xl bg-primary-subtle text-primary">{icon}</dt>
       <dd className="min-w-0">
         <span className="block text-[11px] font-medium text-text-muted">{label}</span>
-        <span className="mt-1 block text-[12px] leading-5 font-semibold text-text-strong">{value}</span>
+        <span className="mt-1 block break-words text-[12px] leading-5 font-semibold text-text-strong">{value}</span>
       </dd>
     </div>
   );
