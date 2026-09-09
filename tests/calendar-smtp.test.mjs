@@ -32,7 +32,7 @@ test("calendar connects scheduled campaigns, audience filters and the due queue"
   assert.match(store, /isNotNull\(campaigns\.scheduledAt\)/);
   assert.match(store, /campaignSummaryRecords\(\{ limit: 250 \}\)/);
   assert.match(store, /campaignStatsRows/);
-  assert.match(calendar, /items\.map\(\(campaign\)/);
+  assert.match(calendar, /selectedItems\.map\(\(campaign\)/);
   assert.doesNotMatch(calendar, /Проверить очередь/);
   assert.doesNotMatch(calendar, /fetch\("\/api\/scheduler"/);
   assert.doesNotMatch(calendar, /items\.slice\(0, 3\)/);

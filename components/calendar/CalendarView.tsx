@@ -3,8 +3,9 @@
 import * as React from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Filter, Plus, UsersRound } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Filter, Plus, X } from "lucide-react";
 
+import { getCampaignChannelDefinition } from "@/components/campaigns/campaignChannels";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Alert, Badge, Button, Input, Select, buttonVariants, cn } from "@/components/ui";
 import { describeTimeZone, useBrowserTimeZone } from "@/lib/client-timezone";
@@ -70,6 +71,10 @@ export function CalendarView() {
   const [snapshot, setSnapshot] = React.useState<WorkspaceSnapshot | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [month, setMonth] = React.useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  const [selectedDay, setSelectedDay] = React.useState<string | null>(null);
+  const dayButtons = React.useRef(new Map<string, HTMLButtonElement>());
+  const dayPanel = React.useRef<HTMLElement>(null);
+  const panelHeading = React.useRef<HTMLHeadingElement>(null);
   const [query, setQuery] = React.useState("");
   const [group, setGroup] = React.useState("");
   const [status, setStatus] = React.useState("");
@@ -102,22 +107,50 @@ export function CalendarView() {
     };
   }, [load]);
 
+  const targetScheduledAt = snapshot?.campaigns.find((item) => item.id === targetCampaignId)?.scheduledAt;
   React.useEffect(() => {
-    if (!snapshot || !targetCampaignId) return;
-    const campaign = snapshot.campaigns.find((item) => item.id === targetCampaignId);
-    if (!campaign?.scheduledAt) return;
-    const key = dateKeyInTimezone(campaign.scheduledAt, timeZone);
+    if (!targetScheduledAt) return;
+    const key = dateKeyInTimezone(targetScheduledAt, timeZone);
     const [year, monthNumber] = key.split("-").map(Number);
-    if (!year || !monthNumber) return;
-    const frame = window.requestAnimationFrame(() => setMonth(new Date(year, monthNumber - 1, 1)));
+    const frame = window.requestAnimationFrame(() => {
+      setMonth(new Date(year, monthNumber - 1, 1));
+      setSelectedDay(key);
+    });
     return () => window.cancelAnimationFrame(frame);
-  }, [snapshot, targetCampaignId, timeZone]);
+  }, [targetCampaignId, targetScheduledAt, timeZone]);
+
+  React.useEffect(() => {
+    if (!selectedDay) return;
+    panelHeading.current?.focus({ preventScroll: true });
+    if (window.matchMedia("(max-width: 1023px)").matches) {
+      panelHeading.current?.scrollIntoView({ block: "nearest" });
+    }
+    const panel = dayPanel.current;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      dayButtons.current.get(selectedDay)?.focus({ preventScroll: true });
+      setSelectedDay(null);
+    };
+    panel?.addEventListener("keydown", onKeyDown);
+    return () => panel?.removeEventListener("keydown", onKeyDown);
+  }, [selectedDay]);
+
+  function closeDay() {
+    if (selectedDay) dayButtons.current.get(selectedDay)?.focus({ preventScroll: true });
+    setSelectedDay(null);
+  }
+
+  function changeMonth(delta: number) {
+    setSelectedDay(null);
+    setMonth((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1));
+  }
 
   const campaigns = React.useMemo(() => {
     if (!snapshot) return [];
     const normalized = query.trim().toLocaleLowerCase("ru");
     return snapshot.campaigns.filter((campaign) => {
-      if (!campaign.scheduledAt) return false;
+      if (!campaign.scheduledAt || campaign.status === "completed") return false;
       const audience = audienceLabel(campaign, snapshot);
       if (group && audience !== group) return false;
       if (status && campaign.status !== status) return false;
@@ -143,15 +176,22 @@ export function CalendarView() {
       const key = dateKeyInTimezone(campaign.scheduledAt!, timeZone);
       map.set(key, [...(map.get(key) ?? []), campaign]);
     }
+    for (const items of map.values()) {
+      items.sort((a, b) => Date.parse(a.scheduledAt!) - Date.parse(b.scheduledAt!) || a.id.localeCompare(b.id));
+    }
     return map;
   }, [campaigns, timeZone]);
+  const selectedItems = selectedDay ? campaignsByDay.get(selectedDay) ?? [] : [];
+  const selectedDateLabel = selectedDay
+    ? new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric" }).format(new Date(`${selectedDay}T12:00:00`))
+    : "";
 
   return (
     <div className="space-y-5">
       <PageHeader
         eyebrow="Расписание"
         title="Календарь рассылок"
-        description="Планируйте одно письмо человеку или серию для группы. Тема, аудитория и время остаются видны в одном календаре."
+        description="Выберите день с отметкой, чтобы посмотреть запланированные рассылки."
         action={<Link href={`/campaigns/new?scheduledDate=${dateKey(new Date())}`} className={buttonVariants()}><Plus className="size-4" />Запланировать</Link>}
       />
       {error ? <Alert tone="danger" title="Календарь недоступен">{error}</Alert> : null}
@@ -161,77 +201,104 @@ export function CalendarView() {
 
       <section className="card p-4 sm:p-5" aria-label="Фильтры календаря">
         <div className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_240px_200px_auto]">
-          <div className="relative"><Filter className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-subtle" /><Input className="pl-9" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Тема, название или группа" aria-label="Поиск по теме" /></div>
+          <div className="relative"><Filter className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-subtle" /><Input className="input-with-leading-icon" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Тема, название или группа" aria-label="Поиск по теме" /></div>
           <Select value={group} onChange={(event) => setGroup(event.target.value)} aria-label="Группа получателей" options={[{ value: "", label: "Все группы" }, ...groups.map((value) => ({ value, label: value }))]} />
           <Select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="Статус рассылки" options={[{ value: "", label: "Все статусы" }, { value: "scheduled", label: "Запланированные" }, { value: "sending", label: "Отправляются" }, { value: "blocked", label: "Нужно исправить" }]} />
           <Button variant="ghost" onClick={() => { setQuery(""); setGroup(""); setStatus(""); }}>Сбросить</Button>
         </div>
       </section>
 
-      <section className="card overflow-hidden" aria-label="Месячный календарь">
-        <header className="flex items-center justify-between border-b border-border px-4 py-3 sm:px-5">
-          <Button size="icon" variant="ghost" aria-label="Предыдущий месяц" onClick={() => setMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}><ChevronLeft className="size-5" /></Button>
-          <h2 className="text-[18px] font-semibold text-text-strong">{formatMonth(month)}</h2>
-          <Button size="icon" variant="ghost" aria-label="Следующий месяц" onClick={() => setMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}><ChevronRight className="size-5" /></Button>
-        </header>
-        <div className="grid grid-cols-7 border-b border-border bg-surface-subtle">
-          {weekdays.map((day) => <div key={day} className="px-2 py-2 text-center text-[12px] font-semibold text-text-muted">{day}</div>)}
-        </div>
-        <div className="grid grid-cols-7">
-          {days.map((day) => {
-            const key = dateKey(day);
-            const items = campaignsByDay.get(key) ?? [];
-            const outside = day.getMonth() !== month.getMonth();
-            const today = key === dateKey(new Date());
-            const selected = Boolean(targetCampaignId && items.some((item) => item.id === targetCampaignId));
-            return (
-              <div key={key} className={cn(
-                "min-h-[118px] border-b border-r border-border p-1.5 sm:min-h-[138px] sm:p-2",
-                outside && "bg-surface-subtle/60",
-                items.length > 0 && !outside && "bg-primary/[0.035]",
-                selected && "relative z-[1] ring-2 ring-inset ring-primary",
-              )}>
-                <div className="flex items-center justify-between">
-                  <span className={cn("grid size-7 place-items-center rounded-full text-[12px] font-semibold", today ? "bg-primary text-white" : outside ? "text-text-subtle" : "text-text-strong")}>{day.getDate()}</span>
-                  {!outside ? (
-                    <div className="flex items-center gap-1">
-                      {items.length > 0 ? (
-                        <span
-                          className="inline-flex min-w-6 items-center justify-center gap-1 rounded-full bg-primary px-1.5 py-1 text-[10px] font-bold leading-none text-white"
-                          aria-label={`Рассылок на этот день: ${items.length}`}
-                          title={`Рассылок: ${items.length}`}
-                        >
-                          <span aria-hidden="true" className="size-1.5 rounded-full bg-white" />
-                          {items.length}
-                        </span>
-                      ) : null}
-                      <Link href={`/campaigns/new?scheduledDate=${key}`} aria-label={`Запланировать на ${key}`} className="grid size-7 place-items-center rounded-full text-text-subtle hover:bg-primary/10 hover:text-primary"><Plus className="size-3.5" /></Link>
-                    </div>
+      <div className={cn("grid min-w-0 grid-cols-1 items-start gap-5", selectedDay && "lg:grid-cols-[minmax(0,1fr)_320px]")}>
+        <section className="card min-w-0 overflow-hidden" aria-label="Месячный календарь">
+          <header className="flex items-center justify-between gap-2 border-b border-border px-3 py-3 sm:px-5">
+            <Button size="icon" variant="ghost" aria-label="Предыдущий месяц" onClick={() => changeMonth(-1)}><ChevronLeft aria-hidden="true" className="size-5" /></Button>
+            <h2 className="text-center text-[18px] font-semibold text-text-strong">{formatMonth(month)}</h2>
+            <Button size="icon" variant="ghost" aria-label="Следующий месяц" onClick={() => changeMonth(1)}><ChevronRight aria-hidden="true" className="size-5" /></Button>
+          </header>
+          <div className="grid grid-cols-7 border-b border-border bg-surface-subtle">
+            {weekdays.map((day) => <div key={day} className="py-2 text-center text-[12px] font-semibold text-text-muted">{day}</div>)}
+          </div>
+          <div className="grid grid-cols-7">
+            {days.map((day) => {
+              const key = dateKey(day);
+              const items = campaignsByDay.get(key) ?? [];
+              const outside = day.getMonth() !== month.getMonth();
+              const today = key === dateKey(new Date());
+              const selected = selectedDay === key;
+              const dayLabel = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric" }).format(day);
+              return (
+                <button
+                  key={key}
+                  ref={(element) => { if (element) dayButtons.current.set(key, element); else dayButtons.current.delete(key); }}
+                  type="button"
+                  onClick={() => setSelectedDay(key)}
+                  aria-label={`${dayLabel}. Рассылок на этот день: ${items.length}`}
+                  aria-pressed={selected}
+                  aria-controls={selectedDay ? "calendar-day-details" : undefined}
+                  aria-current={today ? "date" : undefined}
+                  className={cn(
+                    "flex min-h-24 min-w-0 flex-col items-start gap-2 border-b border-e border-border p-1.5 text-start hover:bg-primary/5 focus-visible:relative focus-visible:z-[1] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary sm:min-h-28 sm:p-3",
+                    outside && "bg-surface-subtle/60",
+                    items.length > 0 && !outside && "bg-primary/[0.035]",
+                    selected && "bg-primary/10 ring-2 ring-inset ring-primary",
+                  )}
+                >
+                  <span className={cn("grid size-7 shrink-0 place-items-center rounded-full text-[13px] font-semibold", today ? "bg-primary text-white" : outside ? "text-text-subtle" : "text-text-strong")}>{day.getDate()}</span>
+                  {items.length > 0 ? (
+                    <span aria-hidden="true" className="inline-flex max-w-full items-center justify-center gap-0.5 rounded-full bg-primary px-0.5 py-1 text-[10px] font-semibold leading-none text-white sm:gap-1.5 sm:px-2 sm:text-[14px]">
+                      <span className="size-1 shrink-0 rounded-full bg-white sm:size-1.5" />
+                      {items.length}
+                    </span>
                   ) : null}
-                </div>
-                <div className="mt-1 space-y-1">
-                  {items.map((campaign) => (
-                    <Link key={campaign.id} href={`/campaigns/${campaign.id}`} className={cn(
-                      "block rounded-lg border border-primary/15 bg-white/85 p-1.5 shadow-[0_1px_2px_rgba(17,24,39,0.04)] hover:border-primary/40",
-                      campaign.status === "blocked" && "border-warning/30 bg-warning-subtle/60",
-                      campaign.status === "cancelled" && "border-border bg-surface-subtle opacity-70",
-                      campaign.id === targetCampaignId && "border-primary bg-primary/[0.09] ring-1 ring-primary/25",
-                    )}>
-                      <div className="flex items-center justify-between gap-1 text-[10px] font-semibold text-primary"><span className="flex items-center gap-1"><Clock3 className="size-3" />{formatTime(campaign.scheduledAt!, timeZone)}</span><span className="truncate text-[9px] text-text-subtle">{statusLabel[campaign.status]}</span></div>
-                      <div className="mt-0.5 truncate text-[11px] font-semibold text-text-strong">{campaign.subject || campaign.name}</div>
-                      <div className="mt-0.5 flex items-center gap-1 truncate text-[10px] text-text-muted"><UsersRound className="size-3 shrink-0" />{snapshot ? audienceLabel(campaign, snapshot) : ""}</div>
-                    </Link>
-                  ))}
-                </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {selectedDay ? (
+          <aside ref={dayPanel} id="calendar-day-details" className="card min-w-0 p-4 sm:p-5" aria-labelledby="calendar-day-title">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 ref={panelHeading} id="calendar-day-title" tabIndex={-1} className="rounded text-[18px] font-semibold text-text-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">{selectedDateLabel}</h2>
+                <p className="mt-1 text-[12px] text-text-muted" role="status">Рассылок: {selectedItems.length}</p>
               </div>
-            );
-          })}
-        </div>
-      </section>
+              <Button size="icon" variant="ghost" aria-label="Закрыть сведения о дне" onClick={closeDay}><X aria-hidden="true" className="size-4" /></Button>
+            </div>
+            <p className="mt-3 text-[12px] text-text-muted">Время: {describeTimeZone(timeZone)}</p>
+            <div className="mt-5 space-y-4">
+              {selectedItems.map((campaign) => (
+                <article key={campaign.id} className={cn("min-w-0 rounded-xl border border-border p-4", campaign.id === targetCampaignId && "border-primary bg-primary/[0.035]")}>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <time dateTime={campaign.scheduledAt!} className="inline-flex items-center gap-1.5 text-[15px] font-semibold tabular-nums text-primary"><Clock3 aria-hidden="true" className="size-4" />{formatTime(campaign.scheduledAt!, timeZone)}</time>
+                    <Badge variant={campaign.status === "blocked" ? "warning" : "neutral"}>{statusLabel[campaign.status]}</Badge>
+                  </div>
+                  <h3 className="mt-3 break-words text-[14px] font-semibold text-text-strong">{campaign.name}</h3>
+                  <dl className="mt-4 space-y-3 text-[13px]">
+                    <CalendarDetail label="Тема" value={campaign.subject || "Не указана"} />
+                    <CalendarDetail label="Аудитория" value={snapshot ? audienceLabel(campaign, snapshot) : ""} />
+                    <CalendarDetail label="Получателей" value={campaign.metrics.recipients.toLocaleString("ru-RU")} />
+                    <CalendarDetail label="Отправитель" value={[campaign.senderName, campaign.senderEmail].filter(Boolean).join(" · ") || "Не указан"} />
+                    <CalendarDetail label="Каналы" value={campaign.deliveryChannels.map((channel) => getCampaignChannelDefinition(channel).label).join(", ") || "Не выбраны"} />
+                  </dl>
+                  {campaign.statusReason ? <p className="mt-4 break-words rounded-lg bg-surface-subtle p-3 text-[12px] leading-5 text-text-muted">{campaign.statusReason}</p> : null}
+                  <Link href={`/campaigns/${campaign.id}`} aria-label={`Открыть рассылку «${campaign.name}»`} className={buttonVariants({ variant: "outline", size: "sm", className: "mt-4 w-full" })}>Открыть рассылку</Link>
+                </article>
+              ))}
+              {selectedItems.length === 0 ? <p className="rounded-xl bg-surface-subtle p-4 text-[14px] leading-6 text-text-muted">{query || group || status ? "На этот день нет рассылок по выбранным фильтрам." : "На этот день нет запланированных рассылок."}</p> : null}
+            </div>
+            <Link href={`/campaigns/new?scheduledDate=${selectedDay}`} className={buttonVariants({ className: "mt-5 w-full" })}><Plus aria-hidden="true" className="size-4" />Запланировать</Link>
+          </aside>
+        ) : null}
+      </div>
       <div className="flex flex-wrap gap-2">
         <Badge variant="success"><CalendarDays className="size-3" />Запланировано: {campaigns.filter((item) => item.status === "scheduled").length}</Badge>
         {Object.entries(statusLabel).filter(([key]) => campaigns.some((item) => item.status === key)).map(([key, label]) => <Badge key={key}>{label}: {campaigns.filter((item) => item.status === key).length}</Badge>)}
       </div>
     </div>
   );
+}
+
+function CalendarDetail({ label, value }: { label: string; value: string }) {
+  return <div><dt className="text-[12px] text-text-muted">{label}</dt><dd className="mt-1 break-words font-medium text-text-strong">{value}</dd></div>;
 }
