@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { CalendarReport } from "./CalendarReport";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Filter, Plus, X } from "lucide-react";
@@ -68,6 +69,9 @@ const statusLabel: Record<CampaignRecord["status"], string> = {
 export function CalendarView() {
   const params = useSearchParams();
   const targetCampaignId = params.get("campaign");
+  const [view, setView] = React.useState<"calendar" | "report">("calendar");
+  const [loading, setLoading] = React.useState(false);
+  const inFlight = React.useRef(false);
   const [snapshot, setSnapshot] = React.useState<WorkspaceSnapshot | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [month, setMonth] = React.useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
@@ -81,6 +85,9 @@ export function CalendarView() {
   const timeZone = useBrowserTimeZone();
 
   const load = React.useCallback(async () => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setLoading(true);
     try {
       const response = await fetch("/api/workspace?scope=calendar", { headers: { Accept: "application/json" } });
       const body = await response.json() as WorkspaceSnapshot | { error?: string };
@@ -89,6 +96,9 @@ export function CalendarView() {
       setError(null);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Не удалось загрузить календарь.");
+    } finally {
+      inFlight.current = false;
+      setLoading(false);
     }
   }, []);
 
@@ -191,7 +201,7 @@ export function CalendarView() {
       <PageHeader
         eyebrow="Расписание"
         title="Календарь рассылок"
-        description="Выберите день с отметкой, чтобы посмотреть запланированные рассылки."
+        description="Планируйте рассылки и проверяйте результаты отправки за последние 24 часа."
         action={<Link href={`/campaigns/new?scheduledDate=${dateKey(new Date())}`} className={buttonVariants()}><Plus className="size-4" />Запланировать</Link>}
       />
       {error ? <Alert tone="danger" title="Календарь недоступен">{error}</Alert> : null}
@@ -199,6 +209,11 @@ export function CalendarView() {
         Все даты календаря и время отправки показаны по вашему устройству: {describeTimeZone(timeZone)}. На сервере расписание хранится в UTC без сдвига.
       </Alert>
 
+      <div className="flex flex-wrap gap-3" aria-label="Представление календаря">
+        <Button variant={view === "calendar" ? "primary" : "outline"} aria-pressed={view === "calendar"} onClick={() => setView("calendar")}>Календарь</Button>
+        <Button variant={view === "report" ? "primary" : "outline"} aria-pressed={view === "report"} onClick={() => setView("report")}>Отчёт за 24 часа{snapshot?.calendarReport ? ` · ${snapshot.calendarReport.rows.length}` : ""}</Button>
+      </div>
+      {view === "report" ? <CalendarReport report={snapshot?.calendarReport} timeZone={timeZone} loading={loading} refresh={() => void load()} /> : <>
       <section className="card p-4 sm:p-5" aria-label="Фильтры календаря">
         <div className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_240px_200px_auto]">
           <div className="relative"><Filter className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-subtle" /><Input className="input-with-leading-icon" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Тема, название или группа" aria-label="Поиск по теме" /></div>
@@ -295,6 +310,7 @@ export function CalendarView() {
         <Badge variant="success"><CalendarDays className="size-3" />Запланировано: {campaigns.filter((item) => item.status === "scheduled").length}</Badge>
         {Object.entries(statusLabel).filter(([key]) => campaigns.some((item) => item.status === key)).map(([key, label]) => <Badge key={key}>{label}: {campaigns.filter((item) => item.status === key).length}</Badge>)}
       </div>
+      </>}
     </div>
   );
 }

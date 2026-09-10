@@ -1,3 +1,4 @@
+import { calendarReport } from "./calendar-report";
 import { assessCommunications, enforceCommunications, recordCommunicationTouches } from "./communication-store";
 import { and, asc, desc, eq, inArray, isNotNull, lte, or, sql, type SQL } from "drizzle-orm";
 import { getD1, getDb } from "@/db";
@@ -702,13 +703,15 @@ export async function getWorkspaceBootstrap(request: Request) {
       .limit(3);
     // A provider outage must not prevent viewing saved plans or hide them.
     await Promise.allSettled(pendingRows.map(({ id }) => syncCampaignDelivery(request, id)));
-    const [campaignRecords, segmentRows] = await Promise.all([
+    const [campaignRecords, segmentRows, report] = await Promise.all([
       campaignSummaryRecords({ scheduledOnly: true }),
       db.select().from(segments).where(eq(segments.workspaceId, WORKSPACE_ID)).orderBy(desc(segments.updatedAt)),
+      calendarReport(),
     ]);
     return {
       ...base,
       campaigns: campaignRecords,
+      calendarReport: report,
       segments: segmentRows.map((segment) => toSegment(segment, [], [])),
     };
   }

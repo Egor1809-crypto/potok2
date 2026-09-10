@@ -813,6 +813,7 @@ export type WorkspaceHistoryWindow = {
 };
 
 export type WorkspaceSnapshot = {
+  calendarReport?: import("@/lib/calendar/report").CalendarReport;
   workspace: WorkspaceRecord;
   participant: ParticipantRecord;
   members: ParticipantRecord[];
