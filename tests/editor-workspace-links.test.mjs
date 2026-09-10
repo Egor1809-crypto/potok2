@@ -106,7 +106,7 @@ test("AI briefs preserve design, CTA and social links in emails and presentation
   assert.match(emailAi, /input\.visualStyle === "premium"/);
   assert.match(
     emailAi,
-    /Не заменяй явно запрошенный цвет стандартным голубым или фиолетовым/,
+    /Цвета возвращай в их запрошенных ролях/,
   );
   assert.match(
     emailCompiler,
