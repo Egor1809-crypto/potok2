@@ -73,7 +73,7 @@ test("Openverse fallback accepts only wide CC0 or public-domain images", async (
   ]);
 });
 
-test("both AI constructors persist a thematic fallback when image generation fails", async () => {
+test("AI image fallback stores real assets while failed email design is reported honestly", async () => {
   const [presentation, email, store] = await Promise.all([
     readFile(
       new URL("../lib/server/presentation-ai.ts", import.meta.url),
@@ -89,12 +89,8 @@ test("both AI constructors persist a thematic fallback when image generation fai
   assert.match(presentation, /slide\.imageUrl = fallback\.url/);
   assert.match(email, /storePublicDomainFallbackImage/);
   assert.match(email, /block\.href = fallback\.url/);
-  assert.match(email, /completeFallbackEmailDesign/);
-  assert.match(
-    email,
-    /Email AI provider unavailable; using complete art-directed fallback/,
-  );
-  assert.match(email, /fallbackDesignedSuggestion/);
+  assert.doesNotMatch(email, /completeFallbackEmailDesign/);
+  assert.match(email, /ИИ не смог подготовить письмо/);
   assert.match(email, /input\.action === "design"/);
   assert.match(store, /candidates\.slice\(0, 6\)/);
   assert.match(store, /storeGeneratedEmailAsset/);

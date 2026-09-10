@@ -35,6 +35,7 @@ import type {
   EmailTemplatesListResponse,
 } from "@/types/api";
 import type { BuilderDocument } from "./builder-types";
+import { emailPromptFields } from "@/lib/email-ai-brief";
 
 type Stage = "prompt" | "questions";
 type ComparisonView = "ai" | "current" | "split";
@@ -187,7 +188,7 @@ export function AiEmailAssistant({
     {},
   );
   const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [ctaLabel, setCtaLabel] = useState("Узнать подробнее");
+  const [ctaLabel, setCtaLabel] = useState("");
   const [ctaUrl, setCtaUrl] = useState("");
   const [designBrief, setDesignBrief] = useState("");
   const [visualStyle, setVisualStyle] = useState<
@@ -326,7 +327,7 @@ export function AiEmailAssistant({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "brief",
-          goal: useLinkedContext ? goal : goal.replace(/https:\/\/[^\s]+/g, ""),
+          ...emailPromptFields(goal, useLinkedContext),
           tone: "expert",
         }),
       });
@@ -378,12 +379,8 @@ export function AiEmailAssistant({
                   document: selectedTemplate.builderDocument,
                 }
               : undefined,
-          goal: useLinkedContext ? goal : goal.replace(/https:\/\/[^\s]+/g, ""),
+          ...emailPromptFields(goal, useLinkedContext, ctaLabel, ctaUrl),
           tone: "expert",
-          websiteUrl:
-            ctaUrl.trim() ||
-            [...goal.matchAll(/https:\/\/[^\s]+/g)].map((item) => item[0])[0],
-          ctaLabel: ctaLabel.trim() || "Узнать подробнее",
           designBrief: designBrief.trim(),
           visualStyle,
           socialLinks: [
@@ -674,19 +671,9 @@ export function AiEmailAssistant({
             <Textarea
               aria-describedby="ai-inline-suggestion-help"
               rows={9}
-              maxLength={2000}
+              maxLength={8000}
               value={goal}
               onChange={(event) => setGoal(event.target.value)}
-              onKeyDown={(event) => {
-                if (
-                  (event.key === "Enter" || event.key === "Tab") &&
-                  !event.shiftKey &&
-                  promptSuggestion
-                ) {
-                  event.preventDefault();
-                  setGoal((value) => `${value}${promptSuggestion}`);
-                }
-              }}
               placeholder="Например: письмо о запуске нового продукта для действующих клиентов. Коротко объяснить пользу и привести к странице продукта…"
               className="relative z-10 resize-y !bg-transparent font-medium text-text-strong caret-primary"
               style={{
@@ -696,10 +683,10 @@ export function AiEmailAssistant({
               }}
             />
             <span id="ai-inline-suggestion-help" className="sr-only">
-              Серый текст рядом с курсором — предлагаемое продолжение. Нажмите
-              Enter или Tab, чтобы принять его.
+              Серый текст — необязательная подсказка. Она не добавляется в запрос автоматически.
             </span>
           </div>
+          {promptSuggestion ? <Button type="button" variant="ghost" onClick={() => setGoal((value) => `${value}${promptSuggestion}`)}>Добавить подсказку</Button> : null}
           <FormField
             label="Стиль и визуальное направление"
             htmlFor="ai-email-design-brief"
@@ -752,11 +739,9 @@ export function AiEmailAssistant({
           ) : (
             <div className="rounded-xl border border-success/25 bg-success-subtle px-4 py-3 text-[11px] leading-5 text-text-muted">
               <strong className="block text-text-strong">
-                Режим «с нуля»: библиотека физически не передаётся ИИ
+                Письмо по вашему описанию
               </strong>
-              Модель сама определит композицию, шрифтовую пару, размеры,
-              интервалы, рамку, изображение и создаст отдельный авторский узор
-              из вашего запроса.
+              Укажите текст, порядок разделов, цвета и ограничения. ИИ подберёт остальные детали оформления.
             </div>
           )}
           {detectedUrl ? (
@@ -919,8 +904,6 @@ export function AiEmailAssistant({
                             };
                           });
                           if (!activeQuestion.multiple) {
-                            if (/action|cta/i.test(activeQuestion.id))
-                              setCtaLabel(option);
                             setAnswers((current) => ({
                               ...current,
                               [activeQuestion.id]: "",
@@ -959,8 +942,6 @@ export function AiEmailAssistant({
                         [activeQuestion.id]: [],
                       }));
                     }
-                    if (/action|cta/i.test(activeQuestion.id) && value)
-                      setCtaLabel(value);
                   }}
                   placeholder={activeQuestion.placeholder}
                 />
@@ -1013,7 +994,7 @@ export function AiEmailAssistant({
                   id="ai-email-cta-label"
                   value={ctaLabel}
                   onChange={(event) => setCtaLabel(event.target.value)}
-                  placeholder="Узнать подробнее"
+                  placeholder="Из запроса, если оставить пустым"
                 />
               </FormField>
               <FormField label="HTTPS-ссылка кнопки" htmlFor="ai-email-cta-url">

@@ -12,7 +12,6 @@ export function normalizeEmailVisualDesign(document: EmailBuilderDocumentInput) 
       block.textColor = readableColor(block.textColor, block.type === "button" ? buttonBackground : background);
       block.fontSize = Math.max(block.type === "footer" || block.type === "social" ? 12 : headings.has(block.type) ? 22 : 16, block.fontSize);
       block.lineHeight = headings.has(block.type) ? Math.max(115, Math.min(135, block.lineHeight ?? 120)) : Math.max(145, Math.min(175, block.lineHeight ?? 155));
-      if (!headings.has(block.type) && block.type !== "button" && block.content.length > 150) block.alignment = "left";
     }
     // A common gutter prevents the jagged edge caused by independently styled blocks.
     block.paddingLeft = Math.max(24, Math.min(48, block.paddingLeft ?? 36));

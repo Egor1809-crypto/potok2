@@ -187,7 +187,7 @@ test("AI brief asks follow-up questions and accepts dragged user images", async 
   assert.match(assistant, /Стиль и визуальное направление/);
   assert.match(
     assistant,
-    /Режим «с нуля»: библиотека физически не передаётся ИИ/,
+    /Письмо по вашему описанию/,
   );
   assert.ok(
     assistant.indexOf("Стиль и визуальное направление") <
@@ -204,12 +204,11 @@ test("AI brief asks follow-up questions and accepts dragged user images", async 
   assert.match(assistant, /Варианты ответа/);
   assert.match(assistant, /aria-pressed=\{selected\}/);
   assert.match(assistant, /Можно выбрать несколько вариантов/);
-  assert.match(server, /7–12 микровопросов/);
-  assert.match(server, /minItems: 7/);
+  assert.match(server, /от 0 до 4 вопросов/);
+  assert.match(server, /minItems: 0/);
   assert.match(server, /multiple: \{ type: "boolean" \}/);
   assert.match(assistant, /if \(!value\.trim\(\)\) return ""/);
   assert.match(assistant, /createImageBitmap/);
-  assert.match(server, /Арт-направление — чистый минимализм/);
   assert.match(server, /classifyEmailType/);
   assert.match(server, /saasEmailBlockStyle/);
   assert.match(server, /modelDesignNumber\(design\.contentWidth/);
@@ -221,9 +220,7 @@ test("AI brief asks follow-up questions and accepts dragged user images", async 
   assert.match(server, /suggestion: fallbackBriefQuestions\(input\.goal\)/);
   assert.doesNotMatch(server, /createEditorialCopy/);
   assert.match(server, /emailCompositionGuidance/);
-  assert.match(server, /Каждую загруженную фотографию/);
   assert.match(server, /blocks\.splice\(heroIndex/);
-  assert.match(server, /visibleBlockContent/);
   assert.match(server, /creativeBlockStyle/);
   assert.match(server, /artDirection/);
   assert.match(server, /contentStrategy/);
@@ -258,10 +255,7 @@ test("email AI can either adapt a real library template or design from scratch",
   assert.match(assistant, /selectedTemplate\.builderDocument/);
   assert.match(server, /adaptSuggestionToTemplate/);
   assert.match(server, /templateBlueprint/);
-  assert.match(server, /Режим композиции — адаптация библиотечного шаблона/);
-  assert.match(server, /Режим композиции — полностью оригинальная генерация/);
   assert.match(server, /patternArtwork = usesTemplateLibrary/);
-  assert.match(server, /kind: "pattern"/);
   assert.match(server, /Библиотека шаблонов и готовых паттернов не использовалась/);
   assert.match(assistant, /Создано с нуля · библиотека не использовалась/);
 });

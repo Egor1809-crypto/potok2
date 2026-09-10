@@ -16,7 +16,9 @@ async function generateEmail(name) {
   const calls = [];
   const server = await loadAiServer("lib/server/email-ai.ts", { env, fetch: async (url, init) => {
     assert.match(String(url), /chat\/completions$/); // A no-image brief must never call image generation.
-    calls.push(JSON.parse(init.body));
+    const payload = JSON.parse(init.body);
+    if (payload.response_format?.json_schema?.name === "email_brief_review") return providerResponse(JSON.stringify({ issues: [] }));
+    calls.push(payload);
     return providerResponse(example.providerText);
   } });
   return { result: await server.generateEmailSuggestion(request(), example.input), calls, example };
@@ -57,13 +59,10 @@ test("real event output keeps unfamiliar program/details blocks and the exact CT
   assert.match(html, /href="https:\/\/example.com\/register"/);
 });
 
-test("provider failure is disclosed and the basic draft contains only provided source text", async () => {
+test("provider failure never returns an unrelated basic letter as a successful design", async () => {
   const server = await loadAiServer("lib/server/email-ai.ts", { env, fetch: async () => Response.json({ error: "unavailable" }, { status: 500 }) });
   const input = { action: "design", goal: "Встреча команды 28 сентября в 17:00", visualContent: "none", imageSource: "none" };
-  const result = await server.generateEmailSuggestion(request(), input);
-  assert.match(result.generationNotice, /базовый макет/);
-  assert.ok(result.suggestion.document.blocks.some((block) => block.content === input.goal));
-  assert.ok(!result.suggestion.document.blocks.some((block) => block.type === "image"));
+  await assert.rejects(server.generateEmailSuggestion(request(), input), /ИИ не смог подготовить письмо/);
 });
 
 test("real presentation has the requested slide count, readable layouts and no unwanted artwork", async () => {
