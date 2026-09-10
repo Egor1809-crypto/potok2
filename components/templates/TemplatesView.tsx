@@ -4,8 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import Link from "next/link";
 import { ArrowLeft, FileText, PenTool, RefreshCw, SearchX, Sparkles, Upload } from "lucide-react";
 
-import { importLetter, uploadImportedResources, disposeImportedLetter, type ImportedLetter } from "@/lib/email-import/import-letter";
-import { importAccept } from "@/lib/email-import/formats";
+import { importLetter, uploadImportedResources, type ImportedLetter } from "@/lib/email-import/import-letter";
+import { importCodeLetter, type CodeImportInput } from "@/lib/email-import/code";
+import { EmailImportDialog } from "./EmailImportDialog";
 import type { TemplateCategory } from "@/types";
 import type {
   ApiError,
@@ -165,12 +166,13 @@ export function TemplatesView() {
   const [palette, setPalette] = useState<PaletteFilter>("all");
   const [busy, setBusy] = useState<{ id: string; action: "clone" | "delete" | "favorite" } | null>(null);
   const [importing, setImporting] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [importPreview, setImportPreview] = useState<ImportedLetter | null>(null);
   const [importProgress, setImportProgress] = useState("");
-  useEffect(() => () => { if (importPreview) disposeImportedLetter(importPreview); }, [importPreview]);
+  const importResources = importPreview?.resources;
+  useEffect(() => () => { importResources?.forEach(resource => URL.revokeObjectURL(resource.url)); }, [importResources]);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const importRef = useRef<HTMLInputElement>(null);
   const importPromptedRef = useRef(false);
 
   const loadTemplates = useCallback(async () => {
@@ -198,8 +200,11 @@ export function TemplatesView() {
 
   useEffect(() => {
     if (loadState !== "ready" || importPromptedRef.current || new URLSearchParams(browserSearch).get("import") !== "1") return;
-    importPromptedRef.current = true;
-    importRef.current?.click();
+    const frame = window.requestAnimationFrame(() => {
+      importPromptedRef.current = true;
+      setImportOpen(true);
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [browserSearch, loadState]);
 
   const filteredTemplates = useMemo(() => {
@@ -331,16 +336,22 @@ export function TemplatesView() {
 
   const importTemplate = async (files: File[]) => {
     setImporting(true); setError(null); setNotice(null); setImportProgress("Читаем письмо…");
-    try { setImportPreview(await importLetter(files, setImportProgress)); }
+    try { setImportPreview(await importLetter(files, setImportProgress)); setImportOpen(false); }
     catch (error) { setError(error instanceof Error ? error.message : "Не удалось прочитать письмо."); }
-    finally { setImporting(false); setImportProgress(""); if (importRef.current) importRef.current.value = ""; }
+    finally { setImporting(false); setImportProgress(""); }
+  };
+  const importCode = async (input: CodeImportInput) => {
+    setImporting(true); setError(null); setNotice(null); setImportProgress("Читаем код…");
+    try { setImportPreview(await importCodeLetter(input, setImportProgress)); setImportOpen(false); }
+    catch (caught) { setError(caught instanceof Error ? caught.message : "Не удалось создать письмо из кода."); }
+    finally { setImporting(false); setImportProgress(""); }
   };
   const saveImportedTemplate = async () => {
     if (!importPreview) return;
     setImporting(true); setError(null);
     try {
       const document = await uploadImportedResources(importPreview, setImportProgress);
-      const name = `${importPreview.name || "Импортированное письмо"} · импорт ${new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}`;
+      const name = importPreview.name.trim() || "Импортированное письмо";
       const response = await fetch("/api/templates", { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({
         name, description: document.rawHtml ? "Импортированное письмо: исходный макет без пересборки." : "Импортирован из резервного файла Поток.", category: "Business",
         subject: document.subject || "Новое письмо", previewText: document.previewText || "", builderDocument: document,
@@ -378,8 +389,7 @@ export function TemplatesView() {
               </Link>
             ) : null}
             <>
-              <input ref={importRef} type="file" multiple accept={importAccept} className="sr-only" onChange={(event) => { const files = Array.from(event.target.files ?? []); if (files.length) void importTemplate(files); }} />
-              <button type="button" disabled={importing} onClick={() => importRef.current?.click()} className={buttonVariants({ variant: "secondary", size: "md" })}>
+              <button type="button" disabled={importing} onClick={() => { setError(null); setImportOpen(true); }} className={buttonVariants({ variant: "secondary", size: "md" })}>
                 <Upload aria-hidden="true" className="size-4" />{importing ? "Импортируем…" : "Импортировать письмо"}
               </button>
             </>
@@ -391,13 +401,14 @@ export function TemplatesView() {
         }
       />
 
-      <p className="text-sm text-text-muted">Импорт: HTML, PDF, Word DOCX, PNG/JPEG/GIF/WebP, TXT и резервный JSON. Для HTML с локальными изображениями выберите письмо и файлы изображений/CSS вместе.</p>
+      <p className="text-sm text-text-muted">Импортируйте файл или вставьте код письма. Перед добавлением в шаблоны можно проверить результат.</p>
+      <EmailImportDialog open={importOpen} onOpenChange={setImportOpen} busy={importing} progress={importProgress} error={error} onFiles={files => void importTemplate(files)} onCode={input => void importCode(input)} />
       {importProgress ? <p role="status" className="text-sm text-primary">{importProgress}</p> : null}
-      <Modal open={Boolean(importPreview)} onOpenChange={open => { if (!open && !importing) setImportPreview(null); }} title="Проверьте импортированное письмо" size="xl" closeOnEscape={!importing} closeOnBackdrop={!importing} footer={<div className="flex flex-wrap gap-3"><Button variant="outline" disabled={importing} onClick={() => setImportPreview(null)}>Отмена</Button><Button loading={importing} onClick={() => void saveImportedTemplate()}>Сохранить письмо</Button></div>}>
+      <Modal open={Boolean(importPreview)} onOpenChange={open => { if (!open && !importing) setImportPreview(null); }} title="Проверьте импортированное письмо" size="xl" closeOnEscape={!importing} closeOnBackdrop={!importing} footer={<div className="flex flex-wrap gap-3"><Button variant="outline" disabled={importing} onClick={() => { setImportPreview(null); setImportOpen(true); }}>Назад к импорту</Button><Button loading={importing} disabled={importing || !importPreview?.name.trim()} onClick={() => void saveImportedTemplate()}>Добавить в шаблоны</Button></div>}>
         {importPreview ? <div className="space-y-4">
           {error ? <Alert tone="danger" title="Не удалось сохранить">{error}</Alert> : null}
           <ul className="space-y-2 text-sm leading-6 text-text-muted">{importPreview.notes.map(note => <li key={note}>{note}</li>)}</ul>
-          <div><label htmlFor="import-subject" className="mb-1 block text-sm">Тема письма</label><Input id="import-subject" maxLength={300} value={importPreview.document.subject} readOnly /></div>
+          <div className="grid gap-4 sm:grid-cols-2"><div><label htmlFor="import-name" className="mb-1 block text-sm">Название шаблона</label><Input id="import-name" maxLength={160} disabled={importing} value={importPreview.name} onChange={event => setImportPreview(current => current ? { ...current, name: event.target.value } : current)} /></div><div><label htmlFor="import-subject" className="mb-1 block text-sm">Тема письма</label><Input id="import-subject" maxLength={300} disabled={importing} value={importPreview.document.subject} onChange={event => setImportPreview(current => current ? { ...current, document: { ...current.document, subject: event.target.value } } : current)} /></div></div>
           {importProgress ? <p role="status" className="text-sm text-primary">{importProgress}</p> : null}
           {importPreview.document.rawHtml ? <iframe title="Исходное оформление импортированного письма" sandbox="" srcDoc={importPreview.document.rawHtml} className="h-[60vh] min-h-80 w-full rounded-lg border border-border bg-white" /> : <p className="text-sm">Блочный макет можно открыть в редакторе после сохранения.</p>}
         </div> : null}

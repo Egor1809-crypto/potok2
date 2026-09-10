@@ -1,4 +1,6 @@
 export const importAccept = ".html,.htm,.pdf,.docx,.png,.jpg,.jpeg,.gif,.webp,.txt,.json,.css";
+export const MAX_AI_CODE_LENGTH = 60_000;
+export const MAX_HTML_CODE_LENGTH = 500_000;
 export const escapeMarkup = (text: string) => text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 export function decodeDocument(bytes: Uint8Array) {
   if (bytes[0] === 0xff && bytes[1] === 0xfe) return new TextDecoder("utf-16le").decode(bytes);

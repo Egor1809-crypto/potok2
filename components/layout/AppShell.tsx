@@ -2,9 +2,9 @@
 
 import { useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 import { cn } from "@/components/ui/utils";
+import { useSidebarPreference } from "@/lib/sidebar-preference";
 
 import { AppSidebar } from "./app-sidebar";
 import { CommandMenu } from "./command-menu";
@@ -38,12 +38,13 @@ export function AppShell({
   contentWidth = "wide",
   contentClassName,
   viewportLocked = false,
-  desktopSidebarCollapsible = false,
+  desktopSidebarCollapsible = true,
 }: AppShellProps) {
   const pathname = usePathname();
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const [commandMenuOpen, setCommandMenuOpen] = useState(false);
-  const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false);
+  const sidebar = useSidebarPreference();
+  const desktopSidebarCollapsed = desktopSidebarCollapsible && sidebar.collapsed;
 
   return (
     <div
@@ -68,36 +69,10 @@ export function AppShell({
           viewportLocked ? "h-full min-h-0" : "min-h-screen",
         )}
       >
-        {!desktopSidebarCollapsed ? (
-          <AppSidebar className="sticky top-0 hidden xl:flex" />
-        ) : null}
-
-        {desktopSidebarCollapsible ? (
-          <button
-            type="button"
-            aria-label={
-              desktopSidebarCollapsed
-                ? "Показать навигацию платформы"
-                : "Скрыть навигацию платформы"
-            }
-            title={
-              desktopSidebarCollapsed
-                ? "Показать навигацию"
-                : "Скрыть навигацию"
-            }
-            onClick={() => setDesktopSidebarCollapsed((current) => !current)}
-            className={cn(
-              "fixed top-2.5 z-50 hidden size-8 place-items-center rounded-lg border border-border bg-surface text-text-muted shadow-[var(--shadow-sm)] outline-none transition hover:bg-surface-subtle hover:text-text-strong focus-visible:ring-2 focus-visible:ring-primary/30 xl:grid",
-              desktopSidebarCollapsed ? "left-2.5" : "left-[222px]",
-            )}
-          >
-            {desktopSidebarCollapsed ? (
-              <PanelLeftOpen aria-hidden="true" className="size-4" />
-            ) : (
-              <PanelLeftClose aria-hidden="true" className="size-4" />
-            )}
-          </button>
-        ) : null}
+        <div id="platform-sidebar" aria-hidden={desktopSidebarCollapsed} inert={desktopSidebarCollapsed}
+          className={cn("sticky top-0 hidden h-dvh shrink-0 overflow-hidden motion-safe:transition-[width] motion-safe:duration-200 xl:block", desktopSidebarCollapsed ? "w-0" : "w-[264px]")}>
+          <AppSidebar className={cn("motion-safe:transition-transform motion-safe:duration-200", desktopSidebarCollapsed && "-translate-x-full")} />
+        </div>
 
         <div
           className={cn(
@@ -110,6 +85,7 @@ export function AppShell({
             onMenuClick={() => setMobileNavigationOpen(true)}
             onSearchClick={() => setCommandMenuOpen(true)}
             action={action}
+            sidebar={desktopSidebarCollapsible ? { collapsed: desktopSidebarCollapsed, onToggle: sidebar.toggle } : undefined}
           />
           <main
             id="main-content"

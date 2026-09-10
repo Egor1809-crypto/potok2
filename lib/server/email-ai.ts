@@ -278,7 +278,7 @@ function runtime() {
   };
 }
 
-function aiProvider() {
+export function aiProvider() {
   const navyKey = runtime().NAVYAI_API_KEY?.trim();
   if (navyKey) {
     return {

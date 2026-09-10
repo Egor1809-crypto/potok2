@@ -14,7 +14,7 @@ export async function loadAiServer(entry, { env = {}, fetch = globalThis.fetch, 
   const mocks = {
     "cloudflare:workers": synthetic({ env }),
     "@/db": synthetic({ getD1: () => db }),
-    "./database-init": synthetic({ ensureDatabase: async () => {}, WORKSPACE_ID: "design-evaluation" }),
+    "./database-init": synthetic({ ensureDatabase: async () => ({ participant: { id: "design-evaluation" }, sessionId: "test-session" }), WORKSPACE_ID: "design-evaluation" }),
     "./email-asset-store": synthetic(assetStore ?? { storeGeneratedEmailAsset: async () => { throw new Error("Asset writes are disabled in design tests"); }, storeGeneratedEmailAssetBytes: async () => { throw new Error("Asset writes are disabled in design tests"); } }),
     "./public-domain-image-store": synthetic({ storePublicDomainFallbackImage: async () => null }),
   };

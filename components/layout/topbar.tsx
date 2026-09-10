@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { CalendarDays, Command, LogOut, Menu, Plus, Search } from "lucide-react";
+import { CalendarDays, Command, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Plus, Search } from "lucide-react";
 
 import { Avatar } from "@/components/ui/avatar";
 import { IconButton, buttonVariants } from "@/components/ui/button";
@@ -15,6 +15,7 @@ type TopbarProps = {
   onMenuClick: () => void;
   onSearchClick: () => void;
   action?: ReactNode;
+  sidebar?: { collapsed: boolean; onToggle: () => void };
 };
 
 export function Topbar({
@@ -22,6 +23,7 @@ export function Topbar({
   onMenuClick,
   onSearchClick,
   action,
+  sidebar,
 }: TopbarProps) {
   const [participantName, setParticipantName] = useState<string>(demoUser.name);
   const [participantColor, setParticipantColor] = useState("#6558E8");
@@ -46,6 +48,11 @@ export function Topbar({
       <span className="sr-only">Текущий раздел: {currentSection}</span>
 
       <div className="flex min-w-0 items-center gap-2.5">
+        {sidebar ? <IconButton
+          label={sidebar.collapsed ? "Развернуть левую панель" : "Свернуть левую панель"}
+          title={sidebar.collapsed ? "Развернуть левую панель" : "Свернуть левую панель"}
+          variant="ghost" className="hidden xl:inline-flex" aria-expanded={!sidebar.collapsed} aria-controls="platform-sidebar" onClick={sidebar.onToggle}
+        >{sidebar.collapsed ? <PanelLeftOpen aria-hidden="true" className="size-[18px]" /> : <PanelLeftClose aria-hidden="true" className="size-[18px]" />}</IconButton> : null}
         <IconButton
           label="Открыть навигацию"
           variant="ghost"
