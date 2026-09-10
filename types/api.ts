@@ -433,6 +433,7 @@ export type EmailExportResponse = {
 export type EmailAiResponse = {
   configured: boolean;
   provider?: "navyai" | "openai";
+  generationNotice?: string;
   suggestion?: EmailAiSuggestion;
 };
 

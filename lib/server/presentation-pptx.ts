@@ -1,3 +1,5 @@
+import { fittedPresentationFont, presentationChartData, presentationFontFamily, presentationReadableColors, presentationStepText } from "@/lib/presentation-design-quality";
+import { estimatedTextLines } from "@/lib/design-readability";
 import type {
   PresentationPatternId,
   PresentationProjectRecord,
@@ -519,7 +521,7 @@ function textParagraph(value: string, options: TextOptions) {
   const indent = options.bullet
     ? ` marL="${Math.round(0.28 * EMU)}" indent="-${Math.round(0.16 * EMU)}"`
     : "";
-  return `<a:p><a:pPr algn="${options.align ?? "l"}"${indent}>${bullet}</a:pPr><a:r><a:rPr lang="ru-RU" sz="${Math.round(options.fontSize * 100)}"${options.bold ? ' b="1"' : ""}${options.italic ? ' i="1"' : ""} dirty="0"><a:solidFill><a:srgbClr val="${hex(options.color)}"/></a:solidFill><a:latin typeface="${xml(options.fontFace ?? "Arial")}"/><a:cs typeface="${xml(options.fontFace ?? "Arial")}"/></a:rPr><a:t>${xml(value || " ")}</a:t></a:r><a:endParaRPr lang="ru-RU" sz="${Math.round(options.fontSize * 100)}"/></a:p>`;
+  return `<a:p><a:pPr algn="${options.align ?? "l"}"${indent}>${options.bullet ? '<a:spcAft><a:spcPts val="800"/></a:spcAft>' : ""}${bullet}</a:pPr><a:r><a:rPr lang="ru-RU" sz="${Math.round(options.fontSize * 100)}"${options.bold ? ' b="1"' : ""}${options.italic ? ' i="1"' : ""} dirty="0"><a:solidFill><a:srgbClr val="${hex(options.color)}"/></a:solidFill><a:latin typeface="${xml(options.fontFace ?? "Arial")}"/><a:cs typeface="${xml(options.fontFace ?? "Arial")}"/></a:rPr><a:t>${xml(value || " ")}</a:t></a:r><a:endParaRPr lang="ru-RU" sz="${Math.round(options.fontSize * 100)}"/></a:p>`;
 }
 
 function textBox(
@@ -532,6 +534,17 @@ function textBox(
   paragraphs: Array<{ text: string; options: TextOptions }>,
   options?: { fill?: string; radius?: boolean; hyperlinkId?: string },
 ) {
+  const widthPoints = w / EMU * 72;
+  const heightPoints = h / EMU * 72;
+  const totalHeight = (scale: number) => paragraphs.reduce((height, item) => {
+    const size = Math.max(Math.min(item.options.fontSize, 17), item.options.fontSize * scale);
+    return height + estimatedTextLines(item.text, widthPoints - (item.options.bullet ? 22 : 0), size) * size * 1.18 + (item.options.bullet ? 8 : 0);
+  }, 0);
+  let scale = 1;
+  while (scale > 0.66 && totalHeight(scale) > heightPoints) scale -= 0.02;
+  paragraphs = paragraphs.map((item) => ({ ...item, options: { ...item.options,
+    fontSize: Math.max(Math.min(item.options.fontSize, 17), Math.floor(item.options.fontSize * scale)),
+  } }));
   const margin = paragraphs[0]?.options.margin ?? 0;
   const hyperlink = options?.hyperlinkId
     ? `<a:hlinkClick r:id="${options.hyperlinkId}"/>`
@@ -638,8 +651,10 @@ function slideShapes(
   }
   const accent = project.accentColor;
   const background = project.backgroundColor;
-  const text = project.textColor;
-  const inverse = dark(accent) ? "#FFFFFF" : "#151019";
+  const colors = presentationReadableColors(background, project.textColor, accent);
+  const text = colors.text;
+  const inverse = colors.inverse;
+  const headingFont = presentationFontFamily(project.themeId);
   const muted = dark(background) ? "#C9C3CD" : "#6D6472";
   const x = 0.82 * EMU;
   const fullWidth = 11.7 * EMU;
@@ -663,7 +678,7 @@ function slideShapes(
         true,
       ),
     );
-    if (slide.eyebrow)
+    if (slide.eyebrow && slide.layout !== "callout")
       shapes.push(
         textBox(id++, "Надзаголовок", x, 0.72 * EMU, contentWidth, 0.36 * EMU, [
           {
@@ -672,7 +687,7 @@ function slideShapes(
           },
         ]),
       );
-    if (image)
+    if (image && slide.layout !== "gallery")
       shapes.push(
         picture(
           id++,
@@ -692,7 +707,7 @@ function slideShapes(
       textBox(id++, "Заголовок", x, 1.35 * EMU, contentWidth, 2.35 * EMU, [
         {
           text: slide.title,
-          options: { color: text, fontSize: 50, bold: true, valign: "ctr" },
+          options: { color: text, fontSize: fittedPresentationFont(slide.title, contentWidth / EMU * 72, 2.35 * 72, 50, 34), fontFace: headingFont, bold: true, valign: "ctr" },
         },
       ]),
     );
@@ -724,6 +739,7 @@ function slideShapes(
           options: {
             color: text,
             fontSize: image ? 34 : 43,
+            fontFace: headingFont,
             bold: true,
             valign: "ctr",
           },
@@ -744,7 +760,7 @@ function slideShapes(
       textBox(id++, "Заголовок", x, 1.25 * EMU, leftWidth, 1.75 * EMU, [
         {
           text: slide.title,
-          options: { color: text, fontSize: image ? 32 : 36, bold: true },
+          options: { color: text, fontSize: image ? 32 : 36, fontFace: headingFont, bold: true },
         },
       ]),
     );
@@ -791,10 +807,10 @@ function slideShapes(
     }
   } else if (slide.layout === "timeline" || slide.layout === "process") {
     shapes.push(
-      textBox(id++, "Заголовок", x, 0.95 * EMU, contentWidth, 1.15 * EMU, [
+      textBox(id++, "Заголовок", x, 1.2 * EMU, contentWidth, 1.15 * EMU, [
         {
           text: slide.title,
-          options: { color: text, fontSize: 34, bold: true },
+          options: { color: text, fontSize: 34, fontFace: headingFont, bold: true },
         },
       ]),
     );
@@ -806,22 +822,21 @@ function slideShapes(
     const cardWidth = (contentWidth - 0.5 * EMU) / 3;
     items.forEach((item, index) => {
       const itemX = x + index * (cardWidth + 0.25 * EMU);
+      shapes.push(rect(id++, "Линия этапа", itemX, 2.55 * EMU, cardWidth, 0.015 * EMU, accent));
+      shapes.push(textBox(id++, "Номер этапа", itemX, 2.75 * EMU, cardWidth, 0.35 * EMU, [
+        { text: `0${index + 1}`, options: { color: accent, fontSize: 17, bold: true } },
+      ]));
       shapes.push(
         textBox(
           id++,
           `Этап ${index + 1}`,
           itemX,
-          2.55 * EMU,
+          3.25 * EMU,
           cardWidth,
-          2.65 * EMU,
+          1.95 * EMU,
           [
-            {
-              text: `0${index + 1}`,
-              options: { color: accent, fontSize: 17, bold: true },
-            },
-            { text: item, options: { color: text, fontSize: 19, bold: true } },
+            { text: presentationStepText(item, index), options: { color: text, fontSize: 19, bold: true } },
           ],
-          { fill: dark(background) ? "#24262A" : "#F0E8E2", radius: true },
         ),
       );
     });
@@ -833,10 +848,10 @@ function slideShapes(
       );
   } else if (slide.layout === "comparison") {
     shapes.push(
-      textBox(id++, "Заголовок", x, 0.95 * EMU, contentWidth, 1.15 * EMU, [
+      textBox(id++, "Заголовок", x, 1.2 * EMU, contentWidth, 1.15 * EMU, [
         {
           text: slide.title,
-          options: { color: text, fontSize: 34, bold: true },
+          options: { color: text, fontSize: 34, fontFace: headingFont, bold: true },
         },
       ]),
     );
@@ -862,7 +877,7 @@ function slideShapes(
             {
               text: label,
               options: {
-                color: column ? accent : text,
+                color: column ? colors.accent : text,
                 fontSize: 19,
                 bold: true,
               },
@@ -873,18 +888,18 @@ function slideShapes(
             })),
           ],
           {
-            fill: column ? accent : dark(background) ? "#24262A" : "#F0E8E2",
-            radius: true,
+            fill: background,
+            radius: false,
           },
         ),
       );
     });
   } else if (slide.layout === "agenda" || slide.layout === "table") {
     shapes.push(
-      textBox(id++, "Заголовок", x, 0.95 * EMU, 4.1 * EMU, 2.0 * EMU, [
+      textBox(id++, "Заголовок", x, 1.2 * EMU, 4.1 * EMU, 2.0 * EMU, [
         {
           text: slide.title,
-          options: { color: text, fontSize: 34, bold: true },
+          options: { color: text, fontSize: 34, fontFace: headingFont, bold: true },
         },
         { text: slide.body, options: { color: muted, fontSize: 16 } },
       ]),
@@ -913,86 +928,49 @@ function slideShapes(
         })),
       ),
     );
+  } else if (slide.layout === "gallery") {
+    shapes.push(textBox(id++, "Заголовок", x, 3.4 * EMU, 4.0 * EMU, 1.5 * EMU, [
+      { text: slide.title, options: { color: text, fontSize: 32, fontFace: headingFont, bold: true } },
+    ]));
+    if (slide.body) shapes.push(textBox(id++, "Описание", x, 5.05 * EMU, 4.0 * EMU, 1.6 * EMU, [
+      { text: slide.body, options: { color: muted, fontSize: 18 } },
+    ]));
+    if (image) shapes.push(picture(id++, "Изображение", "rId2", image, 5.5 * EMU, 1.15 * EMU, 7.0 * EMU, 5.65 * EMU));
   } else if (slide.layout === "chart") {
     shapes.push(
-      textBox(id++, "Заголовок", x, 0.95 * EMU, contentWidth, 1.15 * EMU, [
+      textBox(id++, "Заголовок", x, 1.2 * EMU, contentWidth, 1.15 * EMU, [
         {
           text: slide.title,
-          options: { color: text, fontSize: 34, bold: true },
+          options: { color: text, fontSize: 34, fontFace: headingFont, bold: true },
         },
       ]),
     );
-    const items = (
-      slide.bullets.length
-        ? slide.bullets
-        : ["24 | Сейчас", "48 | Этап 1", "67 | Этап 2", "86 | Цель"]
-    ).slice(0, 4);
-    const barWidth = contentWidth / items.length;
+    if (slide.body) shapes.push(textBox(id++, "Пояснение", x, 2.3 * EMU, contentWidth, 0.55 * EMU, [
+      { text: slide.body, options: { color: muted, fontSize: 17 } },
+    ]));
+    const items = presentationChartData(slide.bullets);
+    const barWidth = contentWidth / Math.max(1, items.length);
     items.forEach((item, index) => {
-      const [rawValue = "0", label = ""] = item
-        .split("|")
-        .map((part) => part.trim());
-      const value = Math.max(
-        12,
-        Math.min(92, Number.parseFloat(rawValue) || 20),
-      );
-      const height = 3.4 * EMU * (value / 100);
+      const height = 2.6 * EMU * item.fraction;
       const itemX = x + index * barWidth + 0.18 * EMU;
-      shapes.push(
-        rect(
-          id++,
-          `Столбец ${index + 1}`,
-          itemX,
-          5.65 * EMU - height,
-          barWidth - 0.36 * EMU,
-          height,
-          accent,
-          true,
-        ),
-      );
-      shapes.push(
-        textBox(
-          id++,
-          `Подпись ${index + 1}`,
-          itemX,
-          5.75 * EMU,
-          barWidth - 0.36 * EMU,
-          0.55 * EMU,
-          [
-            {
-              text: `${rawValue}\n${label}`,
-              options: { color: text, fontSize: 12, align: "ctr", bold: true },
-            },
-          ],
-        ),
-      );
+      if (height > 0) shapes.push(rect(id++, `Столбец ${index + 1}`, itemX, 5.65 * EMU - height, barWidth - 0.36 * EMU, height, accent));
+      shapes.push(textBox(id++, `Значение ${index + 1}`, itemX, 5.15 * EMU - height, barWidth - 0.36 * EMU, 0.45 * EMU, [
+        { text: item.raw, options: { color: text, fontSize: 22, bold: true } },
+      ]));
+      shapes.push(textBox(id++, `Подпись ${index + 1}`, itemX, 5.85 * EMU, barWidth - 0.36 * EMU, 0.7 * EMU, [
+        { text: item.label, options: { color: text, fontSize: 16 } },
+      ]));
     });
   } else if (slide.layout === "callout") {
-    shapes.push(
-      textBox(
-        id++,
-        "Акцент",
-        1.35 * EMU,
-        1.05 * EMU,
-        10.65 * EMU,
-        5.35 * EMU,
-        [
-          {
-            text: slide.eyebrow || "ГЛАВНАЯ МЫСЛЬ",
-            options: { color: accent, fontSize: 12, bold: true, align: "ctr" },
-          },
-          {
-            text: slide.title,
-            options: { color: text, fontSize: 38, bold: true, align: "ctr" },
-          },
-          {
-            text: slide.body,
-            options: { color: muted, fontSize: 18, align: "ctr" },
-          },
-        ],
-        { fill: dark(background) ? "#24262A" : "#F0E8E2", radius: true },
-      ),
-    );
+    if (slide.eyebrow) shapes.push(textBox(id++, "Акцент", x, 1.3 * EMU, fullWidth, 0.4 * EMU, [
+      { text: slide.eyebrow, options: { color: colors.accent, fontSize: 12, bold: true } },
+    ]));
+    shapes.push(textBox(id++, "Главная мысль", x, 2.1 * EMU, fullWidth, 2.1 * EMU, [
+      { text: slide.title, options: { color: text, fontSize: 42, fontFace: headingFont, bold: true } },
+    ]));
+    if (slide.body) shapes.push(textBox(id++, "Пояснение", x, 4.5 * EMU, fullWidth * 0.88, 1.4 * EMU, [
+      { text: slide.body, options: { color: muted, fontSize: 21 } },
+    ]));
   } else if (slide.layout === "quote") {
     shapes.push(
       textBox(id++, "Цитата", x, 1.25 * EMU, contentWidth, 3.7 * EMU, [
@@ -1026,7 +1004,7 @@ function slideShapes(
       textBox(id++, "Заголовок", x, 1.05 * EMU, contentWidth, 1.1 * EMU, [
         {
           text: slide.title,
-          options: { color: text, fontSize: 35, bold: true },
+          options: { color: text, fontSize: 35, fontFace: headingFont, bold: true },
         },
       ]),
     );
@@ -1074,7 +1052,7 @@ function slideShapes(
         12.23 * EMU,
         6.4 * EMU,
         accent,
-        true,
+        false,
       ),
     );
     if (slide.eyebrow)
@@ -1113,6 +1091,7 @@ function slideShapes(
             options: {
               color: inverse,
               fontSize: 44,
+              fontFace: headingFont,
               bold: true,
               align: "ctr",
               valign: "ctr",
@@ -1140,16 +1119,16 @@ function slideShapes(
       );
   } else {
     shapes.push(
-      textBox(id++, "Заголовок", x, 1.0 * EMU, contentWidth, 1.25 * EMU, [
+      textBox(id++, "Заголовок", x, 1.2 * EMU, contentWidth, 1.25 * EMU, [
         {
           text: slide.title,
-          options: { color: text, fontSize: 35, bold: true },
+          options: { color: text, fontSize: 35, fontFace: headingFont, bold: true },
         },
       ]),
     );
     if (slide.body)
       shapes.push(
-        textBox(id++, "Введение", x, 2.35 * EMU, contentWidth, 0.9 * EMU, [
+        textBox(id++, "Введение", x, 2.7 * EMU, contentWidth, 0.7 * EMU, [
           { text: slide.body, options: { color: muted, fontSize: 17 } },
         ]),
       );
@@ -1165,9 +1144,9 @@ function slideShapes(
         id++,
         "Список",
         x,
-        3.35 * EMU,
+        3.65 * EMU,
         contentWidth,
-        2.8 * EMU,
+        2.5 * EMU,
         items.slice(0, 6).map((item) => ({
           text: item,
           options: { color: text, fontSize: 20, bullet: true },

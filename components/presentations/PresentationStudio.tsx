@@ -1,5 +1,7 @@
 "use client";
 
+import { presentationChartData, presentationFontFamily, presentationReadableColors, presentationStepText } from "@/lib/presentation-design-quality";
+import { estimatedTextLines } from "@/lib/design-readability";
 import {
   useCallback,
   useEffect,
@@ -623,20 +625,14 @@ function SlidePreview({
     textColor:
       slide.textColor ?? slideTheme?.textColor ?? baseProject.textColor,
   };
-  const inverse =
-    project.backgroundColor.toLowerCase() === "#101113"
-      ? "#F5F1E8"
-      : project.textColor;
+  const colors = presentationReadableColors(project.backgroundColor, project.textColor, project.accentColor);
+  const inverse = colors.text;
   const metrics = slide.bullets.slice(0, 3).map((item) => {
     const [value, label] = item.split("|").map((part) => part.trim());
     return { value: value || "—", label: label || "показатель" };
   });
-  const titleClass = compact
-    ? "text-[9px] leading-[1.08]"
-    : "text-[clamp(24px,3.2vw,52px)] leading-[1.02]";
-  const bodyClass = compact
-    ? "text-[4px] leading-[1.3]"
-    : "text-[clamp(11px,1.15vw,18px)] leading-[1.45]";
+  const titleClass = "text-[5.2cqw] leading-[1.02]";
+  const bodyClass = "text-[1.8cqw] leading-[1.45]";
   const image = slide.imageUrl ? (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -649,16 +645,17 @@ function SlidePreview({
     editable ? (
       <textarea
         aria-label="Заголовок слайда"
+        style={{ fontFamily: presentationFontFamily(project.themeId) }}
         value={slide.title}
         onChange={(event) => onChange?.({ title: event.target.value })}
         className={cn(
-          "m-0 w-full resize-none overflow-hidden border-0 bg-transparent p-0 font-semibold tracking-[-0.045em] text-inherit outline-none ring-0 focus:ring-2 focus:ring-primary/30",
+          "m-0 w-full resize-none overflow-hidden border-0 bg-transparent p-0 font-semibold tracking-[-0.025em] text-inherit outline-none ring-0 focus:ring-2 focus:ring-primary/30",
           className,
         )}
-        rows={3}
+        rows={Math.max(1, estimatedTextLines(slide.title, image || ["split", "gallery", "table", "agenda"].includes(slide.layout) ? 500 : 900, slide.layout === "title" ? 52 : 38))}
       />
     ) : (
-      <h2 className={cn("m-0 font-semibold tracking-[-0.045em]", className)}>
+      <h2 style={{ fontFamily: presentationFontFamily(project.themeId) }} className={cn("m-0 font-semibold tracking-[-0.025em]", className)}>
         {slide.title}
       </h2>
     );
@@ -672,7 +669,7 @@ function SlidePreview({
           "m-0 w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-inherit outline-none ring-0 focus:ring-2 focus:ring-primary/30",
           className,
         )}
-        rows={4}
+        rows={Math.max(1, estimatedTextLines(slide.body, image || ["split", "gallery", "table", "agenda"].includes(slide.layout) ? 500 : 900, 18))}
         placeholder="Добавьте пояснение"
       />
     ) : slide.body ? (
@@ -696,7 +693,7 @@ function SlidePreview({
       <button
         type="button"
         onClick={onPickImage}
-        className="grid h-full w-full place-items-center rounded-[inherit] border border-dashed border-current/25 bg-black/5 text-[12px] font-semibold opacity-65 hover:opacity-100"
+        className="grid h-full w-full place-items-center rounded-[inherit] border border-dashed border-current/25 bg-black/5 text-[1.2cqw] font-semibold opacity-65 hover:opacity-100"
       >
         + Добавить фотографию
       </button>
@@ -713,6 +710,8 @@ function SlidePreview({
         onOpenQuickEdit();
       }}
       style={{
+        containerType: "inline-size",
+        fontFamily: "Arial, sans-serif",
         backgroundColor: project.backgroundColor,
         color: inverse,
         ...presentationPatternStyle(
@@ -750,15 +749,15 @@ function SlidePreview({
       />
       {slide.layout === "closing" ? (
         <div
-          className="absolute inset-[5%] grid place-items-center rounded-[5%] px-[9%] text-center"
-          style={{ backgroundColor: project.accentColor, color: "#fff" }}
+          className="absolute inset-[5%] grid place-items-center px-[9%] text-center"
+          style={{ backgroundColor: project.accentColor, color: colors.inverse }}
         >
           <div>
             {slide.eyebrow ? (
               <p
                 className={cn(
                   "m-0 font-bold uppercase tracking-[0.16em]",
-                  compact ? "text-[3px]" : "text-[10px]",
+                  "text-[1.0cqw]",
                 )}
               >
                 {slide.eyebrow}
@@ -766,7 +765,7 @@ function SlidePreview({
             ) : null}
             <h2
               className={cn(
-                "m-0 mt-[4%] font-semibold tracking-[-0.045em]",
+                "m-0 mt-[4%] font-semibold tracking-[-0.025em]",
                 titleClass,
               )}
             >
@@ -786,9 +785,9 @@ function SlidePreview({
               <p
                 className={cn(
                   "m-0 font-bold uppercase tracking-[0.15em]",
-                  compact ? "text-[3px]" : "text-[10px]",
+                  "text-[1.0cqw]",
                 )}
-                style={{ color: project.accentColor }}
+                style={{ color: colors.accent }}
               >
                 {slide.eyebrow}
               </p>
@@ -816,9 +815,9 @@ function SlidePreview({
               <p
                 className={cn(
                   "m-0 font-bold uppercase tracking-[0.15em]",
-                  compact ? "text-[3px]" : "text-[10px]",
+                  "text-[1.0cqw]",
                 )}
-                style={{ color: project.accentColor }}
+                style={{ color: colors.accent }}
               >
                 {slide.eyebrow}
               </p>
@@ -826,9 +825,7 @@ function SlidePreview({
             {editableTitle(
               cn(
                 "mt-[4%] max-w-[96%]",
-                compact
-                  ? titleClass
-                  : "text-[clamp(23px,2.8vw,46px)] leading-[1.08]",
+                "text-[4.6cqw] leading-[1.08]",
               ),
             )}
             {editableBody(cn("mt-[7%] max-w-[88%] opacity-70", bodyClass))}
@@ -846,9 +843,9 @@ function SlidePreview({
               <p
                 className={cn(
                   "m-0 font-bold uppercase tracking-[0.15em]",
-                  compact ? "text-[3px]" : "text-[10px]",
+                  "text-[1.0cqw]",
                 )}
-                style={{ color: project.accentColor }}
+                style={{ color: colors.accent }}
               >
                 {slide.eyebrow}
               </p>
@@ -856,15 +853,13 @@ function SlidePreview({
             {editableTitle(
               cn(
                 "mt-[5%]",
-                compact
-                  ? titleClass
-                  : "text-[clamp(20px,2.2vw,36px)] leading-[1.08]",
+                "text-[3.6cqw] leading-[1.08]",
               ),
             )}
             {editableBody(cn("mt-[7%] opacity-70", bodyClass))}
           </div>
           <div
-            className="min-h-0 overflow-hidden rounded-[8%] p-[9%]"
+            className="min-h-0 overflow-hidden border-l border-current/15 p-[6%]"
             style={{ backgroundColor: `${project.accentColor}18` }}
           >
             {imageArea ?? (
@@ -878,7 +873,7 @@ function SlidePreview({
                     <li key={`${item}-${index}`} className="flex gap-[5%]">
                       <span
                         className="font-bold"
-                        style={{ color: project.accentColor }}
+                        style={{ color: colors.accent }}
                       >
                         0{index + 1}
                       </span>
@@ -895,9 +890,9 @@ function SlidePreview({
             <p
               className={cn(
                 "m-0 font-bold uppercase tracking-[0.15em]",
-                compact ? "text-[3px]" : "text-[10px]",
+                "text-[1.0cqw]",
               )}
-              style={{ color: project.accentColor }}
+              style={{ color: colors.accent }}
             >
               {slide.eyebrow}
             </p>
@@ -905,9 +900,7 @@ function SlidePreview({
           {editableTitle(
             cn(
               "mt-[3%] max-w-[82%]",
-              compact
-                ? titleClass
-                : "text-[clamp(20px,2.2vw,36px)] leading-[1.08]",
+              "text-[3.6cqw] leading-[1.08]",
             ),
           )}
           <div className="relative mt-[8%] grid grid-cols-3 gap-[3%]">
@@ -923,21 +916,19 @@ function SlidePreview({
               .map((item, index) => (
                 <div
                   key={`${item}-${index}`}
-                  className="relative rounded-[7%] border border-current/10 bg-white/55 p-[8%]"
+                  className="relative border-t border-current/20 px-[3%] py-[6%]"
                 >
                   <span
                     className={cn(
                       "relative z-10 grid rounded-full font-bold text-white",
-                      compact
-                        ? "size-3 place-items-center text-[3px]"
-                        : "size-8 place-items-center text-[11px]",
+                      "size-[3.2cqw] place-items-center text-[1.1cqw]",
                     )}
                     style={{ backgroundColor: project.accentColor }}
                   >
                     {index + 1}
                   </span>
                   <p className={cn("mb-0 mt-[9%] font-semibold", bodyClass)}>
-                    {item}
+                    {presentationStepText(item, index)}
                   </p>
                 </div>
               ))}
@@ -948,26 +939,24 @@ function SlidePreview({
           {editableTitle(
             cn(
               "max-w-[80%]",
-              compact
-                ? titleClass
-                : "text-[clamp(20px,2.2vw,36px)] leading-[1.08]",
+              "text-[3.6cqw] leading-[1.08]",
             ),
           )}
           <div className="mt-[7%] grid grid-cols-2 gap-[4%]">
             {[0, 1].map((column) => (
               <div
                 key={column}
-                className="rounded-[7%] border border-current/10 p-[7%]"
+                className="border-t-2 border-current/20 px-[3%] py-[5%]"
                 style={{
                   backgroundColor: column
                     ? `${project.accentColor}20`
-                    : "rgba(255,255,255,.56)",
+                    : "transparent",
                 }}
               >
                 <strong
                   className={cn(
                     "block",
-                    compact ? "text-[5px]" : "text-[16px]",
+                    "text-[1.6cqw]",
                   )}
                 >
                   {column ? "Целевое состояние" : "Сейчас"}
@@ -999,9 +988,9 @@ function SlidePreview({
               <p
                 className={cn(
                   "m-0 font-bold uppercase tracking-[0.15em]",
-                  compact ? "text-[3px]" : "text-[10px]",
+                  "text-[1.0cqw]",
                 )}
-                style={{ color: project.accentColor }}
+                style={{ color: colors.accent }}
               >
                 {slide.eyebrow}
               </p>
@@ -1009,9 +998,7 @@ function SlidePreview({
             {editableTitle(
               cn(
                 "mt-[5%]",
-                compact
-                  ? titleClass
-                  : "text-[clamp(20px,2.2vw,36px)] leading-[1.08]",
+                "text-[3.6cqw] leading-[1.08]",
               ),
             )}
             {editableBody(cn("mt-[7%] opacity-65", bodyClass))}
@@ -1033,8 +1020,8 @@ function SlidePreview({
                   className="grid grid-cols-[12%_1fr] items-center border-b border-current/15 py-[3%]"
                 >
                   <strong
-                    className={cn(compact ? "text-[4px]" : "text-[13px]")}
-                    style={{ color: project.accentColor }}
+                    className={cn("text-[1.3cqw]")}
+                    style={{ color: colors.accent }}
                   >
                     {String(index + 1).padStart(2, "0")}
                   </strong>
@@ -1048,9 +1035,7 @@ function SlidePreview({
           <div className="flex min-w-0 flex-col justify-end pb-[4%]">
             {editableTitle(
               cn(
-                compact
-                  ? titleClass
-                  : "text-[clamp(20px,2.35vw,38px)] leading-[1.06]",
+                "text-[3.8cqw] leading-[1.06]",
               ),
             )}
             {editableBody(cn("mt-[7%] opacity-65", bodyClass))}
@@ -1064,25 +1049,13 @@ function SlidePreview({
           {editableTitle(
             cn(
               "max-w-[80%]",
-              compact
-                ? titleClass
-                : "text-[clamp(20px,2.2vw,36px)] leading-[1.08]",
+              "text-[3.6cqw] leading-[1.08]",
             ),
           )}
-          <div className="mt-[8%] grid h-[48%] grid-cols-4 items-end gap-[4%] border-b border-current/20">
-            {(slide.bullets.length
-              ? slide.bullets
-              : ["18 | А", "42 | Б", "68 | В", "84 | Г"]
-            )
-              .slice(0, 4)
-              .map((item, index) => {
-                const [value, label] = item
-                  .split("|")
-                  .map((part) => part.trim());
-                const numeric = Math.max(
-                  18,
-                  Math.min(92, Number.parseFloat(value) || 28 + index * 17),
-                );
+          {editableBody(cn("mt-[2%]", bodyClass))}
+          <div className="mt-[5%] grid h-[42%] items-end gap-[4%] border-b border-current/20" style={{ gridTemplateColumns: `repeat(${Math.max(1, Math.min(4, slide.bullets.length))}, minmax(0, 1fr))` }}>
+            {presentationChartData(slide.bullets).map((item, index) => {
+                const { raw: rawValue, label, fraction } = item;
                 return (
                   <div
                     key={`${item}-${index}`}
@@ -1091,22 +1064,22 @@ function SlidePreview({
                     <strong
                       className={cn(
                         "mb-[4%]",
-                        compact ? "text-[4px]" : "text-[12px]",
+                        "text-[1.2cqw]",
                       )}
                     >
-                      {value}
+                      {rawValue}
                     </strong>
                     <span
                       className="mx-auto block w-[64%] rounded-t-md"
                       style={{
-                        height: `${numeric}%`,
+                        height: `${fraction * 100}%`,
                         backgroundColor: project.accentColor,
                       }}
                     />
                     <span
                       className={cn(
                         "mt-[5%] opacity-65",
-                        compact ? "text-[3px]" : "text-[10px]",
+                        "text-[1.0cqw]",
                       )}
                     >
                       {label}
@@ -1117,15 +1090,15 @@ function SlidePreview({
           </div>
         </div>
       ) : slide.layout === "callout" ? (
-        <div className="absolute inset-[8%] grid place-items-center rounded-[5%] border border-current/10 bg-white/55 px-[10%] text-center">
+        <div className="absolute inset-[8%] grid place-items-center rounded-[5%] border border-current/10 px-[10%] text-center">
           <div>
             {slide.eyebrow ? (
               <p
                 className={cn(
                   "m-0 font-bold uppercase tracking-[0.16em]",
-                  compact ? "text-[3px]" : "text-[10px]",
+                  "text-[1.0cqw]",
                 )}
-                style={{ color: project.accentColor }}
+                style={{ color: colors.accent }}
               >
                 {slide.eyebrow}
               </p>
@@ -1133,9 +1106,7 @@ function SlidePreview({
             {editableTitle(
               cn(
                 "mt-[5%]",
-                compact
-                  ? titleClass
-                  : "text-[clamp(24px,3vw,48px)] leading-[1.08]",
+                "text-[4.8cqw] leading-[1.08]",
               ),
             )}
             {editableBody(
@@ -1149,18 +1120,16 @@ function SlidePreview({
             <span
               className={cn(
                 "font-serif leading-none",
-                compact ? "text-[13px]" : "text-[72px]",
+                "text-[7.2cqw]",
               )}
-              style={{ color: project.accentColor }}
+              style={{ color: colors.accent }}
             >
               “
             </span>
             {editableTitle(
               cn(
                 "-mt-[4%] font-serif",
-                compact
-                  ? "text-[8px] leading-[1.1]"
-                  : "text-[clamp(22px,2.6vw,43px)] leading-[1.14]",
+                "text-[4.3cqw] leading-[1.14]",
               ),
             )}
             {editableBody(cn("mt-[6%] opacity-65", bodyClass))}
@@ -1171,9 +1140,7 @@ function SlidePreview({
           {editableTitle(
             cn(
               "max-w-[75%]",
-              compact
-                ? titleClass
-                : "text-[clamp(20px,2.2vw,36px)] leading-[1.08]",
+              "text-[3.6cqw] leading-[1.08]",
             ),
           )}
           <div className="mt-[8%] grid grid-cols-3 gap-[3%]">
@@ -1193,9 +1160,9 @@ function SlidePreview({
                 <strong
                   className={cn(
                     "block tracking-[-0.05em]",
-                    compact ? "text-[8px]" : "text-[clamp(22px,2.5vw,42px)]",
+                    "text-[4.2cqw]",
                   )}
-                  style={{ color: project.accentColor }}
+                  style={{ color: colors.accent }}
                 >
                   {metric.value}
                 </strong>
@@ -1213,9 +1180,9 @@ function SlidePreview({
               <p
                 className={cn(
                   "m-0 font-bold uppercase tracking-[0.15em]",
-                  compact ? "text-[3px]" : "text-[10px]",
+                  "text-[1.0cqw]",
                 )}
-                style={{ color: project.accentColor }}
+                style={{ color: colors.accent }}
               >
                 {slide.eyebrow}
               </p>
@@ -1223,16 +1190,14 @@ function SlidePreview({
             {editableTitle(
               cn(
                 "mt-[4%]",
-                compact
-                  ? titleClass
-                  : "text-[clamp(20px,2.2vw,36px)] leading-[1.08]",
+                "text-[3.6cqw] leading-[1.08]",
               ),
             )}
             {editableBody(cn("mt-[5%] opacity-70", bodyClass))}
             <ul
               className={cn(
                 "m-0 mt-[6%] grid gap-[3%] p-0",
-                compact ? "text-[4px]" : "text-[clamp(11px,1.2vw,18px)]",
+                "text-[1.8cqw]",
               )}
             >
               {(slide.bullets.length
@@ -1269,7 +1234,7 @@ function SlidePreview({
               target="_blank"
               rel="noreferrer"
               onClick={(event) => event.stopPropagation()}
-              className="inline-flex rounded-lg px-4 py-2 text-[11px] font-semibold text-white no-underline shadow-sm"
+              className="inline-flex rounded-lg px-4 py-2 text-[1.1cqw] font-semibold text-white no-underline shadow-sm"
               style={{
                 backgroundColor:
                   slide.layout === "closing" ? "#FFFFFF" : project.accentColor,
@@ -1291,7 +1256,7 @@ function SlidePreview({
                   target="_blank"
                   rel="noreferrer"
                   onClick={(event) => event.stopPropagation()}
-                  className="text-[10px] font-semibold underline underline-offset-2"
+                  className="text-[1.0cqw] font-semibold underline underline-offset-2"
                   style={{
                     color:
                       slide.layout === "closing"

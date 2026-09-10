@@ -212,10 +212,10 @@ test("AI presentation outline follows a narrative and does not invent evidence",
     ),
   ]);
   assert.match(server, /chat\/completions/);
-  assert.match(server, /gemini-2\.5-flash-lite/);
+  assert.match(server, /gpt-5\.6-terra/);
   assert.match(
     server,
-    /Не выдумывай конкретные цифры, даты, отзывы, клиентов или результаты/,
+    /Не выдумывай достижения, клиентов, цитаты, источники, стоимость или гарантии/,
   );
   assert.match(server, /suggestedLayouts/);
   assert.match(
@@ -228,7 +228,7 @@ test("AI presentation outline follows a narrative and does not invent evidence",
   assert.match(server, /patternLibrary/);
   assert.match(
     server,
-    /slides\[index\]\.layout !== slides\[index - 1\]\.layout/,
+    /presentationVisualIssues\(slides\)/,
   );
   assert.match(server, /safeFallbackOutline/);
   assert.match(server, /function resolvedThemeId/);
@@ -241,7 +241,7 @@ test("AI presentation outline follows a narrative and does not invent evidence",
     /Цифровой рубль: как устроена третья форма российской валюты/,
   );
   assert.match(server, /generationMode: "topic_fallback"/);
-  assert.match(server, /NAVYAI_EMAIL_MODEL\?\.trim\(\)\s*\|\|\s*"gpt-5\.2"/);
+  assert.match(server, /NAVYAI_EMAIL_MODEL\?\.trim\(\)\s*\|\|\s*"gpt-5\.6-sol"/);
   assert.match(server, /GENERATION_LIMIT = 8/);
   assert.match(server, /INSERT INTO ai_request_limits/);
   assert.match(server, /INSERT OR IGNORE INTO ai_idempotency/);

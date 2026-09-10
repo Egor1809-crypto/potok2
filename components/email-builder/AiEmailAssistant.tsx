@@ -200,6 +200,7 @@ export function AiEmailAssistant({
   const [assets, setAssets] = useState<EmailAssetRecord[]>([]);
   const [uploading, setUploading] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [generationNotice, setGenerationNotice] = useState<string | undefined>();
   const [suggestion, setSuggestion] = useState<EmailAiSuggestion | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -385,7 +386,6 @@ export function AiEmailAssistant({
           ctaLabel: ctaLabel.trim() || "Узнать подробнее",
           designBrief: designBrief.trim(),
           visualStyle,
-          visualContent: "image-and-pattern",
           socialLinks: [
             ["Telegram", socialLinks.telegram],
             ["ВКонтакте", socialLinks.vk],
@@ -418,6 +418,7 @@ export function AiEmailAssistant({
           "error" in body ? body.error : "Дизайн не подготовлен.",
         );
       setSuggestion(body.suggestion);
+      setGenerationNotice(body.generationNotice);
       const [currentPreview, aiPreview] = await Promise.all(
         [document, body.suggestion.document].map(async (value) => {
           const result = await fetch("/api/email-export", {
@@ -513,6 +514,7 @@ export function AiEmailAssistant({
               Режим подтверждён сервером после сборки письма.
             </span>
           </div>
+          {generationNotice ? <p role="status" className="m-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{generationNotice}</p> : null}
           <div className="grid gap-3 border-t border-border p-3 lg:grid-cols-2">
             <DesignReport title="Моя редакция" document={document} />
             <DesignReport
@@ -572,7 +574,7 @@ export function AiEmailAssistant({
         </h2>
         <p className="mx-auto mt-2 max-w-2xl text-[13px] leading-6 text-text-muted">
           {stage === "prompt"
-            ? "Одним запросом задайте смысл и визуальный характер. Поток сам подготовит текст, палитру, композицию, тематическое изображение и узор."
+            ? "Одним запросом задайте смысл и визуальный характер. Поток подготовит текст и оформление по вашей задаче. Иллюстрации и декор добавит, когда они нужны."
             : "Ответьте только на вопросы о недостающих фактах. Дизайн-задача уже зафиксирована и не потеряется."}
         </p>
         <span className="mt-3 inline-flex rounded-full border border-border bg-surface px-3 py-1 text-[10px] font-medium text-text-muted">
@@ -1138,7 +1140,7 @@ export function AiEmailAssistant({
               </div>
             ) : (
               <p className="mt-2 text-[10px] text-text-subtle">
-                Необязательно. Без загрузки Поток сам создаст тематическое
+                Необязательно. Если макету нужна иллюстрация, Поток создаст тематическое
                 изображение через NavyAI и поместит его в письмо.
               </p>
             )}

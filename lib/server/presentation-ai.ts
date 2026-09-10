@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { presentationLayoutContracts, presentationVisualIssues, requestedPresentationColors } from "@/lib/presentation-design-quality";
 
 import { getD1 } from "@/db";
 import {
@@ -88,7 +89,7 @@ const LAYOUTS = new Set<PresentationSlideLayout>([
 const GENERATION_WINDOW_MS = 10 * 60 * 1_000;
 const GENERATION_LIMIT = 8;
 const IDEMPOTENCY_STALE_MS = 15 * 60 * 1_000;
-const PROVIDER_TIMEOUT_MS = 55_000;
+const PROVIDER_TIMEOUT_MS = 90_000;
 const MAX_PROVIDER_RESPONSE_BYTES = 1_000_000;
 const PRESENTATION_IMAGE_LIMIT = 2;
 const PRESENTATION_IMAGE_TIMEOUT_MS = 90_000;
@@ -117,8 +118,8 @@ function provider() {
       model:
         runtime().NAVYAI_PRESENTATION_MODEL?.trim() ||
         runtime().NAVYAI_EMAIL_MODEL?.trim() ||
-        "gpt-5.2",
-      fallbackModel: "gemini-2.5-flash-lite",
+        "gpt-5.6-sol",
+      fallbackModel: "gpt-5.6-terra",
       imageEndpoint: `${runtime().NAVYAI_BASE_URL?.trim().replace(/\/$/, "") || "https://api.navy/v1"}/images/generations`,
       imageModel: runtime().NAVYAI_IMAGE_MODEL?.trim() || "gpt-image-1.5",
     };
@@ -627,33 +628,10 @@ function parseSlides(
       } satisfies PresentationSlide,
     ];
   });
-  if (slides.length < Math.min(3, expectedCount))
-    throw new ApiRequestError(
-      "ИИ вернул слишком мало содержательных слайдов. Повторите запрос.",
-      502,
-    );
-  slides[0] = { ...slides[0], layout: "title" };
-  slides[slides.length - 1] = {
-    ...slides[slides.length - 1],
-    layout: "closing",
-  };
-  for (let index = 1; index < slides.length - 1; index += 1) {
-    if (slides[index].layout !== slides[index - 1].layout) continue;
-    const bodyParts = slides[index].body
-      .split(/(?<=[.!?])\s+/)
-      .map((part) => part.trim())
-      .filter(Boolean);
-    if (slides[index].bullets.length >= 2) {
-      slides[index] = { ...slides[index], layout: "bullets" };
-    } else if (bodyParts.length >= 2) {
-      slides[index] = {
-        ...slides[index],
-        layout: "split",
-        body: bodyParts[0],
-        bullets: bodyParts.slice(1, 5),
-      };
-    }
-  }
+  if (slides.length !== expectedCount)
+    throw new ApiRequestError(`Нужно ровно ${expectedCount} слайдов; ИИ вернул ${slides.length}.`, 502);
+  if (slides[0].layout !== "title" || slides.at(-1)?.layout !== "closing")
+    throw new ApiRequestError("Первый слайд должен открывать презентацию, последний — завершать.", 502);
   return slides;
 }
 
@@ -661,7 +639,7 @@ function presentationQualityIssues(
   slides: PresentationSlide[],
   input: ReturnType<typeof parseRequest>,
 ) {
-  const issues: string[] = [];
+  const issues: string[] = presentationVisualIssues(slides);
   const genericTitle = /^(?:введение|возможности|риски|итоги|выводы|наше решение|решение|проблема|преимущества|следующие шаги|заключение)[.!:—\s]*$/iu;
   const copiedCommand = /^(?:нужно|надо|сделай|создай|подготовь|разработай|сформируй|презентация (?:о|об|про|для))\b/iu;
   const titleKeys = slides.map((slide) =>
@@ -699,111 +677,10 @@ function presentationQualityIssues(
       break;
     }
   }
-  const noImages = /без\s+(?:фото|изображ|картин)|только\s+типограф/iu.test(
-    `${input.goal}\n${input.designBrief ?? ""}`,
-  );
-  const imagePrompts = slides.filter((slide) => slide.imagePrompt?.trim()).length;
-  const expectedImages = noImages ? 0 : Math.min(2, Math.max(1, slides.length - 2));
-  if (imagePrompts < expectedImages)
-    issues.push(`Нужно ${expectedImages} предметных imagePrompt для самых визуальных слайдов, сейчас ${imagePrompts}.`);
   const missingNotes = slides.filter((slide) => !slide.speakerNotes.trim()).length;
   if (missingNotes > Math.floor(slides.length / 2))
     issues.push(`У ${missingNotes} слайдов нет полезных заметок выступающего.`);
-  const missingPatterns = slides.filter(
-    (slide) => !slide.patternId || slide.patternId === "auto",
-  ).length;
-  if (missingPatterns > Math.floor(slides.length / 2))
-    issues.push(`У ${missingPatterns} слайдов не выбран осмысленный patternId из библиотеки.`);
   return issues.slice(0, 8);
-}
-
-const topicPatternPools: Array<{
-  pattern: RegExp;
-  ids: PresentationPatternId[];
-}> = [
-  {
-    pattern: /технолог|данн|цифр|ии|ai|saas|разработ|инженер|финтех/i,
-    ids: ["circuit-board", "data-stream", "network-nodes", "blueprint-grid", "radar-sweep", "pixel-grid", "constellation", "hexagon-net"],
-  },
-  {
-    pattern: /природ|эко|ботан|сад|еда|здоров|wellness|органич/i,
-    ids: ["organic-cells", "leaf-canopy", "wave-ribbon", "ink-blobs", "flower-lattice", "contour-flow", "topography", "waves"],
-  },
-  {
-    pattern: /преми|luxur|дорог|элит|fashion|мод|ювелир|архитект/i,
-    ids: ["gold-frame", "rope-knot", "stacked-arches", "frame-corners", "monogram", "fan-arches", "editorial-lines"],
-  },
-  {
-    pattern: /празд|фестив|детск|игр|креатив|вечерин|развлеч/i,
-    ids: ["festival-flags", "snowfall", "solar-orbit", "memphis", "confetti", "star-field", "bauhaus", "terrazzo"],
-  },
-  {
-    pattern: /финанс|банк|юрид|отч[её]т|исслед|аналит|консалт|стратег/i,
-    ids: ["pinstripe", "woven-lines", "mosaic-tiles", "editorial-lines", "plaid", "diamond-grid", "barcode", "micro-dots"],
-  },
-  {
-    pattern: /путеш|географ|маршрут|город|недвиж|строител/i,
-    ids: ["stair-steps", "stacked-arches", "topography", "contour-flow", "archways", "isometric-cubes", "fan-arches"],
-  },
-];
-
-const defaultPatternPool: PresentationPatternId[] = [
-  "aurora-mesh",
-  "editorial-lines",
-  "orbit",
-  "gradient-orbs",
-  "diamond-grid",
-  "micro-dots",
-  "frame-corners",
-  "contour-flow",
-  "nested-squares",
-  "split-circles",
-  "prism-facets",
-  "tessellated-plus",
-];
-
-function hashText(value: string) {
-  return [...value].reduce(
-    (sum, character) => (sum * 31 + character.charCodeAt(0)) >>> 0,
-    2166136261,
-  );
-}
-
-function presentationPatternFor(
-  input: ReturnType<typeof parseRequest>,
-  slide: PresentationSlide,
-  index: number,
-) {
-  const subject = `${input.goal}\n${input.context ?? ""}\n${input.designBrief ?? ""}`;
-  const pool =
-    topicPatternPools.find((candidate) => candidate.pattern.test(subject))?.ids ??
-    defaultPatternPool;
-  const roleOffset =
-    slide.layout === "title"
-      ? 0
-      : slide.layout === "closing"
-        ? 2
-        : ["stats", "chart", "table", "comparison"].includes(slide.layout)
-          ? 3
-          : 1;
-  return pool[(hashText(`${slide.title}:${index}`) + roleOffset) % pool.length];
-}
-
-function fallbackPresentationImagePrompt(
-  input: ReturnType<typeof parseRequest>,
-  slide: PresentationSlide,
-  themeId: PresentationThemeId,
-) {
-  const visualStyle =
-    input.designBrief ||
-    (themeId === "premium"
-      ? "quiet luxury, dramatic soft light, restrained materials"
-      : themeId === "editorial"
-        ? "editorial art photography, tactile natural textures"
-        : themeId === "neon" || themeId === "violet"
-          ? "cinematic technology editorial, controlled neon accents"
-          : "premium contemporary editorial photography");
-  return `Тема презентации: ${input.goal}. Смысл слайда: ${slide.title}. Создай один предметный визуальный образ, который раскрывает этот тезис, а не буквально иллюстрирует каждое слово. Арт-направление: ${visualStyle}. Горизонтальная композиция 3:2, главный объект в центральных 70%, чистые края и достаточно негативного пространства. Без текста, букв, цифр, логотипов, интерфейсов, мокапов и водяных знаков.`;
 }
 
 function applyPresentationArtDirection(
@@ -814,47 +691,20 @@ function applyPresentationArtDirection(
   const noImages = /без\s+(?:фото|изображ|картин)|только\s+типограф/i.test(
     `${input.goal}\n${input.designBrief ?? ""}`,
   );
-  const preferredImageIndexes = [
-    slides.findIndex((slide) => slide.layout === "title"),
-    slides.findIndex((slide, index) =>
-      index > 0 && ["split", "gallery", "callout", "statement"].includes(slide.layout),
-    ),
-    slides.findIndex((slide, index) =>
-      index > 0 && index < slides.length - 1 && !["stats", "chart", "table"].includes(slide.layout),
-    ),
-  ].filter((value, index, values) => value >= 0 && values.indexOf(value) === index);
-  const imageIndexes = new Set(
-    noImages ? [] : preferredImageIndexes.slice(0, PRESENTATION_IMAGE_LIMIT),
-  );
-
-  const directed: PresentationSlide[] = [];
-  slides.forEach((slide, index) => {
-    const patternId =
-      slide.patternId && slide.patternId !== "auto" && slide.patternId !== "none"
-        ? slide.patternId
-        : presentationPatternFor(input, slide, index);
-    const previousPattern = directed.at(-1)?.patternId;
-    const effectivePattern =
-      previousPattern === patternId && directed.at(-2)?.patternId === patternId
-        ? presentationPatternFor(input, slide, index + 7)
-        : patternId;
-    directed.push({
-      ...slide,
-      eyebrow: normalizePresentationEyebrow(slide.eyebrow || "РАЗДЕЛ"),
-      title: normalizePresentationTitle(slide.title),
-      body: normalizePresentationBody(slide.body),
-      bullets: slide.bullets.map(normalizePresentationBullet).slice(0, 6),
-      themeId: slide.themeId ?? themeId,
-      patternId: effectivePattern,
-      ...(imageIndexes.has(index)
-        ? {
-            imagePrompt:
-              slide.imagePrompt ||
-              fallbackPresentationImagePrompt(input, slide, themeId),
-          }
-        : { imagePrompt: undefined }),
-    });
-  });
+  const noPatterns = /без\s+(?:узор|орнамент|паттерн)|никаких.*(?:узор|орнамент)|без.*и\s+узор/iu.test(`${input.goal}\n${input.designBrief ?? ""}`);
+  // Keep imagery on the slides the designer chose. Never displace a chart or cover a list.
+  const imageIndexes = new Set(noImages ? [] : slides.flatMap((slide, index) =>
+    slide.imagePrompt && presentationLayoutContracts[slide.layout].image ? [index] : [],
+  ).slice(0, PRESENTATION_IMAGE_LIMIT));
+  const directed = slides.map((slide, index): PresentationSlide => ({
+    ...slide,
+    themeId: themeId,
+    ...requestedPresentationColors(input.designBrief),
+    patternId: noPatterns ? "none" : slide.patternId ?? "none",
+    imagePrompt: imageIndexes.has(index) ? slide.imagePrompt : undefined,
+    // Without an image, the gallery has an empty half. Keep its text visible.
+    layout: slide.layout === "gallery" && !imageIndexes.has(index) && !slide.imageUrl ? "statement" : slide.layout,
+  }));
   return directed;
 }
 
@@ -1218,7 +1068,7 @@ function responseSchema(slideCount: number) {
       description: { type: "string", maxLength: 500 },
       slides: {
         type: "array",
-        minItems: Math.min(3, slideCount),
+        minItems: slideCount,
         maxItems: slideCount,
         items: {
           type: "object",
@@ -1270,7 +1120,7 @@ function responseSchema(slideCount: number) {
             patternId: {
               type: "string",
               enum: presentationPatternIds.filter(
-                (pattern) => pattern !== "auto" && pattern !== "none",
+                (pattern) => pattern !== "auto",
               ),
             },
             imagePrompt: {
@@ -1832,27 +1682,20 @@ export async function generatePresentationOutline(
   if (reservation.replayed) return reservation.replayed;
   try {
     const selectedThemeId = resolvedThemeId(input);
-    const theme = presentationTheme(selectedThemeId);
+    const theme = { ...presentationTheme(selectedThemeId), ...requestedPresentationColors(input.designBrief) };
     const narrativeBlueprint = presentationNarrativeBlueprint(input);
     const templateBlueprint = selectedPresentationTemplate(input);
     const sourceRule = templateBlueprint
       ? `Режим композиции — адаптация библиотечного сценария «${templateBlueprint.name}». Сохрани последовательность layout, смену плотности, визуальную тему и паттерны templateBlueprint. При этом полностью перепиши старые заголовки, аргументы, факты и заметки под новую задачу. Это новая презентация в проверенной дизайн-системе, а не копия исходного текста.`
       : "Режим композиции — полностью оригинальная арт-дирекция. Не воспроизводи готовый шаблон библиотеки: самостоятельно спроектируй сюжет, чередование макетов и визуальный ритм по narrativeBlueprint.";
-    const instructions = `Ты — senior presentation designer и стратегический редактор. Создай на русском языке законченную профессиональную презентацию уровня сильной продуктовой/консалтинговой команды, а не набор текстовых карточек и не пересказ анкеты.
-
-Сначала внимательно исполни narrativeBlueprint: это обязательная режиссёрская карта конкретного сценария, а не справочная подсказка. Она задаёт напряжение аудитории, центральный тезис, смысловую дугу, правила доказательств, визуальный ритм, роли изображений и логику финала. Затем раскрой тему самостоятельно, используя общеизвестные определения, механизмы, сценарии, возможности, ограничения и риски. Поля пользователя — контекст и ограничения, а не текст для копирования. Не выдумывай конкретные цифры, даты, отзывы, клиентов или результаты; цитаты тоже разрешены только из подтверждённого контекста.
-
+    const instructions = `Ты — senior presentation designer и редактор. Создай законченную русскоязычную презентацию по задаче пользователя. Ответ — один JSON: name, description, slides. У каждого слайда обязательны layout, eyebrow, title, body, bullets, themeId, patternId, imagePrompt, speakerNotes.
 ${sourceRule}
-
-Драматургия: сильный вход → почему тема важна сейчас → как устроено → практические сценарии → ограничения/риски → критерии решения → ясный финал. У каждого слайда один вывод и своя функция. Заголовок должен сообщать вывод, а не называться «Возможности», «Риски» или «Итоги». Не делай agenda и не пиши заглушки «добавьте факты», «нужно показать», «согласуйте пилот».
-
-Композиция должна меняться осмысленно: title только первый, closing только последний; statement — один тезис; split — текст и изображение; bullets — система; timeline — этапы во времени; process — последовательность действий; comparison — честное сравнение; agenda — структура выступления; gallery — визуальная история; chart и stats — только подтверждённые числа; table — компактная матрица; callout — важное предупреждение или вывод; quote — только предоставленная реальная цитата. Не повторяй layout более двух раз подряд. Для визуальной подачи чередуй крупный тезис, структурный слайд, контраст/сравнение и практический слайд.
-
-Ты отвечаешь не только за текст, но и за реальную арт-дирекцию каждого слайда. У каждого слайда обязательны themeId и patternId из переданных библиотек. Узоры выбирай по смыслу и роли: технологиям — схемы и потоки данных, аналитике — сетки и редакционные линии, природе — органика и контуры, премиальному продукту — тихие рамки и монограммный ритм. Не ставь один узор на все слайды и не повторяй один patternId более двух раз подряд. Сохраняй целостную дизайн-систему, но меняй визуальный ритм между слайдами. Ровно для двух наиболее визуальных слайдов верни подробный imagePrompt; для остальных imagePrompt=null. ImagePrompt описывает предметную сцену, композицию, свет, материал и связь с тезисом, запрещает текст, логотипы, интерфейсы и водяные знаки. Если пользователь прямо просит без изображений, для всех imagePrompt=null. visualDesignBrief обязателен: он определяет арт-направление, контраст, плотность и ритм. «Премиальный» означает сдержанную типографику, графит/слоновую кость, тонкие линии и золотой акцент — не фиолетовый шаблон и не россыпь одинаковых точек.
-
-Тексты должны помещаться без уменьшения до нечитаемого размера: title до 80 знаков, body до 280 знаков, максимум 4 bullets по 90 знаков. eyebrow — короткая смысловая метка. speakerNotes — 1–3 полезных предложения для выступающего, не повтор текста. Верни ровно ${input.slideCount} слайдов.
-
-Ответ — только один JSON-объект с name, description и slides; у каждого слайда обязательны layout, eyebrow, title, body, bullets, themeId, patternId, imagePrompt, speakerNotes. Никаких Markdown и комментариев.`;
+Сначала выбери одну визуальную идею для всего доклада: типографическая редакционная, контрастная продуктовая, спокойная аналитическая, предметная визуальная или другая, соответствующая designBrief. Строй различия композицией и плотностью, а не случайными цветами и узорами. Не делай весь доклад набором одинаковых скруглённых карточек. selectedTheme — базовая тема, сохраняй её на слайдах. Чередуй крупный тезис, данные, сравнение и процесс лишь там, где это помогает содержанию. Узоры необязательны: patternId=none подходит для большинства текстовых и аналитических слайдов. Максимум два родственных орнамента во всей презентации; просьба без узоров означает none везде.
+Ровно ${input.slideCount} слайдов, включая title первым и closing последним. У каждого одна функция и конкретный предмет. Название процесса может быть короткой именной фразой; для результатов уместен вывод. Не превращай все заголовки в длинные лозунги. Не повторяй один layout больше двух раз подряд. narrativeBlueprint помогает связать повествование, но не требует выдумывать содержание для каждой стадии.
+layoutContracts описывает РЕАЛЬНЫЕ места под текст и иллюстрации и является обязательным ограничением. Соблюдай лимит символов title/body и число/длину bullets для выбранного layout. Текст, который не вмещается, изложи в speakerNotes полными предложениями. Не обрывай слова и не добавляй многоточие. Не клади текст в поле, которое макет не показывает. split использует справа либо картинку, либо список; не оба. chart/stats: каждый bullet в формате число|подпись, только сопоставимые подтверждённые данные.
+imagePrompt нужен только если предметная иллюстрация помогает смыслу, от нуля до двух слайдов. gallery требует изображение; title может быть чисто типографическим. Если пользователь просит без изображений, imagePrompt=null везде. Не иллюстрируй числа декоративными картинками. Описание изображения задаёт конкретный предмет, композицию, свет, материал; без надписей и выдуманных логотипов. Не добавляй изображения на макеты без места под них.
+Факты, числа, даты, названия и ссылки используй только из пользовательского контекста. Не выдумывай достижения, клиентов, цитаты, источники, стоимость или гарантии. Сохрани единицы измерения и смысл сравнения. Обычные объяснения механизмов допустимы; предположения обозначай. Не пиши технических заглушек, инструкций дизайнеру и комментариев о проверке качества.
+Перед ответом проверь целостность стиля, разнообразие силуэтов, отсутствие лишних карточек и точность фактов. Верни весь JSON без Markdown.`;
     const modelInput = {
       userGoal: input.goal,
       audience: input.audience || "Аудитория указана в задаче пользователя",
@@ -1864,6 +1707,7 @@ ${sourceRule}
         "Сформулировать уместный следующий шаг из задачи пользователя",
       presentationTone: input.tone,
       narrativeBlueprint,
+      layoutContracts: presentationLayoutContracts,
       creativeSource: input.creativeSource,
       templateBlueprint: templateBlueprint
         ? {
@@ -1882,12 +1726,13 @@ ${sourceRule}
         : undefined,
       slideCount: input.slideCount,
       selectedTheme: selectedThemeId,
+      requestedColors: requestedPresentationColors(input.designBrief),
       visualDesignBrief:
         input.designBrief ||
         "Выразительный, но деловой дизайн с аккуратными узорами и достаточным контрастом",
       availableThemes: [...THEMES],
       patternLibrary: presentationPatternCatalog
-        .filter((pattern) => pattern.id !== "auto" && pattern.id !== "none")
+        .filter((pattern) => pattern.id !== "auto")
         .map((pattern) => ({
           id: pattern.id,
           name: pattern.label,
@@ -1911,18 +1756,19 @@ ${sourceRule}
           ? {
               model: selected.model,
               messages: [
-                { role: "system", content: instructions },
+                { role: "system", content: `${instructions}\nJSON-схема: ${JSON.stringify(schema)}` },
                 { role: "user", content: JSON.stringify(modelInput) },
               ],
-              max_tokens: input.slideCount > 12 ? 5_600 : 4_600,
-              response_format: { type: "json_object" },
+              max_tokens: Math.max(6_000, input.slideCount * 700),
+              reasoning_effort: "medium",
+              response_format: { type: "json_schema", json_schema: { name: "presentation_outline", strict: true, schema } },
             }
           : {
               model: selected.model,
               store: false,
               safety_identifier: await safetyIdentifier(request),
               reasoning: { effort: "medium" },
-              max_output_tokens: input.slideCount > 12 ? 5_600 : 4_600,
+              max_output_tokens: Math.max(6_000, input.slideCount * 700),
               instructions,
               input: JSON.stringify(modelInput),
               text: {
@@ -1965,18 +1811,18 @@ ${sourceRule}
     let usedTopicFallback = false;
     try {
       parsed = parseJson(outputText(responseBody));
-      slides = parseSlides(parsed.slides, input.slideCount);
+      slides = applyPresentationTemplateBlueprint(parseSlides(parsed.slides, input.slideCount), input);
     } catch {
       const raw = JSON.parse(String(requestBody.body)) as Record<
         string,
         unknown
       >;
-      const retryInstructions = `${instructions}\nПРЕДЫДУЩАЯ ПОПЫТКА НАРУШИЛА ФОРМАТ. Верни только один валидный JSON-объект без Markdown, вводного текста и комментариев. Проверь количество слайдов и обязательные поля.`;
+      const retryInstructions = `${instructions}\nJSON-схема: ${JSON.stringify(schema)}\nПРЕДЫДУЩАЯ ПОПЫТКА НАРУШИЛА ФОРМАТ. Верни только один валидный JSON-объект без Markdown, вводного текста и комментариев. Проверь количество слайдов и обязательные поля.`;
       const retryBody =
         selected.provider === "navyai"
           ? {
               ...raw,
-              model: selected.fallbackModel || selected.model,
+              model: selected.model,
               messages: [
                 { role: "system", content: retryInstructions },
                 { role: "user", content: JSON.stringify(modelInput) },
@@ -1995,7 +1841,7 @@ ${sourceRule}
         if (!retry.response.ok)
           throw providerResponseError(retry.response.status);
         parsed = parseJson(outputText(retry.body));
-        slides = parseSlides(parsed.slides, input.slideCount);
+        slides = applyPresentationTemplateBlueprint(parseSlides(parsed.slides, input.slideCount), input);
       } catch (retryError) {
         if (
           retryError instanceof ApiRequestError &&
@@ -2017,7 +1863,7 @@ ${sourceRule}
         string,
         unknown
       >;
-      const repairInstructions = `${instructions}\nПРЕДЫДУЩИЙ ЧЕРНОВИК ФОРМАЛЬНО ВАЛИДЕН, НО НЕ ПРОШЁЛ РЕДАКТОРСКИЙ КОНТРОЛЬ. Исправь перечисленные qualityIssues, сохрани только подтверждённые факты и верни заново полный JSON со всеми ${input.slideCount} слайдами. Не объясняй правки.`;
+      const repairInstructions = `${instructions}\nJSON-схема: ${JSON.stringify(schema)}\nПРЕДЫДУЩИЙ ЧЕРНОВИК ФОРМАЛЬНО ВАЛИДЕН, НО НЕ ПРОШЁЛ РЕДАКТОРСКИЙ КОНТРОЛЬ. Исправь перечисленные qualityIssues, сохрани только подтверждённые факты и верни заново полный JSON со всеми ${input.slideCount} слайдами. Не объясняй правки.`;
       const repairInput = {
         ...modelInput,
         qualityIssues,
@@ -2035,7 +1881,7 @@ ${sourceRule}
         selected.provider === "navyai"
           ? {
               ...raw,
-              model: selected.fallbackModel || selected.model,
+              model: selected.model,
               messages: [
                 { role: "system", content: repairInstructions },
                 { role: "user", content: JSON.stringify(repairInput) },
@@ -2078,6 +1924,7 @@ ${sourceRule}
     );
     slides = applyPresentationTemplateBlueprint(slides, input);
     slides = await generatePresentationImages(request, selected, slides);
+    slides = slides.map((slide) => slide.layout === "gallery" && !slide.imageUrl ? { ...slide, layout: "statement" as const } : slide);
     const lastSlide = slides.at(-1);
     if (lastSlide)
       slides[slides.length - 1] = {
@@ -2121,7 +1968,7 @@ ${sourceRule}
       (error.status === 504 || error.status === 502 || error.status === 422)
     ) {
       const selectedThemeId = resolvedThemeId(input);
-      const theme = presentationTheme(selectedThemeId);
+      const theme = { ...presentationTheme(selectedThemeId), ...requestedPresentationColors(input.designBrief) };
       const fallback = safeFallbackOutline(input);
       fallback.slides = applyPresentationArtDirection(
         fallback.slides,

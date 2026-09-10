@@ -163,8 +163,8 @@ test("AI design remains a separate version until the user chooses it", async () 
   assert.match(assistant, /Сравнение редакций/);
   assert.match(assistant, /Продолжить с моим/);
   assert.match(assistant, /Заменить на вариант ИИ/);
-  assert.match(assistant, /Поток сам подготовит текст, палитру, композицию, тематическое изображение и узор/);
-  assert.match(assistant, /сам создаст тематическое/);
+  assert.match(assistant, /Поток подготовит текст и оформление по вашей задаче/);
+  assert.match(assistant, /макету нужна иллюстрация/);
   assert.match(server, /api\.openverse\.org/);
   assert.match(server, /license_type/);
   assert.match(server, /aspect_ratio/);
@@ -194,7 +194,7 @@ test("AI brief asks follow-up questions and accepts dragged user images", async 
       assistant.indexOf("2 · Уточнения"),
   );
   assert.match(assistant, /Перетащите изображение сюда/);
-  assert.match(assistant, /visualContent: "image-and-pattern"/);
+  assert.doesNotMatch(assistant, /visualContent: "image-and-pattern"/);
   assert.doesNotMatch(assistant, /setVisualContent/);
   assert.match(assistant, /: "generate"/);
   assert.match(assistant, /prepareImageFile/);
@@ -217,18 +217,18 @@ test("AI brief asks follow-up questions and accepts dragged user images", async 
   assert.match(server, /availableAssets/);
   assert.match(server, /Не спрашивай цвета/);
   assert.match(server, /action === "design"/);
-  assert.match(server, /\? "image-and-pattern"/);
+  assert.match(server, /object\.visualContent/);
   assert.match(server, /suggestion: fallbackBriefQuestions\(input\.goal\)/);
-  assert.match(server, /createEditorialCopy/);
-  assert.match(server, /сырьё и ограничения, а не текст для копирования/);
+  assert.doesNotMatch(server, /createEditorialCopy/);
+  assert.match(server, /emailCompositionGuidance/);
   assert.match(server, /Каждую загруженную фотографию/);
   assert.match(server, /blocks\.splice\(heroIndex/);
   assert.match(server, /visibleBlockContent/);
   assert.match(server, /creativeBlockStyle/);
   assert.match(server, /artDirection/);
   assert.match(server, /contentStrategy/);
-  assert.match(server, /ensureOriginalCompositionDepth/);
-  assert.match(server, /минимум два разных содержательных модуля/);
+  assert.match(server, /normalizeEmailVisualDesign/);
+  assert.doesNotMatch(server, /минимум два разных содержательных модуля/);
   assert.match(assistant, /Сравнение редакций/);
   assert.match(assistant, /какой контекст использовал/);
   assert.match(assistant, /sandbox="allow-same-origin"/);
@@ -711,7 +711,7 @@ test("NavyAI uses its supported chat endpoint and a working structured-output fa
     "utf8",
   );
   assert.match(server, /\/chat\/completions/);
-  assert.match(server, /gemini-2\.5-flash-lite/);
+  assert.match(server, /gpt-5\.6-terra/);
   assert.match(server, /choices/);
   assert.match(server, /response_format/);
   assert.match(server, /imageEndpoint/);

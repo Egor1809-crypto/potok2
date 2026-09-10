@@ -1,12 +1,3 @@
-function compactAtWord(value: string, maxLength: number) {
-  const normalized = value.replace(/\s+/g, " ").trim();
-  if (normalized.length <= maxLength) return normalized;
-  const candidate = normalized.slice(0, maxLength + 1);
-  const boundary = candidate.lastIndexOf(" ");
-  const compact = candidate.slice(0, boundary >= maxLength * 0.68 ? boundary : maxLength);
-  return `${compact.replace(/[\s,;:—-]+$/u, "")}…`;
-}
-
 function capitalize(value: string) {
   const index = value.search(/[\p{L}\p{N}]/u);
   if (index < 0) return value;
@@ -20,28 +11,22 @@ export function normalizePresentationTitle(value: string) {
       /^(?:(?:нужно|надо)\s+)?(?:сделать|создать|подготовить|собрать|разработать)\s+(?:мне\s+)?(?:презентаци(?:ю|я)|слайд(?:ы|ов)?)\s*[:—-]?\s*/iu,
       "",
     )
-    .replace(/^(?:на\s+тему|про|для)\s*[:—-]?\s*/iu, "")
-    .replace(/^(?:презентаци(?:я|ю))\s*[:—-]?\s*/iu, "")
-    .replace(/^(?:на\s+тему|про|для)\s*[:—-]?\s*/iu, "")
+    .replace(/^(?:на\s+тему|про|для)(?:\s+|(?=[:—-]))[:—-]?\s*/iu, "")
+    .replace(/^(?:презентаци(?:я|ю))(?=\s|[:—-]|$)\s*[:—-]?\s*/iu, "")
+    .replace(/^(?:на\s+тему|про|для)(?:\s+|(?=[:—-]))[:—-]?\s*/iu, "")
     .trim();
   const capitalized = capitalize(withoutCommand || normalized);
-  if (capitalized.length <= 88) return capitalized;
-  for (const separator of [", а не ", " — вместо ", " — даже ", " — один ", ": ", "; "]) {
-    const boundary = capitalized.indexOf(separator);
-    if (boundary >= 38 && boundary <= 88)
-      return capitalized.slice(0, boundary).replace(/[\s,;:—-]+$/u, "");
-  }
-  return compactAtWord(capitalized, 88);
+  return capitalized;
 }
 
 export function normalizePresentationBody(value: string) {
-  return compactAtWord(capitalize(value), 360);
+  return capitalize(value.replace(/\s+/g, " ").trim());
 }
 
 export function normalizePresentationBullet(value: string) {
-  return compactAtWord(capitalize(value), 110);
+  return capitalize(value.replace(/\s+/g, " ").trim());
 }
 
 export function normalizePresentationEyebrow(value: string) {
-  return compactAtWord(value, 42).toLocaleUpperCase("ru-RU");
+  return value.replace(/\s+/g, " ").trim().toLocaleUpperCase("ru-RU");
 }
