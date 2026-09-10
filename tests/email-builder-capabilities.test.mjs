@@ -567,8 +567,8 @@ test("scaled library offers 150+ original templates and useful discovery filters
     "Подробный · 9+ блоков",
   ])
     assert.match(templatesView, new RegExp(filter.replace(/[+]/g, "\\+")));
-  assert.match(templatesView, /Импортировать шаблон/);
-  assert.match(templatesView, /\.mailflow\.json/);
+  assert.match(templatesView, /Импортировать письмо/);
+  assert.match(await readFile(new URL("../lib/email-import/import-letter.ts", import.meta.url), "utf8"), /\.mailflow\.json/);
   assert.doesNotMatch(templatesView, /Юридическая коллекция/);
   assert.match(database, /email-template-library-v6-scale/);
   assert.match(dashboard, /Выбрать шаблон/);

@@ -1,3 +1,4 @@
+import { checkEmailHtml } from "@/lib/email-import/formats";
 import type {
   EmailBuilderBlockInput,
   EmailBuilderDocumentInput,
@@ -136,9 +137,15 @@ export function parseEmailBuilderDocument(
   const frameStyle = frameStyles.has(source.frameStyle as EmailFrameStyle) ? source.frameStyle as EmailFrameStyle : "none";
   const rawHtml = source.rawHtml === undefined
     ? undefined
-    : text(source.rawHtml, "HTML письма", 500_000);
-  if (rawHtml && !/^\s*<!doctype html|^\s*<html[\s>]/i.test(rawHtml)) {
+    : typeof source.rawHtml === "string" && source.rawHtml.length <= 500_000
+      ? source.rawHtml
+      : (() => { throw new ApiRequestError("HTML письма должен быть текстом размером до 500 КБ."); })();
+  if (rawHtml && !/^(?:\s|<!--[\s\S]*?-->)*(?:<!doctype\s+html|<html[\s>])/i.test(rawHtml)) {
     throw new ApiRequestError("Импортированный HTML должен содержать полный документ письма.");
+  }
+  if (rawHtml) {
+    try { checkEmailHtml(rawHtml); }
+    catch (error) { throw new ApiRequestError(error instanceof Error ? error.message : "HTML письма не поддерживается."); }
   }
   return {
     templateId: text(source.templateId, "ID шаблона", 160),
@@ -325,18 +332,19 @@ export function emailDocumentPlainText(
   document: EmailBuilderDocumentInput,
 ): string {
   if (document.rawHtml) {
+    const decode = (value: string) => value.replace(/&(?:amp|lt|gt|quot|apos|nbsp|#34|#39|#160);/gi, entity => ({ "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&apos;": "'", "&nbsp;": " ", "&#34;": '"', "&#39;": "'", "&#160;": " " })[entity.toLowerCase()] ?? entity);
+    const preformatted = document.rawHtml.match(/<body[^>]*>\s*<pre\b[^>]*>([\s\S]*?)<\/pre>\s*<\/body>/i);
+    if (preformatted && !/<[^>]+>/.test(preformatted[1])) return decode(preformatted[1]).slice(0, 200_000);
     const text = document.rawHtml
+      .replace(/<img\b[^>]*\balt\s*=\s*(["'])([\s\S]*?)\1[^>]*>/gi, (_tag, _quote, alt: string) => ` ${alt} `)
       .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
       .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
       .replace(/<[^>]+>/g, " ")
-      .replace(/&nbsp;|&#160;/gi, " ")
-      .replace(/&amp;/gi, "&")
-      .replace(/&quot;|&#34;/gi, '"')
-      .replace(/&#39;|&apos;/gi, "'")
       .replace(/\s+/g, " ")
       .trim();
+    if (!text && /<img\b/i.test(document.rawHtml)) return document.subject || "Письмо в изображении";
     if (!text) throw new ApiRequestError("Импортированный HTML не содержит текста.");
-    return text.slice(0, 200_000);
+    return decode(text).slice(0, 200_000);
   }
   const sections = document.blocks.flatMap((block) => {
     if (block.type === "divider" || block.type === "spacer" || block.type === "pattern") return [];

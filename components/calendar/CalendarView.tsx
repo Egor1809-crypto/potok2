@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { useCalendarTimeZone } from "@/lib/calendar-timezone";
+import { russianTimeZones } from "@/lib/russian-timezones";
 import { CalendarReport } from "./CalendarReport";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -9,7 +11,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Filter, Plus, X } from
 import { getCampaignChannelDefinition } from "@/components/campaigns/campaignChannels";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Alert, Badge, Button, Input, Select, buttonVariants, cn } from "@/components/ui";
-import { describeTimeZone, useBrowserTimeZone } from "@/lib/client-timezone";
+import { describeTimeZone } from "@/lib/client-timezone";
 import type { CampaignRecord, WorkspaceSnapshot } from "@/types/api";
 
 const weekdays = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
@@ -82,7 +84,21 @@ export function CalendarView() {
   const [query, setQuery] = React.useState("");
   const [group, setGroup] = React.useState("");
   const [status, setStatus] = React.useState("");
-  const timeZone = useBrowserTimeZone();
+  const { timeZone, choice: timeZoneChoice, setChoice: setTimeZoneChoice } = useCalendarTimeZone();
+  const todayKey = dateKeyInTimezone(new Date().toISOString(), timeZone);
+  const previousToday = React.useRef(dateKey(new Date()));
+  React.useEffect(() => {
+    const oldMonth = previousToday.current.slice(0, 7);
+    const frame = requestAnimationFrame(() => {
+      previousToday.current = todayKey;
+      setMonth(current => {
+      if (dateKey(current).slice(0, 7) !== oldMonth) return current;
+      const [year, monthNumber] = todayKey.split("-").map(Number);
+      return new Date(year, monthNumber - 1, 1);
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [todayKey]);
 
   const load = React.useCallback(async () => {
     if (inFlight.current) return;
@@ -202,14 +218,15 @@ export function CalendarView() {
         eyebrow="Расписание"
         title="Календарь рассылок"
         description="Планируйте рассылки и проверяйте результаты отправки за последние 24 часа."
-        action={<Link href={`/campaigns/new?scheduledDate=${dateKey(new Date())}`} className={buttonVariants()}><Plus className="size-4" />Запланировать</Link>}
+        action={<Link href={`/campaigns/new?scheduledDate=${todayKey}&timeZone=${encodeURIComponent(timeZone)}`} className={buttonVariants()}><Plus className="size-4" />Запланировать</Link>}
       />
       {error ? <Alert tone="danger" title="Календарь недоступен">{error}</Alert> : null}
-      <Alert tone="info" title="Часовой пояс определён автоматически">
-        Все даты календаря и время отправки показаны по вашему устройству: {describeTimeZone(timeZone)}. На сервере расписание хранится в UTC без сдвига.
+      <Alert tone="info" title={timeZoneChoice === "auto" ? "Часовой пояс определён автоматически" : "Часовой пояс календаря"}>
+        Все даты календаря и время отправки показаны в выбранном часовом поясе: {describeTimeZone(timeZone)}. На сервере расписание хранится в UTC без сдвига.
       </Alert>
 
-      <div className="flex flex-wrap gap-3" aria-label="Представление календаря">
+      <div className="flex flex-wrap items-end gap-3" aria-label="Представление и фильтры календаря">
+        <div className="min-w-0 sm:ms-auto sm:order-last"><label htmlFor="calendar-time-zone" className="mb-1 block text-xs text-text-muted">Часовой пояс</label><Select id="calendar-time-zone" value={timeZoneChoice} onChange={event => setTimeZoneChoice(event.target.value)} options={[{ value: "auto", label: "Автоматически — по устройству" }, ...russianTimeZones]} /></div>
         <Button variant={view === "calendar" ? "primary" : "outline"} aria-pressed={view === "calendar"} onClick={() => setView("calendar")}>Календарь</Button>
         <Button variant={view === "report" ? "primary" : "outline"} aria-pressed={view === "report"} onClick={() => setView("report")}>Отчёт за 24 часа{snapshot?.calendarReport ? ` · ${snapshot.calendarReport.rows.length}` : ""}</Button>
       </div>
@@ -238,7 +255,7 @@ export function CalendarView() {
               const key = dateKey(day);
               const items = campaignsByDay.get(key) ?? [];
               const outside = day.getMonth() !== month.getMonth();
-              const today = key === dateKey(new Date());
+              const today = key === todayKey;
               const selected = selectedDay === key;
               const dayLabel = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric" }).format(day);
               return (
@@ -302,7 +319,7 @@ export function CalendarView() {
               ))}
               {selectedItems.length === 0 ? <p className="rounded-xl bg-surface-subtle p-4 text-[14px] leading-6 text-text-muted">{query || group || status ? "На этот день нет рассылок по выбранным фильтрам." : "На этот день нет запланированных рассылок."}</p> : null}
             </div>
-            <Link href={`/campaigns/new?scheduledDate=${selectedDay}`} className={buttonVariants({ className: "mt-5 w-full" })}><Plus aria-hidden="true" className="size-4" />Запланировать</Link>
+            <Link href={`/campaigns/new?scheduledDate=${selectedDay}&timeZone=${encodeURIComponent(timeZone)}`} className={buttonVariants({ className: "mt-5 w-full" })}><Plus aria-hidden="true" className="size-4" />Запланировать</Link>
           </aside>
         ) : null}
       </div>

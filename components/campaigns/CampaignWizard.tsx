@@ -3,6 +3,7 @@
 import * as React from "react";
 import { CampaignCommunicationCheck } from "@/components/communications/CampaignCommunicationCheck";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
@@ -67,7 +68,9 @@ import {
   integrationProviderById,
   type IntegrationProviderId,
 } from "@/config/integrations";
-import { describeTimeZone, useBrowserTimeZone } from "@/lib/client-timezone";
+import { validTimeZone, zonedInputValue, zonedInputToIso } from "@/lib/russian-timezones";
+import { useCalendarTimeZone } from "@/lib/calendar-timezone";
+import { describeTimeZone } from "@/lib/client-timezone";
 import type {
   ApiError,
   CampaignCreateInput,
@@ -191,17 +194,12 @@ function getServerSnapshot() {
   return JSON.stringify({ search: "", draft: "", builderDraft: "" });
 }
 
-function localInputValue(iso: string | null) {
-  if (!iso) return "";
-  const date = new Date(iso);
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 16);
-}
-
 function initialScheduledAt(params: URLSearchParams, draft: Partial<WizardDraft> | null) {
   if (draft?.scheduledAt) return draft.scheduledAt;
   const day = params.get("scheduledDate");
   if (!day || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
+  const zone = params.get("timeZone");
+  if (validTimeZone(zone)) return zonedInputToIso(`${day}T10:00`, zone);
   const date = new Date(`${day}T10:00:00`);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
@@ -2193,7 +2191,10 @@ function ReviewStep({
   minimumScheduledAt: string;
 }) {
   const blockers = evaluation?.blockers.length ? evaluation.blockers : clientBlockers;
-  const timeZone = useBrowserTimeZone();
+  const { timeZone: savedTimeZone } = useCalendarTimeZone();
+  const scheduleParams = useSearchParams();
+  const requestedZone = scheduleParams.get("timeZone");
+  const timeZone = validTimeZone(requestedZone) ? requestedZone : savedTimeZone;
   const scheduledAt = scheduledTimes[0] ?? null;
   const totalMessages = recipientCount * scheduledTimes.length;
   return (
@@ -2248,13 +2249,13 @@ function ReviewStep({
                   <Input
                     id={`campaign-scheduled-at-${index}`}
                     type="datetime-local"
-                    min={localInputValue(minimumScheduledAt)}
-                    value={localInputValue(waveTime)}
+                    min={zonedInputValue(minimumScheduledAt, timeZone)}
+                    value={zonedInputValue(waveTime, timeZone)}
                     onChange={(event) => {
-                      const value = new Date(event.target.value);
-                      if (Number.isNaN(value.getTime())) return;
+                      const value = zonedInputToIso(event.target.value, timeZone);
+                      if (!value) return;
                       const next = [...scheduledTimes];
-                      next[index] = value.toISOString();
+                      next[index] = value;
                       onScheduledTimesChange(next);
                     }}
                   />
