@@ -12,8 +12,9 @@ export function decodeDocument(bytes: Uint8Array) {
 export function completeHtml(html: string) {
   // Preserve complete documents byte for byte after decoding, including MSO
   // conditional comments, media queries and table attributes.
-  return /^(?:\s|<!--[\s\S]*?-->)*(?:<!doctype\s+html|<html[\s>])/i.test(html)
-    ? html : `<!doctype html><html><head><meta charset="utf-8"></head><body>${html}</body></html>`;
+  if (/^(?:\s|<!--[\s\S]*?-->)*(?:<!doctype\s+html|<html[\s>])/i.test(html)) return html;
+  if (/<body[\s>]/i.test(html)) return `<!doctype html><html>${/<head[\s>]/i.test(html) ? "" : '<head><meta charset="utf-8"></head>'}${html}</html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"></head><body>${html}</body></html>`;
 }
 export function textLetter(text: string) {
   return `<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0"><pre style="margin:0;white-space:pre-wrap;overflow-wrap:break-word;font:16px/1.5 Arial,sans-serif">${escapeMarkup(text)}</pre></body></html>`;

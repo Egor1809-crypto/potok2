@@ -18,6 +18,7 @@ test("all eleven Russian zones round-trip calendar input across a day boundary",
 test("HTML retains CSS, conditional Outlook markup, links and text through parsing and compilation", async () => {
   const original = '\n<!-- исходник -->\n<!doctype html><html><head><style>@media(max-width:500px){td{font-size:14px}}</style></head><body><!--[if mso]><table><tr><td><![endif]--><table width="640" cellpadding="0"><tr><td style="color:#123456"><a href="https://example.org/?a=1&amp;b=2">Привет &amp; до встречи</a></td></tr></table><!--[if mso]></td></tr></table><![endif]--></body></html>\n';
   assert.equal(completeHtml(original), original);
+  assert.equal((completeHtml('<body style="margin:0">Письмо</body>').match(/<body/g) ?? []).length, 1);
   const imported = await importLetter([new File([original], "letter.html")], () => {});
   const parsed = parseEmailBuilderDocument(imported.document);
   assert.equal(compileEmailDocument(parsed), original);
