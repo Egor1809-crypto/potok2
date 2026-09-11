@@ -696,7 +696,7 @@ test("email action blocks are real links in the canvas and compiled email", asyn
     (canvas.match(/href=\{block\.href \|\| undefined\}/g) ?? []).length >= 5,
   );
   assert.match(compiler, /<a href="\$\{escapeHtml\(block\.href \?\? ""\)\}"/);
-  assert.match(compiler, /safeHttpsUrl\(block\.href, `Ссылка кнопки/);
+  assert.match(compiler, /actionUrl\(block\.href, `Ссылка кнопки/);
 });
 
 test("NavyAI uses its supported chat endpoint and a working structured-output fallback", async () => {

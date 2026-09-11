@@ -38,6 +38,7 @@ import type { BuilderBlock, BuilderDocument } from "./builder-types";
 import { getBlockLabel } from "./BlockLibrary";
 import { ImageAssetPicker } from "./ImageAssetPicker";
 import { emailPatternPresets } from "./pattern-presets";
+import { applyEmailVariant, emailBlockVariants, emailVariantLabel } from "@/lib/email-ai/variants";
 
 const PRODUCTION_ORIGIN = "https://mailflow-outreach.isakovegor820.chatgpt.site";
 const localAsset = (url: string) => url.startsWith(PRODUCTION_ORIGIN) ? url.slice(PRODUCTION_ORIGIN.length) : url;
@@ -155,6 +156,8 @@ export function PropertiesPanel({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto scrollbar-subtle">
+        {block.aiRole ? <div className="grid gap-3 border-b border-border p-4"><FormField label="Надпись над блоком" htmlFor="builder-block-badge"><Input id="builder-block-badge" value={block.badge || ""} maxLength={150} onChange={e => onUpdateBlock({ badge: e.target.value })} /></FormField><FormField label="Вариант блока" htmlFor="builder-block-variant"><Select id="builder-block-variant" value={block.variant || emailBlockVariants[block.aiRole][0]} options={emailBlockVariants[block.aiRole].map(value => ({ value, label: emailVariantLabel(value) }))} onChange={event => onUpdateBlock(applyEmailVariant(block, event.target.value, document) as Partial<BuilderBlock>)} /></FormField></div> : null}
+        {block.type === "hero" && block.aiRole ? <div className="grid gap-3 border-b border-border p-4"><FormField label="Изображение первого экрана"><ImageAssetPicker kind="photo" value={block.imageHref} onSelect={(url, filename) => onUpdateBlock({ imageHref: url, imageAlt: filename })} /></FormField><FormField label="Описание изображения"><Input value={block.imageAlt || ""} onChange={event => onUpdateBlock({ imageAlt: event.target.value })} /></FormField><FormField label="Текст кнопки"><Input value={block.label || ""} onChange={event => onUpdateBlock({ label: event.target.value })} /></FormField><FormField label="Ссылка кнопки"><Input value={block.href || ""} onChange={event => onUpdateBlock({ href: event.target.value })} /></FormField></div> : null}
         {canEditContent ? (
           <PropertySection
             icon={Type}
@@ -187,7 +190,7 @@ export function PropertiesPanel({
           >
             {compoundContentLabels[block.type] ? (
               <div className="grid gap-2 rounded-xl border border-border bg-surface-subtle p-2.5">
-                {compoundContentLabels[block.type]?.map((label, index) => {
+                {(block.aiRole && ["columns", "stats"].includes(block.type) ? block.content.split("|").map((_, index) => `Элемент ${index + 1}`) : compoundContentLabels[block.type])?.map((label, index) => {
                   const parts = block.content.split("|");
                   return <FormField key={`${block.id}-${label}`} label={label}><Input value={parts[index] ?? ""} onChange={(event) => { const next = [...parts]; while (next.length <= index) next.push(""); next[index] = event.target.value; updateContent(next.join("|")); }} className="bg-surface text-[11px]" /></FormField>;
                 })}

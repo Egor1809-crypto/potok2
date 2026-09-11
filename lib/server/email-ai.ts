@@ -1489,11 +1489,12 @@ function emailDesignQualityIssues(suggestion: EmailAiSuggestion, input: EmailAiR
   return issues;
 }
 
-async function generateDesignImages(
+export async function generateDesignImages(
   request: Request,
   provider: NonNullable<ReturnType<typeof aiProvider>>,
   suggestion: EmailAiSuggestion,
   nonPhotosOnly = false,
+  signal?: AbortSignal,
 ) {
   if (!suggestion.document || !suggestion.imagePrompts?.length)
     return suggestion;
@@ -1527,7 +1528,7 @@ async function generateDesignImages(
             quality: "high",
             n: 1,
           }),
-          signal: AbortSignal.timeout(120_000),
+          signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(120_000)]) : AbortSignal.timeout(120_000),
         },
       );
       const body = asObject(await response.json());
@@ -1567,6 +1568,7 @@ async function generateDesignImages(
       if (!stored) throw new Error("Image provider returned no file");
       block.href = stored.url;
     } catch (error) {
+      if (signal?.aborted) throw new ApiRequestError("Создание письма отменено.", 499);
       console.warn(
         "Email AI visual generation failed",
         error instanceof Error ? error.message : "unknown error",

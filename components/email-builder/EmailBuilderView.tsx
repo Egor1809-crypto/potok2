@@ -12,7 +12,6 @@ import {
 import Link from "next/link";
 import {
   Blocks,
-  Gauge,
   Library,
   PenTool,
   SlidersHorizontal,
@@ -51,9 +50,10 @@ import { BuilderTopbar, MobilePreviewToggle } from "./BuilderTopbar";
 import { EmailExportMenu } from "./EmailExportMenu";
 import { EmailCanvas } from "./EmailCanvas";
 import { PropertiesPanel } from "./PropertiesPanel";
-import { AiEmailAssistant } from "./AiEmailAssistant";
-import { CreativeDirectorPanel } from "./CreativeDirectorPanel";
-import { analyzeEmailQuality } from "./email-design-director";
+import { AiEmailWizard } from "./AiEmailWizard";
+import { AiEmailEditPanel } from "./AiEmailEditPanel";
+import { Button } from "@/components/ui";
+import { EmailSubjectFields } from "./EmailSubjectFields";
 import {
   cloneBlock,
   createBlankDocument,
@@ -581,6 +581,7 @@ function EmailBuilderWorkspace({
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("desktop");
   const [mobilePanel, setMobilePanel] = useState<BuilderPanel>("canvas");
+  const [rightPanelMode, setRightPanelMode] = useState<"properties" | "ai">(initialDirectorOpen ? "ai" : "properties");
   const [dirty, setDirty] = useState(
     mode === "template" ? !templateRecord || editingStarter : true,
   );
@@ -591,7 +592,6 @@ function EmailBuilderWorkspace({
       ? "start"
       : "manual",
   );
-  const [directorOpen, setDirectorOpen] = useState(initialDirectorOpen);
   const editRevisionRef = useRef(0);
   const savingTemplateRef = useRef(false);
 
@@ -599,10 +599,6 @@ function EmailBuilderWorkspace({
   const selectedBlock =
     document.blocks.find((block) => block.id === selectedBlockId) ??
     document.blocks[0];
-  const qualityReport = useMemo(
-    () => analyzeEmailQuality(document),
-    [document],
-  );
 
   const markDirty = useCallback(() => {
     editRevisionRef.current += 1;
@@ -611,7 +607,11 @@ function EmailBuilderWorkspace({
 
   const mutateDocument = useCallback(
     (update: (current: BuilderDocument) => BuilderDocument) => {
-      dispatch({ type: "update", update });
+      dispatch({ type: "update", update: (current) => {
+        const next = update(current);
+        if (next !== current && next.aiMetadata && next.aiMetadata === current.aiMetadata) return { ...next, aiMetadata: { ...next.aiMetadata, review: undefined } };
+        return next;
+      } });
       markDirty();
     },
     [markDirty],
@@ -1004,6 +1004,7 @@ function EmailBuilderWorkspace({
         continueHref={continueHref}
         tools={<EmailExportMenu document={document} name={campaignName} />}
       />
+      {creationMode === "manual" ? <EmailSubjectFields document={document} onUpdate={updateDocument} onOpenAi={() => { setRightPanelMode("ai"); setMobilePanel("properties"); }} /> : null}
 
       <div
         className="studio-modebar flex flex-wrap items-center justify-center gap-1 border-b border-border/80 bg-surface/95 px-4 py-2.5"
@@ -1038,52 +1039,6 @@ function EmailBuilderWorkspace({
           Создать с ИИ
         </button>
       </div>
-
-      <button
-        type="button"
-        onClick={() => setDirectorOpen(true)}
-        className="group flex w-full items-center gap-3 border-b border-primary/15 bg-[linear-gradient(90deg,rgba(108,72,255,.12),rgba(214,79,135,.07)_52%,rgba(79,131,214,.09))] px-4 py-3 text-left outline-none transition duration-200 hover:bg-primary-subtle/65 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30 sm:px-6"
-      >
-        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary text-white shadow-[var(--shadow-xs)]">
-          <Gauge aria-hidden="true" className="size-4" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <strong className="block text-[12px] text-text-strong">
-            Арт-директор проверит письмо целиком
-          </strong>
-          <span className="mt-0.5 block text-[10px] leading-4 text-text-muted">
-            Оценит текст, дизайн, конверсию и мобильную версию — затем исправит слабые места одним действием.
-          </span>
-        </span>
-        <span
-          className={cn(
-            "shrink-0 rounded-lg px-2.5 py-1.5 font-mono text-[11px] font-semibold",
-            qualityReport.score >= 80
-              ? "bg-success-subtle text-success"
-              : qualityReport.score >= 55
-                ? "bg-warning-subtle text-warning"
-                : "bg-danger-subtle text-danger",
-          )}
-          aria-label={`Оценка письма ${qualityReport.score} из 100`}
-        >
-          {qualityReport.score}/100
-        </span>
-        <span className="hidden text-[11px] font-semibold text-primary group-hover:underline sm:block">
-          Открыть
-        </span>
-      </button>
-
-      <CreativeDirectorPanel
-        open={directorOpen}
-        onOpenChange={setDirectorOpen}
-        document={document}
-        onApply={(next, message) => {
-          mutateDocument(() => next);
-          setSelectedBlockId(next.blocks[0]?.id ?? "");
-          setCreationMode("manual");
-          toast.success("Арт-директор", message);
-        }}
-      />
 
       {creationMode === "start" ? (
         <section
@@ -1154,7 +1109,7 @@ function EmailBuilderWorkspace({
           </div>
         </section>
       ) : creationMode === "ai" ? (
-        <AiEmailAssistant
+        <AiEmailWizard
           document={document}
           onApply={(next) => {
             mutateDocument(() => next);
@@ -1261,7 +1216,7 @@ function EmailBuilderWorkspace({
             />
           </div>
 
-          <div className="grid min-h-0 flex-1 bg-surface-subtle/30 lg:grid-cols-[210px_minmax(560px,1fr)_285px] xl:grid-cols-[220px_minmax(680px,1fr)_305px]">
+          <div className="grid min-h-0 flex-1 bg-surface-subtle/30 lg:grid-cols-[210px_minmax(0,1fr)_285px] xl:grid-cols-[220px_minmax(0,1fr)_305px]">
             <BlockLibrary
               onAdd={addBlock}
               document={document}
@@ -1294,7 +1249,9 @@ function EmailBuilderWorkspace({
                 "lg:flex",
               )}
             />
-            {selectedBlock ? (
+            <div className={cn("min-h-0 flex-col border-l border-border bg-surface", mobilePanel === "properties" ? "flex" : "hidden", "lg:flex")}>
+              <div className="flex shrink-0 gap-2 border-b border-border p-2"><Button type="button" size="sm" variant={rightPanelMode === "properties" ? "primary" : "ghost"} onClick={() => setRightPanelMode("properties")}>Свойства</Button><Button type="button" size="sm" variant={rightPanelMode === "ai" ? "primary" : "ghost"} onClick={() => setRightPanelMode("ai")}>ИИ-помощник</Button></div>
+            {rightPanelMode === "ai" ? <AiEmailEditPanel document={document} block={selectedBlock} onApply={next => mutateDocument(() => next)} /> : selectedBlock ? (
               <PropertiesPanel
                 block={selectedBlock}
                 document={document}
@@ -1303,9 +1260,7 @@ function EmailBuilderWorkspace({
                 onDuplicate={() => duplicateBlock(selectedBlock.id)}
                 onDelete={() => deleteBlock(selectedBlock.id)}
                 className={cn(
-                  "min-h-0 border-l border-border",
-                  mobilePanel === "properties" ? "flex" : "hidden",
-                  "lg:flex",
+                  "flex min-h-0 flex-1",
                 )}
               />
             ) : (
@@ -1326,6 +1281,7 @@ function EmailBuilderWorkspace({
                 </p>
               </aside>
             )}
+            </div>
           </div>
         </>
       )}

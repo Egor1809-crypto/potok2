@@ -48,7 +48,7 @@ async function harness(){
  };
  const modules=new Map();
  async function moduleFor(path){if(modules.has(path))return modules.get(path);const source=await readFile(new URL(`../${path}`,import.meta.url),"utf8");const code=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;const m=new vm.SourceTextModule(code,{context,identifier:path});modules.set(path,m);await m.link(async(spec)=>mocks[spec]??moduleFor(spec==="./api-utils"?"lib/server/api-utils.ts":"lib/communications/rules.ts"));return m;}
- const module=await moduleFor("lib/server/communication-store.ts");await module.evaluate();return {api:module.namespace,sqlite,runtimeEnv};
+ const loadedModule=await moduleFor("lib/server/communication-store.ts");await loadedModule.evaluate();return {api:loadedModule.namespace,sqlite,runtimeEnv};
 }
 test("real SQL: evidence is append-only; duplicate reply creates one hold and one task",async()=>{
  const {api,sqlite}=await harness();const request=new Request("https://test/api");

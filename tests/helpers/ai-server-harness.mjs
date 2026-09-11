@@ -4,9 +4,9 @@ import vm from "node:vm";
 import ts from "typescript";
 
 // Exercise the production orchestration without touching contacts, storage or mail.
-export async function loadAiServer(entry, { env = {}, fetch = globalThis.fetch, expose = [], assetStore } = {}) {
+export async function loadAiServer(entry, { env = {}, fetch = globalThis.fetch, expose = [], assetStore, overrides = {} } = {}) {
   const root = path.resolve(import.meta.dirname, "../..");
-  const context = vm.createContext({ console, fetch, crypto, URL, Request, Response, Headers, AbortSignal, TextEncoder, TextDecoder, Uint8Array, ArrayBuffer, atob, btoa, setTimeout, clearTimeout });
+  const context = vm.createContext({ console, process: { env: { NODE_ENV: "test" } }, fetch, crypto, URL, Request, Response, Headers, AbortSignal, TextEncoder, TextDecoder, Uint8Array, ArrayBuffer, atob, btoa, setTimeout, clearTimeout });
   const synthetic = (values) => new vm.SyntheticModule(Object.keys(values), function () {
     for (const [key, value] of Object.entries(values)) this.setExport(key, value);
   }, { context });
@@ -15,8 +15,9 @@ export async function loadAiServer(entry, { env = {}, fetch = globalThis.fetch, 
     "cloudflare:workers": synthetic({ env }),
     "@/db": synthetic({ getD1: () => db }),
     "./database-init": synthetic({ ensureDatabase: async () => ({ participant: { id: "design-evaluation" }, sessionId: "test-session" }), WORKSPACE_ID: "design-evaluation" }),
-    "./email-asset-store": synthetic(assetStore ?? { storeGeneratedEmailAsset: async () => { throw new Error("Asset writes are disabled in design tests"); }, storeGeneratedEmailAssetBytes: async () => { throw new Error("Asset writes are disabled in design tests"); } }),
+    "./email-asset-store": synthetic({ storeGeneratedEmailAsset: async () => { throw new Error("Asset writes are disabled in design tests"); }, storeGeneratedEmailAssetBytes: async () => { throw new Error("Asset writes are disabled in design tests"); }, getEmailAssetRecord: async () => { throw new Error("Unknown test asset"); }, ...assetStore }),
     "./public-domain-image-store": synthetic({ storePublicDomainFallbackImage: async () => null }),
+    ...Object.fromEntries(Object.entries(overrides).map(([name, exports]) => [name, synthetic(exports)])),
   };
   const modules = new Map();
   async function load(file) {

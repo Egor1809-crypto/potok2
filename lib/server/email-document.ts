@@ -5,6 +5,10 @@ import type {
 } from "@/types/api";
 import { emailFrameInlineCss, type EmailFrameStyle } from "@/components/email-builder/frame-presets";
 import { ApiRequestError } from "./api-utils";
+import { emailBlockVariants, isEmailVariant } from "@/lib/email-ai/variants";
+import { renderEmailVariant } from "@/lib/email-ai/render-variants";
+import { parseAiEmailBrief, parseEmailReview } from "@/lib/email-ai/schema";
+import { safeEmailUrl } from "@/lib/email-ai/urls";
 
 const BLOCK_TYPES = new Set<EmailBuilderBlockInput["type"]>([
   "logo",
@@ -80,6 +84,12 @@ function safeHttpsUrl(value: unknown, field: string, required: boolean) {
   }
 }
 
+function actionUrl(value: unknown, field: string, required = false) {
+  if ((value === undefined || value === "") && !required) return undefined;
+  try { return safeEmailUrl(value); }
+  catch { throw new ApiRequestError(`Поле «${field}» должно содержать безопасную ссылку.`); }
+}
+
 export function parseEmailBuilderDocument(
   value: unknown,
 ): EmailBuilderDocumentInput | null {
@@ -99,16 +109,22 @@ export function parseEmailBuilderDocument(
       throw new ApiRequestError(`Некорректное выравнивание блока ${index + 1}.`);
     }
     const href = type === "button" || type === "product"
-      ? safeHttpsUrl(block.href, `Ссылка кнопки ${index + 1}`, true)
+      ? actionUrl(block.href, `Ссылка кнопки ${index + 1}`, true)
       : type === "image"
         ? safeHttpsUrl(block.href, `Ссылка изображения ${index + 1}`, true)
-        : safeHttpsUrl(block.href, `Ссылка блока ${index + 1}`, false);
+        : type === "hero" ? actionUrl(block.href, `Ссылка блока ${index + 1}`) : safeHttpsUrl(block.href, `Ссылка блока ${index + 1}`, false);
     const linkHref = type === "image" || type === "logo"
-      ? safeHttpsUrl(block.linkHref, `Ссылка при нажатии ${index + 1}`, false)
+      ? actionUrl(block.linkHref, `Ссылка при нажатии ${index + 1}`)
       : undefined;
+    if (block.aiRole !== undefined && (typeof block.aiRole !== "string" || !Object.hasOwn(emailBlockVariants, block.aiRole))) throw new ApiRequestError("Неизвестная роль блока.");
+    if (block.variant !== undefined && (!isEmailVariant(block.variant) || !block.aiRole || !emailBlockVariants[block.aiRole as keyof typeof emailBlockVariants].includes(block.variant))) throw new ApiRequestError("Вариант не соответствует типу блока.");
     return {
       id: text(block.id, `ID блока ${index + 1}`, 160),
       type,
+      ...(typeof block.aiRole === "string" && block.aiRole in emailBlockVariants ? { aiRole: block.aiRole as NonNullable<EmailBuilderBlockInput["aiRole"]> } : {}),
+      ...(block.badge ? { badge: text(block.badge, "Надпись над блоком", 150) } : {}),
+      ...(isEmailVariant(block.variant) ? { variant: block.variant } : {}),
+      ...(block.imageHref ? { imageHref: safeHttpsUrl(block.imageHref, "Изображение первого экрана", true), imageAlt: text(block.imageAlt ?? "", "Описание изображения", 1000) } : {}),
       content: text(block.content, `Контент блока ${index + 1}`, 20_000),
       ...(block.label === undefined ? {} : { label: text(block.label, `Подпись блока ${index + 1}`, 2_000) }),
       ...(href ? { href } : {}),
@@ -163,6 +179,11 @@ export function parseEmailBuilderDocument(
     frameColor: source.frameColor === undefined ? color(source.accentColor, "Цвет окантовки") : color(source.frameColor, "Цвет окантовки"),
     frameRadius: source.frameRadius === undefined ? 0 : number(source.frameRadius, "Скругление окантовки", 0, 48),
     blocks,
+    ...(source.aiMetadata ? { aiMetadata: (() => {
+      const metadata = record(source.aiMetadata);
+      const review = metadata.review ? record(metadata.review) : undefined;
+      return { brief: parseAiEmailBrief(metadata.brief), generationId: text(metadata.generationId, "Генерация", 160), generatedAt: text(metadata.generatedAt, "Дата генерации", 100), model: text(metadata.model, "Модель", 100), ...(review ? { review: review.score === null ? { score: null, issues: [], suggestions: ["ИИ-проверка временно недоступна. Запустите её повторно в редакторе."], unavailable: true } : parseEmailReview({ ...review, issues: Array.isArray(review.issues) ? review.issues.map(value => ({ ...record(value), blockId: record(value).blockId || null })) : [] }) } : {}) };
+    })() } : {}),
   };
 }
 
@@ -224,7 +245,9 @@ function blockHtml(block: EmailBuilderBlockInput, accent: string) {
   const tracking = block.letterSpacing ?? 0;
   const wrapper = `padding:${block.paddingTop}px ${block.paddingRight ?? 40}px ${block.paddingBottom}px ${block.paddingLeft ?? 40}px;${background}color:${block.textColor};text-align:${block.alignment};`;
   let content = "";
-  if (block.type === "heading") {
+  if (block.aiRole && block.variant) {
+    content = renderEmailVariant(block, accent);
+  } else if (block.type === "heading") {
     content = `<h1 style="margin:0;font-family:${family},sans-serif;font-size:${block.fontSize}px;font-weight:${weight};line-height:${lineHeight};letter-spacing:${tracking}px;color:${block.textColor};">${lineBreaks(block.content)}</h1>`;
   } else if (block.type === "text" || block.type === "footer" || block.type === "logo" || block.type === "signature") {
     const weight = block.type === "logo" ? "font-weight:700;letter-spacing:.12em;" : "";
@@ -321,7 +344,7 @@ export function compileEmailDocument(document: EmailBuilderDocumentInput) {
   const backgroundImage = document.backgroundImageUrl
     ? `background-image:url('${escapeHtml(document.backgroundImageUrl)}');background-repeat:no-repeat;background-position:center top;background-size:cover;`
     : "";
-  const html = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="x-apple-disable-message-reformatting"><style>body,table,td{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}table,td{mso-table-lspace:0;mso-table-rspace:0}@media only screen and (max-width:680px){.email-outer{padding:12px 8px!important}.email-shell{width:100%!important;max-width:100%!important}.email-block{padding-left:20px!important;padding-right:20px!important}.email-cta{display:block!important;text-align:center!important}.email-columns,.email-columns tbody,.email-columns tr{display:block!important;width:100%!important}.email-column{display:block!important;width:auto!important}.email-column-gap{display:block!important;width:100%!important;height:12px!important}}</style><!--[if mso]><style>body,table,td,a{font-family:Arial,Helvetica,sans-serif!important}td{mso-line-height-rule:exactly}</style><![endif]--></head><body style="margin:0;padding:0;background:${document.workspaceBackground};"><div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(document.previewText)}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;background:${document.workspaceBackground};"><tr><td class="email-outer" align="center" style="padding:24px 12px;"><table class="email-shell" role="presentation" width="${document.contentWidth}" cellspacing="0" cellpadding="0" background="${document.backgroundImageUrl ? escapeHtml(document.backgroundImageUrl) : ""}" style="width:100%;max-width:${document.contentWidth}px;background-color:${document.bodyBackground};${backgroundImage}${frameCss}overflow:hidden;">${blocks}</table></td></tr></table></body></html>`;
+  const html = `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="x-apple-disable-message-reformatting"><style>body,table,td{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}table,td{mso-table-lspace:0;mso-table-rspace:0}@media only screen and (max-width:680px){.email-outer{padding:12px 8px!important}.email-shell{width:100%!important;max-width:100%!important}.email-block{padding-left:20px!important;padding-right:20px!important}.email-cta{display:block!important;text-align:center!important}.email-headline{font-size:28px!important}.email-columns,.email-columns tbody,.email-columns tr{display:block!important;width:100%!important}.email-column{display:block!important;width:auto!important}.email-column-gap{display:block!important;width:100%!important;height:12px!important}}</style><!--[if mso]><style>body,table,td,a{font-family:Arial,Helvetica,sans-serif!important}td{mso-line-height-rule:exactly}</style><![endif]--></head><body style="margin:0;padding:0;background:${document.workspaceBackground};"><div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(document.previewText)}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;background:${document.workspaceBackground};"><tr><td class="email-outer" align="center" style="padding:24px 12px;"><table class="email-shell" role="presentation" width="${document.contentWidth}" cellspacing="0" cellpadding="0" background="${document.backgroundImageUrl ? escapeHtml(document.backgroundImageUrl) : ""}" style="table-layout:fixed;width:100%;max-width:${document.contentWidth}px;background-color:${document.bodyBackground};${backgroundImage}${frameCss}overflow:hidden;">${blocks}</table></td></tr></table></body></html>`;
   if (html.length > 500_000) {
     throw new ApiRequestError("Скомпилированный HTML письма превышает 500 КБ.");
   }

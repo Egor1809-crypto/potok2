@@ -108,7 +108,7 @@ test("presentation library offers varied scenarios and practical filters", async
     ),
     import("../data/presentation-templates.ts"),
   ]);
-  assert.equal(catalog.presentationTemplates.length, 60);
+  assert.equal(catalog.presentationTemplates.length, 61);
   assert.equal(catalog.presentationThemes.length, 27);
   assert.ok((templates.match(/presentation-template-/g) ?? []).length >= 12);
   assert.match(templates, /styleTemplateSpecs/);
@@ -306,13 +306,15 @@ test("PowerPoint export builds OOXML and only fetches same-origin library assets
   assert.match(exporter, /slideMasters\/slideMaster1\.xml/);
   assert.match(
     exporter,
-    /if \(!slide\.assetId \|\| !slide\.imageUrl\) return undefined/,
+    /if \(!slide\.imageUrl\) return undefined/,
   );
   assert.match(
     exporter,
-    /new URL\(\s*`\/api\/assets\/\$\{encodeURIComponent\(slide\.assetId\)\}`/,
+    /new URL\(expectedPath, requestUrl\.origin\)/,
   );
   assert.match(exporter, /redirect: "error"/);
+  assert.match(exporter, /url\.origin !== requestUrl\.origin/);
+  assert.match(exporter, /isPresentationTemplate/);
   assert.match(exporter, /presentationPatternShapes/);
   assert.match(
     exporter,

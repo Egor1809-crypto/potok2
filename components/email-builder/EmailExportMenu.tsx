@@ -393,6 +393,8 @@ export function EmailExportMenu({ document, name }: { document: BuilderDocument;
 
   useLayoutEffect(() => {
     if (!open) {
+      // Layout measurement must reset before the next paint to avoid stale menu placement.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setMenuPosition(null);
       return;
     }

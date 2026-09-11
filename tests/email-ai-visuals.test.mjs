@@ -14,7 +14,7 @@ const response = (value) => Response.json({ choices: [{ message: { content: JSON
 async function serverWith(replies, { imageFailure = false, networkFailure = false } = {}) {
   const calls = []; const saved = [];
   const server = await loadAiServer('lib/server/email-ai.ts', {
-    env: { NAVYAI_API_KEY: 'test-key' }, expose: ['emailVisualIntent', 'parseSuggestion', 'generateDesignImages'],
+    env: { NAVYAI_API_KEY: 'test-key' }, expose: ['emailVisualIntent', 'parseSuggestion'],
     fetch: async (url, init) => {
       const payload = JSON.parse(init.body); calls.push({ url: String(url), payload });
       if (networkFailure && calls.length === 1) throw new Error('Provider connection timed out');

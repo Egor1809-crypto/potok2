@@ -31,6 +31,7 @@ export type BuilderBlock = EmailBlock & {
 };
 
 export type BuilderDocument = {
+  aiMetadata?: import("@/types/email-ai").AiEmailMetadata;
   templateId: string;
   subject: string;
   previewText: string;
@@ -358,6 +359,10 @@ export function createBlankDocument(): BuilderDocument {
     frameRadius: 0,
     blocks: [],
   } satisfies EmailBuilderDocumentInput;
+}
+
+export function builderDocumentFromInput(document: EmailBuilderDocumentInput): BuilderDocument {
+  return { ...createBlankDocument(), ...document, blocks: document.blocks.map(block => ({ ...blockDefaults[block.type], ...block })) };
 }
 
 export function createPlainTextDocument({

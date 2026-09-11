@@ -35,6 +35,11 @@ export type EmailBlockType =
   | "compliance";
 
 export interface EmailBlock {
+  aiRole?: import("./email-ai").AiEmailBlockType;
+  variant?: string;
+  imageHref?: string;
+  imageAlt?: string;
+  badge?: string;
   id: string;
   type: EmailBlockType;
   content: string;

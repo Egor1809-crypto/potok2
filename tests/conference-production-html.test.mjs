@@ -20,7 +20,7 @@ test("conference HTML letters are seeded as editable user templates", async () =
   assert.doesNotMatch(generated, /PRACTICE MODE: ON/);
   assert.doesNotMatch(generated, /Private executive note · №07/);
   assert.doesNotMatch(generated, /ЛИЧНОЕ ПРИГЛАШЕНИЕ/);
-  assert.doesNotMatch(generated, /<tr><td height=\"3\" bgcolor=\"#29e0e5\"/);
+  assert.doesNotMatch(generated, /<tr><td height="3" bgcolor="#29e0e5"/);
   assert.match(generated, /display:block;white-space:nowrap;color:#29e0e5;padding:0 0 6px;border-bottom:3px solid #29e0e5/);
   assert.match(generated, /display:block;white-space:nowrap;color:#21dfe4;padding:0 0 6px;border-bottom:3px solid #21dfe4/);
   assert.match(generated, /border-collapse:separate;border-spacing:0/);
@@ -68,7 +68,7 @@ test("conference HTML letters are seeded as editable user templates", async () =
   assert.match(database, /conference-production-html-v17-pdf-typography/);
   assert.match(database, /conference-production-html-v18-editable-greeting-logo/);
   assert.match(database, /conference-production-html-v19-personal-invitation-manyasha/);
-  assert.match(database, /runtime-schema-v28-contact-bases-and-ticket-sender/);
+  assert.match(database, /runtime-schema-v31-conference-brief-subject/);
   assert.match(database, /runtime-schema-v\d+-/);
   assert.match(database, /template-user-conference-11-cost-reduction/);
   assert.match(database, /isFavorite: true/);

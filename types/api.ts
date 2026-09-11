@@ -163,6 +163,11 @@ export type CampaignStatus =
   | "cancelled";
 
 export type EmailBuilderBlockInput = {
+  aiRole?: import("./email-ai").AiEmailBlockType;
+  variant?: string;
+  imageHref?: string;
+  imageAlt?: string;
+  badge?: string;
   id: string;
   type:
     | "logo"
@@ -216,6 +221,7 @@ export type EmailBuilderBlockInput = {
 };
 
 export type EmailBuilderDocumentInput = {
+  aiMetadata?: import("./email-ai").AiEmailMetadata;
   templateId: string;
   subject: string;
   previewText: string;

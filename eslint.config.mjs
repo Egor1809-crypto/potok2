@@ -14,6 +14,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "public/pdfjs/**", // Copied upstream PDF.js distribution.
+    "tmp/**",
+    "output/**",
   ]),
   eslint.configs.recommended,
   ...tseslint.configs.recommended,

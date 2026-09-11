@@ -23,6 +23,7 @@ import type {
 } from "./builder-types";
 import { getBlockLabel } from "./BlockLibrary";
 import { emailFrameCss } from "./frame-presets";
+import { renderEmailVariant } from "@/lib/email-ai/render-variants";
 
 type EmailCanvasProps = {
   document: BuilderDocument;
@@ -444,6 +445,7 @@ function BlockContent({
   selected: boolean;
   onInlineEdit: (content: string) => void;
 }) {
+  if (block.aiRole && block.variant) return <div onClickCapture={event => { if ((event.target as HTMLElement).closest("a")) event.preventDefault(); }} dangerouslySetInnerHTML={{ __html: renderEmailVariant(block, block.accentColor || accentColor) }} />;
   if (block.type === "logo") {
     if (block.href) {
       return (
