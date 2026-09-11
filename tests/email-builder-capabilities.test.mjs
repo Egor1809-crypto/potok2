@@ -425,11 +425,11 @@ test("pattern gallery offers varied email-safe designs", async () => {
   assert.match(canvas, /whitespace-pre-line/);
   assert.match(canvas, /if \(patternImage\)/);
   assert.match(canvas, /aria-hidden="true"/);
-  assert.match(canvas, /h-\[88px\].*object-cover/);
+  assert.match(canvas, /className="block h-auto w-full"/);
   assert.match(compiler, /letter-spacing:\$\{tracking\}px/);
   assert.match(compiler, /role="presentation"/);
   assert.match(compiler, /block\.type === "pattern"/);
-  assert.match(compiler, /height="88"/);
+  assert.match(compiler, /height:auto;border:0;border-radius:\$\{block.borderRadius\}px;background:transparent/);
 });
 
 test("a new letter starts empty and offers full-email frame presets", async () => {

@@ -182,7 +182,7 @@ export function parseEmailBuilderDocument(
     ...(source.aiMetadata ? { aiMetadata: (() => {
       const metadata = record(source.aiMetadata);
       const review = metadata.review ? record(metadata.review) : undefined;
-      return { brief: parseAiEmailBrief(metadata.brief), generationId: text(metadata.generationId, "Генерация", 160), generatedAt: text(metadata.generatedAt, "Дата генерации", 100), model: text(metadata.model, "Модель", 100), ...(review ? { review: review.score === null ? { score: null, issues: [], suggestions: ["ИИ-проверка временно недоступна. Запустите её повторно в редакторе."], unavailable: true } : parseEmailReview({ ...review, issues: Array.isArray(review.issues) ? review.issues.map(value => ({ ...record(value), blockId: record(value).blockId || null })) : [] }) } : {}) };
+      return { brief: parseAiEmailBrief(metadata.brief), generationId: text(metadata.generationId, "Генерация", 160), generatedAt: text(metadata.generatedAt, "Дата генерации", 100), model: text(metadata.model, "Модель", 100), ...(review ? { review: parseEmailReview(review) } : {}) };
     })() } : {}),
   };
 }
@@ -304,7 +304,7 @@ function blockHtml(block: EmailBuilderBlockInput, accent: string) {
     content = `<div style="padding:22px;border:1px solid ${block.borderColor ?? "#e5e7eb"};border-radius:${block.borderRadius}px;background:${block.backgroundColor === "transparent" ? "#ffffff" : block.backgroundColor};font-family:${family},Helvetica,sans-serif;color:${block.textColor};"><div style="font-size:20px;font-weight:700;">${lineBreaks(name)}</div><div style="margin-top:8px;font-size:${block.fontSize}px;line-height:${lineHeight};">${lineBreaks(description)}</div><div style="margin-top:14px;font-size:18px;font-weight:700;">${lineBreaks(price)}</div><a href="${escapeHtml(block.href ?? "")}" style="display:inline-block;margin-top:16px;padding:10px 18px;border-radius:8px;background:${accent};color:#fff;text-decoration:none;font-size:13px;font-weight:700;">${lineBreaks(block.label || "Узнать подробнее")}</a></div>`;
   } else if (block.type === "pattern") {
     content = block.href
-      ? `<img src="${escapeHtml(block.href)}" alt="" role="presentation" width="100%" height="88" style="display:block;width:100%;max-width:100%;height:88px;object-fit:cover;border:0;border-radius:${block.borderRadius}px;background-color:${block.backgroundColor === "transparent" ? `${accent}12` : block.backgroundColor};">`
+      ? `<img src="${escapeHtml(block.href)}" alt="" role="presentation" width="100%" style="display:block;width:100%;max-width:100%;height:auto;border:0;border-radius:${block.borderRadius}px;background:transparent;">`
       : `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;background-color:${block.backgroundColor === "transparent" ? `${accent}12` : block.backgroundColor};border-radius:${block.borderRadius}px;"><tr><td align="center" valign="middle" style="height:64px;padding:12px 24px;font-family:${family};font-size:${block.fontSize}px;font-weight:${weight};line-height:${lineHeight};letter-spacing:${tracking}px;color:${block.textColor};text-align:center;">${lineBreaks(block.content)}</td></tr></table>`;
   } else if (block.type === "banner") {
     const [title = "", subtitle = ""] = block.content.split("|");

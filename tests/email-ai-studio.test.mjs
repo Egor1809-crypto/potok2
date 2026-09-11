@@ -10,7 +10,7 @@ const variants = await loadAiServer('lib/email-ai/variants.ts');
 const brief = () => schema.parseAiEmailBrief({ description: 'Продать билеты на конференцию юристов по ИИ. Реальные практические кейсы, 30+ спикеров.', goal: 'sale', cta: { text: 'Получить билет', url: 'https://example.org/tickets' }, requiredFacts: ['30+ спикеров'], visuals: 'none' });
 const block = (type, patch = {}) => ({ id: type, type, variant: variants.emailBlockVariants[type][0], title: '', text: '', badge: '', items: [], button: null, image: null, backgroundColor: null, textColor: null, ...patch });
 const draft = (blocks = [block('hero', { title: 'ИИ в юридической практике', text: 'Реальные кейсы и 30+ спикеров', button: brief().cta }), block('footer', {text: 'Организатор конференции'})]) => ({ version: '1.0', subject: 'ИИ для юристов: практические кейсы', preheader: '30+ спикеров на конференции', meta: { goal: 'sale', language: 'ru', tone: 'expert', length: 'medium' }, theme: { emailWidth: 640, backgroundColor: '#F1F4F6', contentBackgroundColor: '#FFFFFF', textColor: '#18212D', mutedTextColor: '#637080', primaryColor: '#087F73', accentColor: '#C06532', borderColor: '#DCE5E7', borderRadius: 12, fontFamily: 'Arial' }, blocks });
-const review = () => ({ score: 91, issues: [], suggestions: ['Проверьте ссылку перед отправкой.'] });
+const review = () => ({ findings: [] });
 const req = signal => new Request('https://evaluation.example/api/email-ai/generate', {signal});
 const json = value => JSON.parse(JSON.stringify(value));
 async function service(replies, options = {}) {
@@ -18,6 +18,7 @@ async function service(replies, options = {}) {
   const api = await loadAiServer('lib/server/email-ai-studio.ts', { env: {NAVYAI_API_KEY:'test-only'}, assetStore: {storeGeneratedEmailAssetBytes: async () => ({url:`https://evaluation.example/api/assets/image-${++images}`}), getEmailAssetRecord: async (_req,id) => { if (id !== 'uploaded-photo') throw Error('Asset not found'); return {url:'https://evaluation.example/api/assets/uploaded-photo'}; }}, fetch: async (url, init) => {
     const body = JSON.parse(init.body); calls.push(body);
     if (options.cancel) { options.cancel.abort(); throw Error('aborted'); }
+    if (body.response_format?.json_schema?.name === 'email_pattern') return Response.json({choices:[{message:{content:JSON.stringify({strokes:[{type:'polyline',points:[{x:20,y:60},{x:1180,y:60}],radius:0,width:2,color:'#AA8844'},{type:'polyline',points:[{x:20,y:100},{x:1180,y:100}],radius:0,width:2,color:'#AA8844'},{type:'circle',points:[{x:600,y:80}],radius:12,width:2,color:'#AA8844'}]})}}]});
     if (String(url).endsWith('/images/generations')) return Response.json({data:[{b64_json:btoa('test-png-bytes'.repeat(20))}]});
     assert.ok(replies.length, 'No unbounded AI retry'); const value = replies.shift();
     if (value instanceof Error) throw value;
@@ -73,18 +74,18 @@ test('switching variants preserves content, URL, image, ID and applies a contras
   for(const key of ['id','content','href','imageHref']) assert.equal(after[key],before[key]);assert.equal(after.textColor,'#FFFFFF');assert.notEqual(after.backgroundColor,before.backgroundColor);
 });
 test('generation maps validated JSON and review to the existing builder document',async()=>{
-  const {api,calls}=await service([draft(),review()]);const result=await api.emailAiStudio(req(),'generate',{brief:brief()});assert.equal(result.review.score,91);assert.equal(result.document.blocks[0].type,'hero');assert.equal(calls.length,2);assert.equal(calls[0].response_format.type,'json_schema');
+  const {api,calls}=await service([draft(),review()]);const result=await api.emailAiStudio(req(),'generate',{brief:brief()});assert.equal(result.review.score,100);assert.equal(result.review.rubricVersion,'rules-v1');assert.equal(result.review.unavailable,undefined);assert.equal(result.document.blocks[0].type,'hero');assert.equal(calls.length,2);assert.equal(calls[0].response_format.type,'json_schema');
 });
 test('one repair fixes malformed JSON; repeated invalid output stops after two calls',async()=>{
   const repaired=await service(['not JSON',draft(),review()]);assert.ok((await repaired.api.emailAiStudio(req(),'generate',{brief:brief()})).document);assert.equal(repaired.calls.length,3);
   const invalid=await service(['not JSON','still not JSON']);await assert.rejects(()=>invalid.api.emailAiStudio(req(),'generate',{brief:brief()}));assert.equal(invalid.calls.length,2);
 });
 test('numeric inventions are repaired before render, with a single repair budget shared with review',async()=>{
-  const bad=draft();bad.blocks[0].text='Экономия 40%';const s=await service([bad,draft(),{score:60,issues:[{severity:'high',blockId:'hero',message:'Проверьте формулировку'}],suggestions:[]}]);
+  const bad=draft();bad.blocks[0].text='Экономия 40%';const s=await service([bad,draft(),{findings:[{category:'clarity',blockId:'hero',evidence:'Реальные кейсы',message:'Уточните пользу',suggestion:'Свяжите кейсы с задачами аудитории'}]}]);
   const r=await s.api.emailAiStudio(req(),'generate',{brief:brief()});assert.doesNotMatch(r.document.blocks[0].content,/40%/);assert.equal(s.calls.length,3);
 });
 test('review outages return a usable editable document and honest advisory status',async()=>{
-  const {api}=await service([draft(),new Error('Review outage')]);const r=await api.emailAiStudio(req(),'generate',{brief:brief()});assert.ok(r.document);assert.equal(r.review.score,null);assert.equal(r.review.unavailable,true);
+  const {api}=await service([draft(),new Error('Review outage')]);const r=await api.emailAiStudio(req(),'generate',{brief:brief()});assert.ok(r.document);assert.equal(r.review.score,100);assert.equal(r.review.unavailable,true);
 });
 test('block rewrite changes only the selected block and keeps subject, siblings, layout settings and template ID',async()=>{
   const doc=mapper.mapAiEmailToBuilderDocument(draft(),brief(),new Map());doc.templateId='saved-template';doc.blocks[0].paddingLeft=44;

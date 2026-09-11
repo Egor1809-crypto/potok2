@@ -1,3 +1,4 @@
+import { generateTransparentEmailPattern } from "./email-pattern-generation";
 import { env } from "cloudflare:workers";
 import { emailCompositionGuidance, normalizeEmailVisualDesign } from "@/lib/email-design-quality";
 import { emailBriefConstraints, emailBriefText, emailBriefUrls } from "@/lib/email-ai-brief";
@@ -1508,6 +1509,11 @@ export async function generateDesignImages(
       (item) => item.id === image.blockId,
     );
     try {
+      if (image.kind === "pattern" && block) {
+        const stored = await generateTransparentEmailPattern(request, provider, image.prompt, block.backgroundColor === "transparent" ? document.bodyBackground : block.backgroundColor, signal);
+        block.href = stored.url;
+        return;
+      }
       const response = await fetch(
         provider.imageEndpoint,
         {

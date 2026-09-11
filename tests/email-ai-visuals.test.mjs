@@ -18,6 +18,7 @@ async function serverWith(replies, { imageFailure = false, networkFailure = fals
     fetch: async (url, init) => {
       const payload = JSON.parse(init.body); calls.push({ url: String(url), payload });
       if (networkFailure && calls.length === 1) throw new Error('Provider connection timed out');
+      if (payload.response_format?.json_schema?.name === 'email_pattern') return response({strokes:[{type:'polyline',points:[{x:20,y:60},{x:1180,y:60}],radius:0,width:2,color:'#24736A'},{type:'polyline',points:[{x:20,y:100},{x:1180,y:100}],radius:0,width:2,color:'#24736A'},{type:'circle',points:[{x:600,y:80}],radius:12,width:2,color:'#24736A'}]});
       if (String(url).endsWith('/images/generations')) return imageFailure ? Response.json({ error: 'Unavailable' }, { status: 503 }) : Response.json({ data: [{ b64_json: btoa('image-bytes'.repeat(20)) }] });
       assert.ok(replies.length, 'Unexpected text request');
       return response(replies.shift());

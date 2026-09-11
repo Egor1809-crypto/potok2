@@ -27,7 +27,7 @@ export function renderEmailVariant(block: EmailBuilderBlockInput, accent: string
       html = table(`<tr>${cell(variant.endsWith("left") ? visual : copy)}<td class="email-column-gap" width="24">&nbsp;</td>${cell(variant.endsWith("left") ? copy : visual)}</tr>`, 'class="email-columns"');
     } else html = `${visual ? `<div style="margin-bottom:24px;">${visual}</div>` : ""}${copy}`;
   } else if (block.aiRole === "image") html = image(block.href, block.content);
-  else if (block.aiRole === "pattern") html = url(block.href, true) ? `<img src="${url(block.href, true)}" alt="" role="presentation" width="560" height="72" style="display:block;width:100%;max-width:100%;height:72px;object-fit:cover;border:0;">` : "";
+  else if (block.aiRole === "pattern") html = url(block.href, true) ? `<img src="${url(block.href, true)}" alt="" role="presentation" width="560" style="display:block;width:100%;max-width:100%;height:auto;border:0;background:transparent;">` : "";
   else if (["benefits", "cards", "speakers", "products"].includes(block.aiRole || "")) {
     const count = /3-column|three/.test(variant) ? 3 : /list/.test(variant) ? 1 : 2;
     const rows: string[] = [];

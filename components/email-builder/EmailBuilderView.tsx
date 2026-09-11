@@ -1251,7 +1251,7 @@ function EmailBuilderWorkspace({
             />
             <div className={cn("min-h-0 flex-col border-l border-border bg-surface", mobilePanel === "properties" ? "flex" : "hidden", "lg:flex")}>
               <div className="flex shrink-0 gap-2 border-b border-border p-2"><Button type="button" size="sm" variant={rightPanelMode === "properties" ? "primary" : "ghost"} onClick={() => setRightPanelMode("properties")}>Свойства</Button><Button type="button" size="sm" variant={rightPanelMode === "ai" ? "primary" : "ghost"} onClick={() => setRightPanelMode("ai")}>ИИ-помощник</Button></div>
-            {rightPanelMode === "ai" ? <AiEmailEditPanel document={document} block={selectedBlock} onApply={next => mutateDocument(() => next)} /> : selectedBlock ? (
+            {rightPanelMode === "ai" ? <AiEmailEditPanel onSelectBlock={setSelectedBlockId} document={document} block={selectedBlock} onApply={next => mutateDocument(() => next)} /> : selectedBlock ? (
               <PropertiesPanel
                 block={selectedBlock}
                 document={document}

@@ -45,9 +45,14 @@ export type AiEmailDocument = {
 };
 export type AiEmailReview = {
   score: number | null;
-  issues: Array<{ severity: "low" | "medium" | "high"; blockId?: string; message: string }>;
+  issues: Array<{ severity: "low" | "medium" | "high"; blockId?: string; message: string; evidence?: string; suggestion?: string; source?: "rule" | "editor" }>;
   suggestions: string[];
   unavailable?: boolean;
+  rubricVersion?: "rules-v1";
+  fingerprint?: string;
+  checkedAt?: string;
+  checks?: Array<{ id: string; title: string; status: "pass" | "fail" | "not_checked"; points: number; maximum: number; detail: string }>;
 };
+export type AiEmailEditorialReview = { findings: Array<{ category: "clarity" | "repetition" | "brief" | "cta"; blockId: string | null; evidence: string; message: string; suggestion: string }> };
 export type AiEmailMetadata = { brief: AiEmailBrief; generationId: string; generatedAt: string; model: string; review?: AiEmailReview };
 export type AiEmailStudioResponse = { document?: EmailBuilderDocumentInput; review?: AiEmailReview; variants?: Array<{ subject: string; preheader: string }> };

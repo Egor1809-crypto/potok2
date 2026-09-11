@@ -1,7 +1,8 @@
-import { readFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
 import ts from "typescript";
+import * as fflate from "fflate";
 
 // Exercise the production orchestration without touching contacts, storage or mail.
 export async function loadAiServer(entry, { env = {}, fetch = globalThis.fetch, expose = [], assetStore, overrides = {} } = {}) {
@@ -13,6 +14,7 @@ export async function loadAiServer(entry, { env = {}, fetch = globalThis.fetch, 
   const db = { prepare(sql) { return { bind() { return this; }, async run() { return { meta: { changes: 1 } }; }, async first() { return sql.includes("RETURNING request_count") ? { request_count: 1 } : null; } }; } };
   const mocks = {
     "cloudflare:workers": synthetic({ env }),
+    "fflate": synthetic(fflate),
     "@/db": synthetic({ getD1: () => db }),
     "./database-init": synthetic({ ensureDatabase: async () => ({ participant: { id: "design-evaluation" }, sessionId: "test-session" }), WORKSPACE_ID: "design-evaluation" }),
     "./email-asset-store": synthetic({ storeGeneratedEmailAsset: async () => { throw new Error("Asset writes are disabled in design tests"); }, storeGeneratedEmailAssetBytes: async () => { throw new Error("Asset writes are disabled in design tests"); }, getEmailAssetRecord: async () => { throw new Error("Unknown test asset"); }, ...assetStore }),
@@ -22,19 +24,19 @@ export async function loadAiServer(entry, { env = {}, fetch = globalThis.fetch, 
   const modules = new Map();
   async function load(file) {
     if (modules.has(file)) return modules.get(file);
-    const source = await readFile(path.join(root, file), "utf8");
+    const source = readFileSync(path.join(root, file), "utf8");
     const code = ts.transpileModule(source + (file === entry && expose.length ? `\nexport { ${expose.join(", ")} };` : ""), { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
     const loadedModule = new vm.SourceTextModule(code, { context, identifier: file });
     modules.set(file, loadedModule);
-    await loadedModule.link(async (specifier) => {
-      if (mocks[specifier]) return mocks[specifier];
-      let resolved = specifier.startsWith("@/") ? specifier.slice(2) : path.join(path.dirname(file), specifier);
-      if (!path.extname(resolved)) resolved += ".ts";
-      return load(resolved);
-    });
     return loadedModule;
   }
   const loadedModule = await load(entry);
+  await loadedModule.link(async (specifier, referencingModule) => {
+    if (mocks[specifier]) return mocks[specifier];
+    let resolved = specifier.startsWith("@/") ? specifier.slice(2) : path.join(path.dirname(referencingModule.identifier), specifier);
+    if (!path.extname(resolved)) resolved += ".ts";
+    return load(resolved);
+  });
   await loadedModule.evaluate();
   return loadedModule.namespace;
 }

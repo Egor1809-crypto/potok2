@@ -5,9 +5,11 @@ import { emptyAiEmailBrief } from "@/lib/email-ai/defaults";
 import type { AiEmailReview } from "@/types/email-ai";
 import { builderDocumentFromInput, type BuilderBlock, type BuilderDocument } from "./builder-types";
 import { useEmailAiRequest } from "./useEmailAiRequest";
+import { EmailReviewReport } from "./EmailReviewReport";
+import { emailReviewFingerprint } from "@/lib/email-ai/review";
 
 const commands = ["Сделать короче", "Сделать более продающим", "Сделать более деловым", "Сделать более премиальным", "Сделать технологичнее", "Сделать дружелюбнее", "Упростить текст", "Сделать CTA сильнее", "Предложить другой заголовок", "Убрать повторы", "Добавить преимущества", "Сгенерировать другой вариант"];
-export function AiEmailEditPanel({ document, block, onApply }: { document: BuilderDocument; block?: BuilderBlock; onApply: (next: BuilderDocument) => void }) {
+export function AiEmailEditPanel({ document, block, onApply, onSelectBlock }: { document: BuilderDocument; block?: BuilderBlock; onApply: (next: BuilderDocument) => void; onSelectBlock: (id: string) => void }) {
   const [scope, setScope] = useState("block"); const [instruction, setInstruction] = useState("");
   const [report, setReport] = useState<AiEmailReview | undefined>();
   const latest = useRef(document);
@@ -19,9 +21,14 @@ export function AiEmailEditPanel({ document, block, onApply }: { document: Build
     const result = await ai.run(action, { brief, document, blockId: block?.id, instruction: command });
     if (latest.current !== snapshot) { ai.setError("Письмо изменилось во время работы ИИ. Повторите команду для текущей версии."); return; }
     if (result?.document) onApply(builderDocumentFromInput(result.document));
-    if (result?.review) setReport(result.review);
+    if (result?.review) {
+      setReport(result.review);
+      if (!result.document) onApply({ ...snapshot, aiMetadata: { ...(snapshot.aiMetadata || { brief, generationId: crypto.randomUUID(), generatedAt: new Date().toISOString(), model: "review" }), review: result.review } });
+    }
   };
-  const review = report || document.aiMetadata?.review;
+  const fingerprint = emailReviewFingerprint(document, brief);
+  const review = [report, document.aiMetadata?.review].find(r => r?.fingerprint === fingerprint) || report || document.aiMetadata?.review;
+  const currentReview = review?.fingerprint === fingerprint;
   return <aside className="min-h-0 overflow-y-auto p-4" aria-label="Изменить письмо с ИИ">
     <h3 className="m-0 text-sm font-semibold text-text-strong">Изменить с ИИ</h3>
     <p className="mt-2 text-xs leading-5 text-text-muted">ИИ учитывает текущее письмо. Изменение можно отменить кнопкой Undo.</p>
@@ -31,11 +38,12 @@ export function AiEmailEditPanel({ document, block, onApply }: { document: Build
       <FormField label="Быстрая команда" htmlFor="ai-quick-command"><Select id="ai-quick-command" value={commands.includes(instruction) ? instruction : ""} onChange={e => setInstruction(e.target.value)} disabled={ai.busy} options={[{ value: "", label: "Выбрать команду" }, ...commands.map(value => ({ value, label: value }))]} /></FormField>
       <FormField label="Что изменить?" htmlFor="ai-edit-instruction"><Textarea id="ai-edit-instruction" rows={5} value={instruction} onChange={e => setInstruction(e.target.value)} disabled={ai.busy} required maxLength={2500} placeholder="Например: сократи первый экран, сохрани факты и кнопку" /></FormField>
       <Button type="button" variant="secondary" disabled={ai.busy} onClick={() => void run("rewrite", "Сгенерировать другой вариант всего письма: предложи новую композицию и подачу, сохрани все исходные факты, ссылки и смысл.")}>Другой вариант всего письма</Button>
+      {block?.type === "pattern" ? <Button type="button" variant="secondary" disabled={ai.busy} onClick={() => void run("rewrite-block", "Пересоздай выбранный узор с настоящим прозрачным фоном: новый image.prompt вместо существующего assetId. Сохрани мотив и палитру, тонкие чёткие линии, широкая горизонтальная композиция. Без подложки и теней.")}>Пересоздать узор без фона</Button> : null}
       <Button type="submit" variant="primary" disabled={ai.busy || scope === "block" && !block}>{ai.busy ? "Вносим изменения…" : "Применить команду"}</Button>
       {ai.busy ? <Button type="button" variant="secondary" onClick={ai.cancel}>Остановить</Button> : <Button type="button" variant="secondary" onClick={() => void run("review")}>Проверить письмо</Button>}
     </form>}
     <div role="status" className="mt-3 text-xs text-text-muted">{ai.busy ? ai.stageLabel : ""}</div>
     {ai.error ? <p role="alert" className="rounded-lg bg-danger-subtle p-3 text-xs leading-5 text-danger">{ai.error}</p> : null}
-    {review ? <details className="mt-5 rounded-xl border border-border p-3" open={review.issues.some(i => i.severity === "high")}><summary className="cursor-pointer text-sm font-semibold">{review.score === null ? "Проверка недоступна" : `Качество письма: ${review.score}/100`}</summary><p className="text-xs text-text-muted">Рекомендации последней AI-проверки.</p><ul className="grid gap-2 pl-4 text-xs leading-5">{review.issues.map((issue, index) => <li key={index}>{issue.severity === "high" ? "Важно: " : ""}{issue.message}</li>)}{review.suggestions.map((suggestion, index) => <li key={`suggestion-${index}`}>{suggestion}</li>)}</ul>{!review.issues.length && !review.unavailable ? <p className="text-xs text-text-muted">Замечаний нет.</p> : null}</details> : null}
+    {review ? <EmailReviewReport review={review} current={currentReview} onSelectBlock={onSelectBlock} onFix={(id, command) => { if (id) onSelectBlock(id); setScope(id ? "block" : "email"); setInstruction(command); }} /> : null}
   </aside>;
 }

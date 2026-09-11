@@ -1,9 +1,10 @@
-import type { AiEmailBrief, AiEmailDocument, AiEmailReview, AiEmailStudioResponse } from "@/types/email-ai";
+import type { AiEmailBrief, AiEmailDocument, AiEmailReview, AiEmailEditorialReview, AiEmailStudioResponse } from "@/types/email-ai";
 import type { EmailBuilderDocumentInput, EmailAiSuggestion } from "@/types/api";
-import { aiEmailBlockSchema, aiEmailDocumentSchema, aiEmailReviewSchema, object, parseAiEmailBlock, parseAiEmailBrief, parseAiEmailDocument, parseEmailReview, subjectVariantsSchema, validateEmailSchema } from "@/lib/email-ai/schema";
+import { aiEmailBlockSchema, aiEmailDocumentSchema, aiEmailReviewSchema, object, parseAiEmailBlock, parseAiEmailBrief, parseAiEmailDocument, subjectVariantsSchema, validateEmailSchema } from "@/lib/email-ai/schema";
 import { EMAIL_EDIT_PROMPT, EMAIL_REVIEW_PROMPT, EMAIL_STRATEGIST_PROMPT } from "@/lib/email-ai/prompts";
 import { builderToAiEmail, mapAiEmailToBuilderDocument } from "@/lib/email-ai/mapping";
 import { emailFactIssues, emailSourceOfTruth } from "@/lib/email-ai/facts";
+import { emailReviewFingerprint, reviewEmailDocument } from "@/lib/email-ai/review";
 import { emailBlockVariants } from "@/lib/email-ai/variants";
 import { aiProvider, generateDesignImages } from "./email-ai";
 import { parseEmailBuilderDocument, emailDocumentPlainText } from "./email-document";
@@ -43,13 +44,17 @@ async function aiJson(provider: Provider, request: Request, name: string, schema
   return { value, model };
 }
 
-async function review(provider: Provider, request: Request, email: AiEmailDocument, brief: AiEmailBrief, existingText: string): Promise<AiEmailReview> {
+async function review(provider: Provider | null, request: Request, document: EmailBuilderDocumentInput, brief: AiEmailBrief, existingText: string): Promise<AiEmailReview> {
+  const cached = document.aiMetadata?.review;
+  if (cached?.rubricVersion === "rules-v1" && !cached.unavailable && cached.fingerprint === emailReviewFingerprint(document, brief)) return cached;
+  const measured = reviewEmailDocument(document, brief);
+  if (!provider) return measured;
   try {
-    const result = await aiJson(provider, request, "email_review", aiEmailReviewSchema, EMAIL_REVIEW_PROMPT, { email, brief, sourceOfTruth: emailSourceOfTruth(brief, existingText) });
-    return parseEmailReview(result.value);
+    const result = await aiJson(provider, request, "email_review", aiEmailReviewSchema, EMAIL_REVIEW_PROMPT, { document: { ...document, aiMetadata: undefined }, brief, checks: measured.checks, sourceOfTruth: emailSourceOfTruth(brief, existingText) });
+    return reviewEmailDocument(document, brief, result.value as AiEmailEditorialReview);
   } catch {
     if (request.signal.aborted) throw new ApiRequestError("Создание письма отменено.", 499);
-    return { score: null, issues: [], suggestions: ["ИИ-проверка временно недоступна. Её можно запустить повторно в редакторе."], unavailable: true };
+    return measured;
   }
 }
 
@@ -61,7 +66,7 @@ async function prepareImages(request: Request, provider: Provider, email: AiEmai
   if (!pending.length) return assets;
   const suggestion: EmailAiSuggestion = {
     creationMode: "original", subject: email.subject, previewText: email.preheader, body: "", cta: "",
-    document: { templateId: "", subject: email.subject, previewText: email.preheader, contentWidth: 640, accentColor: email.theme.primaryColor, bodyBackground: "#FFFFFF", workspaceBackground: "#FFFFFF", blocks: pending.map(b => ({ id: b.id, type: b.type === "pattern" ? "pattern" : "image", content: b.image?.alt || "", href: "https://placehold.co/1200x675/png", paddingTop: 0, paddingBottom: 0, backgroundColor: "#FFFFFF", textColor: "#202632", fontSize: 16, borderRadius: 0 })) },
+    document: { templateId: "", subject: email.subject, previewText: email.preheader, contentWidth: 640, accentColor: email.theme.primaryColor, bodyBackground: email.theme.contentBackgroundColor, workspaceBackground: email.theme.backgroundColor, blocks: pending.map(b => ({ id: b.id, type: b.type === "pattern" ? "pattern" : "image", content: b.image?.alt || "", href: "https://placehold.co/1200x675/png", paddingTop: 0, paddingBottom: 0, backgroundColor: b.backgroundColor || email.theme.contentBackgroundColor, textColor: b.textColor || email.theme.textColor, fontSize: 16, borderRadius: 0 })) },
     imagePrompts: pending.map(b => ({ blockId: b.id, prompt: b.image!.prompt!, alt: b.image!.alt, kind: b.type === "pattern" ? "pattern" : "photo" })),
   };
   await generateDesignImages(request, provider, suggestion, false, request.signal);
@@ -76,7 +81,7 @@ async function prepareImages(request: Request, provider: Provider, email: AiEmai
 export async function emailAiStudio(request: Request, action: string, input: unknown): Promise<AiEmailStudioResponse> {
   await ensureDatabase(request);
   if (!actions.has(action)) throw new ApiRequestError("Действие ИИ не найдено.", 404);
-  const provider = aiProvider(); if (!provider) throw new ApiRequestError("ИИ не подключён. Добавьте серверный ключ существующего AI-провайдера.", 503);
+  const provider = aiProvider(); if (!provider && action !== "review") throw new ApiRequestError("ИИ не подключён. Добавьте серверный ключ существующего AI-провайдера.", 503);
   let brief: AiEmailBrief; let current: EmailBuilderDocumentInput | null; const row = object(input);
   try { brief = parseAiEmailBrief(row.brief); current = row.document ? parseEmailBuilderDocument(row.document) : null; }
   catch (error) { throw new ApiRequestError(error instanceof Error ? error.message : "Проверьте поля письма."); }
@@ -85,7 +90,8 @@ export async function emailAiStudio(request: Request, action: string, input: unk
   if (["rewrite", "rewrite-block"].includes(action) && !instruction) throw new ApiRequestError("Напишите, что изменить.");
   const context = current ? builderToAiEmail(current, brief) : null;
   const existingText = [instruction, current ? [emailDocumentPlainText(current), ...current.blocks.flatMap(b => [b.href || "", b.linkHref || ""])].join("\n") : ""].filter(Boolean).join("\n");
-  if (action === "review") return { review: await review(provider, request, context!.email, brief, existingText) };
+  if (action === "review") return { review: await review(provider, request, current!, brief, existingText) };
+  if (!provider) throw new ApiRequestError("ИИ не подключён.", 503);
   if (action === "subject-variants") {
     try {
       const result = await aiJson(provider, request, "email_subjects", subjectVariantsSchema, "Предложи ровно 3 разные пары subject/preheader по текущему письму. Прехедер дополняет тему. Не меняй факты и числа, без выдуманной срочности, без HTML. Верни только JSON по схеме.", { email: context!.email, brief });
@@ -110,6 +116,7 @@ export async function emailAiStudio(request: Request, action: string, input: unk
     model = result.model;
     if (selected) {
       const block = parseAiEmailBlock(result.value);
+      if (selected.type === "pattern" && /пересозда|прозрач|без фона/iu.test(instruction) && (!block.image?.prompt || block.image.assetId)) throw new Error("Для нового прозрачного орнамента верни image с новым prompt и assetId=null.");
       if (block.id !== selected.id || block.type !== selected.type) throw new Error("Сохрани тип и ID выбранного блока.");
       if (["benefits", "cards", "speakers", "products", "stats"].includes(block.type) && (block.title || block.text)) throw new Error("При редактировании этого блока запиши весь контент в items; title и text оставь пустыми. Не добавляй соседние заголовки.");
       if (selected.button && block.type === "cta" && (block.title || block.text)) throw new Error("При редактировании кнопки меняй button, title и text оставь пустыми.");
@@ -120,12 +127,8 @@ export async function emailAiStudio(request: Request, action: string, input: unk
   };
   try {
     try { await generate(); } catch (error) { if (request.signal.aborted) throw error; if (error instanceof EmailJsonError) failedDraft = error.draft; repaired = true; await generate([error instanceof Error ? error.message : "Некорректная структура."]); }
-    const reviewCurrent = () => review(provider, request, selected ? { ...context!.email, blocks: context!.email.blocks.map(block => block.id === selected.id ? email!.blocks[0] : block) } : email!, brief, existingText);
-    let report = await reviewCurrent();
-    const critical = report.issues.filter(i => i.severity === "high");
-    if (!repaired && critical.length) { repaired = true; await generate(critical.map(i => i.message)); report = await reviewCurrent(); }
     const assets = await prepareImages(request, provider, email!, knownAssets);
-    const metadata = { brief, generationId: crypto.randomUUID(), generatedAt: new Date().toISOString(), model, review: report };
+    const metadata = { brief, generationId: crypto.randomUUID(), generatedAt: new Date().toISOString(), model };
     const mapped = mapAiEmailToBuilderDocument(email!, brief, assets, metadata);
     let document = mapped;
     if (selected && current) {
@@ -145,6 +148,8 @@ export async function emailAiStudio(request: Request, action: string, input: unk
     }
     const valid = parseEmailBuilderDocument(document);
     if (!valid) throw new Error("Пустое письмо.");
+    const report = await review(provider, request, valid, brief, existingText);
+    valid.aiMetadata = { ...metadata, review: report };
     return { document: valid, review: report };
   } catch (error) {
     if (request.signal.aborted) throw new ApiRequestError("Создание письма отменено.", 499);
