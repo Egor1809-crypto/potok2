@@ -273,6 +273,22 @@ a {
 }
 
 /* Shared layout helpers */
+.command-search-input:focus,
+.command-search-input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.command-search-field:focus-within {
+  border-color: var(--text-muted);
+  outline: 2px solid var(--text-muted);
+  outline-offset: 1px;
+}
+
+@media (forced-colors: active) {
+  .command-search-field:focus-within { outline-color: Highlight; }
+}
+
 .container-shell {
   width: min(100% - 40px, 1240px);
   margin-inline: auto;

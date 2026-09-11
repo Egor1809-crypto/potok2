@@ -15,7 +15,7 @@ export function containTabFocus(
   if (event.key !== "Tab" || !container) return;
   const focusable = Array.from(
     container.querySelectorAll<HTMLElement>(focusableSelector),
-  ).filter((element) => !element.hasAttribute("hidden"));
+  ).filter((element) => element.tabIndex >= 0 && !element.closest("[hidden], [inert]") && element.getClientRects().length > 0);
   if (!focusable.length) return;
 
   const first = focusable[0];
@@ -25,7 +25,7 @@ export function containTabFocus(
   if (event.shiftKey && (active === first || !container.contains(active))) {
     event.preventDefault();
     last.focus();
-  } else if (!event.shiftKey && active === last) {
+  } else if (!event.shiftKey && (active === last || !container.contains(active))) {
     event.preventDefault();
     first.focus();
   }

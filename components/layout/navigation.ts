@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  CalendarDays,
   ContactRound,
   FolderOpen,
   Gauge,
@@ -119,6 +120,13 @@ export const productNavigation: ProductNavGroup[] = [
         href: "/campaigns",
         icon: Megaphone,
         keywords: ["рассылка", "отправка", "тест", "email", "telegram", "вконтакте"],
+      },
+      {
+        label: "Календарь",
+        description: "Запланированные рассылки и отчёт за сутки",
+        href: "/calendar",
+        icon: CalendarDays,
+        keywords: ["расписание", "план", "запланировать", "время", "часовой пояс", "24 часа"],
       },
       {
         label: "История",

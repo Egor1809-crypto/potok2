@@ -71,7 +71,7 @@ test("calendar connects scheduled campaigns, audience filters and the due queue"
   assert.match(wizard, /Есть Email/);
   assert.match(wizard, /Ответственный:/);
   assert.match(topbar, /href="\/calendar"/);
-  assert.doesNotMatch(navigation, /href: "\/calendar"/);
+  assert.match(navigation, /href: "\/calendar"/);
 });
 
 test("VK WorkSpace sends inline HTML through authenticated SMTP", async () => {

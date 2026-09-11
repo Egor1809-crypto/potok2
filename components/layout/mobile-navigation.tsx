@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 
 import { AppSidebar } from "./app-sidebar";
 import { containTabFocus } from "./focus-management";
@@ -8,18 +8,20 @@ import { containTabFocus } from "./focus-management";
 type MobileNavigationProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  returnFocusRef?: RefObject<HTMLElement | null>;
 };
 
 export function MobileNavigation({
   open,
   onOpenChange,
+  returnFocusRef,
 }: MobileNavigationProps) {
   const priorFocusRef = useRef<HTMLElement | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
-    priorFocusRef.current = document.activeElement as HTMLElement | null;
+    priorFocusRef.current = returnFocusRef?.current ?? document.activeElement as HTMLElement | null;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
@@ -28,19 +30,24 @@ export function MobileNavigation({
       containTabFocus(event, dialogRef.current);
     };
     document.addEventListener("keydown", onKeyDown);
+    const desktop = window.matchMedia("(min-width: 1280px)");
+    const onViewportChange = () => { if (desktop.matches) onOpenChange(false); };
+    desktop.addEventListener("change", onViewportChange);
 
-    window.requestAnimationFrame(() => {
+    const frame = window.requestAnimationFrame(() => {
       document
         .querySelector<HTMLButtonElement>("[data-mobile-nav-close]")
         ?.focus();
     });
 
     return () => {
+      window.cancelAnimationFrame(frame);
       document.body.style.overflow = previousOverflow;
       document.removeEventListener("keydown", onKeyDown);
+      desktop.removeEventListener("change", onViewportChange);
       priorFocusRef.current?.focus();
     };
-  }, [open, onOpenChange]);
+  }, [open, onOpenChange, returnFocusRef]);
 
   if (!open) return null;
 

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { ChevronRight, Plus, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Avatar } from "@/components/ui/avatar";
@@ -17,6 +17,7 @@ export type AppSidebarProps = {
   mobile?: boolean;
   onNavigate?: () => void;
   onClose?: () => void;
+  onCollapse?: () => void;
   className?: string;
 };
 
@@ -24,6 +25,7 @@ export function AppSidebar({
   mobile = false,
   onNavigate,
   onClose,
+  onCollapse,
   className,
 }: AppSidebarProps) {
   const pathname = usePathname();
@@ -73,6 +75,7 @@ export function AppSidebar({
     >
       <div className="flex h-[var(--topbar-height)] shrink-0 items-center justify-between border-b border-border/70 px-5">
         <BrandMark />
+        {!mobile && onCollapse ? <button data-sidebar-collapse type="button" onClick={onCollapse} aria-label="Свернуть левую панель" title="Свернуть левую панель" aria-expanded="true" aria-controls="platform-sidebar" className="grid size-10 shrink-0 place-items-center rounded-lg text-text-muted hover:bg-surface-subtle"><ChevronLeft aria-hidden="true" className="size-[18px]" /></button> : null}
         {mobile ? (
           <IconButton
             data-mobile-nav-close

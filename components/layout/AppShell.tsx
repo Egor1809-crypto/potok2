@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useCallback, useRef, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 
 import { cn } from "@/components/ui/utils";
@@ -9,6 +9,7 @@ import { useSidebarPreference } from "@/lib/sidebar-preference";
 import { AppSidebar } from "./app-sidebar";
 import { CommandMenu } from "./command-menu";
 import { MobileNavigation } from "./mobile-navigation";
+import { NavigationRail } from "./navigation-rail";
 import { getProductSection } from "./navigation";
 import { Topbar } from "./topbar";
 import { ProductGuide } from "../onboarding/ProductGuide";
@@ -43,8 +44,19 @@ export function AppShell({
   const pathname = usePathname();
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const [commandMenuOpen, setCommandMenuOpen] = useState(false);
+  const searchReturnFocus = useRef<HTMLElement | null>(null);
+  const mobileReturnFocus = useRef<HTMLElement | null>(null);
   const sidebar = useSidebarPreference();
   const desktopSidebarCollapsed = desktopSidebarCollapsible && sidebar.collapsed;
+  const changeSearchOpen = useCallback((open: boolean) => {
+    if (open) searchReturnFocus.current = document.activeElement?.closest('[aria-label="Меню навигации"]') ? mobileReturnFocus.current : document.activeElement as HTMLElement | null;
+    setCommandMenuOpen(open);
+    if (open) setMobileNavigationOpen(false);
+  }, []);
+  const toggleSidebar = () => {
+    sidebar.toggle();
+    requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(desktopSidebarCollapsed ? "[data-sidebar-collapse]" : "[data-rail-expand]")?.focus());
+  };
 
   return (
     <div
@@ -56,6 +68,7 @@ export function AppShell({
         "bg-background text-text-strong",
       )}
     >
+      <div inert={commandMenuOpen || mobileNavigationOpen} className={viewportLocked ? "h-full" : undefined}>
       <a
         href="#main-content"
         className="fixed left-3 top-3 z-[100] -translate-y-20 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground shadow-lg outline-none transition-transform focus:translate-y-0"
@@ -69,9 +82,12 @@ export function AppShell({
           viewportLocked ? "h-full min-h-0" : "min-h-screen",
         )}
       >
-        <div id="platform-sidebar" aria-hidden={desktopSidebarCollapsed} inert={desktopSidebarCollapsed}
-          className={cn("sticky top-0 hidden h-dvh shrink-0 overflow-hidden motion-safe:transition-[width] motion-safe:duration-200 xl:block", desktopSidebarCollapsed ? "w-0" : "w-[264px]")}>
-          <AppSidebar className={cn("motion-safe:transition-transform motion-safe:duration-200", desktopSidebarCollapsed && "-translate-x-full")} />
+        <div id="platform-sidebar" className={cn("sticky top-0 z-50 h-dvh w-14 shrink-0 sm:w-16", !desktopSidebarCollapsed && "xl:w-[264px]")}>
+          {!desktopSidebarCollapsed ? <div className="hidden xl:block"><AppSidebar onCollapse={desktopSidebarCollapsible ? toggleSidebar : undefined} /></div> : null}
+          <NavigationRail className={!desktopSidebarCollapsed ? "xl:hidden" : undefined} onExpand={() => {
+            if (window.matchMedia("(min-width: 1280px)").matches) toggleSidebar();
+            else { mobileReturnFocus.current = document.activeElement as HTMLElement | null; setMobileNavigationOpen(true); }
+          }} />
         </div>
 
         <div
@@ -82,10 +98,8 @@ export function AppShell({
         >
           <Topbar
             currentSection={title ?? getProductSection(pathname)}
-            onMenuClick={() => setMobileNavigationOpen(true)}
-            onSearchClick={() => setCommandMenuOpen(true)}
+            onSearchClick={() => changeSearchOpen(true)}
             action={action}
-            sidebar={desktopSidebarCollapsible ? { collapsed: desktopSidebarCollapsed, onToggle: sidebar.toggle } : undefined}
           />
           <main
             id="main-content"
@@ -108,13 +122,15 @@ export function AppShell({
           </main>
         </div>
       </div>
+      <ProductGuide />
+      </div>
 
       <MobileNavigation
         open={mobileNavigationOpen}
         onOpenChange={setMobileNavigationOpen}
+        returnFocusRef={mobileReturnFocus}
       />
-      <CommandMenu open={commandMenuOpen} onOpenChange={setCommandMenuOpen} />
-      <ProductGuide />
+      <CommandMenu open={commandMenuOpen} onOpenChange={changeSearchOpen} returnFocusRef={searchReturnFocus} />
     </div>
   );
 }

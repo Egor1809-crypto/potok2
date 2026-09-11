@@ -39,8 +39,8 @@ test("creative editors lock the page viewport and scroll inside their workspaces
   assert.match(presentationsPage, /viewportLocked/);
   assert.match(presentationsPage, /desktopSidebarCollapsible/);
   assert.match(shell, /desktopSidebarCollapsed/);
-  const topbar = await readFile(new URL("../components/layout/topbar.tsx", import.meta.url), "utf8");
-  assert.match(topbar, /Свернуть левую панель/);
+  const sidebar = await readFile(new URL("../components/layout/app-sidebar.tsx", import.meta.url), "utf8");
+  assert.match(sidebar, /Свернуть левую панель/);
   assert.match(imageStudio, /viewportLocked/);
   assert.match(imageStudio, /overflow-y-auto overscroll-contain/);
   assert.match(emailBuilder, /h-full min-h-0 flex-col overflow-hidden/);
