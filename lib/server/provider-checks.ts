@@ -8,6 +8,7 @@ import {
 } from "./provider-adapters";
 import { hasRuntimeCredentials, runtimeSecret } from "./runtime-integrations";
 import { checkVkWorkspaceSmtp } from "./vk-workspace-smtp";
+import { checkTelegramConnection } from "./telegram-connection";
 
 const CHECK_TIMEOUT_MS = 10_000;
 
@@ -42,6 +43,7 @@ export async function checkProviderConnection(
     };
   }
   if (integration.providerId === "telegram-bot-api") {
+    if (integration.publicConfig.credentialSource === "vault") return checkTelegramConnection();
     return checkTelegramBot({
       token: runtimeSecret(integration.publicConfig.botSlot === "secondary" ? "TELEGRAM_BOT_TOKEN_2" : "TELEGRAM_BOT_TOKEN"),
       expectedUsername: integration.publicConfig.botUsername,

@@ -444,7 +444,7 @@ function CampaignWizardState({
   );
   const [purpose, setPurpose] = React.useState<CampaignRecord["purpose"]>(seedDraft?.purpose ?? "marketing");
   const [audienceType, setAudienceType] = React.useState<"none" | "segment" | "contacts">(
-    queryContactIds.length > 0 || params.get("audienceType") === "contacts"
+    queryContactIds.length > 0 || params.get("audienceType") === "contacts" || params.get("audience") === "telegram"
       ? "contacts"
       : querySegmentId || params.get("audienceType") === "segment"
         ? "segment"
@@ -490,6 +490,7 @@ function CampaignWizardState({
   const [messengerDocumentName, setMessengerDocumentName] = React.useState<string | null>(
     seedDraft?.messengerDocumentName ?? null,
   );
+  const telegramAudience = params.get("audience") === "telegram";
   const [channels, setChannels] = React.useState<CampaignChannel[]>(
     () => initialChannels(params, seedDraft),
   );
@@ -536,7 +537,7 @@ function CampaignWizardState({
       if (sourceId) bootstrapParams.set("sourceId", sourceId);
       const [response, contactsResponse, templatesResponse, presentationsResponse] = await Promise.all([
         fetch(`/api/workspace?${bootstrapParams.toString()}`, { headers: { Accept: "application/json" } }),
-        fetch("/api/contacts?page=1&pageSize=250&delivery=pending", { headers: { Accept: "application/json" }, cache: "no-store" }),
+        fetch(telegramAudience ? "/api/contacts?page=1&pageSize=250&telegramSubscribers=1" : "/api/contacts?page=1&pageSize=250&delivery=pending", { headers: { Accept: "application/json" }, cache: "no-store" }),
         fetch("/api/templates", { headers: { Accept: "application/json" } }),
         fetch("/api/presentations", { headers: { Accept: "application/json" } }),
       ]);
@@ -643,7 +644,7 @@ function CampaignWizardState({
       setTemplateLoadState("error");
       setApiMode("offline");
     }
-  }, [duplicate, purpose, recoveredCampaignId, setScheduledAt, sourceId]);
+  }, [duplicate, purpose, recoveredCampaignId, setScheduledAt, sourceId, telegramAudience]);
 
   React.useEffect(() => {
     const frame = window.requestAnimationFrame(() => void loadWorkspace());
@@ -661,7 +662,7 @@ function CampaignWizardState({
         page: "1",
         pageSize: "250",
         meta: "0",
-        delivery: "pending",
+        ...(telegramAudience ? { telegramSubscribers: "1" } : { delivery: "pending" }),
       });
       if (sheet) query.set("sheet", sheet);
       const response = await fetch(`/api/contacts?${query.toString()}`, {
@@ -686,7 +687,7 @@ function CampaignWizardState({
     } finally {
       if (contactBaseRequestId.current === requestId) setWorkspaceContactsLoading(false);
     }
-  }, [setError]);
+  }, [setError, telegramAudience]);
 
   const loadMorePendingContacts = React.useCallback(async () => {
     if (workspaceContactsLoadingMore || workspaceContacts.length >= workspaceContactCount) return;
@@ -697,7 +698,7 @@ function CampaignWizardState({
         page: String(nextPage),
         pageSize: "250",
         meta: "0",
-        delivery: "pending",
+        ...(telegramAudience ? { telegramSubscribers: "1" } : { delivery: "pending" }),
       });
       if (workspaceContactSheet) query.set("sheet", workspaceContactSheet);
       const response = await fetch(`/api/contacts?${query.toString()}`, {
@@ -723,10 +724,10 @@ function CampaignWizardState({
     } finally {
       setWorkspaceContactsLoadingMore(false);
     }
-  }, [setError, workspaceContactCount, workspaceContactSheet, workspaceContacts.length, workspaceContactsLoadingMore, workspaceContactsPage]);
+  }, [setError, telegramAudience, workspaceContactCount, workspaceContactSheet, workspaceContacts.length, workspaceContactsLoadingMore, workspaceContactsPage]);
 
   const refreshPendingContacts = React.useCallback(async () => {
-    const query = new URLSearchParams({ page: "1", pageSize: "250", meta: "0", delivery: "pending" });
+    const query = new URLSearchParams({ page: "1", pageSize: "250", meta: "0", ...(telegramAudience ? { telegramSubscribers: "1" } : { delivery: "pending" }) });
     if (workspaceContactSheet) query.set("sheet", workspaceContactSheet);
     const response = await fetch(`/api/contacts?${query.toString()}`, {
       headers: { Accept: "application/json" },
@@ -742,7 +743,7 @@ function CampaignWizardState({
     });
     setWorkspaceContactCount(body.filteredCount);
     setWorkspaceContactsPage(1);
-  }, [workspaceContactSheet]);
+  }, [telegramAudience, workspaceContactSheet]);
 
   React.useEffect(() => {
     if (!shouldApplyTemplateQuery(queryTemplateId, consumedTemplateQueryId) || sourceId || builderResult || templateLoadState !== "ready") return;
@@ -1264,6 +1265,7 @@ function CampaignWizardState({
         <section className="card min-w-0 p-5 sm:p-7">
           {currentStep === 0 ? (
             <AudienceStep
+              telegramAudience={telegramAudience}
               audienceType={audienceType}
               onAudienceTypeChange={(value) => { setAudienceType(value); setEvaluation(null); }}
               segments={workspaceSegments}
@@ -1287,6 +1289,7 @@ function CampaignWizardState({
 
           {currentStep === 1 ? (
             <MessageStep
+              telegramOnly={channels.length === 1 && channels[0] === "telegram"}
               campaignName={campaignName}
               onCampaignNameChange={setCampaignName}
               subject={subject}
@@ -1531,6 +1534,7 @@ function StepIntro({ number, title, description }: { number: number; title: stri
 }
 
 function AudienceStep({
+  telegramAudience,
   audienceType,
   onAudienceTypeChange,
   segments,
@@ -1550,6 +1554,7 @@ function AudienceStep({
   onToggleContact,
   onSetContacts,
 }: {
+  telegramAudience: boolean;
   audienceType: "none" | "segment" | "contacts";
   onAudienceTypeChange: (value: "segment" | "contacts") => void;
   segments: AudienceSegment[];
@@ -1839,7 +1844,7 @@ function AudienceStep({
                 />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[13px] font-medium text-text-strong">{contact.fullName}</span>
-                  <span className="block truncate text-[11px] text-text-muted">{contact.email}{contact.companyName ? ` · ${contact.companyName}` : ""}</span>
+                  <span className="block truncate text-[11px] text-text-muted">{telegramAudience ? `Telegram · ${contact.fullName}` : contact.email}{contact.companyName ? ` · ${contact.companyName}` : ""}</span>
                   {ownerIdFor(contact) ? <span className="mt-0.5 block truncate text-[9px] font-semibold" style={{ color: memberById.get(ownerIdFor(contact))?.color ?? "#6558E8" }}>Ответственный: {memberById.get(ownerIdFor(contact))?.displayName ?? "Участник команды"}</span> : null}
                 </span>
                 {contact.status && contact.status !== "active" ? <Badge variant="warning">Недоступен</Badge> : null}
@@ -1849,7 +1854,7 @@ function AudienceStep({
           </div>
           {contacts.length < totalContactCount ? (
             <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface-subtle/45 px-4 py-3">
-              <p className="m-0 text-[11px] text-text-muted">Осталось загрузить: {formatNumber(totalContactCount - contacts.length)}. Уже отправленные контакты исключены.</p>
+              <p className="m-0 text-[11px] text-text-muted">Осталось загрузить: {formatNumber(totalContactCount - contacts.length)}. {telegramAudience ? "Показаны подписчики подключённого бота." : "Уже отправленные контакты исключены."}</p>
               <Button type="button" variant="outline" size="sm" disabled={loadingMore} onClick={onLoadMore}>
                 {loadingMore ? "Загружаем…" : "Показать ещё 250"}
               </Button>
@@ -1870,6 +1875,7 @@ function AudienceStep({
 }
 
 function MessageStep({
+  telegramOnly,
   campaignName,
   onCampaignNameChange,
   subject,
@@ -1894,6 +1900,7 @@ function MessageStep({
   editorHref,
   templateLibraryHref,
 }: {
+  telegramOnly: boolean;
   campaignName: string;
   onCampaignNameChange: (value: string) => void;
   subject: string;
@@ -1921,12 +1928,13 @@ function MessageStep({
   const selectedTemplate = templates.find((template) => template.id === templateId);
   return (
     <div>
-      <StepIntro number={2} title="Подготовьте сообщение" description="Создайте email-версию и короткий вариант для мессенджеров. На следующем шаге выберите, какие версии отправлять." />
+      <StepIntro number={2} title="Подготовьте сообщение" description={telegramOnly ? "Напишите сообщение подписчикам. При необходимости добавьте PDF, затем выберите время отправки." : "Создайте email-версию и короткий вариант для мессенджеров. На следующем шаге выберите, какие версии отправлять."} />
       <div className="mt-6">
         <FormField label="Название рассылки" htmlFor="campaign-name" required hint="Внутреннее название для вашего списка. Получателю оно не показывается.">
           <Input id="campaign-name" value={campaignName} onChange={(event) => onCampaignNameChange(event.target.value)} />
         </FormField>
       </div>
+      {!telegramOnly && <>
       <section className="mt-5 rounded-xl border border-border bg-surface-subtle/45 p-4" aria-labelledby="campaign-template-title">
         <div className="grid gap-3 md:grid-cols-[minmax(240px,1fr)_auto] md:items-end">
           <FormField
@@ -1970,7 +1978,9 @@ function MessageStep({
         </div>
         {presentationId ? <p className="mb-0 mt-3 rounded-lg bg-info-subtle px-3 py-2 text-[10px] leading-4 text-text-muted">Для автоматической отправки вложения выберите на следующем шаге Email → UniSender. Лимит вложения — 500 КБ; Поток проверит размер перед передачей провайдеру.</p> : null}
       </section>
-      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+      </>}
+      <div className={telegramOnly ? "mt-6" : "mt-6 grid gap-4 lg:grid-cols-2"}>
+        {!telegramOnly && (
         <section className="rounded-xl border border-border p-5" aria-labelledby="email-message-title">
           <div className="flex items-center gap-3">
             <span className="grid size-9 place-items-center rounded-xl bg-primary-subtle text-primary"><Mail aria-hidden="true" className="size-4" /></span>
@@ -2001,22 +2011,23 @@ function MessageStep({
           </div>
         </section>
 
+        )}
         <section className="rounded-xl border border-border p-5" aria-labelledby="messenger-message-title">
           <div className="flex items-center gap-3">
             <span className="grid size-9 place-items-center rounded-xl bg-info-subtle text-info"><MessageCircle aria-hidden="true" className="size-4" /></span>
             <div>
-              <h3 id="messenger-message-title" className="text-[15px] font-semibold text-text-strong">Telegram и ВКонтакте</h3>
-              <p className="mt-0.5 text-[11px] text-text-muted">Один короткий вариант для выбранных мессенджеров</p>
+              <h3 id="messenger-message-title" className="text-[15px] font-semibold text-text-strong">{telegramOnly ? "Сообщение в Telegram" : "Telegram и ВКонтакте"}</h3>
+              <p className="mt-0.5 text-[11px] text-text-muted">{telegramOnly ? "Текст получит каждый выбранный подписчик" : "Один короткий вариант для выбранных мессенджеров"}</p>
             </div>
           </div>
           <div className="mt-5">
-            <FormField label="Текст сообщения" htmlFor="campaign-messenger-message" hint={`${messengerMessage.length} из 4 000 символов`}>
-              <Textarea id="campaign-messenger-message" rows={11} maxLength={4000} value={messengerMessage} onChange={(event) => onMessengerMessageChange(event.target.value)} placeholder="Здравствуйте, {{first_name}}…" />
+            <FormField label="Текст сообщения" htmlFor="campaign-messenger-message" hint={`${messengerMessage.length} из ${messengerDocumentUrl ? "1 024" : "4 000"} символов`}>
+              <Textarea id="campaign-messenger-message" rows={11} maxLength={messengerDocumentUrl ? 1024 : 4000} value={messengerMessage} onChange={(event) => onMessengerMessageChange(event.target.value)} placeholder="Здравствуйте, {{first_name}}…" />
             </FormField>
             <div className="mt-4 border-t border-border pt-4">
               <p className="mb-2 text-[12px] font-semibold text-text-strong">PDF для Telegram</p>
               <TelegramDocumentPicker value={messengerDocumentUrl} filename={messengerDocumentName} onChange={onMessengerDocumentChange} />
-              <p className="mt-2 text-[10px] leading-4 text-text-muted">Получатель должен заранее нажать Start у выбранного бота и дать согласие. ВКонтакте этот PDF не отправляет.</p>
+              <p className="mt-2 text-[10px] leading-4 text-text-muted">{telegramOnly ? "PDF придёт отдельным документом с вашим текстом в подписи. Получатель может отписаться командой /stop." : "Получатель должен подтвердить подписку у выбранного бота. ВКонтакте этот PDF не отправляет."}</p>
             </div>
           </div>
         </section>

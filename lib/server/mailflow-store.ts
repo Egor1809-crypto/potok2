@@ -2,6 +2,7 @@ import { calendarReport } from "./calendar-report";
 import { assessCommunications, enforceCommunications, recordCommunicationTouches } from "./communication-store";
 import { and, asc, desc, eq, inArray, isNotNull, lte, or, sql, type SQL } from "drizzle-orm";
 import { getD1, getDb } from "@/db";
+import { disconnectTelegramConnection, resolveTelegramToken, telegramRecipientAllowed, telegramSubscribedChatIds } from "./telegram-connection";
 import {
   campaignEvents,
   campaignVersions,
@@ -1234,6 +1235,10 @@ function contactListFilters(url: URL): SQL[] {
   if (channel === "telegram") filters.push(sql`${contacts.telegramChatId} is not null and ${contacts.telegramChatId} <> ''`);
   if (channel === "vk") filters.push(sql`${contacts.vkUserId} is not null and ${contacts.vkUserId} <> ''`);
   if (channel === "phone") filters.push(sql`${contacts.phone} <> ''`);
+  if (url.searchParams.get("telegramSubscribers") === "1") filters.push(sql`${contacts.telegramConsent}=1 AND ${contacts.status}='active' AND EXISTS (
+    SELECT 1 FROM telegram_subscribers ts JOIN telegram_connections tc ON tc.workspace_id=ts.workspace_id AND tc.bot_id=ts.bot_id
+    WHERE ts.workspace_id=${contacts.workspaceId} AND ts.chat_id=${contacts.telegramChatId} AND ts.status='subscribed' AND tc.state='connected'
+  )`);
   if (owner) filters.push(sql`coalesce(${contacts.responsibleParticipantId}, ${contacts.createdByParticipantId}) = ${owner}`);
   if (delivery === "sent") filters.push(isNotNull(contacts.lastContactedAt));
   if (delivery === "pending") filters.push(sql`${contacts.lastContactedAt} is null`);
@@ -2487,6 +2492,10 @@ export async function updateIntegration(
     )
     .limit(1);
   if (!existing) throw new ApiRequestError("Интеграция не найдена.", 404);
+  if (selectedProvider === "telegram-bot-api") {
+    if (input.action === "disconnect") await disconnectTelegramConnection();
+    else if (input.action !== "check") throw new ApiRequestError("Подключите Telegram через форму с токеном бота.", 422);
+  }
   const now = new Date().toISOString();
   const [savedRow] = await db
     .update(integrations)
@@ -3013,7 +3022,7 @@ function recipientFingerprints(
                 ]
               : [purpose]
             : plan.channel === "telegram"
-              ? contact.telegramConsent
+              ? [contact.telegramConsent, contact.customFields.telegramSubscriptionBotId ?? ""]
               : contact.vkConsent,
           contact.firstName,
           contact.lastName,
@@ -3246,8 +3255,9 @@ async function evaluateLaunch(
 
   for (const plan of plans) {
     const channelBlockers: string[] = [];
+    const telegramChats = plan.channel === "telegram" ? await telegramSubscribedChatIds(integrationRecords.find(item => item.providerId === plan.providerId)?.publicConfig ?? {}) : null;
     const eligibleCount = audience.filter((contact) =>
-      contactEligible(contact, plan.channel, campaign.purpose),
+      contactEligible(contact, plan.channel, campaign.purpose) && (!telegramChats || telegramChats.has(contact.telegramChatId ?? "")),
     ).length;
     eligibleByChannel[plan.channel] = eligibleCount;
     const provider = integrationRecords.find(
@@ -3500,20 +3510,28 @@ async function processDirectOutbox(
           .where(eq(deliveryOutbox.id, row.id));
         if (row.providerId === "telegram-bot-api") {
           const publicConfig = integrationRecords.find((item) => item.providerId === row.providerId)?.publicConfig ?? {};
-          const credentials = automaticProviderSecrets(row.providerId, publicConfig) as {
-            token?: string;
-          };
+          if (!await telegramRecipientAllowed(publicConfig, row.recipientEndpoint)) {
+            await updateOutboxResult(row, { status: "rejected", message: "Telegram отключён или получатель не подписан на этого бота. Отправка отменена." });
+            continue;
+          }
+          let token: string;
+          try { token = await resolveTelegramToken(publicConfig); }
+          catch { await updateOutboxResult(row, { status: "rejected", message: "Токен Telegram недоступен. Проверьте подключение бота." }); continue; }
           const renderedMessage = renderContactTemplate(messengerMessage, contact);
+          if (!renderedMessage.trim() && !messengerDocumentUrl || renderedMessage.length > (messengerDocumentUrl ? 1024 : 4096)) {
+            await updateOutboxResult(row, { status: "rejected", message: "Текст после персонализации пуст или превышает лимит Telegram. Сократите сообщение." });
+            continue;
+          }
           const result = messengerDocumentUrl
             ? await sendTelegramDocument({
-                token: credentials.token ?? "",
+                token,
                 chatId: row.recipientEndpoint,
                 documentUrl: messengerDocumentUrl,
                 caption: renderedMessage,
                 signal: AbortSignal.timeout(20_000),
               })
             : await sendTelegramMessage({
-                token: credentials.token ?? "",
+                token,
                 chatId: row.recipientEndpoint,
                 text: renderedMessage,
                 signal: AbortSignal.timeout(15_000),
@@ -3888,7 +3906,7 @@ async function dispatchCampaign(
     if (
       !integration ||
       definition?.deliveryMode === "roadmap" ||
-      !hasRuntimeCredentials(plan.providerId) ||
+      !hasRuntimeCredentials(plan.providerId, integration.publicConfig) ||
       !isIntegrationReadyForChannel(integration, plan.channel)
     ) {
       return blockDispatch(
@@ -3896,8 +3914,9 @@ async function dispatchCampaign(
         `${definition?.name ?? plan.providerId}: серверная конфигурация больше не готова. Отправка не начиналась.`,
       );
     }
+    const telegramChats = plan.channel === "telegram" ? await telegramSubscribedChatIds(integration.publicConfig) : null;
     const eligible = freshAudience.filter((contact) =>
-      contactEligible(contact, plan.channel, current.campaign.purpose),
+      contactEligible(contact, plan.channel, current.campaign.purpose) && (!telegramChats || telegramChats.has(contact.telegramChatId ?? "")),
     );
     if (eligible.length !== plan.eligibleCount || eligible.length === 0) {
       return blockDispatch(

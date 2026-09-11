@@ -30,6 +30,28 @@ const timestamps = {
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 };
 
+// Telegram credentials never appear in integrations.public_config or API responses.
+export const telegramConnections = sqliteTable("telegram_connections", {
+  workspaceId: text("workspace_id").primaryKey(), botId: text("bot_id").notNull(),
+  username: text("username").notNull(), displayName: text("display_name").notNull(),
+  encryptedToken: text("encrypted_token").notNull(), webhookId: text("webhook_id").notNull(),
+  webhookSecretHash: text("webhook_secret_hash").notNull(), webhookUrl: text("webhook_url").notNull(),
+  state: text("state").notNull(), operationId: text("operation_id").notNull(),
+  operator: text("operator").notNull(), lastReceivedAt: text("last_received_at"),
+  ...timestamps,
+}, t => [uniqueIndex("idx_telegram_webhook").on(t.webhookId), uniqueIndex("idx_telegram_bot").on(t.botId)]);
+
+export const telegramSubscribers = sqliteTable("telegram_subscribers", {
+  id: text("id").primaryKey(), workspaceId: text("workspace_id").notNull(), botId: text("bot_id").notNull(),
+  chatId: text("chat_id").notNull(), status: text("status").notNull(), pendingNonce: text("pending_nonce").notNull().default(""),
+  eventAt: integer("event_at").notNull(), updateId: integer("update_id").notNull(), eventNonce: text("event_nonce").notNull(),
+  ...timestamps,
+}, t => [uniqueIndex("idx_telegram_subscriber").on(t.workspaceId, t.botId, t.chatId), index("idx_telegram_subscriber_status").on(t.workspaceId, t.botId, t.status)]);
+
+export const telegramUpdates = sqliteTable("telegram_updates", {
+  id: text("id").primaryKey(), nonce: text("nonce").notNull(), createdAt: text("created_at").notNull(),
+});
+
 export const workspaces = sqliteTable("workspaces", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),

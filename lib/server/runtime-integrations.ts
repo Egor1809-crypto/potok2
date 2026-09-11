@@ -49,6 +49,7 @@ export function hasRuntimeCredentials(
 ) {
   const runtime = runtimeEnvironment();
   if (providerId === "telegram-bot-api") {
+    if (publicConfig.credentialSource === "vault") return Boolean(runtime.TELEGRAM_CREDENTIAL_KEY?.trim() && publicConfig.botId);
     const key = publicConfig.botSlot === "secondary" ? "TELEGRAM_BOT_TOKEN_2" : "TELEGRAM_BOT_TOKEN";
     return Boolean(runtime[key]?.trim());
   }
@@ -113,7 +114,7 @@ export function toIntegrationRecord(
   const status = connectionStatus(integration);
   const statusMessage =
     !credentialsConfigured
-      ? "Добавьте секреты в защищённую конфигурацию сервера и запустите проверку."
+      ? integration.providerId === "telegram-bot-api" ? "Подключите бота токеном из BotFather в разделе Telegram." : "Добавьте секреты в защищённую конфигурацию сервера и запустите проверку."
       : !hasRequiredPublicConfig(integration.providerId, integration.publicConfig)
         ? "Заполните открытые параметры и запустите проверку."
         : integration.checkMessage;

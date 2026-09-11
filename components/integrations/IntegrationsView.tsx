@@ -16,6 +16,7 @@ import {
   Unplug,
 } from "lucide-react";
 
+import { TelegramConnectionPanel } from "./TelegramConnectionPanel";
 import { PageHeader } from "@/components/shared/PageHeader";
 import {
   Alert,
@@ -73,24 +74,7 @@ const setupFields: Record<IntegrationProviderId, SetupField[]> = {
       hint: "Полный адрес ящика VK WorkSpace. Пароль приложения хранится только в защищённой конфигурации сервера.",
     },
   ],
-  "telegram-bot-api": [
-    {
-      key: "botSlot",
-      label: "Какой бот отправляет",
-      placeholder: "primary",
-      hint: "Первый бот использует TELEGRAM_BOT_TOKEN, второй — TELEGRAM_BOT_TOKEN_2.",
-      options: [
-        { value: "primary", label: "Бот №1 · основной" },
-        { value: "secondary", label: "Бот №2 · дополнительный" },
-      ],
-    },
-    {
-      key: "botUsername",
-      label: "Имя бота",
-      placeholder: "company_bot",
-      hint: "Без символа @. Токен бота хранится только на сервере.",
-    },
-  ],
+  "telegram-bot-api": [],
   "vk-api": [
     {
       key: "communityId",
@@ -449,7 +433,7 @@ export function IntegrationsView() {
       ) : (
         <Alert tone="info" title="Статус подтверждается провайдером" icon={<ShieldCheck aria-hidden="true" className="size-4" />}>
           Сохранение формы не означает подключение. Кнопка проверки выполняет безопасный
-          запрос конкретного провайдера; секреты читаются только из серверного окружения.
+          запрос конкретного провайдера. Токены и пароли защищены на сервере.
         </Alert>
       )}
 
@@ -458,6 +442,13 @@ export function IntegrationsView() {
           {notice.text}
         </Alert>
       ) : null}
+
+      <TelegramConnectionPanel
+        open={setupProviderId === "telegram-bot-api"}
+        onOpenChange={open => setSetupProviderId(open ? "telegram-bot-api" : null)}
+        onChange={() => void loadIntegrations()}
+        updatedAt={recordByProvider["telegram-bot-api"]?.updatedAt}
+      />
 
       <section className="card overflow-hidden" aria-labelledby="delivery-checklist-title">
         <div className="flex flex-col gap-3 border-b border-border px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
@@ -539,7 +530,7 @@ export function IntegrationsView() {
                       Настроить
                     </Button>
                   )}
-                  {record?.enabled ? (
+                  {record?.enabled && provider.id !== "telegram-bot-api" ? (
                     <Button
                       variant="ghost"
                       size="sm"
@@ -551,7 +542,7 @@ export function IntegrationsView() {
                       Проверить
                     </Button>
                   ) : null}
-                  {record?.enabled ? (
+                  {record?.enabled && provider.id !== "telegram-bot-api" ? (
                     <Button
                       variant="ghost"
                       size="sm"
@@ -570,17 +561,7 @@ export function IntegrationsView() {
         </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-2" aria-label="Инструкции подключения мессенджеров">
-        <article className="rounded-xl border border-[#b9def3] bg-[#f2f9fd] p-5">
-          <div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-xl bg-[#229ed9] text-white"><MessageCircleMore aria-hidden="true" className="size-5" /></span><div><h2 className="text-[14px] font-semibold text-text-strong">Telegram без риска блокировки</h2><p className="mt-0.5 text-[11px] text-text-muted">Официальный Bot API, до двух ботов</p></div></div>
-          <ol className="mt-4 space-y-2 text-[12px] leading-5 text-text-muted">
-            <li><b>1.</b> Создайте бота через @BotFather и добавьте токен в защищённый секрет сервера.</li>
-            <li><b>2.</b> Для второго бота используйте секрет <code>TELEGRAM_BOT_TOKEN_2</code> и выберите «Бот №2» в форме.</li>
-            <li><b>3.</b> Получатель должен сам открыть бота и нажать Start; после этого сохраните его числовой chat ID и согласие.</li>
-            <li><b>4.</b> PDF отправляется документом с подписью. Используйте очередь, паузы и не отправляйте одному чату чаще одного сообщения в секунду.</li>
-          </ol>
-          <p className="mt-3 rounded-lg bg-white/80 px-3 py-2 text-[10px] leading-4 text-[#3d647b]">Личные аккаунты не автоматизируются: такой маршрут нарушает ожидаемое поведение Telegram и намного чаще приводит к ограничениям.</p>
-        </article>
+      <section className="grid gap-4" aria-label="Инструкции подключения мессенджеров">
         <article className="rounded-xl border border-[#bed8ff] bg-[#f4f8ff] p-5">
           <div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-xl bg-[#0077ff] text-white"><MessagesSquare aria-hidden="true" className="size-5" /></span><div><h2 className="text-[14px] font-semibold text-text-strong">ВКонтакте от имени сообщества</h2><p className="mt-0.5 text-[11px] text-text-muted">Сообщения только разрешившим пользователям</p></div></div>
           <ol className="mt-4 space-y-2 text-[12px] leading-5 text-text-muted">
@@ -622,7 +603,7 @@ export function IntegrationsView() {
         channelId={setupChannelId}
         values={setupValues}
         onValueChange={(key, value) => setSetupValues((current) => ({ ...current, [key]: value }))}
-        open={Boolean(selectedSetupProvider)}
+        open={Boolean(selectedSetupProvider && selectedSetupProvider.id !== "telegram-bot-api")}
         onOpenChange={(open) => !open && setSetupProviderId(null)}
         onSave={() => void saveIntegration()}
         saving={Boolean(setupProviderId && busyAction === `save:${setupProviderId}`)}

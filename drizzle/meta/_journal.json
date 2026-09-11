@@ -134,6 +134,13 @@
       "when": 1788956788510,
       "tag": "0018_open_jack_flag",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1789137516453,
+      "tag": "0019_tidy_rockslide",
+      "breakpoints": true
     }
   ]
 }
