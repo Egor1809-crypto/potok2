@@ -20,9 +20,10 @@ function forbids(text: string, nouns: string) {
 /** Only unambiguous constraints are enforced here; the full brief is also reviewed. */
 export function emailBriefConstraints(input: EmailAiRequest) {
   const text = emailBriefText(input);
+  const textOnly = /только (?:обычный )?текст|только типограф|plain[ -]?text/iu.test(text);
   return {
-    noImages: input.visualContent === "none" || input.visualContent === "pattern" || forbids(text, "фото|картин|изображ|иллюстрац") || /только (?:обычный )?текст|только типограф/iu.test(text),
-    noPatterns: input.visualContent === "none" || input.visualContent === "image" || forbids(text, "узор|орнамент|паттерн"),
+    noImages: input.visualContent === "none" || input.visualContent === "pattern" || forbids(text, "фото|картин|изображ|иллюстрац") || textOnly,
+    noPatterns: input.visualContent === "none" || input.visualContent === "image" || forbids(text, "узор|орнамент|паттерн") || textOnly,
     noButtons: forbids(text, "кноп[ок]|cta") || /ссылк[ауи][^.\n]{0,24}(?:только|обычным) текст/iu.test(text),
     noLogos: forbids(text, "лого"),
   };
