@@ -33,6 +33,9 @@ const eslintConfig = defineConfig([
         ...globals.serviceworker,
       },
     },
+    rules: {
+      "jsx-a11y/label-has-associated-control": ["error", { controlComponents: ["Select"] }],
+    },
     settings: {
       react: {
         version: "detect",

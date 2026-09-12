@@ -1,5 +1,7 @@
 "use client";
 
+import { useEditorDraft } from "@/lib/use-editor-draft";
+
 import {
   useCallback,
   useEffect,
@@ -343,6 +345,7 @@ export function EmailBuilderView(props: EmailBuilderViewProps) {
     getBrowserSearch,
     getServerSearch,
   );
+  const browserReady = useSyncExternalStore(subscribeToLocation, () => true, () => false);
   const query = useMemo(
     () => new URLSearchParams(browserSearch),
     [browserSearch],
@@ -463,7 +466,7 @@ export function EmailBuilderView(props: EmailBuilderViewProps) {
         }`
       : "/templates?scope=mine");
 
-  if (templateLoadState === "loading") {
+  if (!browserReady || templateLoadState === "loading" || (requestedTemplateId && templateRecord?.id !== requestedTemplateId && templateLoadState !== "error")) {
     return (
       <div className="card grid min-h-[560px] place-items-center p-8 text-center text-[13px] text-text-muted">
         Загружаем шаблон с сервера…
@@ -939,31 +942,34 @@ function EmailBuilderWorkspace({
     return () => window.document.removeEventListener("keydown", onKeyDown);
   }, [redo, save, undo]);
 
+  useEditorDraft({
+    storageKey: mode === "template" ? `potok:email-draft:${savedTemplateId ?? templateId ?? "new"}` : null,
+    value: { document, campaignName, templateDescription, templateCategory }, dirty,
+    revision: templateRevision,
+    onRestore: (draft, stale) => {
+      if (!draft?.document || !Array.isArray(draft.document.blocks)) return;
+      dispatch({ type: "reset", document: draft.document });
+      setCampaignName(stale ? `${draft.campaignName} — черновик` : draft.campaignName);
+      setTemplateDescription(draft.templateDescription); setTemplateCategory(draft.templateCategory);
+      setCreationMode("manual"); setDirty(true);
+      if (stale) { setSavedTemplateId(null); setTemplateRevision(null); }
+      toast.info("Черновик восстановлен", stale ? "На сервере есть новая версия. Ваши правки будут сохранены отдельным шаблоном." : "Можно продолжить редактирование. Для записи на сервер нажмите «Сохранить».");
+    },
+    onError: message => toast.warning("Черновик", message),
+  });
+
   useEffect(() => {
-    if (!dirty) return;
-    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-    };
-    window.addEventListener("beforeunload", warnBeforeUnload);
-    return () => window.removeEventListener("beforeunload", warnBeforeUnload);
-  }, [dirty]);
+    if (mode !== "campaign" || !dirty) return;
+    const save = () => { persistDraft(); };
+    const timer = window.setTimeout(save, 300);
+    window.addEventListener("pagehide", save);
+    return () => { window.clearTimeout(timer); window.removeEventListener("pagehide", save); save(); };
+  }, [mode, dirty, persistDraft]);
 
   const continueFromEditor = useCallback(
     (event: React.MouseEvent<HTMLAnchorElement>) => {
-      if (mode === "campaign") {
-        if (!persistDraft()) event.preventDefault();
-        return;
-      }
-      if (
-        dirty &&
-        !window.confirm(
-          "Выйти без сохранения? Несохранённые изменения шаблона будут потеряны.",
-        )
-      ) {
-        event.preventDefault();
-      }
-    },
-    [dirty, mode, persistDraft],
+      if (mode === "campaign" && !persistDraft()) event.preventDefault();
+    }, [mode, persistDraft],
   );
 
   const setCampaignNameDirty = (name: string) => {

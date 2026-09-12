@@ -1,5 +1,7 @@
 "use client";
 
+import { Select } from "@/components/ui/select";
+
 import Link from "next/link";
 import {
   Check,
@@ -275,12 +277,12 @@ function AccountSection({ form, participant, canManage, update }: { form: Worksp
         <Field label="Название пространства" value={form.name} onChange={(value) => update("name", value)} />
         <label className="block">
           <span className="mb-1.5 block text-[12px] font-semibold">Часовой пояс</span>
-          <select className="input" value={form.timezone} onChange={(event) => update("timezone", event.target.value)}>
+          <Select className="input" value={form.timezone} onChange={(event) => update("timezone", event.target.value)}>
             <option value="Europe/Moscow">Москва (UTC+3)</option>
             <option value="Europe/Saratov">Саратов (UTC+4)</option>
             <option value="Asia/Yekaterinburg">Екатеринбург (UTC+5)</option>
             <option value="Asia/Novosibirsk">Новосибирск (UTC+7)</option>
-          </select>
+          </Select>
         </label>
       </FormBlock>}
     </div>

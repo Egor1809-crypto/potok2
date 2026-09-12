@@ -1,5 +1,7 @@
 "use client";
 
+import { Select } from "@/components/ui/select";
+
 import { useState } from "react";
 import {
   ArrowDown,
@@ -85,7 +87,7 @@ export function EmailCanvas({
             Предпросмотр в реальном времени
           </span>
         </div>
-        <div className="flex items-center gap-3"><span className="text-xs text-text-muted">{isMobile ? "360 пикс." : `${document.contentWidth} пикс.`}</span><label className="flex items-center gap-2 text-xs"><span>Масштаб</span><select aria-label="Масштаб письма" value={zoom} onChange={event => setZoom(event.target.value)} className="rounded-md border border-border bg-surface px-2 py-1">{[50, 65, 75, 85, 100, 125].map(value => <option key={value} value={value}>{value}%</option>)}</select></label></div>
+        <div className="flex items-center gap-3"><span className="text-xs text-text-muted">{isMobile ? "360 пикс." : `${document.contentWidth} пикс.`}</span><label className="flex items-center gap-2 text-xs"><span>Масштаб</span><Select aria-label="Масштаб письма" value={zoom} onChange={event => setZoom(event.target.value)} className="rounded-md border border-border bg-surface px-2 py-1">{[50, 65, 75, 85, 100, 125].map(value => <option key={value} value={value}>{value}%</option>)}</Select></label></div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto p-3 scrollbar-subtle sm:p-4">

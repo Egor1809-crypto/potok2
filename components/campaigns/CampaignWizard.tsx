@@ -1,5 +1,7 @@
 "use client";
 
+import { confirmAction } from "@/components/ui/confirm-action";
+
 import * as React from "react";
 import { CampaignCommunicationCheck } from "@/components/communications/CampaignCommunicationCheck";
 import Link from "next/link";
@@ -1304,10 +1306,10 @@ function CampaignWizardState({
               }}
               emailBodyText={emailBodyText}
               visualDocumentActive={Boolean(emailBuilderDocument)}
-              onEmailBodyTextChange={(value) => {
+              onEmailBodyTextChange={async (value) => {
                 if (
                   emailBuilderDocument &&
-                  !window.confirm("Перейти к обычному тексту? Визуальная структура письма будет отвязана от кампании, но сам текст сохранится.")
+                  !await confirmAction("Перейти к обычному тексту? Визуальная структура письма будет отвязана от кампании, но сам текст сохранится.")
                 ) return;
                 setEmailBodyText(value);
                 setEmailBuilderDocument(null);
@@ -1320,7 +1322,7 @@ function CampaignWizardState({
               presentations={workspacePresentations}
               presentationId={presentationId}
               onPresentationChange={setPresentationId}
-              onTemplateChange={(nextTemplateId) => {
+              onTemplateChange={async (nextTemplateId) => {
                 if (!nextTemplateId) {
                   setTemplateId(null);
                   setEmailBuilderDocument(unlinkEmailTemplateDocument);
@@ -1331,7 +1333,7 @@ function CampaignWizardState({
                 if (
                   nextTemplateId !== templateId &&
                   (subject.trim() || previewText.trim() || emailBodyText.trim()) &&
-                  !window.confirm("Заменить текущее email-письмо выбранным шаблоном? Тема, прехедер, текст и визуальный макет будут заменены.")
+                  !await confirmAction("Заменить текущее email-письмо выбранным шаблоном? Тема, прехедер, текст и визуальный макет будут заменены.")
                 ) return;
                 const template = workspaceTemplates.find((item) => item.id === nextTemplateId);
                 if (!template) {

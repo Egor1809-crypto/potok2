@@ -514,6 +514,10 @@ a.card:hover {
   padding: 0;
 }
 
+fieldset {
+  min-inline-size: 0;
+}
+
 /* Inputs */
 .input {
   width: 100%;

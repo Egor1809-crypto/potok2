@@ -1,5 +1,7 @@
 "use client";
 
+import { Select } from "@/components/ui/select";
+
 import { useDrawerAccessibility } from "@/components/shared/useDrawerAccessibility";
 import type {
   SegmentCreateInput,
@@ -360,7 +362,7 @@ export function SegmentEditor({
                             <span className="sr-only">
                               Связь с предыдущим условием
                             </span>
-                            <select
+                            <Select
                               value={rule.join}
                               onChange={(event) =>
                                 updateRule(rule.id, {
@@ -371,7 +373,7 @@ export function SegmentEditor({
                             >
                               <option value="and">И</option>
                               <option value="or">ИЛИ</option>
-                            </select>
+                            </Select>
                           </label>
                         )}
                         <button
@@ -392,7 +394,7 @@ export function SegmentEditor({
                       <div className="grid gap-2 sm:grid-cols-[1.05fr_.85fr_1.2fr]">
                         <label>
                           <span className="sr-only">Поле условия</span>
-                          <select
+                          <Select
                             value={rule.field}
                             onChange={(event) =>
                               changeField(
@@ -407,12 +409,12 @@ export function SegmentEditor({
                                 {field.label}
                               </option>
                             ))}
-                          </select>
+                          </Select>
                         </label>
 
                         <label>
                           <span className="sr-only">Оператор условия</span>
-                          <select
+                          <Select
                             value={rule.operator}
                             onChange={(event) =>
                               updateRule(rule.id, {
@@ -427,13 +429,13 @@ export function SegmentEditor({
                                 {operatorLabels[operator]}
                               </option>
                             ))}
-                          </select>
+                          </Select>
                         </label>
 
                         <label>
                           <span className="sr-only">Значение условия</span>
                           {option.input === "status" ? (
-                            <select
+                            <Select
                               value={rule.value}
                               onChange={(event) =>
                                 updateRule(rule.id, { value: event.target.value })
@@ -445,7 +447,7 @@ export function SegmentEditor({
                                   {status.label}
                                 </option>
                               ))}
-                            </select>
+                            </Select>
                           ) : (
                             <input
                               type={option.input}

@@ -1,5 +1,9 @@
 "use client";
 
+import { useEditorDraft } from "@/lib/use-editor-draft";
+
+import { confirmAction } from "@/components/ui/confirm-action";
+
 import { presentationChartData, presentationFontFamily, presentationReadableColors, presentationStepText } from "@/lib/presentation-design-quality";
 import { estimatedTextLines } from "@/lib/design-readability";
 import {
@@ -1461,34 +1465,17 @@ export function PresentationStudio() {
     return () => controller.abort();
   }, []);
 
-  useEffect(() => {
-    if (!dirty) return;
-    const beforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = "";
-    };
-    const guardInternalNavigation = (event: MouseEvent) => {
-      const target =
-        event.target instanceof HTMLElement
-          ? event.target.closest<HTMLAnchorElement>("a[href]")
-          : null;
-      if (!target || target.target === "_blank") return;
-      if (
-        !window.confirm(
-          "В презентации есть несохранённые изменения. Покинуть редактор без сохранения?",
-        )
-      ) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-      }
-    };
-    window.addEventListener("beforeunload", beforeUnload);
-    document.addEventListener("click", guardInternalNavigation, true);
-    return () => {
-      window.removeEventListener("beforeunload", beforeUnload);
-      document.removeEventListener("click", guardInternalNavigation, true);
-    };
-  }, [dirty]);
+
+  useEditorDraft({
+    storageKey: project && !loading ? `potok:presentation-draft:${project.id}` : null,
+    value: project, dirty, revision: project?.updatedAt ?? null,
+    onRestore: (draft, stale) => {
+      if (!draft || !Array.isArray(draft.slides)) return;
+      setProject(draft); setSelectedSlideId(draft.slides[0]?.id ?? null); setDirty(true);
+      setNotice(stale ? "Черновик восстановлен. На сервере есть более новая версия; сохранение защищено от перезаписи чужих правок." : "Черновик восстановлен в этой вкладке. Сохраните изменения, чтобы записать их на сервер.");
+    },
+    onError: setError,
+  });
 
   useEffect(() => {
     if (!quickCreateKey) {
@@ -1533,14 +1520,6 @@ export function PresentationStudio() {
   }, [projectId, quickCreateKey, requestedAssetId, router]);
 
   const navigateTo = (id?: string) => {
-    if (
-      dirty &&
-      projectId &&
-      !window.confirm(
-        "В презентации есть несохранённые изменения. Покинуть редактор без сохранения?",
-      )
-    )
-      return;
     router.push(
       id ? `/presentations?id=${encodeURIComponent(id)}` : "/presentations",
     );
@@ -1716,7 +1695,7 @@ export function PresentationStudio() {
   };
 
   const deleteProject = async (item: PresentationProjectRecord) => {
-    if (!window.confirm(`Удалить презентацию «${item.name}»?`)) return;
+    if (!await confirmAction(`Удалить презентацию «${item.name}»?`)) return;
     setBusy(`delete-${item.id}`);
     try {
       const response = await fetch(
@@ -1869,7 +1848,7 @@ export function PresentationStudio() {
         "Ссылка на редактирование скопирована. Доступ к ней остаётся внутри вашего рабочего пространства.",
       );
     } catch {
-      window.prompt("Скопируйте ссылку на презентацию", url);
+      setNotice(`Скопируйте ссылку на презентацию: ${url}`);
     }
   };
 

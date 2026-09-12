@@ -1,5 +1,7 @@
 "use client";
 
+import { confirmAction } from "@/components/ui/confirm-action";
+
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
 
@@ -97,7 +99,7 @@ export function CampaignDetailRoute() {
 
   const deleteCampaign = React.useCallback(async () => {
     if (!campaign) return;
-    if (!window.confirm(`Удалить кампанию «${campaign.name}» без возможности восстановления?`)) {
+    if (!await confirmAction(`Удалить кампанию «${campaign.name}» без возможности восстановления?`)) {
       return;
     }
     setDeleting(true);

@@ -70,7 +70,8 @@ test("presentation studio exposes real creation, editing and save flows", async 
     /\/presentations\?new=1&asset=\$\{encodeURIComponent\(selectedAsset\.id\)\}/,
   );
   assert.match(imageStudio, /Использовать в презентации/);
-  assert.match(view, /beforeunload/);
+  assert.doesNotMatch(view, /beforeunload|window\.confirm/);
+  assert.match(view, /useEditorDraft/);
   assert.match(view, /editRevisionRef/);
   assert.match(view, /sourceLabels\[project\.sourceType\]/);
   assert.match(view, /ImageAssetPicker/);

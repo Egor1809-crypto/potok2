@@ -1,5 +1,7 @@
 "use client";
 
+import { Select } from "@/components/ui/select";
+
 import {
   MAX_TABLE_BYTES,
   mappingError,
@@ -533,7 +535,7 @@ export function ImportWizard() {
                             <span className="sr-only">
                               Поле для столбца {header}
                             </span>
-                            <select
+                            <Select
                               value={mapping[index] ?? "ignore"}
                               onChange={(event) =>
                                 changeMapping(
@@ -548,7 +550,7 @@ export function ImportWizard() {
                                   {option.label}
                                 </option>
                               ))}
-                            </select>
+                            </Select>
                           </label>
                         </td>
                         <td

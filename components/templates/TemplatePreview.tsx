@@ -24,6 +24,7 @@ export function TemplateCard({
   editHref,
   editLabel = "Редактировать",
   applyHref,
+  onDirector,
   onClone,
   onDelete,
   onFavorite,
@@ -33,6 +34,7 @@ export function TemplateCard({
   editHref: string;
   editLabel?: string;
   applyHref: string;
+  onDirector?: () => void;
   onClone: () => void;
   onDelete: () => void;
   onFavorite: () => void;
@@ -98,6 +100,7 @@ export function TemplateCard({
           </Link>
         </div>
 
+        {onDirector && <Button variant="secondary" size="sm" className="mt-2 w-full" onClick={onDirector}><Sparkles aria-hidden className="size-3.5" />Арт-директор</Button>}
         <div className="mt-2 flex justify-end gap-1">
           <Button
             variant="ghost"

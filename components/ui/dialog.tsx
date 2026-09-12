@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { IconButton } from "./button";
 import { cn } from "./utils";
@@ -45,7 +46,9 @@ function useOverlayBehavior({
     });
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && closeOnEscape) {
+      const layers = Array.from(document.querySelectorAll<HTMLElement>('[role="dialog"][aria-modal="true"]')).filter(element => element.getClientRects().length);
+      if (layers.at(-1) !== panelRef.current) return;
+      if (event.key === "Escape" && closeOnEscape && !event.defaultPrevented) {
         event.preventDefault();
         onCloseRef.current();
         return;
@@ -54,7 +57,7 @@ function useOverlayBehavior({
       if (event.key !== "Tab" || !panelRef.current) return;
       const focusable = Array.from(
         panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
-      ).filter((element) => element.offsetParent !== null);
+      ).filter((element) => element.offsetParent !== null && element.tabIndex >= 0 && element.getAttribute("aria-hidden") !== "true");
       if (focusable.length === 0) {
         event.preventDefault();
         panelRef.current.focus();
@@ -124,9 +127,9 @@ export function Modal({
   const close = React.useCallback(() => onOpenChange(false), [onOpenChange]);
 
   useOverlayBehavior({ open, panelRef, onClose: close, closeOnEscape });
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
-  return (
+  return createPortal(
     <div
       role="presentation"
       className={cn(
@@ -145,7 +148,7 @@ export function Modal({
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
         className={cn(
-          "flex max-h-[min(760px,calc(100vh-32px))] w-full flex-col overflow-hidden rounded-[16px] border border-border bg-surface-raised shadow-[var(--shadow-lg)] outline-none animate-[mf-slide-up_220ms_var(--ease-out)]",
+          "flex min-w-0 max-h-[calc(100dvh-32px)] w-full flex-col overflow-hidden rounded-[16px] border border-border bg-surface-raised shadow-[var(--shadow-lg)] outline-none animate-[mf-slide-up_220ms_var(--ease-out)]",
           modalSizes[size],
         )}
       >
@@ -176,7 +179,7 @@ export function Modal({
             <X aria-hidden="true" className="size-4" />
           </IconButton>
         </div>
-        <div className={cn("scrollbar-subtle min-h-0 flex-1 overflow-y-auto p-5 sm:p-6", contentClassName)}>
+        <div className={cn("scrollbar-subtle min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-5 sm:p-6", contentClassName)}>
           {children}
         </div>
         {footer && (
@@ -185,7 +188,8 @@ export function Modal({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -224,7 +228,7 @@ export function Drawer({
   const close = React.useCallback(() => onOpenChange(false), [onOpenChange]);
 
   useOverlayBehavior({ open, panelRef, onClose: close, closeOnEscape });
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
   return (
     <div
@@ -280,7 +284,7 @@ export function Drawer({
             <X aria-hidden="true" className="size-4" />
           </IconButton>
         </div>
-        <div className={cn("scrollbar-subtle min-h-0 flex-1 overflow-y-auto p-5 sm:p-6", contentClassName)}>
+        <div className={cn("scrollbar-subtle min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-5 sm:p-6", contentClassName)}>
           {children}
         </div>
         {footer && (

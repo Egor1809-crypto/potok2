@@ -49,7 +49,9 @@ export function CreativeDirectorPanel({
   onOpenChange,
   document,
   onApply,
+  embedded = false,
 }: {
+  embedded?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   document: BuilderDocument;
@@ -80,28 +82,7 @@ export function CreativeDirectorPanel({
     );
   };
 
-  return (
-    <Modal
-      open={open}
-      onOpenChange={onOpenChange}
-      title="Арт-директор · редактура целиком"
-      description="Разбор → дизайн-система → драматургия. Каждый шаг объясняет, что изменится, и сохраняет факты, ссылки и изображения."
-      size="full"
-      contentClassName="!p-0"
-      footer={
-        <>
-          {lastApplied ? (
-            <span className="mr-auto inline-flex items-center gap-1.5 text-[11px] font-medium text-success">
-              <Check aria-hidden="true" className="size-3.5" />
-              {lastApplied}
-            </span>
-          ) : null}
-          <Button variant="secondary" onClick={() => onOpenChange(false)}>
-            Вернуться к письму
-          </Button>
-        </>
-      }
-    >
+  const content = (
       <div className="director-stage grid min-h-[660px] lg:grid-cols-[318px_minmax(0,1fr)]">
         <aside className="border-b border-white/10 bg-[radial-gradient(circle_at_20%_0%,rgba(124,92,255,.30),transparent_35%),linear-gradient(180deg,#17181f,#101116)] p-5 text-white lg:border-b-0 lg:border-r">
           <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.055] p-5 shadow-[0_18px_50px_rgba(0,0,0,.22)]">
@@ -407,6 +388,31 @@ export function CreativeDirectorPanel({
           </div>
         </section>
       </div>
+  );
+  if (embedded) return content;
+  return (
+    <Modal
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Арт-директор · редактура целиком"
+      description="Разбор → дизайн-система → драматургия. Каждый шаг объясняет, что изменится, и сохраняет факты, ссылки и изображения."
+      size="full"
+      contentClassName="!p-0"
+      footer={
+        <>
+          {lastApplied ? (
+            <span className="mr-auto inline-flex items-center gap-1.5 text-[11px] font-medium text-success">
+              <Check aria-hidden="true" className="size-3.5" />
+              {lastApplied}
+            </span>
+          ) : null}
+          <Button variant="secondary" onClick={() => onOpenChange(false)}>
+            Вернуться к письму
+          </Button>
+        </>
+      }
+    >
+      {content}
     </Modal>
   );
 }

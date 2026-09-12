@@ -1,11 +1,15 @@
 "use client";
 
+import { confirmAction } from "@/components/ui/confirm-action";
+
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { ArrowLeft, FileText, PenTool, RefreshCw, SearchX, Sparkles, Upload } from "lucide-react";
 
 import { importLetter, uploadImportedResources, type ImportedLetter } from "@/lib/email-import/import-letter";
 import { importCodeLetter, type CodeImportInput } from "@/lib/email-import/code";
+import { LetterPreview } from "./LetterPreview";
+import { TemplateDirector } from "./TemplateDirector";
 import { EmailImportDialog } from "./EmailImportDialog";
 import type { TemplateCategory } from "@/types";
 import type {
@@ -159,12 +163,20 @@ export function TemplatesView() {
   const [category, setCategory] = useState<CategoryFilter>("All");
   const [scope, setScope] = useState<ScopeFilter>(() => new URLSearchParams(browserSearch).get("scope") === "mine" ? "mine" : "all");
   const [collection, setCollection] = useState<CollectionFilter>(() => new URLSearchParams(browserSearch).get("scope") === "mine" ? "all" : "studio");
+  useEffect(() => {
+    if (new URLSearchParams(browserSearch).get("scope") === "mine") {
+      const frame = window.requestAnimationFrame(() => { setScope("mine"); setCollection("all"); });
+      return () => window.cancelAnimationFrame(frame);
+    }
+  }, [browserSearch]);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortMode>("recent");
   const [style, setStyle] = useState<StyleFilter>("all");
   const [density, setDensity] = useState<DensityFilter>("all");
   const [palette, setPalette] = useState<PaletteFilter>("all");
   const [busy, setBusy] = useState<{ id: string; action: "clone" | "delete" | "favorite" } | null>(null);
+  const [directorOpen, setDirectorOpen] = useState(false);
+  const [directorTemplate, setDirectorTemplate] = useState<EmailTemplateRecord | null>(null);
   const [importing, setImporting] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [importPreview, setImportPreview] = useState<ImportedLetter | null>(null);
@@ -206,6 +218,12 @@ export function TemplatesView() {
     });
     return () => window.cancelAnimationFrame(frame);
   }, [browserSearch, loadState]);
+
+  useEffect(() => {
+    if (new URLSearchParams(browserSearch).get("director") !== "1") return;
+    const frame = window.requestAnimationFrame(() => setDirectorOpen(true));
+    return () => window.cancelAnimationFrame(frame);
+  }, [browserSearch]);
 
   const filteredTemplates = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase("ru-RU");
@@ -289,7 +307,7 @@ export function TemplatesView() {
   };
 
   const deleteTemplate = async (template: EmailTemplateRecord) => {
-    if (!window.confirm(`Удалить шаблон «${template.name}»? Это действие нельзя отменить.`)) return;
+    if (!await confirmAction(`Удалить шаблон «${template.name}»? Это действие нельзя отменить.`)) return;
     setBusy({ id: template.id, action: "delete" });
     setError(null);
     setNotice(null);
@@ -389,6 +407,7 @@ export function TemplatesView() {
               </Link>
             ) : null}
             <>
+              <Button variant="secondary" onClick={() => { setDirectorTemplate(null); setDirectorOpen(true); }}><Sparkles aria-hidden className="size-4" />Арт-директор</Button>
               <button type="button" disabled={importing} onClick={() => { setError(null); setImportOpen(true); }} className={buttonVariants({ variant: "secondary", size: "md" })}>
                 <Upload aria-hidden="true" className="size-4" />{importing ? "Импортируем…" : "Импортировать письмо"}
               </button>
@@ -402,6 +421,7 @@ export function TemplatesView() {
       />
 
       <p className="text-sm text-text-muted">Импортируйте файл или вставьте код письма. Перед добавлением в шаблоны можно проверить результат.</p>
+      <TemplateDirector open={directorOpen} onOpenChange={setDirectorOpen} templates={templates} initialTemplate={directorTemplate} onSaved={template => { setTemplates(current => [template, ...current.filter(item => item.id !== template.id)]); setNotice(`Шаблон «${template.name}» сохранён.`); }} />
       <EmailImportDialog open={importOpen} onOpenChange={setImportOpen} busy={importing} progress={importProgress} error={error} onFiles={files => void importTemplate(files)} onCode={input => void importCode(input)} />
       {importProgress ? <p role="status" className="text-sm text-primary">{importProgress}</p> : null}
       <Modal open={Boolean(importPreview)} onOpenChange={open => { if (!open && !importing) setImportPreview(null); }} title="Проверьте импортированное письмо" size="xl" closeOnEscape={!importing} closeOnBackdrop={!importing} footer={<div className="flex flex-wrap gap-3"><Button variant="outline" disabled={importing} onClick={() => { setImportPreview(null); setImportOpen(true); }}>Назад к импорту</Button><Button loading={importing} disabled={importing || !importPreview?.name.trim()} onClick={() => void saveImportedTemplate()}>Добавить в шаблоны</Button></div>}>
@@ -410,7 +430,7 @@ export function TemplatesView() {
           <ul className="space-y-2 text-sm leading-6 text-text-muted">{importPreview.notes.map(note => <li key={note}>{note}</li>)}</ul>
           <div className="grid gap-4 sm:grid-cols-2"><div><label htmlFor="import-name" className="mb-1 block text-sm">Название шаблона</label><Input id="import-name" maxLength={160} disabled={importing} value={importPreview.name} onChange={event => setImportPreview(current => current ? { ...current, name: event.target.value } : current)} /></div><div><label htmlFor="import-subject" className="mb-1 block text-sm">Тема письма</label><Input id="import-subject" maxLength={300} disabled={importing} value={importPreview.document.subject} onChange={event => setImportPreview(current => current ? { ...current, document: { ...current.document, subject: event.target.value } } : current)} /></div></div>
           {importProgress ? <p role="status" className="text-sm text-primary">{importProgress}</p> : null}
-          {importPreview.document.rawHtml ? <iframe title="Исходное оформление импортированного письма" sandbox="" srcDoc={importPreview.document.rawHtml} className="h-[60vh] min-h-80 w-full rounded-lg border border-border bg-white" /> : <p className="text-sm">Блочный макет можно открыть в редакторе после сохранения.</p>}
+          <LetterPreview document={importPreview.document} resources={importPreview.resources} title="Исходное оформление импортированного письма" />
         </div> : null}
       </Modal>
       {error ? <Alert tone="danger" title="Операция не выполнена">{error}</Alert> : null}
@@ -507,6 +527,7 @@ export function TemplatesView() {
                       : `/email-builder?template=${encodeURIComponent(template.id)}`}
                     editLabel={routeContext.returnTo ? "Настроить" : "Редактировать"}
                     applyHref={addTemplateToReturnPath(returnPath, template.id)}
+                    onDirector={() => { setDirectorTemplate(template); setDirectorOpen(true); }}
                     onClone={() => void cloneTemplate(template)}
                     onDelete={() => void deleteTemplate(template)}
                     onFavorite={() => void toggleFavorite(template)}
