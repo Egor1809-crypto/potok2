@@ -1,18 +1,18 @@
 "use client";
-import { useEffect, useId, useRef, useState } from "react";
-import { Button, Modal, Select } from "@/components/ui";
+import { useEffect, useRef, useState } from "react";
+import { Button, Modal } from "@/components/ui";
 import { CreativeDirectorPanel } from "@/components/email-builder/CreativeDirectorPanel";
 import { documentFromApiTemplate, type BuilderDocument } from "@/components/email-builder/builder-types";
 import type { EmailTemplateRecord } from "@/types/api";
 import { LetterPreview } from "./LetterPreview";
 import { ImportedLetterDirector } from "./ImportedLetterDirector";
+import { DirectorTemplateRail } from "./DirectorTemplateRail";
 
 type WorkingTemplate = { template: EmailTemplateRecord; document: BuilderDocument; dirty: boolean };
 export function TemplateDirector({ open, onOpenChange, templates, initialTemplate, onSaved }: {
   open: boolean; onOpenChange: (open: boolean) => void; templates: EmailTemplateRecord[];
   initialTemplate: EmailTemplateRecord | null; onSaved: (template: EmailTemplateRecord) => void;
 }) {
-  const selectId = useId();
   const [working, setWorking] = useState<WorkingTemplate | null>(null);
   const [view, setView] = useState<"audit" | "preview">("audit");
   const [busy, setBusy] = useState(false);
@@ -20,7 +20,9 @@ export function TemplateDirector({ open, onOpenChange, templates, initialTemplat
   const [notice, setNotice] = useState("");
   const drafts = useRef(new Map<string, WorkingTemplate>());
   const openedFor = useRef<string | null>(null);
+  const workspace = useRef<HTMLDivElement>(null);
   const initialId = initialTemplate?.id;
+  useEffect(() => { if (workspace.current) workspace.current.scrollTop = 0; }, [working?.template.id, view]);
   useEffect(() => {
     if (!open) { openedFor.current = null; return; }
     const selectionKey = initialId ?? "library";
@@ -62,12 +64,17 @@ export function TemplateDirector({ open, onOpenChange, templates, initialTemplat
     } catch (error) { setError(error instanceof Error ? error.message : "Не удалось сохранить изменения."); }
     finally { setBusy(false); }
   }
-  return <Modal open={open} onOpenChange={value => { if (!busy) onOpenChange(value); }} title="Арт-директор шаблонов" description="Выберите готовое письмо, проверьте его и сохраните улучшения в библиотеку." size="full" closeOnEscape={!busy} closeOnBackdrop={!busy}
+  return <Modal open={open} onOpenChange={value => { if (!busy) onOpenChange(value); }} title="Арт-директор шаблонов" hideHeader size="full" panelClassName="!max-w-[1600px] h-[calc(100dvh-32px)]" contentClassName="!p-0 !overflow-hidden flex" closeOnEscape={!busy} closeOnBackdrop={!busy}
     footer={<><span role="status" className="mr-auto min-w-0 text-sm text-text-muted">{notice || (working?.dirty ? "Есть изменения. Они останутся здесь до закрытия страницы." : "")}</span><Button variant="secondary" disabled={busy} onClick={() => onOpenChange(false)}>В библиотеку</Button><Button disabled={busy || !working?.dirty} loading={busy} onClick={() => void save()}>{working?.document.rawHtml ? "Сохранить отдельную копию" : working?.template.isStarter ? "Сохранить в мои шаблоны" : "Сохранить изменения"}</Button></>}>
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-end gap-3"><label htmlFor={selectId} className="min-w-0 flex-1 text-sm"><span className="mb-1 block">Шаблон</span><Select id={selectId} value={working?.template.id ?? ""} disabled={busy} onChange={event => select(event.target.value)} options={templates.map(template => ({ value: template.id, label: template.name }))} /></label><div className="flex gap-1 rounded-lg bg-surface-subtle p-1" role="group" aria-label="Режим арт-директора"><Button size="sm" variant={view === "audit" ? "primary" : "ghost"} aria-pressed={view === "audit"} onClick={() => setView("audit")}>Разбор и правки</Button><Button size="sm" variant={view === "preview" ? "primary" : "ghost"} aria-pressed={view === "preview"} onClick={() => setView("preview")}>Письмо</Button></div></div>
+    <div className="grid min-h-0 min-w-0 flex-1 grid-cols-[76px_minmax(0,1fr)] sm:grid-cols-[148px_minmax(0,1fr)] xl:grid-cols-[188px_minmax(0,1fr)]">
+      <DirectorTemplateRail templates={templates} selectedId={working?.template.id} disabled={busy} onSelect={select} />
+      <section aria-label="Рабочая область арт-директора" className="flex min-h-0 min-w-0 flex-col">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-3 py-2.5 pe-12 sm:px-5 sm:pe-14"><div className="flex max-w-full gap-1 rounded-lg bg-surface-subtle p-1" role="group" aria-label="Режим арт-директора"><Button size="sm" variant={view === "audit" ? "primary" : "ghost"} aria-pressed={view === "audit"} aria-label="Разбор и правки" className="max-sm:!px-2" onClick={() => setView("audit")}><span className="hidden sm:inline">Разбор и правки</span><span className="sm:hidden">Правки</span></Button><Button size="sm" variant={view === "preview" ? "primary" : "ghost"} aria-pressed={view === "preview"} className="max-sm:!px-2" onClick={() => setView("preview")}>Письмо</Button></div></div>
+        <div ref={workspace} className="scrollbar-subtle min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-3 sm:p-5" data-director-workspace>
       {error && <p role="alert" className="text-sm text-danger">{error}</p>}
-      {working ? view === "preview" ? <LetterPreview document={working.document} title={`Письмо: ${working.template.name}`} /> : working.document.rawHtml ? <fieldset disabled={busy} className="min-w-0"><ImportedLetterDirector key={working.template.id} document={working.document} onApply={(document, message) => { const next = { ...working, document, dirty: true }; drafts.current.set(working.template.id, next); setWorking(next); setNotice(message); }} /></fieldset> : <fieldset disabled={busy} className="min-w-0"><CreativeDirectorPanel key={working.template.id} embedded open onOpenChange={() => {}} document={working.document} onApply={(document, message) => { const next = { ...working, document, dirty: true }; drafts.current.set(working.template.id, next); setWorking(next); setNotice(`${message}. Откройте вкладку «Письмо», чтобы посмотреть результат.`); }} /></fieldset> : <p className="py-8 text-sm text-text-muted">В библиотеке пока нет шаблонов. Добавьте письмо, чтобы начать разбор.</p>}
+      {working ? view === "preview" ? <LetterPreview fill document={working.document} title={`Письмо: ${working.template.name}`} /> : working.document.rawHtml ? <fieldset disabled={busy} className="min-w-0"><ImportedLetterDirector key={working.template.id} document={working.document} onApply={(document, message) => { const next = { ...working, document, dirty: true }; drafts.current.set(working.template.id, next); setWorking(next); setNotice(message); }} /></fieldset> : <fieldset disabled={busy} className="min-w-0"><CreativeDirectorPanel key={working.template.id} embedded open onOpenChange={() => {}} document={working.document} onApply={(document, message) => { const next = { ...working, document, dirty: true }; drafts.current.set(working.template.id, next); setWorking(next); setNotice(`${message}. Откройте вкладку «Письмо», чтобы посмотреть результат.`); }} /></fieldset> : <p className="py-8 text-sm text-text-muted">В библиотеке пока нет шаблонов. Добавьте письмо, чтобы начать разбор.</p>}
+        </div>
+      </section>
     </div>
   </Modal>;
 }

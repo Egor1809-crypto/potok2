@@ -4,8 +4,8 @@ import type { BuilderDocument } from "@/components/email-builder/builder-types";
 import type { ImportResource } from "@/lib/email-import/import-letter";
 import { inlinePreviewResources, inlineStoredPreviewImages } from "@/lib/email-import/preview";
 
-export function LetterPreview({ document, resources, html: suppliedHtml, className = "h-[60vh] min-h-64", title = "Предпросмотр письма" }: {
-  document?: BuilderDocument; resources?: ImportResource[]; html?: string; className?: string; title?: string;
+export function LetterPreview({ document, resources, html: suppliedHtml, className = "h-[60vh] min-h-64", title = "Предпросмотр письма", fill = false }: {
+  document?: BuilderDocument; resources?: ImportResource[]; html?: string; className?: string; title?: string; fill?: boolean;
 }) {
   const [result, setResult] = useState<{ key: unknown; html: string; error: string } | null>(null);
   const source = suppliedHtml ?? document?.rawHtml;
@@ -29,7 +29,8 @@ export function LetterPreview({ document, resources, html: suppliedHtml, classNa
     void prepare(); return () => controller.abort();
   }, [key, source, document, resources]);
   const current = result?.key === key ? result : null;
-  return <div className="min-w-0 overflow-hidden rounded-xl border border-border bg-white">
-    {current?.html ? <iframe title={title} sandbox="" srcDoc={current.html} className={`block w-full border-0 bg-white ${className}`} /> : <div role={current?.error ? "alert" : "status"} className={`grid place-content-center p-6 text-center text-sm text-text-muted ${className}`}>{current?.error || "Подготавливаем предпросмотр письма…"}</div>}
+  const height = fill ? "h-full min-h-0" : className;
+  return <div className={`min-w-0 overflow-hidden rounded-xl border border-border bg-white ${fill ? "h-full" : ""}`}>
+    {current?.html ? <iframe title={title} sandbox="" srcDoc={current.html} className={`block w-full border-0 bg-white ${height}`} /> : <div role={current?.error ? "alert" : "status"} className={`grid place-content-center p-6 text-center text-sm text-text-muted ${height}`}>{current?.error || "Подготавливаем предпросмотр письма…"}</div>}
   </div>;
 }

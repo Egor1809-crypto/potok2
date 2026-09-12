@@ -97,6 +97,8 @@ export interface ModalProps {
   closeOnEscape?: boolean;
   className?: string;
   contentClassName?: string;
+  hideHeader?: boolean;
+  panelClassName?: string;
 }
 
 const modalSizes: Record<NonNullable<ModalProps["size"]>, string> = {
@@ -120,6 +122,8 @@ export function Modal({
   closeOnEscape = true,
   className,
   contentClassName,
+  hideHeader = false,
+  panelClassName,
 }: ModalProps) {
   const panelRef = React.useRef<HTMLDivElement>(null);
   const titleId = React.useId();
@@ -148,12 +152,13 @@ export function Modal({
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
         className={cn(
-          "flex min-w-0 max-h-[calc(100dvh-32px)] w-full flex-col overflow-hidden rounded-[16px] border border-border bg-surface-raised shadow-[var(--shadow-lg)] outline-none animate-[mf-slide-up_220ms_var(--ease-out)]",
+          "relative flex min-w-0 max-h-[calc(100dvh-32px)] w-full flex-col overflow-hidden rounded-[16px] border border-border bg-surface-raised shadow-[var(--shadow-lg)] outline-none animate-[mf-slide-up_220ms_var(--ease-out)]",
           modalSizes[size],
+          panelClassName,
         )}
       >
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border px-5 py-4.5 sm:px-6">
-          <div className="min-w-0 pt-0.5">
+        <div className={hideHeader ? "absolute end-3 top-3 z-20" : "flex shrink-0 items-start justify-between gap-4 border-b border-border px-5 py-4.5 sm:px-6"}>
+          <div className={hideHeader ? "sr-only" : "min-w-0 pt-0.5"}>
             <h2
               id={titleId}
               className="m-0 text-[16px] leading-5 font-semibold tracking-[-0.015em] text-text-strong"
@@ -194,7 +199,7 @@ export function Modal({
 }
 
 export interface DrawerProps
-  extends Omit<ModalProps, "size" | "contentClassName"> {
+  extends Omit<ModalProps, "size" | "contentClassName" | "hideHeader" | "panelClassName"> {
   side?: "left" | "right";
   width?: "sm" | "md" | "lg" | "xl";
   contentClassName?: string;
