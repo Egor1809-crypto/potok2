@@ -291,8 +291,10 @@ function runtime() {
     NAVYAI_BASE_URL?: string;
     NAVYAI_EMAIL_MODEL?: string;
     NAVYAI_IMAGE_MODEL?: string;
+    NAVYAI_VISION_MODEL?: string;
     OPENAI_API_KEY?: string;
     OPENAI_EMAIL_MODEL?: string;
+    OPENAI_VISION_MODEL?: string;
   };
 }
 
@@ -304,6 +306,7 @@ export function aiProvider() {
       provider: "navyai" as const,
       endpoint: `${runtime().NAVYAI_BASE_URL?.trim().replace(/\/$/, "") || "https://api.navy/v1"}/chat/completions`,
       model: runtime().NAVYAI_EMAIL_MODEL?.trim() || "gpt-5.6-sol",
+      visionModel: runtime().NAVYAI_VISION_MODEL?.trim() || "gemini-3.8-flash",
       fallbackModel: "gpt-5.6-terra",
       imageEndpoint: `${runtime().NAVYAI_BASE_URL?.trim().replace(/\/$/, "") || "https://api.navy/v1"}/images/generations`,
       imageModel: runtime().NAVYAI_IMAGE_MODEL?.trim() || "gpt-image-1.5",
@@ -316,6 +319,7 @@ export function aiProvider() {
         provider: "openai" as const,
         endpoint: "https://api.openai.com/v1/responses",
         model: runtime().OPENAI_EMAIL_MODEL?.trim() || "gpt-5.2",
+        visionModel: runtime().OPENAI_VISION_MODEL?.trim() || runtime().OPENAI_EMAIL_MODEL?.trim() || "gpt-5.2",
         fallbackModel: undefined,
         imageEndpoint: "https://api.openai.com/v1/images/generations",
         imageModel: "gpt-image-1",

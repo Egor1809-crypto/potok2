@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import type { BuilderDocument } from "@/components/email-builder/builder-types";
 import type { ImportResource } from "@/lib/email-import/import-letter";
-import { inlinePreviewResources } from "@/lib/email-import/preview";
+import { inlinePreviewResources, inlineStoredPreviewImages } from "@/lib/email-import/preview";
 
 export function LetterPreview({ document, resources, html: suppliedHtml, className = "h-[60vh] min-h-64", title = "Предпросмотр письма" }: {
   document?: BuilderDocument; resources?: ImportResource[]; html?: string; className?: string; title?: string;
@@ -22,7 +22,7 @@ export function LetterPreview({ document, resources, html: suppliedHtml, classNa
           html = body.html;
         }
         if (!html) throw new Error("В письме пока нет содержимого.");
-        const ready = await inlinePreviewResources(html, resources ?? []);
+        const ready = await inlineStoredPreviewImages(await inlinePreviewResources(html, resources ?? []), controller.signal);
         if (!controller.signal.aborted) setResult({ key, html: ready, error: "" });
       } catch (error) { if (!controller.signal.aborted) setResult({ key, html: "", error: error instanceof Error ? error.message : "Не удалось показать письмо." }); }
     }
