@@ -6,6 +6,7 @@ import { builderToAiEmail, mapAiEmailToBuilderDocument } from "@/lib/email-ai/ma
 import { emailFactIssues, emailSourceOfTruth } from "@/lib/email-ai/facts";
 import { emailReviewFingerprint, reviewEmailDocument } from "@/lib/email-ai/review";
 import { emailBlockVariants } from "@/lib/email-ai/variants";
+import { emailImageReplacement } from "@/lib/email-ai/edit-intent";
 import { aiProvider, generateDesignImages } from "./email-ai";
 import { parseEmailBuilderDocument, emailDocumentPlainText } from "./email-document";
 import { getEmailAssetRecord } from "./email-asset-store";
@@ -27,7 +28,8 @@ async function aiJson(provider: Provider, request: Request, name: string, schema
   const body = provider.provider === "navyai"
     ? { model, messages: [{ role: "system", content: system }, { role: "user", content: userInput }], response_format: { type: "json_schema", json_schema: { name, strict: true, schema } }, max_tokens: name === "email_document" ? 14000 : 4000, reasoning_effort: "low" }
     : { model, instructions: system, input: userInput, store: false, max_output_tokens: name === "email_document" ? 14000 : 4000, text: { format: { type: "json_schema", name, strict: true, schema } } };
-  const response = await fetch(provider.endpoint, { method: "POST", headers: { Authorization: `Bearer ${provider.key}`, "Content-Type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.any([request.signal, AbortSignal.timeout(120000)]) });
+  const timeout = name === "email_review" ? 20000 : name === "email_subjects" ? 30000 : 120000;
+  const response = await fetch(provider.endpoint, { method: "POST", headers: { Authorization: `Bearer ${provider.key}`, "Content-Type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.any([request.signal, AbortSignal.timeout(timeout)]) });
   if (!response.ok) { console.warn("Email studio provider request failed", { action: name, status: response.status }); throw new Error("ИИ временно недоступен."); }
   const data = object(await response.json());
   const choices = Array.isArray(data.choices) ? data.choices : [];
@@ -92,15 +94,47 @@ export async function emailAiStudio(request: Request, action: string, input: unk
   const existingText = [instruction, current ? [emailDocumentPlainText(current), ...current.blocks.flatMap(b => [b.href || "", b.linkHref || ""])].join("\n") : ""].filter(Boolean).join("\n");
   if (action === "review") return { review: await review(provider, request, current!, brief, existingText) };
   if (!provider) throw new ApiRequestError("ИИ не подключён.", 503);
-  if (action === "subject-variants") {
+  const imageChange = current && ["rewrite", "rewrite-block"].includes(action) ? emailImageReplacement(current, instruction, typeof row.blockId === "string" ? row.blockId : undefined) : undefined;
+  if (imageChange?.requested) {
+    if (!imageChange.blockId) throw new ApiRequestError(imageChange.error || "Выберите изображение.", 422);
+    const target = context!.email.blocks.find(b => b.id === imageChange.blockId)!;
+    // Replace the visual directly. A text model cannot silently keep an old
+    // asset or rewrite the selected paragraph for a photo replacement request.
+    const replacement = { ...target, image: { assetId: null, alt: target.image?.alt || "Иллюстрация к письму", prompt: `${instruction}\nСоздай новую тематическую фотографию, без надписей. Тема письма: ${current!.subject}. ${brief.description}\nКонтекст: ${emailDocumentPlainText(current!).slice(0, 5000)}\nПредыдущее описание: ${target.image?.alt || ""}` } };
     try {
-      const result = await aiJson(provider, request, "email_subjects", subjectVariantsSchema, "Предложи ровно 3 разные пары subject/preheader по текущему письму. Прехедер дополняет тему. Не меняй факты и числа, без выдуманной срочности, без HTML. Верни только JSON по схеме.", { email: context!.email, brief });
-      const variants = object(result.value).variants as Array<{ subject: string; preheader: string }>;
-      if (new Set(variants.map(v => v.subject)).size !== 3) throw new Error("Темы повторяются.");
-      for (const variant of variants) if (emailFactIssues({ ...context!.email, ...variant, blocks: [] }, brief, existingText).length) throw new Error("Тема меняет факты.");
-      return { variants };
-    } catch { throw new ApiRequestError("Не удалось предложить темы письма. Попробуйте ещё раз.", 502); }
+      const draft = { ...context!.email, blocks: [replacement] };
+      const assets = await prepareImages(request, provider, draft, new Map(context!.assets));
+      const url = assets.get(replacement.image.assetId!);
+      if (!url) throw new Error("Missing replacement image");
+      const metadata = { brief, generationId: crypto.randomUUID(), generatedAt: new Date().toISOString(), model: provider.model };
+      const next = { ...current!, aiMetadata: metadata, blocks: current!.blocks.map(b => b.id !== target.id ? b : b.type === "hero" ? { ...b, imageHref: url, imageAlt: replacement.image.alt } : { ...b, href: url }) };
+      const report = await review(provider, request, next, brief, existingText);
+      return { document: { ...next, aiMetadata: { ...metadata, review: report } }, review: report, changedBlockId: target.id, message: "Изображение заменено. Текст и оформление сохранены. Изменение можно отменить." };
+    } catch (error) {
+      if (request.signal.aborted) throw new ApiRequestError("Замена изображения отменена.", 499);
+      if (error instanceof ApiRequestError) throw error;
+      throw new ApiRequestError("Не удалось создать новое изображение. Повторите команду — прежняя картинка сохранена.", 502);
+    }
   }
+  if (action === "subject-variants") {
+    let repair: string | undefined;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      let received = false;
+      try {
+        const result = await aiJson(provider, request, "email_subjects", subjectVariantsSchema, "Предложи ровно 3 разные пары subject/preheader по текущему письму. Прехедер дополняет тему. Не меняй факты и числа, без выдуманной срочности, без HTML. Верни только JSON по схеме.", { email: context!.email, brief, repair }, attempt > 0);
+        received = true;
+        const variants = object(result.value).variants as Array<{ subject: string; preheader: string }>;
+        if (new Set(variants.map(v => v.subject.trim().toLocaleLowerCase("ru"))).size !== 3) throw new Error("Предложи три разные темы, без повторений.");
+        for (const variant of variants) if (emailFactIssues({ ...context!.email, ...variant, blocks: [] }, brief, existingText).length) throw new Error("Тема меняет факты. Используй только исходные сведения.");
+        return { variants };
+      } catch (error) {
+        if (request.signal.aborted) throw new ApiRequestError("Подбор тем отменён.", 499);
+        if (attempt === 0 && (received || error instanceof EmailJsonError || error instanceof SyntaxError)) { repair = error instanceof Error ? error.message : "Исправь структуру JSON."; continue; }
+        throw new ApiRequestError("Не удалось подобрать темы. Повторите подбор — текущая тема письма сохранена.", 502);
+      }
+    }
+  }
+
   const selected = action === "rewrite-block" ? context?.email.blocks.find(b => b.id === row.blockId) : undefined;
   if (action === "rewrite-block" && !selected) throw new ApiRequestError("Выберите блок для изменения.");
   const knownAssets = new Map(context?.assets);
@@ -148,6 +182,7 @@ export async function emailAiStudio(request: Request, action: string, input: unk
     }
     const valid = parseEmailBuilderDocument(document);
     if (!valid) throw new Error("Пустое письмо.");
+    if (current && emailReviewFingerprint(valid, brief) === emailReviewFingerprint(current, brief)) throw new ApiRequestError("ИИ вернул письмо без изменений. Уточните команду или выберите другой блок.", 422);
     const report = await review(provider, request, valid, brief, existingText);
     valid.aiMetadata = { ...metadata, review: report };
     return { document: valid, review: report };

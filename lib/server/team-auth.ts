@@ -9,6 +9,7 @@ import {
 } from "@/db/schema";
 import type { ParticipantRecord } from "@/types/api";
 import { ApiRequestError, asObject, cleanText, newId } from "./api-utils";
+import { readSession } from "./session-read";
 
 export const TEAM_NAME = "ТехнологИИ Права";
 export const TEAM_WORKSPACE_ID = "workspace-main";
@@ -211,15 +212,16 @@ export async function getTeamSession(request: Request): Promise<TeamSession | nu
   if (!token) return null;
   const tokenHash = await sha256(token);
   const now = new Date().toISOString();
-  const [row] = await getDb()
+  const [row] = await readSession(() => getDb()
     .select({ session: authSessions, participant: participants })
     .from(authSessions)
     .innerJoin(participants, eq(authSessions.participantId, participants.id))
     .where(and(eq(authSessions.tokenHash, tokenHash), gt(authSessions.expiresAt, now)))
-    .limit(1);
+    .limit(1), request.signal);
   if (!row || row.participant.status !== "active") return null;
   if (Date.now() - Date.parse(row.session.lastSeenAt) > 60 * 60_000) {
-    await getDb().update(authSessions).set({ lastSeenAt: now }).where(eq(authSessions.id, row.session.id));
+    try { await getDb().update(authSessions).set({ lastSeenAt: now }).where(eq(authSessions.id, row.session.id)); }
+    catch { console.warn("Team session activity timestamp was not updated"); }
   }
   return { participant: toTeamParticipant(row.participant), sessionId: row.session.id };
 }

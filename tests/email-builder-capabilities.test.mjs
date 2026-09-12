@@ -696,7 +696,8 @@ test("email action blocks are real links in the canvas and compiled email", asyn
     (canvas.match(/href=\{block\.href \|\| undefined\}/g) ?? []).length >= 5,
   );
   assert.match(compiler, /<a href="\$\{escapeHtml\(block\.href \?\? ""\)\}"/);
-  assert.match(compiler, /actionUrl\(block\.href, `Ссылка кнопки/);
+  const validation = await readFile(new URL("../lib/email-ai/document-input.ts", import.meta.url), "utf8");
+  assert.match(validation, /actionUrl\(block\.href, `Ссылка кнопки/);
 });
 
 test("NavyAI uses its supported chat endpoint and a working structured-output fallback", async () => {
@@ -727,7 +728,7 @@ test("decor library retains thirty technology motifs, adds general patterns, and
       "utf8",
     ),
     readFile(
-      new URL("../lib/server/email-document.ts", import.meta.url),
+      new URL("../lib/email-ai/document-input.ts", import.meta.url),
       "utf8",
     ),
     readFile(

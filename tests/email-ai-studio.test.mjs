@@ -6,6 +6,7 @@ const schema = await loadAiServer('lib/email-ai/schema.ts');
 const mapper = await loadAiServer('lib/email-ai/mapping.ts');
 const compiler = await loadAiServer('lib/server/email-document.ts');
 const facts = await loadAiServer('lib/email-ai/facts.ts');
+const adapters = await loadAiServer('lib/server/provider-adapters.ts');
 const variants = await loadAiServer('lib/email-ai/variants.ts');
 const brief = () => schema.parseAiEmailBrief({ description: 'Продать билеты на конференцию юристов по ИИ. Реальные практические кейсы, 30+ спикеров.', goal: 'sale', cta: { text: 'Получить билет', url: 'https://example.org/tickets' }, requiredFacts: ['30+ спикеров'], visuals: 'none' });
 const block = (type, patch = {}) => ({ id: type, type, variant: variants.emailBlockVariants[type][0], title: '', text: '', badge: '', items: [], button: null, image: null, backgroundColor: null, textColor: null, ...patch });
@@ -138,11 +139,44 @@ test('test delivery authenticates, sends to one explicit address, and never retr
     './mailflow-store':{listIntegrations:async()=>{authenticated++;return {integrations:[{providerId:'unisender',publicConfig:{senderEmail:'sender@example.org',listId:'test-list'}}]};}},
     './provider-checks':{automaticProviderSecrets:()=>({apiKey:'test-only'})},
     './runtime-integrations':{isIntegrationReadyForChannel:()=>true},
-    './provider-adapters':{renderMergeTemplate:html=>html,sendUniSenderTransactionalEmail:async input=>{sends.push(input);return {status:accepted?'accepted':'unknown'};}},
+    './provider-adapters':{renderMergeTemplate:adapters.renderMergeTemplate,unknownMergeTokens:adapters.unknownMergeTokens,sendUniSenderTransactionalEmail:async input=>{sends.push(input);return {status:accepted?'accepted':'unknown'};}},
   }});
   const document=mapper.mapAiEmailToBuilderDocument(draft(),brief(),new Map());
   await assert.rejects(()=>server.sendEmailBuilderTest(req(),{email:'invalid',document}));assert.equal(sends.length,0);
-  const result=await server.sendEmailBuilderTest(req(),{email:'recipient@example.org',document});assert.match(result.message,/принял/);assert.equal(sends.length,1);assert.equal(sends[0].recipientEmail,'recipient@example.org');assert.ok(sends[0].htmlBody.startsWith('<!DOCTYPE html>'));assert.equal(authenticated,2);
+  const result=await server.sendEmailBuilderTest(req(),{email:'recipient@example.org',document});assert.match(result.message,/принял/);assert.equal(sends.length,1);assert.equal(sends[0].recipientEmail,'recipient@example.org');assert.ok(sends[0].htmlBody.startsWith('<!DOCTYPE html>'));assert.equal(authenticated,2);assert.match(sends[0].htmlBody,/\{\{UnsubscribeUrl\}\}/);
   accepted=false;await assert.rejects(()=>server.sendEmailBuilderTest(req(),{email:'recipient@example.org',document}));assert.equal(sends.length,2);
   document.blocks[0].imageHref='http://localhost:3000/api/assets/test';await assert.rejects(()=>server.sendEmailBuilderTest(req(),{email:'recipient@example.org',document}));assert.equal(sends.length,2);
+});
+
+
+test('photo replacement targets the image despite a selected paragraph and preserves all other fields', async () => {
+  const b = brief(); b.visuals = 'auto';
+  const doc = compiler.parseEmailBuilderDocument(mapper.mapAiEmailToBuilderDocument(draft([
+    block('hero', {title:'ИИ для юристов',text:'30+ спикеров',image:{assetId:'photo',alt:'Участники конференции',prompt:null}}),
+    block('text',{text:'С теплом и надеждой на встречу.'}),
+  ]), b, new Map([['photo','https://example.org/old-photo.png']])));
+  doc.blocks[0].paddingLeft=23;doc.blocks[0].fontSize=27;doc.frameStyle='double';
+  const before=JSON.stringify(doc);const s=await service([review()]);
+  const result=await s.api.emailAiStudio(req(),'rewrite-block',{document:doc,brief:b,blockId:'text',instruction:'Измени картинку в письме'});
+  assert.equal(s.images,1);assert.equal(result.changedBlockId,'hero');assert.notEqual(result.document.blocks[0].imageHref,doc.blocks[0].imageHref);
+  assert.equal(result.document.subject,doc.subject);assert.equal(result.document.frameStyle,'double');
+  for(const key of Object.keys(doc.blocks[0]))if(key!=='imageHref')assert.deepEqual(json(result.document.blocks[0][key]),json(doc.blocks[0][key]),key);
+  assert.deepEqual(json(result.document.blocks[1]),json(doc.blocks[1]));assert.equal(JSON.stringify(doc),before);
+});
+test('ambiguous photo replacement asks for the target before any provider call', async () => {
+  const b=brief();b.visuals='auto';const doc=mapper.mapAiEmailToBuilderDocument(draft(['one','two'].map(id=>block('image',{id,image:{assetId:id,alt:'Фото',prompt:null}}))),b,new Map([['one','https://example.org/one.png'],['two','https://example.org/two.png']]));
+  const s=await service([]);await assert.rejects(()=>s.api.emailAiStudio(req(),'rewrite',{document:doc,brief:b,instruction:'Измени картинку в письме'}),/несколько изображений/);assert.equal(s.calls.length,0);
+});
+test('an unchanged rewrite reports a no-op instead of success', async () => {
+  const b=brief();const doc=compiler.parseEmailBuilderDocument(mapper.mapAiEmailToBuilderDocument(draft(),b,new Map()));
+  const context=mapper.builderToAiEmail(doc,b);const s=await service([context.email.blocks[0]]);
+  await assert.rejects(()=>s.api.emailAiStudio(req(),'rewrite-block',{document:doc,brief:b,blockId:'hero',instruction:'Сократи текст'}),/без изменений/);
+});
+
+test('invalid subject suggestions get one repair; provider outages do not loop',async()=>{
+  const doc=mapper.mapAiEmailToBuilderDocument(draft(),brief(),new Map());
+  const pairs=['Практика ИИ','Конференция юристов','Кейсы для юридической команды'].map(subject=>({subject,preheader:'30+ спикеров'}));
+  const s=await service(['invalid JSON',{variants:pairs}]);
+  assert.equal((await s.api.emailAiStudio(req(),'subject-variants',{document:doc,brief:brief()})).variants.length,3);assert.equal(s.calls.length,2);
+  const outage=await service([new Error('Provider offline')]);await assert.rejects(()=>outage.api.emailAiStudio(req(),'subject-variants',{document:doc,brief:brief()}));assert.equal(outage.calls.length,1);
 });

@@ -2,11 +2,19 @@ import type { EmailBuilderDocumentInput } from "@/types/api";
 import type { AiEmailBrief, AiEmailEditorialReview, AiEmailReview } from "@/types/email-ai";
 import { contrastRatio, readableColor } from "@/lib/design-readability";
 
+import { parseEmailBuilderDocument } from "./document-input";
+import { parseAiEmailBrief } from "./schema";
+
 const normalize = (text: string) => text.toLocaleLowerCase("ru").replace(/\s+/g, " ").trim();
 /** A stable content identity, independent of save IDs, object key order and reviews. */
 export function emailReviewFingerprint(document: EmailBuilderDocumentInput, brief: AiEmailBrief) {
   const canonical = (value: unknown): unknown => Array.isArray(value) ? value.map(canonical) : value && typeof value === "object" ? Object.fromEntries(Object.entries(value).filter(([key, v]) => v !== undefined && !["aiMetadata", "templateId"].includes(key)).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => [k, canonical(v)])) : value;
-  const text = JSON.stringify(canonical({ document, brief }));
+  // Match server defaults, color casing and brief normalization. Incomplete
+  // drafts still need an identity while the user is filling them in.
+  let normalizedDocument = document, normalizedBrief = brief;
+  try { normalizedDocument = parseEmailBuilderDocument({ ...document, aiMetadata: undefined }) || document; } catch { /* In-progress draft. */ }
+  try { normalizedBrief = parseAiEmailBrief(brief); } catch { /* In-progress brief. */ }
+  const text = JSON.stringify(canonical({ document: normalizedDocument, brief: normalizedBrief }));
   let a = 2166136261, b = 5381;
   for (let i = 0; i < text.length; i++) { a = Math.imul(a ^ text.charCodeAt(i), 16777619); b = Math.imul(b, 33) ^ text.charCodeAt(i); }
   return `rules-v1-${(a >>> 0).toString(16)}-${(b >>> 0).toString(16)}`;

@@ -55,4 +55,4 @@ export type AiEmailReview = {
 };
 export type AiEmailEditorialReview = { findings: Array<{ category: "clarity" | "repetition" | "brief" | "cta"; blockId: string | null; evidence: string; message: string; suggestion: string }> };
 export type AiEmailMetadata = { brief: AiEmailBrief; generationId: string; generatedAt: string; model: string; review?: AiEmailReview };
-export type AiEmailStudioResponse = { document?: EmailBuilderDocumentInput; review?: AiEmailReview; variants?: Array<{ subject: string; preheader: string }> };
+export type AiEmailStudioResponse = { document?: EmailBuilderDocumentInput; review?: AiEmailReview; variants?: Array<{ subject: string; preheader: string }>; changedBlockId?: string; message?: string };

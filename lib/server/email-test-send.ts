@@ -3,7 +3,15 @@ import { listIntegrations } from "./mailflow-store";
 import { automaticProviderSecrets } from "./provider-checks";
 import { isIntegrationReadyForChannel } from "./runtime-integrations";
 import { compileEmailDocument, parseEmailBuilderDocument } from "./email-document";
-import { renderMergeTemplate, sendUniSenderTransactionalEmail } from "./provider-adapters";
+import { renderMergeTemplate, unknownMergeTokens, sendUniSenderTransactionalEmail } from "./provider-adapters";
+
+/** The provider expands its own unsubscribe URL after our contact fields. */
+export function renderEmailTestFields(value: string) {
+  const segments = value.split("{{UnsubscribeUrl}}");
+  const unknown = unknownMergeTokens(...segments);
+  if (unknown.length) throw new ApiRequestError(`Замените неизвестные поля в письме: ${unknown.join(", ")}. Поддерживаются first_name, last_name, company, position и city.`, 422);
+  return segments.map(segment => renderMergeTemplate(segment, {})).join("{{UnsubscribeUrl}}");
+}
 
 /** Explicit single-address test delivery through the workspace's configured provider. */
 export async function sendEmailBuilderTest(request: Request, value: unknown) {
@@ -21,7 +29,8 @@ export async function sendEmailBuilderTest(request: Request, value: unknown) {
   if (!credentials.apiKey) throw new ApiRequestError("В интеграции отсутствует ключ отправки.", 422);
   const html = compileEmailDocument(document);
   if (/(?:src|href)=["'](?:blob:|file:|https?:\/\/(?:localhost|127\.0\.0\.1))/i.test(html)) throw new ApiRequestError("Загрузите изображения на платформу перед отправкой.", 422);
-  const result = await sendUniSenderTransactionalEmail({ apiKey: credentials.apiKey, listId: integration.publicConfig.listId, senderName: integration.publicConfig.senderName || "Поток", senderEmail, recipientEmail: email, subject: `[Тест] ${document.subject}`, htmlBody: renderMergeTemplate(html, {}), signal: AbortSignal.timeout(30000) });
+  const result = await sendUniSenderTransactionalEmail({ apiKey: credentials.apiKey, listId: integration.publicConfig.listId, senderName: integration.publicConfig.senderName || "Поток", senderEmail, recipientEmail: email, subject: `[Тест] ${renderEmailTestFields(document.subject)}`, htmlBody: renderEmailTestFields(html), signal: AbortSignal.timeout(30000) });
+  if (result.status === "rejected") throw new ApiRequestError("UniSender отклонил тестовое письмо. Проверьте подтверждение адреса отправителя, список и доступ к отправке в интеграции.", 422);
   if (result.status !== "accepted") throw new ApiRequestError("Провайдер не подтвердил отправку. Проверьте статус в UniSender перед повторной попыткой.", 502);
   return { message: "UniSender принял тестовое письмо к отправке. Проверьте указанный почтовый ящик." };
 }
