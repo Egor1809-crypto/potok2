@@ -345,8 +345,8 @@ test("starter edits become personal templates and uploads work in every manual e
     ),
   ]);
   assert.match(builder, /Сохранить в мои шаблоны/);
-  assert.match(builder, /Категория и описание шаблона/);
-  assert.match(builder, /Вы редактируете готовый макет/);
+  assert.match(builder, /О шаблоне/);
+  assert.match(builder, /setTemplateSettingsOpen\(true\)/);
   assert.match(builder, /editingStarter \? null/);
   assert.match(library, /Мои шаблоны/);
   assert.match(library, /!template\.isStarter/);

@@ -26,8 +26,12 @@ export type WorkspaceRecord = {
   updatedAt: string;
 };
 
-/** Every participant has the same full product access inside one shared team. */
+export type TeamRole = "admin" | "member";
+export type ContactAccessScope = { all: boolean; baseIds: string[]; groupTags: string[] };
+/** Roles govern administration; scopes govern access to contact data. */
 export type ParticipantRecord = {
+  role: TeamRole;
+  accessScope: ContactAccessScope;
   id: string;
   workspaceId: string;
   login: string;

@@ -28,9 +28,9 @@ test("calendar connects scheduled campaigns, audience filters and the due queue"
   assert.match(calendar, /targetCampaignId/);
   assert.match(calendar, /setInterval\(refresh, 30_000\)/);
   assert.match(calendar, /scope=calendar/);
-  assert.match(store, /campaignSummaryRecords\(\{ scheduledOnly: true \}\)/);
+  assert.match(store, /campaignSummaryRecords\(actor\.participant, \{ scheduledOnly: true \}\)/);
   assert.match(store, /isNotNull\(campaigns\.scheduledAt\)/);
-  assert.match(store, /campaignSummaryRecords\(\{ limit: 250 \}\)/);
+  assert.match(store, /campaignSummaryRecords\(actor\.participant, \{ limit: 250 \}\)/);
   assert.match(store, /campaignStatsRows/);
   assert.match(calendar, /selectedItems\.map\(\(campaign\)/);
   assert.doesNotMatch(calendar, /Проверить очередь/);

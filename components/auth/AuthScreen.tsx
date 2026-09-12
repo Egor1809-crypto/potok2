@@ -15,7 +15,7 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
   const [login, setLogin] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
-  const [inviteCode, setInviteCode] = useState("");
+  const [inviteCode, setInviteCode] = useState(searchParams.get("invite") || "");
   const [showPassword, setShowPassword] = useState(false);
   const [firstAccount, setFirstAccount] = useState<boolean | null>(null);
   const [error, setError] = useState("");
@@ -62,7 +62,7 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
           <h1 className="mt-4 text-5xl font-semibold leading-[1.04] tracking-[-0.05em]">Контакты не теряются и не дублируются.</h1>
           <p className="mt-6 text-lg leading-8 text-white/75">Каждый участник работает под своим логином. Цвет автора сразу показывает, кто добавил контакт, а общая проверка защищает базу от повторов.</p>
         </div>
-        <div className="flex gap-6 text-sm text-white/65"><span>10+ участников</span><span>10 000 контактов</span><span>Полный доступ для команды</span></div>
+        <div className="flex gap-6 text-sm text-white/65"><span>10+ участников</span><span>10 000 контактов</span><span>Доступ к назначенным базам</span></div>
       </section>
 
       <section className="flex min-h-screen items-center justify-center px-5 py-10 sm:px-10">
@@ -79,7 +79,7 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
 
           <form className="mt-8 space-y-5" onSubmit={submit}>
             {isRegister && <label className="block"><span className="mb-2 block text-sm font-semibold">Команда</span><input value={TEAM_NAME} readOnly className="h-12 w-full rounded-xl border border-border bg-surface-subtle px-4 text-base font-medium" /></label>}
-            {isRegister && <label className="block"><span className="mb-2 block text-sm font-semibold">Ваше имя</span><input autoComplete="name" value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Например, Егор Шабалин" required minLength={2} maxLength={100} className="h-12 w-full rounded-xl border border-border bg-surface px-4 text-base outline-none focus:border-primary focus:ring-4 focus:ring-primary/10" /><span className="mt-2 block text-sm text-text-muted">Так коллеги увидят ответственного за контакт. Если вы есть в списке команды, будет подключён ваш цвет.</span></label>}
+            {isRegister && <label className="block"><span className="mb-2 block text-sm font-semibold">Ваше имя</span><input autoComplete="name" value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Например, Егор Шабалин" required minLength={2} maxLength={100} className="h-12 w-full rounded-xl border border-border bg-surface px-4 text-base outline-none focus:border-primary focus:ring-4 focus:ring-primary/10" /><span className="mt-2 block text-sm text-text-muted">Так коллеги увидят ответственного за контакт. Администратор назначает доступ к базам и группам.</span></label>}
             <label className="block"><span className="mb-2 block text-sm font-semibold">Логин</span><input autoComplete="username" value={login} onChange={(event) => setLogin(event.target.value)} placeholder="Например, egor" required minLength={3} className="h-12 w-full rounded-xl border border-border bg-surface px-4 text-base outline-none focus:border-primary focus:ring-4 focus:ring-primary/10" /></label>
             <label className="block"><span className="mb-2 block text-sm font-semibold">Пароль</span><span className="relative block"><LockKeyhole aria-hidden className="absolute left-4 top-3.5 size-5 text-text-muted" /><input autoComplete={isRegister ? "new-password" : "current-password"} type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} required minLength={10} className="h-12 w-full rounded-xl border border-border bg-surface pl-12 pr-12 text-base outline-none focus:border-primary focus:ring-4 focus:ring-primary/10" /><button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Скрыть пароль" : "Показать пароль"} className="absolute right-2 top-2 grid size-8 place-items-center rounded-lg hover:bg-surface-subtle">{showPassword ? <EyeOff className="size-5" /> : <Eye className="size-5" />}</button></span>{isRegister && <span className="mt-2 block text-sm text-text-muted">Минимум 10 символов, хотя бы одна буква и цифра.</span>}</label>
             {isRegister && firstAccount === false && <label className="block"><span className="mb-2 block text-sm font-semibold">Код приглашения</span><input value={inviteCode} onChange={(event) => setInviteCode(event.target.value)} required placeholder="POTOK-..." className="h-12 w-full rounded-xl border border-border bg-surface px-4 font-mono text-base uppercase outline-none focus:border-primary focus:ring-4 focus:ring-primary/10" /></label>}

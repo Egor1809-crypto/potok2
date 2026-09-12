@@ -7,6 +7,8 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 import type {
+  ContactAccessScope,
+  TeamRole,
   CampaignEventRecord,
   CampaignMetricsRecord,
   CampaignVersionSnapshot,
@@ -92,6 +94,10 @@ export const participants = sqliteTable(
     email: text("email").notNull(),
     color: text("color").notNull().default("#6558E8"),
     status: text("status").notNull().default("active"),
+    // Existing accounts retain their previous administrative access. New
+    // registrations always set the invitation's role explicitly.
+    role: text("role").$type<TeamRole>().notNull().default("admin"),
+    accessScope: text("access_scope", { mode: "json" }).$type<ContactAccessScope>().notNull().default(sql`'{"all":false,"baseIds":[],"groupTags":[]}'`),
     lastLoginAt: text("last_login_at"),
     ...timestamps,
   },
@@ -129,6 +135,13 @@ export const teamInvites = sqliteTable(
     workspaceId: text("workspace_id")
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
+    role: text("role").$type<TeamRole>().notNull().default("member"),
+    accessScope: text("access_scope", { mode: "json" }).$type<ContactAccessScope>().notNull().default(sql`'{"all":false,"baseIds":[],"groupTags":[]}'`),
+    label: text("label").notNull().default(""),
+    targetParticipantId: text("target_participant_id"),
+    revokedAt: text("revoked_at"),
+    acceptedParticipantId: text("accepted_participant_id"),
+    claimNonce: text("claim_nonce"),
     codeHash: text("code_hash").notNull(),
     createdByParticipantId: text("created_by_participant_id")
       .notNull()
@@ -763,3 +776,13 @@ export const communicationTouches = sqliteTable("communication_touches", {
   endpoint: text("endpoint").notNull(), companyKey: text("company_key").notNull(), channel: text("channel").notNull(),
   campaignId: text("campaign_id").notNull(), actorId: text("actor_id").notNull(), occurredAt: text("occurred_at").notNull(),
 }, (t) => [index("idx_touches_endpoint_time").on(t.workspaceId, t.endpoint, t.occurredAt), index("idx_touches_company_time").on(t.workspaceId, t.companyKey, t.occurredAt)]);
+
+export const teamAccessEvents = sqliteTable("team_access_events", {
+  id: text("id").primaryKey(),
+  workspaceId: text("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  actorId: text("actor_id").notNull(),
+  targetId: text("target_id").notNull(),
+  action: text("action").notNull(),
+  details: text("details", { mode: "json" }).$type<Record<string, unknown>>().notNull(),
+  createdAt: text("created_at").notNull(),
+}, table => [index("idx_team_access_events_workspace_created").on(table.workspaceId, table.createdAt)]);

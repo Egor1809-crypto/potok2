@@ -66,6 +66,7 @@ export function EmailCanvas({
   className,
 }: EmailCanvasProps) {
   const isMobile = previewMode === "mobile";
+  const [zoom, setZoom] = useState("100");
   const [draggedBlockId, setDraggedBlockId] = useState("");
   const [dropTargetId, setDropTargetId] = useState("");
 
@@ -77,45 +78,24 @@ export function EmailCanvas({
         className,
       )}
     >
-      <div className="flex h-10 shrink-0 items-center justify-between border-b border-border/70 bg-surface/75 px-3.5 backdrop-blur-sm">
+      <div className="flex h-9 shrink-0 items-center justify-between border-b border-border/70 bg-surface/75 px-3.5 backdrop-blur-sm">
         <div className="flex items-center gap-2">
           <span className="size-1.5 rounded-full bg-success" />
           <span className="text-[10px] font-medium text-text-muted">
             Предпросмотр в реальном времени
           </span>
         </div>
-        <span className="rounded-md border border-border bg-surface px-2 py-0.5 font-mono text-[9px] text-text-subtle">
-          {isMobile ? "360 пикс." : `${document.contentWidth} пикс.`}
-        </span>
+        <div className="flex items-center gap-3"><span className="text-xs text-text-muted">{isMobile ? "360 пикс." : `${document.contentWidth} пикс.`}</span><label className="flex items-center gap-2 text-xs"><span>Масштаб</span><select aria-label="Масштаб письма" value={zoom} onChange={event => setZoom(event.target.value)} className="rounded-md border border-border bg-surface px-2 py-1">{[50, 65, 75, 85, 100, 125].map(value => <option key={value} value={value}>{value}%</option>)}</select></label></div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto p-4 scrollbar-subtle sm:p-6 xl:p-8">
+      <div className="min-h-0 flex-1 overflow-auto p-3 scrollbar-subtle sm:p-4">
         <div
           className={cn(
             "mx-auto transition-[width,max-width] duration-200",
             isMobile ? "w-full max-w-[360px]" : "w-full",
           )}
-          style={!isMobile ? { maxWidth: document.contentWidth } : undefined}
+          style={{ zoom: Number(zoom) / 100, ...(!isMobile ? { maxWidth: document.contentWidth } : {}) }}
         >
-          <div className="mb-3 overflow-hidden rounded-[11px] border border-border bg-surface px-3.5 py-3 shadow-[var(--shadow-xs)]">
-            <div className="flex items-center gap-2.5">
-              <span className="grid size-7 shrink-0 place-items-center rounded-full bg-primary-subtle text-[9px] font-bold text-primary">
-                ЕС
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-1.5 text-[10px] font-semibold text-text-strong">
-                  Егор Сабалин
-                  <span className="font-normal text-text-subtle">
-                    &lt;egor@mailflow.example&gt;
-                  </span>
-                </span>
-                <span className="block truncate text-[10px] text-text-muted">
-                  {document.subject}
-                </span>
-              </span>
-              <span className="text-[9px] text-text-subtle">Сейчас</span>
-            </div>
-          </div>
 
           <div
             className="overflow-hidden shadow-[0_18px_50px_rgba(28,32,44,0.12)]"

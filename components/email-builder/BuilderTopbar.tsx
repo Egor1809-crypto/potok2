@@ -64,7 +64,7 @@ export function BuilderTopbar({
   tools,
 }: BuilderTopbarProps) {
   return (
-    <div className="flex min-h-[62px] shrink-0 items-center justify-between gap-3 border-b border-border/80 bg-surface/95 px-3 backdrop-blur-xl sm:px-4">
+    <div className="flex min-h-[54px] shrink-0 items-center justify-between gap-3 border-b border-border/80 bg-surface/95 px-3 backdrop-blur-xl sm:px-4">
       <div className="flex min-w-0 items-center gap-2 sm:gap-3">
         <div className="min-w-0">
           <label htmlFor="builder-campaign-name" className="sr-only">

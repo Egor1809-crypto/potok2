@@ -155,8 +155,8 @@ test("email template editor keeps metadata secondary to the canvas", async () =>
     ),
     "utf8",
   );
-  assert.match(view, /<details className="group">/);
-  assert.match(view, /Категория и описание шаблона/);
+  assert.match(view, /<Modal open=\{templateSettingsOpen\}/);
+  assert.match(view, /О шаблоне/);
   assert.doesNotMatch(view, /Сохраните результат как рабочий шаблон/);
 });
 

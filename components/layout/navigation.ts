@@ -140,6 +140,7 @@ export const productNavigation: ProductNavGroup[] = [
   {
     label: "Рабочее пространство",
     items: [
+      { label: "Команда", description: "Участники, приглашения и доступ к базам", href: "/team", icon: UsersRound, keywords: ["сотрудники", "права", "доступ", "роль", "пригласить", "коллега"] },
       {
         label: "Настройки",
         description: "Компания, отправитель и аккаунт",

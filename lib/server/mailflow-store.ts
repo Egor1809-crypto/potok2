@@ -1,3 +1,5 @@
+import { hasAllContactAccess, isTeamAdmin, normalizeContactAccess } from "@/lib/team-access";
+import { accessParticipant, campaignAccessSql, contactAccessSql, rawContactAccess, requireAudienceAccess, requireCampaignAccess, requireContactAccess, requireTeamAdmin } from "./team-access";
 import { calendarReport } from "./calendar-report";
 import { assessCommunications, enforceCommunications, recordCommunicationTouches } from "./communication-store";
 import { and, asc, desc, eq, inArray, isNotNull, lte, or, sql, type SQL } from "drizzle-orm";
@@ -190,6 +192,8 @@ function toParticipant(
   row: typeof participants.$inferSelect,
 ): ParticipantRecord {
   return {
+    role: row.role,
+    accessScope: row.accessScope,
     id: row.id,
     workspaceId: row.workspaceId,
     login: row.login ?? "",
@@ -457,7 +461,15 @@ function toSegment(
   };
 }
 
-async function loadCoreRows(participantId: string, includeContacts: boolean) {
+function accessibleCampaignIds(actor: ParticipantRecord) {
+  return getDb().select({ id: campaigns.id }).from(campaigns).where(and(eq(campaigns.workspaceId, WORKSPACE_ID), campaignAccessSql(actor)));
+}
+function scopedNewContact(input: ContactCreateInput, actor: ParticipantRecord) {
+  if (hasAllContactAccess(actor) || input.responsibleParticipantId != null) return input;
+  const baseId = normalizeContactAccess(actor.accessScope).baseIds[0];
+  return { ...input, responsibleParticipantId: baseId ?? actor.id };
+}
+async function loadCoreRows(actor: ParticipantRecord, includeContacts: boolean) {
   const db = getDb();
   const [
     workspaceRows,
@@ -476,7 +488,7 @@ async function loadCoreRows(participantId: string, includeContacts: boolean) {
     db
       .select()
       .from(participants)
-      .where(eq(participants.id, participantId))
+      .where(eq(participants.id, actor.id))
       .limit(1),
     db
       .select()
@@ -487,7 +499,7 @@ async function loadCoreRows(participantId: string, includeContacts: boolean) {
       ? db
           .select()
           .from(contacts)
-          .where(eq(contacts.workspaceId, WORKSPACE_ID))
+          .where(and(eq(contacts.workspaceId, WORKSPACE_ID), contactAccessSql(actor)))
           .orderBy(desc(contacts.updatedAt))
       : Promise.resolve([] as ContactRow[]),
     db
@@ -508,19 +520,19 @@ async function loadCoreRows(participantId: string, includeContacts: boolean) {
     db
       .select()
       .from(campaigns)
-      .where(eq(campaigns.workspaceId, WORKSPACE_ID))
+      .where(and(eq(campaigns.workspaceId, WORKSPACE_ID), campaignAccessSql(actor)))
       .orderBy(desc(campaigns.updatedAt)),
-    db.select().from(deliveryPlans),
+    db.select().from(deliveryPlans).where(inArray(deliveryPlans.campaignId, accessibleCampaignIds(actor))),
     db
       .select()
       .from(deliveryJobs)
-      .where(eq(deliveryJobs.workspaceId, WORKSPACE_ID))
+      .where(and(eq(deliveryJobs.workspaceId, WORKSPACE_ID), inArray(deliveryJobs.campaignId, accessibleCampaignIds(actor))))
       .orderBy(desc(deliveryJobs.createdAt))
       .limit(WORKSPACE_HISTORY_LIMIT),
     db
       .select()
       .from(campaignEvents)
-      .where(eq(campaignEvents.workspaceId, WORKSPACE_ID))
+      .where(and(eq(campaignEvents.workspaceId, WORKSPACE_ID), inArray(campaignEvents.campaignId, accessibleCampaignIds(actor))))
       .orderBy(desc(campaignEvents.occurredAt))
       .limit(WORKSPACE_HISTORY_LIMIT),
   ]);
@@ -550,7 +562,7 @@ export async function getWorkspaceSnapshot(
   const actor = await ensureDatabase(request);
   const include = new URL(request.url).searchParams.get("include");
   const includeContacts = include === "contacts" || include === "export";
-  const rows = await loadCoreRows(actor.participant.id, includeContacts);
+  const rows = await loadCoreRows(actor.participant, includeContacts);
   const contactRecords = rows.contactRows.map(toContact);
   const campaignRecords = rows.campaignRows.map(toCampaign);
   // Rows from providers removed from the product stay inert in older databases
@@ -569,7 +581,7 @@ export async function getWorkspaceSnapshot(
           active: sql<number>`coalesce(sum(case when ${contacts.status} = 'active' then 1 else 0 end), 0)`,
         })
         .from(contacts)
-        .where(eq(contacts.workspaceId, WORKSPACE_ID));
+        .where(and(eq(contacts.workspaceId, WORKSPACE_ID), contactAccessSql(actor.participant)));
   return {
     workspace: toWorkspace(rows.workspace),
     participant: toParticipant(rows.participant),
@@ -611,7 +623,7 @@ export async function getWorkspaceSnapshot(
   };
 }
 
-async function campaignSummaryRecords(options: { scheduledOnly?: boolean; limit?: number } = {}): Promise<CampaignRecord[]> {
+async function campaignSummaryRecords(actor: ParticipantRecord, options: { scheduledOnly?: boolean; limit?: number } = {}): Promise<CampaignRecord[]> {
   const rows = await getDb().select({
     id: campaigns.id,
     workspaceId: campaigns.workspaceId,
@@ -644,8 +656,8 @@ async function campaignSummaryRecords(options: { scheduledOnly?: boolean; limit?
     updatedAt: campaigns.updatedAt,
   }).from(campaigns)
     .where(options.scheduledOnly
-      ? and(eq(campaigns.workspaceId, WORKSPACE_ID), isNotNull(campaigns.scheduledAt), sql`${campaigns.status} <> 'completed'`)
-      : eq(campaigns.workspaceId, WORKSPACE_ID))
+      ? and(eq(campaigns.workspaceId, WORKSPACE_ID), campaignAccessSql(actor), isNotNull(campaigns.scheduledAt), sql`${campaigns.status} <> 'completed'`)
+      : and(eq(campaigns.workspaceId, WORKSPACE_ID), campaignAccessSql(actor)))
     .orderBy(desc(campaigns.updatedAt))
     .limit(options.limit ?? 250);
   // List, dashboard and analytics screens never need every recipient id. Large
@@ -672,6 +684,7 @@ export async function getWorkspaceBootstrap(request: Request) {
   }
 
   const sourceId = url.searchParams.get("sourceId")?.trim() ?? "";
+  if (sourceId) requireCampaignAccess(actor.participant, (await campaignBundle(sourceId)).campaign);
   const base = { workspace: toWorkspace(workspace), participant: toParticipant(participant) };
   if (scope === "integrations") {
     const rows = await db.select().from(integrations).where(eq(integrations.workspaceId, WORKSPACE_ID)).orderBy(integrations.providerId);
@@ -693,7 +706,7 @@ export async function getWorkspaceBootstrap(request: Request) {
       .from(campaigns)
       .where(and(
         eq(campaigns.workspaceId, WORKSPACE_ID),
-        eq(campaigns.status, "sending"),
+        eq(campaigns.status, "sending"), campaignAccessSql(actor.participant),
         isNotNull(campaigns.scheduledAt),
         lte(campaigns.scheduledAt, new Date().toISOString()),
         lte(campaigns.updatedAt, new Date(Date.now() - 30_000).toISOString()),
@@ -705,9 +718,9 @@ export async function getWorkspaceBootstrap(request: Request) {
     // A provider outage must not prevent viewing saved plans or hide them.
     await Promise.allSettled(pendingRows.map(({ id }) => syncCampaignDelivery(request, id)));
     const [campaignRecords, segmentRows, report] = await Promise.all([
-      campaignSummaryRecords({ scheduledOnly: true }),
+      campaignSummaryRecords(actor.participant, { scheduledOnly: true }),
       db.select().from(segments).where(eq(segments.workspaceId, WORKSPACE_ID)).orderBy(desc(segments.updatedAt)),
-      calendarReport(),
+      calendarReport(actor.participant),
     ]);
     return {
       ...base,
@@ -719,23 +732,23 @@ export async function getWorkspaceBootstrap(request: Request) {
   if (scope === "campaign-list" || scope === "history" || scope === "dashboard") {
     const latestCampaignIds = db.select({ id: campaigns.id })
       .from(campaigns)
-      .where(eq(campaigns.workspaceId, WORKSPACE_ID))
+      .where(and(eq(campaigns.workspaceId, WORKSPACE_ID), campaignAccessSql(actor.participant)))
       .orderBy(desc(campaigns.updatedAt))
       .limit(250);
     const [campaignRecords, segmentRows, integrationRows, planRows, jobRows, eventRows, statsRows, campaignStatsRows, templateCountRows, memberRows] = await Promise.all([
-      campaignSummaryRecords({ limit: 250 }),
+      campaignSummaryRecords(actor.participant, { limit: 250 }),
       db.select().from(segments).where(eq(segments.workspaceId, WORKSPACE_ID)).orderBy(desc(segments.updatedAt)),
       db.select().from(integrations).where(eq(integrations.workspaceId, WORKSPACE_ID)).orderBy(integrations.providerId),
       scope === "campaign-list"
         ? db.select().from(deliveryPlans).where(inArray(deliveryPlans.campaignId, latestCampaignIds))
         : Promise.resolve([]),
-      scope === "history" ? db.select().from(deliveryJobs).where(eq(deliveryJobs.workspaceId, WORKSPACE_ID)).orderBy(desc(deliveryJobs.createdAt)).limit(WORKSPACE_HISTORY_LIMIT) : Promise.resolve([]),
-      scope === "history" ? db.select().from(campaignEvents).where(eq(campaignEvents.workspaceId, WORKSPACE_ID)).orderBy(desc(campaignEvents.occurredAt)).limit(WORKSPACE_HISTORY_LIMIT) : Promise.resolve([]),
-      db.select({ total: sql<number>`count(*)`, active: sql<number>`coalesce(sum(case when ${contacts.status} = 'active' then 1 else 0 end), 0)` }).from(contacts).where(eq(contacts.workspaceId, WORKSPACE_ID)),
+      scope === "history" ? db.select().from(deliveryJobs).where(and(eq(deliveryJobs.workspaceId, WORKSPACE_ID), inArray(deliveryJobs.campaignId, accessibleCampaignIds(actor.participant)))).orderBy(desc(deliveryJobs.createdAt)).limit(WORKSPACE_HISTORY_LIMIT) : Promise.resolve([]),
+      scope === "history" ? db.select().from(campaignEvents).where(and(eq(campaignEvents.workspaceId, WORKSPACE_ID), inArray(campaignEvents.campaignId, accessibleCampaignIds(actor.participant)))).orderBy(desc(campaignEvents.occurredAt)).limit(WORKSPACE_HISTORY_LIMIT) : Promise.resolve([]),
+      db.select({ total: sql<number>`count(*)`, active: sql<number>`coalesce(sum(case when ${contacts.status} = 'active' then 1 else 0 end), 0)` }).from(contacts).where(and(eq(contacts.workspaceId, WORKSPACE_ID), contactAccessSql(actor.participant))),
       db.select({
         total: sql<number>`count(*)`,
         active: sql<number>`coalesce(sum(case when ${campaigns.status} in ('ready', 'scheduled', 'sending') then 1 else 0 end), 0)`,
-      }).from(campaigns).where(eq(campaigns.workspaceId, WORKSPACE_ID)),
+      }).from(campaigns).where(and(eq(campaigns.workspaceId, WORKSPACE_ID), campaignAccessSql(actor.participant))),
       db.select({ total: sql<number>`count(*)` }).from(emailTemplates).where(eq(emailTemplates.workspaceId, WORKSPACE_ID)),
       db.select().from(participants).where(and(eq(participants.workspaceId, WORKSPACE_ID), eq(participants.status, "active"))).orderBy(participants.createdAt),
     ]);
@@ -786,11 +799,11 @@ export async function getUniSenderLifetimeStats(
   request: Request,
   options: { mode?: "quick" | "full"; cursor?: number } = {},
 ): Promise<UniSenderLifetimeStatsResponse> {
-  await ensureDatabase(request);
+  const actor = await ensureDatabase(request);
   const providerRows = await getDb().select({
     campaignId: deliveryJobs.campaignId,
   }).from(deliveryJobs).where(and(
-    eq(deliveryJobs.workspaceId, WORKSPACE_ID),
+    eq(deliveryJobs.workspaceId, WORKSPACE_ID), inArray(deliveryJobs.campaignId, accessibleCampaignIds(actor.participant)),
     sql`json_extract(${deliveryJobs.providerExternalIds}, '$.unisender') is not null`,
   )).orderBy(asc(deliveryJobs.createdAt), asc(deliveryJobs.id));
 
@@ -805,7 +818,7 @@ export async function getUniSenderLifetimeStats(
     const pendingRows = await getDb().select({ campaignId: deliveryJobs.campaignId })
       .from(deliveryJobs)
       .where(and(
-        eq(deliveryJobs.workspaceId, WORKSPACE_ID),
+        eq(deliveryJobs.workspaceId, WORKSPACE_ID), inArray(deliveryJobs.campaignId, accessibleCampaignIds(actor.participant)),
         eq(deliveryJobs.status, "processing"),
         sql`json_extract(${deliveryJobs.providerExternalIds}, '$.unisender') is not null`,
       ))
@@ -814,7 +827,7 @@ export async function getUniSenderLifetimeStats(
     const staleRows = await getDb().select({ campaignId: deliveryJobs.campaignId })
       .from(deliveryJobs)
       .where(and(
-        eq(deliveryJobs.workspaceId, WORKSPACE_ID),
+        eq(deliveryJobs.workspaceId, WORKSPACE_ID), inArray(deliveryJobs.campaignId, accessibleCampaignIds(actor.participant)),
         sql`${deliveryJobs.status} <> 'processing'`,
         sql`json_extract(${deliveryJobs.providerExternalIds}, '$.unisender') is not null`,
       ))
@@ -843,7 +856,7 @@ export async function getUniSenderLifetimeStats(
   // A temporary provider error must not hide the saved lifetime totals.
 
   const [campaignRecords, memberRows] = await Promise.all([
-    campaignSummaryRecords(),
+    campaignSummaryRecords(actor.participant),
     getDb().select().from(participants).where(and(
       eq(participants.workspaceId, WORKSPACE_ID),
       eq(participants.status, "active"),
@@ -1125,6 +1138,12 @@ function contactValues(
   };
 }
 
+async function ensureContactAssignmentEditable(ids: string[]) {
+  for (const part of chunksOf(ids, 80)) {
+    const blocked = await getD1().prepare("SELECT o.contact_id FROM delivery_outbox o JOIN campaigns c ON c.id=o.campaign_id WHERE c.workspace_id=? AND c.status IN ('scheduled','sending') AND o.contact_id IN (SELECT value FROM json_each(?)) LIMIT 1").bind(WORKSPACE_ID, JSON.stringify(part)).first();
+    if (blocked) throw new ApiRequestError("Контакт уже включён в запланированную или выполняемую отправку. Сначала отмените рассылку или дождитесь завершения, затем измените базу или группы.", 409);
+  }
+}
 async function contactById(id: string): Promise<ContactRecord> {
   const db = getDb();
   const [row] = await db
@@ -1203,8 +1222,8 @@ function positiveInteger(value: string | null, fallback: number, maximum: number
   return Number.isInteger(parsed) && parsed > 0 ? Math.min(parsed, maximum) : fallback;
 }
 
-function contactListFilters(url: URL): SQL[] {
-  const filters: SQL[] = [eq(contacts.workspaceId, WORKSPACE_ID)];
+function contactListFilters(url: URL, actor: ParticipantRecord): SQL[] {
+  const filters: SQL[] = [eq(contacts.workspaceId, WORKSPACE_ID), contactAccessSql(actor)];
   const search = url.searchParams.get("q")?.trim().slice(0, 160) ?? "";
   const status = url.searchParams.get("status")?.trim() ?? "";
   const company = url.searchParams.get("company")?.trim().slice(0, 160) ?? "";
@@ -1246,7 +1265,7 @@ function contactListFilters(url: URL): SQL[] {
 }
 
 export async function listContactEndpoints(request: Request): Promise<ContactEndpointsResponse> {
-  await ensureDatabase(request);
+  const actor = await ensureDatabase(request);
   const db = getDb();
   const [rows, memberRows] = await Promise.all([
     db
@@ -1257,7 +1276,7 @@ export async function listContactEndpoints(request: Request): Promise<ContactEnd
         vkUserId: contacts.vkUserId,
       })
       .from(contacts)
-      .where(eq(contacts.workspaceId, WORKSPACE_ID)),
+      .where(and(eq(contacts.workspaceId, WORKSPACE_ID), contactAccessSql(actor.participant))),
     db
       .select()
       .from(participants)
@@ -1273,9 +1292,10 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
   const includeMeta = url.searchParams.get("meta") !== "0";
   const pageSize = positiveInteger(url.searchParams.get("pageSize"), CONTACTS_PAGE_SIZE, CONTACTS_MAX_PAGE_SIZE);
   const requestedPage = positiveInteger(url.searchParams.get("page"), 1, 1_000_000);
-  const filters = contactListFilters(url);
+  const filters = contactListFilters(url, actor.participant);
   const where = and(...filters);
   const db = getDb();
+  const access = rawContactAccess(actor.participant);
 
   const [filteredRows, summaryRows, workspaceRows, memberRows, companyRows, cityRows, tagFacets, ownerFacets, ownerSheetFacets, participantActivityFacets] = await Promise.all([
     db.select({ count: sql<number>`count(*)` }).from(contacts).where(where),
@@ -1296,7 +1316,7 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
         phoneFound: sql<number>`coalesce(sum(case when ${contacts.phone} <> '' then 1 else 0 end), 0)`,
       })
       .from(contacts)
-      .where(eq(contacts.workspaceId, WORKSPACE_ID)) : Promise.resolve([]),
+      .where(and(eq(contacts.workspaceId, WORKSPACE_ID), contactAccessSql(actor.participant))) : Promise.resolve([]),
     db
       .select({ timezone: workspaces.timezone })
       .from(workspaces)
@@ -1310,14 +1330,14 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
     includeMeta ? db
       .select({ value: contacts.companyName, count: sql<number>`count(*)` })
       .from(contacts)
-      .where(and(eq(contacts.workspaceId, WORKSPACE_ID), sql`${contacts.companyName} <> ''`))
+      .where(and(eq(contacts.workspaceId, WORKSPACE_ID), contactAccessSql(actor.participant), sql`${contacts.companyName} <> ''`))
       .groupBy(contacts.companyName)
       .orderBy(desc(sql<number>`count(*)`), asc(contacts.companyName))
       .limit(300) : Promise.resolve([]),
     includeMeta ? db
       .select({ value: contacts.city })
       .from(contacts)
-      .where(and(eq(contacts.workspaceId, WORKSPACE_ID), sql`${contacts.city} <> ''`))
+      .where(and(eq(contacts.workspaceId, WORKSPACE_ID), contactAccessSql(actor.participant), sql`${contacts.city} <> ''`))
       .groupBy(contacts.city)
       .orderBy(asc(contacts.city))
       .limit(500) : Promise.resolve([]),
@@ -1325,12 +1345,12 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
       .prepare(`
         SELECT json_each.value AS label, count(*) AS count
         FROM contacts, json_each(contacts.tags)
-        WHERE contacts.workspace_id = ?
+        WHERE contacts.workspace_id = ? AND ${access.condition}
           AND (json_each.value LIKE 'Импорт: %' OR json_each.value LIKE 'Команда: %' OR json_each.value GLOB 'База №[0-9]*')
         GROUP BY json_each.value
         ORDER BY json_each.value
       `)
-      .bind(WORKSPACE_ID)
+      .bind(WORKSPACE_ID, ...access.params)
       .all<{ label: string; count: number }>() : Promise.resolve({ results: [] as Array<{ label: string; count: number }> }),
     includeMeta ? getD1()
       .prepare(`
@@ -1345,10 +1365,10 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
           sum(CASE WHEN status = 'active' AND email <> '' AND json_extract(custom_fields, '$.serviceEmailAllowed') = 'true' AND coalesce(json_extract(custom_fields, '$.serviceEmailBasis'), '') <> '' AND coalesce(json_extract(custom_fields, '$.serviceEmailAllowedAt'), '') <> '' THEN 1 ELSE 0 END) AS serviceEmail,
           sum(CASE WHEN status = 'active' AND telegram_chat_id IS NOT NULL AND telegram_chat_id <> '' AND telegram_consent = 1 THEN 1 ELSE 0 END) AS readyTelegram
         FROM contacts
-        WHERE workspace_id = ? AND coalesce(responsible_participant_id, created_by_participant_id) IS NOT NULL
+        WHERE workspace_id = ? AND ${access.condition} AND coalesce(responsible_participant_id, created_by_participant_id) IS NOT NULL
         GROUP BY coalesce(responsible_participant_id, created_by_participant_id)
       `)
-      .bind(WORKSPACE_ID)
+      .bind(WORKSPACE_ID, ...access.params)
       .all<{ participantId: string; total: number; email: number; telegram: number; vk: number; phone: number; readyEmail: number; serviceEmail: number; readyTelegram: number }>() : Promise.resolve({ results: [] }),
     includeMeta ? getD1()
       .prepare(`
@@ -1357,13 +1377,13 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
           json_each.value AS label,
           count(*) AS count
         FROM contacts, json_each(contacts.tags)
-        WHERE contacts.workspace_id = ?
+        WHERE contacts.workspace_id = ? AND ${access.condition}
           AND coalesce(contacts.responsible_participant_id, contacts.created_by_participant_id) IS NOT NULL
           AND (json_each.value LIKE 'Импорт: %' OR json_each.value GLOB 'База №[0-9]*')
         GROUP BY coalesce(contacts.responsible_participant_id, contacts.created_by_participant_id), json_each.value
         ORDER BY json_each.value
       `)
-      .bind(WORKSPACE_ID)
+      .bind(WORKSPACE_ID, ...access.params)
       .all<{ participantId: string; label: string; count: number }>() : Promise.resolve({ results: [] }),
     includeMeta ? getD1()
       .prepare(`
@@ -1376,11 +1396,11 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
           sum(coalesce(json_extract(metrics, '$.clicked'), 0)) AS clicked,
           max(CASE WHEN coalesce(json_extract(metrics, '$.sent'), 0) > 0 THEN coalesce(sent_at, updated_at) END) AS lastActivityAt
         FROM campaigns
-        WHERE workspace_id = ?
+        WHERE workspace_id = ? AND (? = 1 OR participant_id = ?)
           AND EXISTS (SELECT 1 FROM json_each(campaigns.delivery_channels) WHERE json_each.value = 'email')
         GROUP BY participant_id
       `)
-      .bind(WORKSPACE_ID)
+      .bind(WORKSPACE_ID, isTeamAdmin(actor.participant) ? 1 : 0, actor.participant.id)
       .all<{ participantId: string; campaigns: number; sent: number; delivered: number; opened: number; clicked: number; lastActivityAt: string | null }>() : Promise.resolve({ results: [] }),
   ]);
 
@@ -1531,12 +1551,13 @@ export async function createContact(
   payload: unknown,
 ): Promise<ContactMutationResponse> {
   const actor = await ensureDatabase(request);
-  const input = parseContact(payload);
+  const input = scopedNewContact(parseContact(payload), actor.participant);
+  requireContactAccess(actor.participant, contactValues(input, "new", new Date().toISOString(), undefined, actor.participant.id));
   const db = getDb();
   const duplicate = await findContactsByIdentifiers(input);
   if (duplicate.length) {
     throw new ApiRequestError(
-      await duplicateOwnerMessage(duplicate[0], "Контакт с таким email, телефоном или идентификатором мессенджера уже существует. Откройте его и сохраните изменения."),
+      isTeamAdmin(actor.participant) ? await duplicateOwnerMessage(duplicate[0], "Контакт с таким email, телефоном или идентификатором мессенджера уже существует. Откройте его и сохраните изменения.") : "Контакт с такими реквизитами уже существует. Обратитесь к администратору.",
       409,
     );
   }
@@ -1680,9 +1701,10 @@ export async function createContactsBatch(
       + Number(Boolean(originalInput.phone)) * 8;
     const sequence = maskSequences.get(channelMask) ?? 0;
     maskSequences.set(channelMask, sequence + 1);
-    const input = originalInput.responsibleParticipantId !== undefined || teamMembers.length === 0
+    const assignedInput = originalInput.responsibleParticipantId !== undefined || teamMembers.length === 0 || !isTeamAdmin(actor.participant)
       ? originalInput
       : { ...originalInput, responsibleParticipantId: teamMembers[(sequence + channelMask) % teamMembers.length].id };
+    let input = scopedNewContact(assignedInput, actor.participant);
     const matches = existingRows.filter((row) => rowMatchesContactInput(row, input));
     const matchIds = new Set(matches.map((row) => row.id));
     if (matchIds.size > 1) {
@@ -1691,9 +1713,16 @@ export async function createContactsBatch(
         409,
       );
     }
-    return { input, existing: matches[0] };
+    const existing = matches[0];
+    if (existing && !isTeamAdmin(actor.participant) && originalInput.responsibleParticipantId == null) input = { ...input, responsibleParticipantId: existing.responsibleParticipantId };
+    if (!(existing && strategy === "skip")) {
+      if (existing) requireContactAccess(actor.participant, toContact(existing));
+      requireContactAccess(actor.participant, contactValues(input, existing?.id ?? "new", new Date().toISOString(), existing ? toContact(existing) : undefined, actor.participant.id));
+    }
+    return { input, existing };
   });
   const now = new Date().toISOString();
+  await ensureContactAssignmentEditable(operations.filter(op => op.existing && strategy === "update" && (op.input.responsibleParticipantId !== op.existing.responsibleParticipantId || JSON.stringify(op.input.tags) !== JSON.stringify(op.existing.tags))).map(op => op.existing!.id));
   const affectedIds: string[] = [];
   let createdCount = 0;
   let updatedCount = 0;
@@ -1754,13 +1783,16 @@ export async function updateContact(
   const object = asObject(payload);
   const id = cleanText(object.id, "Идентификатор контакта", 120);
   const existing = await contactById(id);
+  requireContactAccess(actor.participant, existing);
   const input = parseContact(object, existing);
+  if (input.responsibleParticipantId !== existing.responsibleParticipantId || JSON.stringify(input.tags) !== JSON.stringify(existing.tags)) await ensureContactAssignmentEditable([id]);
+  requireContactAccess(actor.participant, contactValues(input, id, new Date().toISOString(), existing, actor.participant.id));
   const db = getDb();
   const duplicate = await findContactsByIdentifiers(input);
   const conflictingContact = duplicate.find((row) => row.id !== id);
   if (conflictingContact) {
     throw new ApiRequestError(
-      await duplicateOwnerMessage(conflictingContact, "Другой контакт уже использует этот email, телефон или идентификатор мессенджера."),
+      "Другой контакт уже использует этот email, телефон или идентификатор мессенджера.",
       409,
     );
   }
@@ -1794,7 +1826,7 @@ export async function updateContactsBatch(
       throw new ApiRequestError("Укажите базу или фильтр для массового изменения.");
     }
     const selectedRows = await getDb().select({ id: contacts.id }).from(contacts)
-      .where(and(...contactListFilters(selectionUrl))).limit(20_001);
+      .where(and(...contactListFilters(selectionUrl, actor.participant))).limit(20_001);
     ids = selectedRows.map((row) => row.id);
   } else {
     throw new ApiRequestError("Передайте список или фильтр контактов.");
@@ -1813,6 +1845,16 @@ export async function updateContactsBatch(
     )).limit(1);
     if (!member) throw new ApiRequestError("Ответственный не найден в активной команде.", 404);
   }
+  // Preflight the complete selection before the first write (including explicit ids).
+  for (const part of chunksOf(ids, 80)) {
+    const rows = await getDb().select().from(contacts).where(and(eq(contacts.workspaceId, WORKSPACE_ID), inArray(contacts.id, part)));
+    if (rows.length !== part.length) throw new ApiRequestError("Часть контактов недоступна. Обновите выбор.", 404);
+    for (const row of rows) {
+      requireContactAccess(actor.participant, toContact(row));
+      requireContactAccess(actor.participant, { ...toContact(row), ...(responsibleParticipantId !== undefined ? { responsibleParticipantId } : {}) });
+    }
+  }
+  if (responsibleParticipantId !== undefined) await ensureContactAssignmentEditable(ids);
   const now = new Date().toISOString();
   const affected: ContactRow[] = [];
   let bulkUpdatedCount = 0;
@@ -1852,9 +1894,10 @@ export async function deleteContact(
   request: Request,
   idValue: unknown,
 ): Promise<DeleteResponse> {
-  await ensureDatabase(request);
+  const actor = await ensureDatabase(request);
   const id = cleanText(idValue, "Идентификатор контакта", 120);
-  await contactById(id);
+  requireContactAccess(actor.participant, await contactById(id));
+  await ensureContactAssignmentEditable([id]);
   const db = getDb();
   const affectedCampaigns = (await db
     .select()
@@ -2067,7 +2110,7 @@ function parseSegment(
   };
 }
 
-async function allSegmentRecords() {
+async function allSegmentRecords(actor: ParticipantRecord) {
   const db = getDb();
   const segmentRows = await db.select().from(segments)
     .where(eq(segments.workspaceId, WORKSPACE_ID))
@@ -2077,18 +2120,19 @@ async function allSegmentRecords() {
   const campaignRows = await db
     .select({ segmentId: campaigns.segmentId, count: sql<number>`count(*)` })
     .from(campaigns)
-    .where(eq(campaigns.workspaceId, WORKSPACE_ID))
+    .where(and(eq(campaigns.workspaceId, WORKSPACE_ID), campaignAccessSql(actor)))
     .groupBy(campaigns.segmentId);
   const campaignsBySegment = new Map(
     campaignRows.flatMap((row) => row.segmentId ? [[row.segmentId, Number(row.count)] as const] : []),
   );
   const d1 = getD1();
+  const access = rawContactAccess(actor);
   const records: SegmentRecord[] = [];
   for (const segment of segmentRows) {
     const ruleQuery = segmentRuleSql(segment.rules);
     const countRow = await d1
-      .prepare(`SELECT COUNT(*) AS count FROM contacts WHERE workspace_id = ? AND (${ruleQuery.text})`)
-      .bind(WORKSPACE_ID, ...ruleQuery.values)
+      .prepare(`SELECT COUNT(*) AS count FROM contacts WHERE workspace_id = ? AND ${access.condition} AND (${ruleQuery.text})`)
+      .bind(WORKSPACE_ID, ...access.params, ...ruleQuery.values)
       .first<{ count: number }>();
     records.push({
       id: segment.id,
@@ -2174,9 +2218,9 @@ function singleSegmentRuleSql(rule: SegmentRule): SegmentSql {
 }
 
 export async function listSegments(request: Request): Promise<SegmentsListResponse> {
-  await ensureDatabase(request);
+  const actor = await ensureDatabase(request);
   const [records, workspaceRows] = await Promise.all([
-    allSegmentRecords(),
+    allSegmentRecords(actor.participant),
     getDb()
       .select({ timezone: workspaces.timezone })
       .from(workspaces)
@@ -2193,7 +2237,8 @@ export async function createSegment(
   request: Request,
   payload: unknown,
 ): Promise<SegmentMutationResponse> {
-  await ensureDatabase(request);
+  const actor = await ensureDatabase(request);
+  requireTeamAdmin(actor.participant);
   const input = parseSegment(payload);
   const db = getDb();
   const duplicate = await db
@@ -2221,7 +2266,7 @@ export async function createSegment(
     createdAt: now,
     updatedAt: now,
   });
-  const record = (await allSegmentRecords()).find((segment) => segment.id === id);
+  const record = (await allSegmentRecords(actor.participant)).find((segment) => segment.id === id);
   if (!record) throw new Error("Created segment was not found");
   return { segment: record };
 }
@@ -2230,10 +2275,11 @@ export async function updateSegment(
   request: Request,
   payload: unknown,
 ): Promise<SegmentMutationResponse> {
-  await ensureDatabase(request);
+  const actor = await ensureDatabase(request);
+  requireTeamAdmin(actor.participant);
   const object = asObject(payload);
   const id = cleanText(object.id, "Идентификатор сегмента", 120);
-  const existing = (await allSegmentRecords()).find((segment) => segment.id === id);
+  const existing = (await allSegmentRecords(actor.participant)).find((segment) => segment.id === id);
   if (!existing) throw new ApiRequestError("Сегмент не найден.", 404);
   const input = parseSegment(object, existing);
   const db = getDb();
@@ -2262,7 +2308,7 @@ export async function updateSegment(
       updatedAt: new Date().toISOString(),
     })
     .where(eq(segments.id, id));
-  const record = (await allSegmentRecords()).find((segment) => segment.id === id);
+  const record = (await allSegmentRecords(actor.participant)).find((segment) => segment.id === id);
   if (!record) throw new Error("Updated segment was not found");
   return { segment: record };
 }
@@ -2271,7 +2317,8 @@ export async function deleteSegment(
   request: Request,
   idValue: unknown,
 ): Promise<DeleteResponse> {
-  await ensureDatabase(request);
+  const actor = await ensureDatabase(request);
+  requireTeamAdmin(actor.participant);
   const id = cleanText(idValue, "Идентификатор сегмента", 120);
   const db = getDb();
   const [row] = await db
@@ -2349,6 +2396,7 @@ export async function updateWorkspace(
   payload: unknown,
 ): Promise<WorkspacePatchResponse> {
   const actor = await ensureDatabase(request);
+  requireTeamAdmin(actor.participant);
   const input = parseWorkspacePatch(payload);
   const db = getDb();
   const now = new Date().toISOString();
@@ -2463,7 +2511,8 @@ export async function updateIntegration(
   request: Request,
   payload: unknown,
 ): Promise<IntegrationMutationResponse> {
-  await ensureDatabase(request);
+  const actor = await ensureDatabase(request);
+  requireTeamAdmin(actor.participant);
   const object = asObject(payload);
   const selectedProvider = providerId(object.providerId);
   const input: IntegrationPatchInput = {
@@ -2758,7 +2807,7 @@ async function campaignBundle(id: string) {
   };
 }
 
-async function validateAudience(input: ParsedCampaign) {
+async function validateAudience(input: ParsedCampaign, actor: ParticipantRecord) {
   const db = getDb();
   if (input.audienceType === "none") return "Аудитория не выбрана";
   if (input.audienceType === "segment") {
@@ -2785,7 +2834,7 @@ async function validateAudience(input: ParsedCampaign) {
         .from(contacts)
         .where(
           and(
-            eq(contacts.workspaceId, WORKSPACE_ID),
+            eq(contacts.workspaceId, WORKSPACE_ID), contactAccessSql(actor),
             inArray(contacts.id, idChunk),
           ),
         )),
@@ -2793,7 +2842,7 @@ async function validateAudience(input: ParsedCampaign) {
   }
   if (rows.length !== input.contactIds?.length) {
     throw new ApiRequestError(
-      "Некоторые выбранные контакты больше не существуют. Обновите аудиторию.",
+      "Некоторые выбранные контакты недоступны в назначенных вам базах и группах. Обновите аудиторию.",
     );
   }
   return `${rows.length} ${rows.length === 1 ? "контакт" : "контактов"}`;
@@ -2868,18 +2917,18 @@ async function appendEvent(
 export async function listCampaigns(
   request: Request,
 ): Promise<CampaignsListResponse> {
-  await ensureDatabase(request);
+  const actor = await ensureDatabase(request);
   const db = getDb();
   const [campaignRows, planRows, jobRows, eventRows] = await Promise.all([
-    db.select().from(campaigns).where(eq(campaigns.workspaceId, WORKSPACE_ID)).orderBy(desc(campaigns.updatedAt)),
-    db.select().from(deliveryPlans),
+    db.select().from(campaigns).where(and(eq(campaigns.workspaceId, WORKSPACE_ID), campaignAccessSql(actor.participant))).orderBy(desc(campaigns.updatedAt)),
+    db.select().from(deliveryPlans).where(inArray(deliveryPlans.campaignId, accessibleCampaignIds(actor.participant))),
     db
       .select()
       .from(deliveryJobs)
-      .where(eq(deliveryJobs.workspaceId, WORKSPACE_ID))
+      .where(and(eq(deliveryJobs.workspaceId, WORKSPACE_ID), inArray(deliveryJobs.campaignId, accessibleCampaignIds(actor.participant))))
       .orderBy(desc(deliveryJobs.createdAt))
       .limit(WORKSPACE_HISTORY_LIMIT),
-    db.select().from(campaignEvents).where(eq(campaignEvents.workspaceId, WORKSPACE_ID)).orderBy(desc(campaignEvents.occurredAt)).limit(WORKSPACE_HISTORY_LIMIT),
+    db.select().from(campaignEvents).where(and(eq(campaignEvents.workspaceId, WORKSPACE_ID), inArray(campaignEvents.campaignId, accessibleCampaignIds(actor.participant)))).orderBy(desc(campaignEvents.occurredAt)).limit(WORKSPACE_HISTORY_LIMIT),
   ]);
   return {
     campaigns: campaignRows.map(toCampaign),
@@ -2901,7 +2950,7 @@ export async function createCampaign(
   const actor = await ensureDatabase(request);
   const workspace = await workspaceRecord();
   const input = parseCampaign(payload, { workspace });
-  const audienceLabel = await validateAudience(input);
+  const audienceLabel = await validateAudience(input, actor.participant);
   if (input.templateId) {
     await assertEmailTemplateReference(request, input.templateId);
   }
@@ -2955,14 +3004,18 @@ async function audienceForCampaign(
   campaign: CampaignRecord,
 ): Promise<ContactRecord[]> {
   const db = getDb();
+  const owner = await accessParticipant(campaign.participantId);
+  if (owner.status !== "active") throw new ApiRequestError("Автор рассылки отключён. Отправка остановлена.", 403);
   const contactRows = await db
     .select()
     .from(contacts)
-    .where(eq(contacts.workspaceId, WORKSPACE_ID));
+    .where(and(eq(contacts.workspaceId, WORKSPACE_ID), contactAccessSql(owner)));
   const records = contactRows.map(toContact);
   if (campaign.audienceType === "contacts") {
     const selected = new Set(campaign.contactIds);
-    return records.filter((contact) => selected.has(contact.id));
+    const audience = records.filter((contact) => selected.has(contact.id));
+    if (audience.length !== selected.size) throw new ApiRequestError("У автора рассылки нет доступа ко всем выбранным контактам. Обновите аудиторию.", 403);
+    return audience;
   }
   if (!campaign.segmentId) return [];
   const [segment] = await db
@@ -2976,13 +3029,13 @@ async function audienceForCampaign(
 }
 
 export async function checkCommunicationAudience(request: Request, payload: unknown) {
-  await ensureDatabase(request);
+  const actor = await ensureDatabase(request);
   const p = asObject(payload);
   const ids = optionalStringArray(p.contactIds, "Контакты", 20000) ?? [];
   const segmentId = typeof p.segmentId === "string" ? p.segmentId : null;
   const selectedChannels = Array.isArray(p.channels) ? [...new Set(p.channels.filter((c): c is DeliveryChannelId => c === "email" || c === "telegram" || c === "vk"))] : ["email" as const];
   if (!selectedChannels.length) throw new ApiRequestError("Выберите канал.");
-  const audience = await audienceForCampaign({ audienceType: p.audienceType === "segment" ? "segment" : "contacts", contactIds: ids, segmentId } as CampaignRecord);
+  const audience = await audienceForCampaign({ participantId: actor.participant.id, workspaceId: WORKSPACE_ID, audienceType: p.audienceType === "segment" ? "segment" : "contacts", contactIds: ids, segmentId } as CampaignRecord);
   return assessCommunications(audience, selectedChannels, p.purpose === "transactional" ? "transactional" : "marketing", typeof p.scheduledAt === "string" && p.scheduledAt ? parseIsoDate(p.scheduledAt, "Дата отправки") ?? undefined : undefined);
 }
 
@@ -3470,6 +3523,17 @@ async function updateOutboxResult(
     .where(eq(deliveryOutbox.id, row.id));
 }
 
+async function verifyOutboxAccess(rows: DeliveryOutboxRecord[]) {
+  for (const campaignId of new Set(rows.map(row => row.campaignId))) {
+    const campaign = (await campaignBundle(campaignId)).campaign;
+    const recipients: ContactRecord[] = [];
+    const ids = [...new Set(rows.filter(row => row.campaignId === campaignId).map(row => row.contactId))];
+    for (const part of chunksOf(ids, 80)) recipients.push(...(await getDb().select().from(contacts).where(and(eq(contacts.workspaceId, WORKSPACE_ID), inArray(contacts.id, part)))).map(toContact));
+    if (recipients.length !== ids.length) await blockDispatch(campaignId, "Часть контактов удалена. Обновите аудиторию.");
+    try { await requireAudienceAccess(campaign.participantId, recipients); }
+    catch (error) { await blockDispatch(campaignId, error instanceof Error ? error.message : "Доступ к аудитории отозван."); }
+  }
+}
 async function processDirectOutbox(
   rows: DeliveryOutboxRecord[],
   messengerMessage: string,
@@ -3517,6 +3581,7 @@ async function processDirectOutbox(
           let token: string;
           try { token = await resolveTelegramToken(publicConfig); }
           catch { await updateOutboxResult(row, { status: "rejected", message: "Токен Telegram недоступен. Проверьте подключение бота." }); continue; }
+          await verifyOutboxAccess([row]);
           const renderedMessage = renderContactTemplate(messengerMessage, contact);
           if (!renderedMessage.trim() && !messengerDocumentUrl || renderedMessage.length > (messengerDocumentUrl ? 1024 : 4096)) {
             await updateOutboxResult(row, { status: "rejected", message: "Текст после персонализации пуст или превышает лимит Telegram. Сократите сообщение." });
@@ -3541,6 +3606,7 @@ async function processDirectOutbox(
           const credentials = automaticProviderSecrets(row.providerId) as {
             accessToken?: string;
           };
+          await verifyOutboxAccess([row]);
           const result = await sendVkMessage({
             accessToken: credentials.accessToken ?? "",
             peerId: row.recipientEndpoint,
@@ -3565,6 +3631,7 @@ async function processUniSenderOutbox(
   scheduledAt?: string,
 ) {
   if (!rows.length) return {} as Record<string, string>;
+  await verifyOutboxAccess(rows);
   const selectedContactRows: ContactRow[] = [];
   for (const idChunk of chunksOf(Array.from(new Set(rows.map((row) => row.contactId))))) {
     selectedContactRows.push(...await getDb().select().from(contacts).where(and(
@@ -3615,6 +3682,7 @@ async function processUniSenderOutbox(
       position: contact.jobTitle,
       city: contact.city,
     } : {};
+    await verifyOutboxAccess(rows);
     const result = await sendUniSenderTransactionalEmail({
       apiKey: credentials.apiKey ?? "",
       listId: integration.publicConfig.listId ?? "",
@@ -3630,6 +3698,7 @@ async function processUniSenderOutbox(
     await updateOutboxResult(row, result);
     return result.externalId ? { emailId: result.externalId } : {};
   }
+  await verifyOutboxAccess(rows);
   const result = await createUniSenderCampaign({
     apiKey: credentials.apiKey ?? "",
     listId: integration.publicConfig.listId ?? "",
@@ -3712,6 +3781,7 @@ async function processVkWorkspaceSmtpOutbox(
   version: CampaignVersionRecord,
 ) {
   if (!rows.length) return {} as Record<string, string>;
+  await verifyOutboxAccess(rows);
   const contactsById = new Map(
     (await getDb().select().from(contacts).where(eq(contacts.workspaceId, WORKSPACE_ID)))
       .map(toContact)
@@ -3765,6 +3835,10 @@ async function dispatchCampaign(
 ): Promise<CampaignMutationResponse> {
   const db = getDb();
   let current = await campaignBundle(campaignId);
+  try { await audienceForCampaign(current.campaign); } catch (error) {
+    await blockDispatch(campaignId, error instanceof Error ? error.message : "Доступ к аудитории отозван.");
+    throw error;
+  }
   let resumableJob: DeliveryJobRow | null = null;
   const isUnstartedJob = (job: DeliveryJobRow) =>
     job.status === "queued" &&
@@ -4240,8 +4314,9 @@ export async function syncCampaignDelivery(
   request: Request,
   campaignId: string,
 ): Promise<CampaignMutationResponse> {
-  await ensureDatabase(request);
+  const actor = await ensureDatabase(request);
   const current = await campaignBundle(campaignId);
+  requireCampaignAccess(actor.participant, current.campaign);
   const [job] = await getDb()
     .select()
     .from(deliveryJobs)
@@ -4413,7 +4488,8 @@ export async function runDueScheduledCampaignsSystem() {
 }
 
 export async function runDueScheduledCampaigns(request: Request) {
-  await ensureDatabase(request);
+  const actor = await ensureDatabase(request);
+  requireTeamAdmin(actor.participant);
   return runDueScheduledCampaignsCore();
 }
 
@@ -4426,13 +4502,14 @@ export async function exportCampaignManualCsv(
   request: Request,
   campaignIdValue: unknown,
 ): Promise<{ filename: string; csv: string; count: number }> {
-  await ensureDatabase(request);
+  const actor = await ensureDatabase(request);
   const campaignId = cleanText(
     campaignIdValue,
     "Идентификатор кампании",
     120,
   );
   const bundle = await campaignBundle(campaignId);
+  requireCampaignAccess(actor.participant, bundle.campaign);
   if (
     !["ready", "completed"].includes(bundle.campaign.status) ||
     !bundle.campaign.readyVersionId
@@ -4514,7 +4591,7 @@ export async function updateCampaign(
   request: Request,
   payload: unknown,
 ): Promise<CampaignMutationResponse> {
-  await ensureDatabase(request);
+  const actor = await ensureDatabase(request);
   const object = asObject(payload);
   const id = cleanText(object.id, "Идентификатор кампании", 120);
   const action = object.action ?? "save";
@@ -4528,6 +4605,7 @@ export async function updateCampaign(
     throw new ApiRequestError("Неизвестное действие с кампанией.");
   }
   const current = await campaignBundle(id);
+  requireCampaignAccess(actor.participant, current.campaign);
   if (action === "dispatch") {
     return dispatchCampaign(request, id, object.idempotencyKey);
   }
@@ -4602,7 +4680,7 @@ export async function updateCampaign(
     campaign: current.campaign,
     plans: current.plans,
   });
-  const audienceLabel = await validateAudience(input);
+  const audienceLabel = await validateAudience(input, await accessParticipant(current.campaign.participantId));
   if (input.templateId) {
     await assertEmailTemplateReference(request, input.templateId);
   }
@@ -4655,9 +4733,10 @@ export async function deleteCampaign(
   request: Request,
   idValue: unknown,
 ): Promise<DeleteResponse> {
-  await ensureDatabase(request);
+  const actor = await ensureDatabase(request);
   const id = cleanText(idValue, "Идентификатор кампании", 120);
   const current = await campaignBundle(id);
+  requireCampaignAccess(actor.participant, current.campaign);
   if (["scheduled", "sending", "completed"].includes(current.campaign.status)) {
     throw new ApiRequestError(
       current.campaign.status === "scheduled"

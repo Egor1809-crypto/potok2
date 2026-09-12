@@ -1,3 +1,4 @@
+import { accessParticipant, rawContactAccess, requireContactAccess, requireTeamAdmin } from "./team-access";
 import { env } from "cloudflare:workers";
 import { and, eq } from "drizzle-orm";
 import { getD1, getDb } from "@/db";
@@ -193,6 +194,7 @@ export async function communicationOverview(request: Request) {
     const policy = await communicationPolicy();
     if (id) {
         const contact = await communicationContact(id);
+        requireContactAccess(actor.participant, contact);
         const [evidence, history, holds, companyHistory, check] = await Promise.all([
             db.prepare("SELECT * FROM communication_consents WHERE workspace_id=? AND (contact_id=? OR endpoint=?) ORDER BY created_at DESC,id DESC").bind(WORKSPACE_ID, id, contact.email.trim().toLowerCase()).all(),
             db.prepare(`SELECT x.*,a.name AS campaign_name,p.display_name AS author FROM (${touchUnion}) x LEFT JOIN campaigns a ON a.id=x.campaign_id LEFT JOIN participants p ON p.id=x.actor_id WHERE x.endpoint IN (?,?,?) AND x.endpoint<>'' AND x.occurred_at<=? ORDER BY x.occurred_at DESC LIMIT 100`).bind(WORKSPACE_ID, WORKSPACE_ID, contact.email.toLowerCase(), contact.telegramChatId ?? "", contact.vkUserId ?? "", new Date().toISOString()).all(),
@@ -206,11 +208,13 @@ export async function communicationOverview(request: Request) {
         }
         return { contact, policy, evidence: evidence.results, history: history.results, holds: holds.results, companyHistory, check };
     }
+    const access = rawContactAccess(actor.participant);
+    const relatedAccess = access.condition.replaceAll("contacts.", "c.");
     const query = (url.searchParams.get("q") ?? "").trim().slice(0, 100);
     const [people, replies, tasks, members] = await Promise.all([
-        db.prepare("SELECT id,full_name,email,company_name FROM contacts WHERE workspace_id=? AND (full_name LIKE ? OR email LIKE ? OR company_name LIKE ?) ORDER BY updated_at DESC LIMIT 50").bind(WORKSPACE_ID, `%${query}%`, `%${query}%`, `%${query}%`).all(),
-        db.prepare("SELECT m.*,c.full_name AS contact_name,a.name AS campaign_name FROM communication_messages m JOIN contacts c ON c.id=m.contact_id LEFT JOIN campaigns a ON a.id=m.campaign_id WHERE m.workspace_id=? ORDER BY received_at DESC LIMIT 100").bind(WORKSPACE_ID).all(),
-        db.prepare("SELECT t.*,c.full_name AS contact_name,p.display_name AS assignee FROM communication_tasks t JOIN contacts c ON c.id=t.contact_id LEFT JOIN participants p ON p.id=t.assigned_to WHERE t.workspace_id=? ORDER BY CASE t.status WHEN 'done' THEN 1 ELSE 0 END,t.due_date LIMIT 100").bind(WORKSPACE_ID).all(),
+        db.prepare(`SELECT id,full_name,email,company_name FROM contacts WHERE workspace_id=? AND ${access.condition} AND (full_name LIKE ? OR email LIKE ? OR company_name LIKE ?) ORDER BY updated_at DESC LIMIT 50`).bind(WORKSPACE_ID, ...access.params, `%${query}%`, `%${query}%`, `%${query}%`).all(),
+        db.prepare(`SELECT m.*,c.full_name AS contact_name,a.name AS campaign_name FROM communication_messages m JOIN contacts c ON c.id=m.contact_id LEFT JOIN campaigns a ON a.id=m.campaign_id WHERE m.workspace_id=? AND ${relatedAccess} ORDER BY received_at DESC LIMIT 100`).bind(WORKSPACE_ID, ...access.params).all(),
+        db.prepare(`SELECT t.*,c.full_name AS contact_name,p.display_name AS assignee FROM communication_tasks t JOIN contacts c ON c.id=t.contact_id LEFT JOIN participants p ON p.id=t.assigned_to WHERE t.workspace_id=? AND ${relatedAccess} ORDER BY CASE t.status WHEN 'done' THEN 1 ELSE 0 END,t.due_date LIMIT 100`).bind(WORKSPACE_ID, ...access.params).all(),
         db.prepare("SELECT id,display_name FROM participants WHERE workspace_id=? AND status='active'").bind(WORKSPACE_ID).all(),
     ]);
     return { policy, people: people.results, replies: replies.results, tasks: tasks.results, members: members.results, webhookConfigured: Boolean(runtime().COMMUNICATION_WEBHOOK_SECRET), aiConfigured: Boolean(runtime().OPENAI_API_KEY || runtime().NAVYAI_API_KEY), webhookPath: "/api/communications/inbound" };
@@ -309,9 +313,12 @@ export async function mutateCommunications(request: Request, payload: unknown) {
     const action = cleanText(p.action, "Действие", 40);
     const db = getD1();
     const now = new Date().toISOString();
-    if (action === "reply")
+    if (action === "reply") {
+        requireContactAccess(actor.participant, await communicationContact(cleanText(p.contactId, "Контакт", 100)));
         return ingestReply(p, actor.participant.id);
+    }
     if (action === "policy") {
+        requireTeamAdmin(actor.participant);
         const number = (value: unknown, min: number, max: number) => { if (!Number.isInteger(value) || Number(value) < min || Number(value) > max)
             throw new ApiRequestError("Недопустимый лимит."); return Number(value); };
         const windowDays = number(p.windowDays, 1, 90), contactLimit = number(p.contactLimit, 1, 100), companyLimit = number(p.companyLimit, 1, 100);
@@ -324,9 +331,14 @@ export async function mutateCommunications(request: Request, payload: unknown) {
         const status = cleanText(p.status, "Статус", 20);
         if (!["open", "done", "dismissed", "proposed"].includes(status))
             throw new ApiRequestError("Неверный статус задачи.");
+        const task = await db.prepare("SELECT contact_id FROM communication_tasks WHERE id=? AND workspace_id=?").bind(id, WORKSPACE_ID).first<{contact_id:string}>();
+        if (!task) throw new ApiRequestError("Задача не найдена.", 404);
+        const taskContact = await communicationContact(task.contact_id);
+        requireContactAccess(actor.participant, taskContact);
         const assignee = cleanText(p.assignedTo, "Ответственный", 100);
         if (!await db.prepare("SELECT id FROM participants WHERE id=? AND workspace_id=? AND status='active'").bind(assignee, WORKSPACE_ID).first())
             throw new ApiRequestError("Ответственный не найден.");
+        requireContactAccess(await accessParticipant(assignee), taskContact);
         const dueDate = p.dueDate ? cleanText(p.dueDate, "Дата", 10) : null;
         if (dueDate && (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate) || !Number.isFinite(Date.parse(dueDate)) || new Date(`${dueDate}T00:00:00Z`).toISOString().slice(0, 10) !== dueDate))
             throw new ApiRequestError("Некорректная дата.");
@@ -347,6 +359,7 @@ export async function mutateCommunications(request: Request, payload: unknown) {
         if (!reply)
             throw new ApiRequestError("Ответ не найден.", 404);
         const contact = await communicationContact(reply.contact_id);
+        requireContactAccess(actor.participant, contact);
         const statements = [db.prepare("UPDATE communication_messages SET category=?,reviewed=1 WHERE id=? AND workspace_id=?").bind(category, id, WORKSPACE_ID)];
         if (category !== "automatic")
             statements.push(db.prepare("INSERT INTO communication_holds (id,workspace_id,endpoint,channel,reason,active,actor_id,created_at) VALUES (?,?,?,'email',?,1,?,?) ON CONFLICT(id) DO UPDATE SET active=1,resolved_at=NULL,reason=excluded.reason").bind(`reply:${id}`, WORKSPACE_ID, reply.sender, category === "unsubscribe" ? "Получен запрос на отписку" : "Получен ответ: автоматические письма приостановлены до решения ответственного", actor.participant.id, now));
@@ -362,6 +375,7 @@ export async function mutateCommunications(request: Request, payload: unknown) {
         return { ok: true };
     }
     const contact = await communicationContact(cleanText(p.contactId, "Контакт", 100));
+    requireContactAccess(actor.participant, contact);
     const channel = cleanText(p.channel ?? "email", "Канал", 20) as Channel;
     if (!channels.includes(channel))
         throw new ApiRequestError("Неизвестный канал.");

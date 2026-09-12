@@ -6,7 +6,6 @@ import {
   CircleAlert,
   Download,
   KeyRound,
-  Copy,
   LoaderCircle,
   Mail,
   Save,
@@ -14,7 +13,6 @@ import {
   Settings2,
   ShieldCheck,
   UserRound,
-  UserPlus,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -106,7 +104,7 @@ export function SettingsView() {
   const [state, setState] = useState<"loading" | "idle" | "saving" | "saved" | "error">("loading");
   const [error, setError] = useState("");
   const [members, setMembers] = useState<TeamMember[]>([]);
-  const [invite, setInvite] = useState<{ code: string; expiresAt: string } | null>(null);
+  const [canManage, setCanManage] = useState(false);
 
   const load = useCallback(async () => {
     setState("loading");
@@ -122,8 +120,9 @@ export function SettingsView() {
       }));
       const teamResponse = await fetch("/api/team", { cache: "no-store" });
       if (teamResponse.ok) {
-        const teamPayload = await teamResponse.json() as { members?: TeamMember[] };
+        const teamPayload = await teamResponse.json() as { members?: TeamMember[]; canManage?: boolean };
         setMembers(teamPayload.members ?? []);
+        setCanManage(teamPayload.canManage === true);
       }
       setState("idle");
     } catch (reason) {
@@ -190,24 +189,13 @@ export function SettingsView() {
 
   const current = useMemo(() => sections.find((item) => item.id === section) ?? sections[0], [section]);
 
-  const createInvite = async () => {
-    setError("");
-    const response = await fetch("/api/team", { method: "POST" });
-    const payload = await response.json() as { code?: string; expiresAt?: string; error?: string };
-    if (!response.ok || !payload.code || !payload.expiresAt) {
-      setError(payload.error ?? "Не удалось создать приглашение");
-      return;
-    }
-    setInvite({ code: payload.code, expiresAt: payload.expiresAt });
-  };
-
   return (
     <div className="space-y-6">
       <header className="max-w-3xl">
         <p className="section-eyebrow">Рабочее пространство</p>
         <h1 className="text-[28px] font-semibold tracking-[-.035em] text-[var(--text-strong)]">Аккаунт и настройки</h1>
         <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
-          Здесь только настройки, которые влияют на работу рассылок. Команд, ролей и ограничений доступа нет.
+          Настройки компании и отправки. Роли и назначения контактов находятся в разделе «Команда».
         </p>
       </header>
 
@@ -235,7 +223,7 @@ export function SettingsView() {
               <h2 className="text-[16px] font-semibold">{current.label}</h2>
               <p className="mt-1 text-[12px] text-[var(--text-muted)]">{current.description}</p>
             </div>
-            {section !== "data" && (
+            {section !== "data" && canManage && (
               <button type="button" onClick={() => void save()} disabled={state === "loading" || state === "saving"} className="btn btn-primary gap-2 self-start sm:self-auto">
                 {state === "saving" ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : state === "saved" ? <Check aria-hidden="true" className="size-4" /> : <Save aria-hidden="true" className="size-4" />}
                 {state === "saving" ? "Сохраняем" : state === "saved" ? "Сохранено" : "Сохранить"}
@@ -252,8 +240,8 @@ export function SettingsView() {
           )}
 
           <div className="p-5 sm:p-6">
-            {section === "account" && <AccountSection form={form} participant={participant} members={members} invite={invite} onInvite={() => void createInvite()} update={update} />}
-            {section === "sending" && <SendingSection form={form} update={update} />}
+            {section === "account" && <AccountSection form={form} participant={participant} members={members} canManage={canManage} update={update} />}
+            {section === "sending" && <fieldset disabled={!canManage}>{!canManage && <p className="mb-4 text-sm text-[var(--text-muted)]">Настройки отправки изменяет администратор.</p>}<SendingSection form={form} update={update} /></fieldset>}
             {section === "data" && <DataSection participantEmail={participant.email} onExport={() => void exportData()} />}
           </div>
         </section>
@@ -264,7 +252,7 @@ export function SettingsView() {
 
 type UpdateForm = <Key extends keyof WorkspaceForm>(key: Key, value: WorkspaceForm[Key]) => void;
 
-function AccountSection({ form, participant, members, invite, onInvite, update }: { form: WorkspaceForm; participant: { name: string; email: string }; members: TeamMember[]; invite: { code: string; expiresAt: string } | null; onInvite: () => void; update: UpdateForm }) {
+function AccountSection({ form, participant, canManage, update }: { form: WorkspaceForm; participant: { name: string; email: string }; members: TeamMember[]; canManage: boolean; update: UpdateForm }) {
   return (
     <div className="space-y-7">
       <div className="rounded-2xl border border-[var(--primary)]/15 bg-[var(--primary-subtle)]/55 p-4 sm:p-5">
@@ -274,24 +262,16 @@ function AccountSection({ form, participant, members, invite, onInvite, update }
             <p className="truncate text-[14px] font-semibold">{participant.name}</p>
             <p className="mt-0.5 truncate text-[11px] text-[var(--text-muted)]">{participant.email}</p>
           </div>
-          <span className="badge badge-accent">Участник · полный доступ</span>
+          <span className="badge badge-accent">{canManage ? "Администратор" : "Сотрудник"}</span>
         </div>
-        <p className="mt-4 text-[12px] leading-5 text-[var(--text-muted)]">У каждого участника свой логин и цвет. Все работают с общей базой и имеют одинаковый полный доступ.</p>
+        <p className="mt-4 text-[12px] leading-5 text-[var(--text-muted)]">Доступ к контактам зависит от назначений администратора.</p>
       </div>
 
-      <FormBlock title={`Участники · ${members.length}`} description="Цвет участника отображается у добавленных им контактов.">
-        <div className="divide-y divide-[var(--border)] rounded-xl border border-[var(--border)]">
-          {members.map((member) => <div key={member.id} className="flex items-center gap-3 p-3"><span className="grid size-9 place-items-center rounded-full text-xs font-bold text-white" style={{ backgroundColor: member.color }}>{member.displayName.slice(0, 2).toUpperCase()}</span><span className="min-w-0 flex-1"><span className="block truncate text-[12px] font-semibold">{member.displayName}</span><span className="block truncate text-[10px] text-[var(--text-muted)]">@{member.login}{member.lastLoginAt ? ` · вход ${new Date(member.lastLoginAt).toLocaleDateString("ru-RU")}` : ""}</span></span><span className="badge badge-success">Активен</span></div>)}
-        </div>
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)] p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center"><div className="min-w-0 flex-1"><p className="text-[12px] font-semibold">Пригласить коллегу</p><p className="mt-1 text-[11px] text-[var(--text-muted)]">Одноразовый код действует 7 дней. Коллега вводит его на странице регистрации.</p></div><button type="button" onClick={onInvite} className="btn btn-primary gap-2"><UserPlus aria-hidden className="size-4" />Создать код</button></div>
-          {invite && <div className="mt-4 flex items-center gap-2 rounded-lg border border-[var(--primary)]/20 bg-white p-2"><code className="min-w-0 flex-1 truncate px-2 text-[12px] font-semibold text-[var(--primary)]">{invite.code}</code><button type="button" onClick={() => void navigator.clipboard.writeText(invite.code)} className="btn btn-secondary btn-sm gap-2"><Copy aria-hidden className="size-3.5" />Копировать</button></div>}
-        </div>
-      </FormBlock>
+      <div className="rounded-xl border border-[var(--border)] p-4"><p className="mb-3 text-sm">Приглашения, роли и доступ к отдельным базам и группам.</p><Link className="btn btn-secondary" href="/team">Открыть команду</Link></div>
 
       <PasswordPanel />
 
-      <FormBlock title="Рабочее пространство" description="Название видно в навигации и в выгрузке данных.">
+      {canManage && <FormBlock title="Рабочее пространство" description="Название видно в навигации и в выгрузке данных.">
         <Field label="Название пространства" value={form.name} onChange={(value) => update("name", value)} />
         <label className="block">
           <span className="mb-1.5 block text-[12px] font-semibold">Часовой пояс</span>
@@ -302,7 +282,7 @@ function AccountSection({ form, participant, members, invite, onInvite, update }
             <option value="Asia/Novosibirsk">Новосибирск (UTC+7)</option>
           </select>
         </label>
-      </FormBlock>
+      </FormBlock>}
     </div>
   );
 }

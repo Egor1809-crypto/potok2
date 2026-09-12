@@ -3,6 +3,8 @@ import path from "node:path";
 import vm from "node:vm";
 import ts from "typescript";
 import * as fflate from "fflate";
+import * as orm from "drizzle-orm";
+import * as sqliteCore from "drizzle-orm/sqlite-core";
 
 // Exercise the production orchestration without touching contacts, storage or mail.
 export async function loadAiServer(entry, { env = {}, fetch = globalThis.fetch, expose = [], assetStore, overrides = {} } = {}) {
@@ -15,6 +17,8 @@ export async function loadAiServer(entry, { env = {}, fetch = globalThis.fetch, 
   const mocks = {
     "cloudflare:workers": synthetic({ env }),
     "fflate": synthetic(fflate),
+    "drizzle-orm": synthetic(orm),
+    "drizzle-orm/sqlite-core": synthetic(sqliteCore),
     "@/db": synthetic({ getD1: () => db }),
     "./database-init": synthetic({ ensureDatabase: async () => ({ participant: { id: "design-evaluation" }, sessionId: "test-session" }), WORKSPACE_ID: "design-evaluation" }),
     "./email-asset-store": synthetic({ storeGeneratedEmailAsset: async () => { throw new Error("Asset writes are disabled in design tests"); }, storeGeneratedEmailAssetBytes: async () => { throw new Error("Asset writes are disabled in design tests"); }, getEmailAssetRecord: async () => { throw new Error("Unknown test asset"); }, ...assetStore }),

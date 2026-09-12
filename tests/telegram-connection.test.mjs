@@ -31,7 +31,7 @@ function database() {
 async function harness(fetchFn, extra = {}) {
   const { sqlite, d1 } = database();
   const options = { env: { TELEGRAM_CREDENTIAL_KEY: key, TELEGRAM_WEBHOOK_ORIGIN: "https://potok.example" }, fetch: fetchFn,
-    overrides: { "@/db": { getD1: () => d1 }, "./database-init": { ensureDatabase: async () => ({ participant: { id: "member" } }), WORKSPACE_ID: workspace }, ...extra } };
+    overrides: { "@/db": { getD1: () => d1 }, "./database-init": { ensureDatabase: async () => ({ participant: { id: "member", workspaceId: workspace, role: "admin", status: "active", accessScope: { all: true, baseIds: [], groupTags: [] } } }), WORKSPACE_ID: workspace }, ...extra } };
   const connection = await loadAiServer("lib/server/telegram-connection.ts", options);
   const webhook = await loadAiServer("lib/server/telegram-webhook.ts", options);
   return { sqlite, connection, webhook };

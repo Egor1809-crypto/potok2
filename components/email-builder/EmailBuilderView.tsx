@@ -12,6 +12,8 @@ import {
 import Link from "next/link";
 import {
   Blocks,
+  Maximize2,
+  Minimize2,
   Library,
   PenTool,
   SlidersHorizontal,
@@ -29,6 +31,7 @@ import type {
 } from "@/types/api";
 import {
   Alert,
+  Modal,
   FormField,
   Input,
   Select,
@@ -579,6 +582,10 @@ function EmailBuilderWorkspace({
     editingStarter ? null : (templateRecord?.updatedAt ?? null),
   );
   const [savingTemplate, setSavingTemplate] = useState(false);
+  const [focusCanvas, setFocusCanvas] = useState(false);
+  const [showLibrary, setShowLibrary] = useState(true);
+  const [showProperties, setShowProperties] = useState(true);
+  const [templateSettingsOpen, setTemplateSettingsOpen] = useState(false);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("desktop");
   const [mobilePanel, setMobilePanel] = useState<BuilderPanel>("canvas");
   const [rightPanelMode, setRightPanelMode] = useState<"properties" | "ai">(initialDirectorOpen ? "ai" : "properties");
@@ -1002,12 +1009,12 @@ function EmailBuilderWorkspace({
         onSave={save}
         onContinue={continueFromEditor}
         continueHref={continueHref}
-        tools={<EmailExportMenu document={document} name={campaignName} />}
+        tools={<>{creationMode === "manual" && <Button type="button" variant="secondary" size="sm" aria-pressed={focusCanvas} aria-label={focusCanvas ? "Вернуть панели редактора" : "Только письмо"} onClick={() => { setFocusCanvas(value => !value); setMobilePanel("canvas"); }}>{focusCanvas ? <Minimize2 aria-hidden className="size-4" /> : <Maximize2 aria-hidden className="size-4" />}<span className="hidden xl:inline">{focusCanvas ? "Вернуть панели" : "Только письмо"}</span></Button>}<EmailExportMenu document={document} name={campaignName} /></>}
       />
-      {creationMode === "manual" ? <EmailSubjectFields document={document} onUpdate={updateDocument} onOpenAi={() => { setRightPanelMode("ai"); setMobilePanel("properties"); }} /> : null}
+      {creationMode === "manual" && !focusCanvas ? <EmailSubjectFields document={document} onUpdate={updateDocument} onOpenAi={() => { setRightPanelMode("ai"); setShowProperties(true); setMobilePanel("properties"); }} /> : null}
 
       <div
-        className="studio-modebar flex flex-wrap items-center justify-center gap-1 border-b border-border/80 bg-surface/95 px-4 py-2.5"
+        className={cn("studio-modebar flex flex-wrap items-center justify-center gap-1 border-b border-border/80 bg-surface/95 px-3 py-1", focusCanvas && "hidden")}
         role="tablist"
         aria-label="Способ создания письма"
       >
@@ -1038,6 +1045,7 @@ function EmailBuilderWorkspace({
           <Sparkles aria-hidden="true" className="size-4" />
           Создать с ИИ
         </button>
+        {creationMode === "manual" ? <div className="ml-auto flex items-center gap-1"><Button type="button" variant="ghost" size="sm" aria-pressed={showLibrary} onClick={() => setShowLibrary(value => !value)} className="hidden lg:inline-flex"><Blocks aria-hidden className="size-4" />Блоки</Button><Button type="button" variant="ghost" size="sm" aria-pressed={showProperties} onClick={() => setShowProperties(value => !value)} className="hidden lg:inline-flex"><SlidersHorizontal aria-hidden className="size-4" />Свойства</Button>{mode === "template" ? <Button type="button" size="sm" variant="ghost" onClick={() => setTemplateSettingsOpen(true)}>О шаблоне</Button> : null}</div> : null}
       </div>
 
       {creationMode === "start" ? (
@@ -1119,20 +1127,7 @@ function EmailBuilderWorkspace({
         />
       ) : (
         <>
-          {mode === "template" ? (
-            <div className="border-b border-border bg-surface-subtle/45 px-4 py-2">
-              {editingStarter && !savedTemplateId ? (
-                <div className="mb-2 rounded-lg border border-primary/20 bg-primary-subtle/60 px-3 py-1.5 text-[10px] leading-4 text-text-muted">
-                  Вы редактируете готовый макет. «Сохранить в мои шаблоны»
-                  создаст отдельную копию.
-                </div>
-              ) : null}
-              <details className="group">
-                <summary className="flex cursor-pointer list-none items-center justify-between text-[10px] font-semibold text-text-muted hover:text-text-strong">
-                  Категория и описание шаблона
-                  <span className="transition group-open:rotate-180">⌄</span>
-                </summary>
-                <div className="mt-2 grid gap-2 md:grid-cols-[190px_minmax(0,1fr)]">
+          <Modal open={templateSettingsOpen} onOpenChange={setTemplateSettingsOpen} title="О шаблоне">                <div className="mt-2 grid gap-2 md:grid-cols-[190px_minmax(0,1fr)]">
                   <FormField
                     label="Категория"
                     htmlFor="builder-template-category"
@@ -1171,12 +1166,9 @@ function EmailBuilderWorkspace({
                       placeholder="Для какой задачи подходит макет"
                     />
                   </FormField>
-                </div>
-              </details>
-            </div>
-          ) : null}
+                </div></Modal>
 
-          <div className="flex h-11 items-center justify-between gap-3 border-b border-border bg-surface px-3 lg:hidden">
+          <div className={cn("flex h-11 items-center justify-between gap-3 border-b border-border bg-surface px-3 lg:hidden", focusCanvas && "hidden")}>
             <div className="flex items-center rounded-[9px] bg-surface-subtle p-1">
               {(
                 [
@@ -1216,7 +1208,7 @@ function EmailBuilderWorkspace({
             />
           </div>
 
-          <div className="grid min-h-0 flex-1 bg-surface-subtle/30 lg:grid-cols-[210px_minmax(0,1fr)_285px] xl:grid-cols-[220px_minmax(0,1fr)_305px]">
+          <div className={cn("grid min-h-0 flex-1 bg-surface-subtle/30", focusCanvas || !showLibrary && !showProperties ? "lg:grid-cols-[minmax(0,1fr)]" : showLibrary && showProperties ? "lg:grid-cols-[190px_minmax(0,1fr)_270px]" : showLibrary ? "lg:grid-cols-[190px_minmax(0,1fr)]" : "lg:grid-cols-[minmax(0,1fr)_270px]")}>
             <BlockLibrary
               onAdd={addBlock}
               document={document}
@@ -1224,7 +1216,8 @@ function EmailBuilderWorkspace({
               className={cn(
                 "min-h-0 border-r border-border",
                 mobilePanel === "blocks" ? "flex" : "hidden",
-                "lg:flex",
+                showLibrary && !focusCanvas ? "lg:flex" : "lg:hidden",
+                focusCanvas && "hidden",
               )}
             />
             <EmailCanvas
@@ -1241,15 +1234,15 @@ function EmailBuilderWorkspace({
               }
               onOpenBlocks={(afterBlockId) => {
                 if (afterBlockId) setSelectedBlockId(afterBlockId);
-                setMobilePanel("blocks");
+                setFocusCanvas(false); setShowLibrary(true); setMobilePanel("blocks");
               }}
               className={cn(
                 "min-h-0",
-                mobilePanel === "canvas" ? "flex" : "hidden",
+                mobilePanel === "canvas" || focusCanvas ? "flex" : "hidden",
                 "lg:flex",
               )}
             />
-            <div className={cn("min-h-0 flex-col border-l border-border bg-surface", mobilePanel === "properties" ? "flex" : "hidden", "lg:flex")}>
+            <div className={cn("min-h-0 flex-col border-l border-border bg-surface", mobilePanel === "properties" ? "flex" : "hidden", showProperties && !focusCanvas ? "lg:flex" : "lg:hidden", focusCanvas && "hidden")}>
               <div className="flex shrink-0 gap-2 border-b border-border p-2"><Button type="button" size="sm" variant={rightPanelMode === "properties" ? "primary" : "ghost"} onClick={() => setRightPanelMode("properties")}>Свойства</Button><Button type="button" size="sm" variant={rightPanelMode === "ai" ? "primary" : "ghost"} onClick={() => setRightPanelMode("ai")}>ИИ-помощник</Button></div>
             {rightPanelMode === "ai" ? <AiEmailEditPanel onSelectBlock={setSelectedBlockId} document={document} block={selectedBlock} onApply={next => mutateDocument(() => next)} /> : selectedBlock ? (
               <PropertiesPanel

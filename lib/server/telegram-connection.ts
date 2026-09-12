@@ -1,3 +1,4 @@
+import { requireTeamAdmin } from "./team-access";
 import { getD1 } from "@/db";
 import type { TelegramConnectionInfo } from "@/types/telegram";
 import { ApiRequestError, asObject } from "./api-utils";
@@ -74,7 +75,8 @@ export async function disconnectTelegramConnection() {
 }
 
 export async function manageTelegramConnection(request: Request, payload: unknown) {
-  await ensureDatabase(request);
+  const actor = await ensureDatabase(request);
+  requireTeamAdmin(actor.participant);
   const origin = request.headers.get("origin");
   if (origin && origin !== new URL(request.url).origin) throw new ApiRequestError("Запрос с другого сайта отклонён.", 403);
   const input = asObject(payload);

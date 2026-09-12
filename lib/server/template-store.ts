@@ -1,3 +1,4 @@
+import { requireTeamAdmin } from "./team-access";
 import { and, desc, eq } from "drizzle-orm";
 
 import { getDb } from "@/db";
@@ -436,7 +437,7 @@ export async function deleteEmailTemplate(
   request: Request,
   idValue: unknown,
 ): Promise<EmailTemplateDeleteResponse> {
-  await ensureDatabase(request);
+  requireTeamAdmin((await ensureDatabase(request)).participant);
   const id = cleanText(idValue, "Идентификатор шаблона", 160);
   await templateById(id);
   const db = getDb();

@@ -5,6 +5,7 @@ import { webcrypto } from "node:crypto";
 import vm from "node:vm";
 import ts from "typescript";
 import test from "node:test";
+import * as orm from "drizzle-orm";
 import { classifyReply, consentState, companyKey, usagePercent } from "../lib/communications/rules.ts";
 const now="2026-09-09T10:00:00.000Z";
 const contact={id:"contact-a",workspaceId:"workspace-main",fullName:"Иван",firstName:"Иван",lastName:"Тест",email:"ivan@example.org",status:"active",emailConsent:false,companyId:"company-a",companyName:"Компания",customFields:{},responsibleParticipantId:"member-a",createdByParticipantId:"member-a"};
@@ -41,13 +42,13 @@ async function harness(){
  const runtimeEnv={};
  const mocks={
   "cloudflare:workers":synthetic({env:runtimeEnv}),
-  "drizzle-orm":synthetic({and:(...v)=>v,eq:(a,b)=>[a,b]}),
-  "@/db/schema":synthetic({contacts:{id:"id",workspaceId:"workspace_id"}}),
+  "drizzle-orm":synthetic(orm),
+  "@/db/schema":synthetic({contacts:{id:"id",workspaceId:"workspace_id"}, campaigns:{}}),
   "@/db":synthetic({getD1:()=>d1,getDb:()=>({select:()=>({from:()=>({where:()=>({limit:async()=>[{...contact,status:sqlite.prepare("SELECT status FROM contacts WHERE id=?").get(contact.id).status}]})})})})}),
-  "./database-init":synthetic({WORKSPACE_ID:"workspace-main",ensureDatabase:async()=>({participant:{id:"member-a"}}),ensureSystemDatabase:async()=>{}}),
+  "./database-init":synthetic({WORKSPACE_ID:"workspace-main",ensureDatabase:async()=>({participant:{id:"member-a",workspaceId:"workspace-main",role:"admin",status:"active",accessScope:{all:true,baseIds:[],groupTags:[]}}}),ensureSystemDatabase:async()=>{}}),
  };
  const modules=new Map();
- async function moduleFor(path){if(modules.has(path))return modules.get(path);const source=await readFile(new URL(`../${path}`,import.meta.url),"utf8");const code=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;const m=new vm.SourceTextModule(code,{context,identifier:path});modules.set(path,m);await m.link(async(spec)=>mocks[spec]??moduleFor(spec==="./api-utils"?"lib/server/api-utils.ts":"lib/communications/rules.ts"));return m;}
+ async function moduleFor(path){if(modules.has(path))return modules.get(path);const source=await readFile(new URL(`../${path}`,import.meta.url),"utf8");const code=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;const m=new vm.SourceTextModule(code,{context,identifier:path});modules.set(path,m);await m.link(async(spec)=>mocks[spec]??moduleFor(spec==="./api-utils"?"lib/server/api-utils.ts":spec==="./team-access"?"lib/server/team-access.ts":spec==="@/lib/team-access"?"lib/team-access.ts":"lib/communications/rules.ts"));return m;}
  const loadedModule=await moduleFor("lib/server/communication-store.ts");await loadedModule.evaluate();return {api:loadedModule.namespace,sqlite,runtimeEnv};
 }
 test("real SQL: evidence is append-only; duplicate reply creates one hold and one task",async()=>{

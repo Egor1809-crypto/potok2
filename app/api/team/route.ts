@@ -1,27 +1,21 @@
-import { jsonError } from "@/lib/server/api-utils";
+import { ApiRequestError, jsonError, readJsonBody } from "@/lib/server/api-utils";
+import { teamOverview, manageTeam } from "@/lib/server/team-management";
 import { ensureDatabase, rebalanceContactsForChannelMask } from "@/lib/server/database-init";
-import { createTeamInvite, listTeamMembers, TEAM_NAME } from "@/lib/server/team-auth";
-
+import { requireTeamAdmin } from "@/lib/server/team-access";
 export const dynamic = "force-dynamic";
-
 export async function GET(request: Request) {
-  try {
-    const actor = await ensureDatabase(request);
-    return Response.json({ teamName: TEAM_NAME, participant: actor.participant, members: await listTeamMembers() }, { headers: { "Cache-Control": "no-store" } });
-  } catch (error) {
-    return jsonError(error);
-  }
+  try { return Response.json(await teamOverview(request), { headers: { "Cache-Control": "no-store" } }); }
+  catch (error) { return jsonError(error); }
 }
-
 export async function POST(request: Request) {
   try {
-    const actor = await ensureDatabase(request);
-    const payload = await request.clone().json().catch(() => null) as { action?: unknown; mask?: unknown } | null;
-    if (payload?.action === "rebalance_contacts") {
-      return Response.json(await rebalanceContactsForChannelMask(Number(payload.mask)));
+    const origin = request.headers.get("origin");
+    if (origin && origin !== new URL(request.url).origin) throw new ApiRequestError("Нельзя изменить команду с другого сайта.",403);
+    const payload = await readJsonBody(request);
+    if (payload && typeof payload === "object" && "action" in payload && payload.action === "rebalance_contacts") {
+      requireTeamAdmin((await ensureDatabase(request)).participant);
+      return Response.json(await rebalanceContactsForChannelMask(Number((payload as { mask?: unknown }).mask)));
     }
-    return Response.json(await createTeamInvite(actor.participant.id), { status: 201 });
-  } catch (error) {
-    return jsonError(error);
-  }
+    return Response.json(await manageTeam(request,payload), { headers: { "Cache-Control": "no-store" } });
+  } catch (error) { return jsonError(error); }
 }
