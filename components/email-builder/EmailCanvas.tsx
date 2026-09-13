@@ -47,7 +47,8 @@ function previewImageSource(href: string) {
   if (
     href.startsWith(`${PROTECTED_SITE_ORIGIN}/conference-series/`) ||
     href.startsWith(`${PROTECTED_SITE_ORIGIN}/email-brand/`) ||
-    href.startsWith(`${PROTECTED_SITE_ORIGIN}/email-patterns/`)
+    href.startsWith(`${PROTECTED_SITE_ORIGIN}/email-patterns/`) ||
+    href.startsWith(`${PROTECTED_SITE_ORIGIN}/email-icons/`)
   ) {
     return href.slice(PROTECTED_SITE_ORIGIN.length);
   }
@@ -427,7 +428,7 @@ function BlockContent({
   selected: boolean;
   onInlineEdit: (content: string) => void;
 }) {
-  if (block.aiRole && block.variant) return <div onClickCapture={event => { if ((event.target as HTMLElement).closest("a")) event.preventDefault(); }} dangerouslySetInnerHTML={{ __html: renderEmailVariant(block, block.accentColor || accentColor) }} />;
+  if (block.aiRole && block.variant) return <div onClickCapture={event => { if ((event.target as HTMLElement).closest("a")) event.preventDefault(); }} dangerouslySetInnerHTML={{ __html: renderEmailVariant(block, block.accentColor || accentColor).replaceAll(`${PROTECTED_SITE_ORIGIN}/email-icons/`, "/email-icons/") }} />;
   if (block.type === "logo") {
     if (block.href) {
       return (

@@ -29,7 +29,7 @@ export type AiEmailBlock = {
   title: string;
   text: string;
   badge: string;
-  items: Array<{ title: string; text: string; value: string; label: string }>;
+  items: Array<{ title: string; text: string; value: string; label: string; iconId?: string | null }>;
   button: { text: string; url: string } | null;
   image: AiEmailImage | null;
   backgroundColor: string | null;

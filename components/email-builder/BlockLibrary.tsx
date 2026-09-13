@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import {
   AlignJustify,
+  Star,
   Columns3,
   GalleryHorizontal,
   Heading2,
@@ -40,6 +41,8 @@ import type { EmailBlockType } from "@/types";
 import { cn } from "@/components/ui/utils";
 import type { BuilderBlock, BuilderDocument } from "./builder-types";
 import { emailFrameCss, emailFramePresets } from "./frame-presets";
+import { EmailIconPicker } from "./EmailIconPicker";
+import { emailIconUrl, emailIcons } from "@/lib/email-icons";
 import { emailBackgroundPresets, emailPatternCategoryLabels, emailPatternPresets } from "./pattern-presets";
 
 const PRODUCTION_ORIGIN = "https://mailflow-outreach.isakovegor820.chatgpt.site";
@@ -96,7 +99,7 @@ export function BlockLibrary({
   className?: string;
 }) {
   const [query, setQuery] = useState("");
-  const [tab, setTab] = useState<"content" | "layout" | "decor" | "frame">("content");
+  const [tab, setTab] = useState<"content" | "layout" | "decor" | "frame" | "icons">("content");
   const visibleItems = useMemo(() => {
     const layoutTypes = new Set<EmailBlockType>(["columns", "hero", "banner", "timeline", "product", "stats", "comparison", "document", "notice", "compliance"]);
     const normalized = query.trim().toLowerCase();
@@ -136,11 +139,12 @@ export function BlockLibrary({
           <LibraryTab active={tab === "layout"} onClick={() => setTab("layout")} icon={LayoutTemplate}>Структуры</LibraryTab>
           <LibraryTab active={tab === "decor"} onClick={() => setTab("decor")} icon={Sparkles}>Декор</LibraryTab>
           <LibraryTab active={tab === "frame"} onClick={() => setTab("frame")} icon={Shapes}>Окантовки</LibraryTab>
+          <LibraryTab active={tab === "icons"} onClick={() => setTab("icons")} icon={Star}>Значки</LibraryTab>
         </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3 scrollbar-subtle">
-        {tab === "frame" ? (
+        {tab === "icons" ? <EmailIconPicker query={query} onSelect={id => onAdd("image", { href: emailIconUrl(id), content: emailIcons.find(icon => icon.id === id)!.name, widthPercent: 10, paddingTop: 8, paddingBottom: 8, borderRadius: 0 })} /> : tab === "frame" ? (
           <div>
             <p className="mb-3 mt-0 text-[10px] leading-4 text-text-muted">Окантовка применяется ко всему письму и сохраняется в итоговом HTML.</p>
             <div className="grid grid-cols-2 gap-2 lg:grid-cols-1 xl:grid-cols-2" role="radiogroup" aria-label="Окантовка письма">

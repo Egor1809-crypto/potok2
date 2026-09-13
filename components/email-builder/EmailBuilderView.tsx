@@ -1,6 +1,8 @@
 "use client";
 
 import { useEditorDraft } from "@/lib/use-editor-draft";
+import { ImportedLetterDirector } from "@/components/templates/ImportedLetterDirector";
+import { ImportedHtmlEditor } from "./ImportedHtmlEditor";
 
 import {
   useCallback,
@@ -586,6 +588,7 @@ function EmailBuilderWorkspace({
   );
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [focusCanvas, setFocusCanvas] = useState(false);
+  const [htmlDirectorOpen, setHtmlDirectorOpen] = useState(Boolean(initialDirectorOpen && initialDocument.rawHtml));
   const [showLibrary, setShowLibrary] = useState(true);
   const [showProperties, setShowProperties] = useState(true);
   const [templateSettingsOpen, setTemplateSettingsOpen] = useState(false);
@@ -1017,8 +1020,9 @@ function EmailBuilderWorkspace({
         continueHref={continueHref}
         tools={<>{creationMode === "manual" && <Button type="button" variant="secondary" size="sm" aria-pressed={focusCanvas} aria-label={focusCanvas ? "Вернуть панели редактора" : "Только письмо"} onClick={() => { setFocusCanvas(value => !value); setMobilePanel("canvas"); }}>{focusCanvas ? <Minimize2 aria-hidden className="size-4" /> : <Maximize2 aria-hidden className="size-4" />}<span className="hidden xl:inline">{focusCanvas ? "Вернуть панели" : "Только письмо"}</span></Button>}<EmailExportMenu document={document} name={campaignName} /></>}
       />
-      {creationMode === "manual" && !focusCanvas ? <EmailSubjectFields document={document} onUpdate={updateDocument} onOpenAi={() => { setRightPanelMode("ai"); setShowProperties(true); setMobilePanel("properties"); }} /> : null}
+      {creationMode === "manual" && !focusCanvas ? <EmailSubjectFields document={document} onUpdate={updateDocument} onOpenAi={() => { if (document.rawHtml) { setHtmlDirectorOpen(true); return; } setRightPanelMode("ai"); setShowProperties(true); setMobilePanel("properties"); }} /> : null}
 
+      {document.rawHtml && <Modal open={htmlDirectorOpen} onOpenChange={setHtmlDirectorOpen} title="Арт-директор письма" size="full"><ImportedLetterDirector document={document} onApply={(next, message) => { mutateDocument(() => next); toast.success(message); setHtmlDirectorOpen(false); }} /></Modal>}
       <div
         className={cn("studio-modebar flex flex-wrap items-center justify-center gap-1 border-b border-border/80 bg-surface/95 px-3 py-1", focusCanvas && "hidden")}
         role="tablist"
@@ -1051,7 +1055,7 @@ function EmailBuilderWorkspace({
           <Sparkles aria-hidden="true" className="size-4" />
           Создать с ИИ
         </button>
-        {creationMode === "manual" ? <div className="ml-auto flex items-center gap-1"><Button type="button" variant="ghost" size="sm" aria-pressed={showLibrary} onClick={() => setShowLibrary(value => !value)} className="hidden lg:inline-flex"><Blocks aria-hidden className="size-4" />Блоки</Button><Button type="button" variant="ghost" size="sm" aria-pressed={showProperties} onClick={() => setShowProperties(value => !value)} className="hidden lg:inline-flex"><SlidersHorizontal aria-hidden className="size-4" />Свойства</Button>{mode === "template" ? <Button type="button" size="sm" variant="ghost" onClick={() => setTemplateSettingsOpen(true)}>О шаблоне</Button> : null}</div> : null}
+        {creationMode === "manual" && !document.rawHtml ? <div className="ml-auto flex items-center gap-1"><Button type="button" variant="ghost" size="sm" aria-pressed={showLibrary} onClick={() => setShowLibrary(value => !value)} className="hidden lg:inline-flex"><Blocks aria-hidden className="size-4" />Блоки</Button><Button type="button" variant="ghost" size="sm" aria-pressed={showProperties} onClick={() => setShowProperties(value => !value)} className="hidden lg:inline-flex"><SlidersHorizontal aria-hidden className="size-4" />Свойства</Button>{mode === "template" ? <Button type="button" size="sm" variant="ghost" onClick={() => setTemplateSettingsOpen(true)}>О шаблоне</Button> : null}</div> : null}
       </div>
 
       {creationMode === "start" ? (
@@ -1131,6 +1135,8 @@ function EmailBuilderWorkspace({
             setCreationMode("manual");
           }}
         />
+      ) : document.rawHtml ? (
+        <ImportedHtmlEditor document={document} onChange={next => mutateDocument(() => next)} previewMode={previewMode} focusCanvas={focusCanvas} />
       ) : (
         <>
           <Modal open={templateSettingsOpen} onOpenChange={setTemplateSettingsOpen} title="О шаблоне">                <div className="mt-2 grid gap-2 md:grid-cols-[190px_minmax(0,1fr)]">

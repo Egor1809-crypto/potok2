@@ -21,7 +21,7 @@ export async function inlineStoredPreviewImages(html: string, signal: AbortSigna
   const resources: ImportResource[] = [];
   for (const source of sources) {
     const url = new URL(source, location.href);
-    if (!/^\/api\/assets\/[\w-]+$/.test(url.pathname)) continue;
+    if (!/^\/api\/assets\/[\w-]+$|^\/email-icons\/[a-z-]+\.png$/.test(url.pathname)) continue;
     const response = await fetch(url.pathname, { signal });
     if (!response.ok) throw new Error("Не удалось загрузить изображение письма. Повторите открытие предпросмотра.");
     const blob = await response.blob();

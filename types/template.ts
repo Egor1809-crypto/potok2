@@ -39,6 +39,7 @@ export interface EmailBlock {
   variant?: string;
   imageHref?: string;
   imageAlt?: string;
+  itemIcons?: string[];
   badge?: string;
   id: string;
   type: EmailBlockType;

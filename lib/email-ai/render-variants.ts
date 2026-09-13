@@ -1,3 +1,4 @@
+import { emailIconMarkup } from "@/lib/email-icons";
 import type { EmailBuilderBlockInput } from "@/types/api";
 import { safeEmailUrl } from "./urls";
 import { readableColor } from "@/lib/design-readability";
@@ -32,11 +33,11 @@ export function renderEmailVariant(block: EmailBuilderBlockInput, accent: string
     const count = /3-column|three/.test(variant) ? 3 : /list/.test(variant) ? 1 : 2;
     const rows: string[] = [];
     for (let index = 0; index < parts.length; index += count) {
-      rows.push(`<tr>${parts.slice(index, index + count).map(item => `<td class="email-column" width="${Math.floor(100 / count)}%" valign="top" style="padding:14px;${count > 1 ? `border:1px solid ${block.borderColor || "#E5E7EB"};` : "border-bottom:1px solid #E5E7EB;"}border-radius:${block.borderRadius}px;font-size:16px;line-height:1.55;">${lines(item)}</td>`).join('<td class="email-column-gap" width="12">&nbsp;</td>')}</tr>`);
+      rows.push(`<tr>${parts.slice(index, index + count).map((item, offset) => `<td class="email-column" width="${Math.floor(100 / count)}%" valign="top" style="padding:14px;${count > 1 ? `border:1px solid ${block.borderColor || "#E5E7EB"};` : "border-bottom:1px solid #E5E7EB;"}border-radius:${block.borderRadius}px;font-size:16px;line-height:1.55;">${emailIconMarkup(block.itemIcons?.[index + offset] || "")}${lines(item)}</td>`).join('<td class="email-column-gap" width="12">&nbsp;</td>')}</tr>`);
     }
     html = table(rows.join(""), 'class="email-columns"');
   } else if (block.aiRole === "stats") {
-    html = table(`<tr>${parts.flatMap((value, index) => index % 2 ? [] : [`<td class="email-column" valign="top" style="padding:16px;text-align:center;"><strong style="font-size:30px;color:${readableColor(accent, block.backgroundColor)};">${lines(value)}</strong><div style="margin-top:8px;font-size:15px;">${lines(parts[index + 1] || "")}</div></td>`]).join("")}</tr>`, 'class="email-columns"');
+    html = table(`<tr>${parts.flatMap((value, index) => index % 2 ? [] : [`<td class="email-column" valign="top" style="padding:16px;text-align:center;">${emailIconMarkup(block.itemIcons?.[index / 2] || "", "center")}<strong style="font-size:30px;color:${readableColor(accent, block.backgroundColor)};">${lines(value)}</strong><div style="margin-top:8px;font-size:15px;">${lines(parts[index + 1] || "")}</div></td>`]).join("")}</tr>`, 'class="email-columns"');
   } else if (block.aiRole === "quote" || block.aiRole === "review") html = `<blockquote style="margin:0;padding:16px 20px;border-left:3px solid ${accent};"><p style="margin:0;">${lines(parts[0] || "")}</p>${parts[1] ? `<p style="margin:14px 0 0;font-size:13px;">${lines(parts[1])}</p>` : ""}</blockquote>`;
   else if (block.aiRole === "cta") html = block.type === "button" ? button() : lines(block.content);
   else if (block.aiRole === "urgency") html = `<strong style="font-size:12px;">${lines(parts[0] || "Важно")}</strong><p style="font-size:20px;font-weight:700;">${lines(parts[1] || "")}</p>${lines(parts[2] || "")}`;

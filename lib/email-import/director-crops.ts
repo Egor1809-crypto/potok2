@@ -1,5 +1,6 @@
 import type { ImportCrop } from "./director";
 import type { ImportResource } from "./import-letter";
+import { letterElements, editLetterAttribute } from "./visual-editor";
 
 export async function prepareDirectorCrops(html: string, crops: ImportCrop[], signal: AbortSignal) {
   const resources: ImportResource[] = [];
@@ -26,6 +27,11 @@ export async function prepareDirectorCrops(html: string, crops: ImportCrop[], si
         signal.throwIfAborted();
         const resource = { url: URL.createObjectURL(fragment), blob: fragment, name: `art-director-${crop.id}.png` };
         resources.push(resource); html = html.split(`{{crop:${crop.id}}}`).join(resource.url);
+        // Keep the source so a person can correct the crop after saving/reopening.
+        for (const element of letterElements(html).filter(element => element.attributes.src === resource.url).reverse()) {
+          html = editLetterAttribute(html, element.index, "data-potok-original-src", crop.source);
+          html = editLetterAttribute(html, element.index, "data-potok-crop", JSON.stringify({ x: crop.x * 100, y: crop.y * 100, width: crop.width * 100, height: crop.height * 100 }));
+        }
       } finally { bitmap.close(); }
     }
     return { html, resources };

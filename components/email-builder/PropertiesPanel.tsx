@@ -37,6 +37,7 @@ import { cn } from "@/components/ui/utils";
 import type { BuilderBlock, BuilderDocument } from "./builder-types";
 import { getBlockLabel } from "./BlockLibrary";
 import { ImageAssetPicker } from "./ImageAssetPicker";
+import { EmailIconPicker } from "./EmailIconPicker";
 import { emailPatternPresets } from "./pattern-presets";
 import { applyEmailVariant, emailBlockVariants, emailVariantLabel } from "@/lib/email-ai/variants";
 
@@ -202,6 +203,7 @@ export function PropertiesPanel({
               </FormField>
             )}
 
+            {block.aiRole && ["benefits", "cards", "stats"].includes(block.aiRole) && <details className="rounded-lg border border-border p-3"><summary className="cursor-pointer text-xs font-medium">Значки в карточках</summary><div className="mt-3 grid gap-3">{block.content.split("|").filter((_, index) => block.type !== "stats" || index % 2 === 0).map((content, index) => <details key={index} className="rounded-lg border border-border p-2"><summary className="cursor-pointer text-xs">{index + 1}. {content.slice(0, 50)}</summary><div className="mt-3"><EmailIconPicker value={block.itemIcons?.[index]} onSelect={id => { const icons = [...(block.itemIcons || [])]; while (icons.length <= index) icons.push(""); icons[index] = id; onUpdateBlock({ itemIcons: icons }); }} /><button type="button" className="mt-2 text-xs text-primary underline" onClick={() => { const icons = [...(block.itemIcons || [])]; icons[index] = ""; onUpdateBlock({ itemIcons: icons }); }}>Без значка</button></div></details>)}</div></details>}
             {block.type === "button" || block.type === "product" || block.type === "video" || block.type === "document" || block.type === "compliance" ? (
               <FormField label="Куда ведёт нажатие" htmlFor="builder-button-link" hint={block.href?.startsWith("https://") ? "Ссылка готова. Нажмите кнопку на холсте, чтобы проверить переход." : "Вставьте полный адрес. Если протокол не указан, добавим https:// автоматически."}>
                 <div className="relative">

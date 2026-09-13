@@ -1,6 +1,7 @@
+import { emailIcons, emailIconUrl } from "@/lib/email-icons";
 import type { AiEmailBrief, AiEmailDocument, AiEmailReview, AiEmailEditorialReview, AiEmailStudioResponse } from "@/types/email-ai";
 import type { EmailBuilderDocumentInput, EmailAiSuggestion } from "@/types/api";
-import { aiEmailBlockSchema, aiEmailDocumentSchema, aiEmailReviewSchema, object, parseAiEmailBlock, parseAiEmailBrief, parseAiEmailDocument, subjectVariantsSchema, validateEmailSchema } from "@/lib/email-ai/schema";
+import { aiEmailBlockSchema, aiEmailDocumentSchema, aiEmailReviewSchema, object, parseAiEmailBlock, parseAiEmailBrief, parseAiEmailDocument, subjectVariantsSchema, validateEmailSchema, withEmailIconDefaults } from "@/lib/email-ai/schema";
 import { EMAIL_EDIT_PROMPT, EMAIL_REVIEW_PROMPT, EMAIL_STRATEGIST_PROMPT } from "@/lib/email-ai/prompts";
 import { builderToAiEmail, mapAiEmailToBuilderDocument } from "@/lib/email-ai/mapping";
 import { emailFactIssues, emailSourceOfTruth } from "@/lib/email-ai/facts";
@@ -21,7 +22,7 @@ class EmailJsonError extends Error {
 
 async function aiJson(provider: Provider, request: Request, name: string, schema: Record<string, unknown>, instructions: string, input: unknown, fallback = false) {
   const model = fallback && provider.fallbackModel ? provider.fallbackModel : provider.model;
-  const contract = name === "email_document" || name === "email_block" ? `Каждый блок содержит СТРОГО поля id,type,variant,title,text,badge,items,button,image,backgroundColor,textColor. badge обязателен, пустой="". Никакого eyebrow или features. Каждый item содержит все четыре строки title,text,value,label, даже пустые. Полное имя variant обязательно с префиксом типа: ${JSON.stringify(emailBlockVariants)}. ${name === "email_document" ? "Корень: version=1.0,subject,preheader,meta,theme,blocks. meta: goal,language,tone,length. theme: emailWidth,backgroundColor,contentBackgroundColor,textColor,mutedTextColor,primaryColor,accentColor,borderColor,borderRadius,fontFamily." : "Корень ответа — один блок, без обёртки."} image=null либо {assetId:null или строка,alt:строка,prompt:null или строка}; button=null либо {text:строка,url:строка}.` : "Верни только JSON с обязательными полями указанной схемы.";
+  const contract = name === "email_document" || name === "email_block" ? `Каждый блок содержит СТРОГО поля id,type,variant,title,text,badge,items,button,image,backgroundColor,textColor. badge обязателен, пустой="". Никакого eyebrow или features. Каждый item содержит все строки title,text,value,label, даже пустые, и iconId (id значка из iconLibrary или null). Полное имя variant обязательно с префиксом типа: ${JSON.stringify(emailBlockVariants)}. ${name === "email_document" ? "Корень: version=1.0,subject,preheader,meta,theme,blocks. meta: goal,language,tone,length. theme: emailWidth,backgroundColor,contentBackgroundColor,textColor,mutedTextColor,primaryColor,accentColor,borderColor,borderRadius,fontFamily." : "Корень ответа — один блок, без обёртки."} image=null либо {assetId:null или строка,alt:строка,prompt:null или строка}; button=null либо {text:строка,url:строка}.` : "Верни только JSON с обязательными полями указанной схемы.";
   const themeContract = name === "email_document" ? 'Theme example (colors may change): {"emailWidth":640,"backgroundColor":"#F4F7FB","contentBackgroundColor":"#FFFFFF","textColor":"#172033","mutedTextColor":"#667080","primaryColor":"#087F73","accentColor":"#C06532","borderColor":"#DCE5E7","borderRadius":12,"fontFamily":"Arial"}. emailWidth and borderRadius MUST be JSON numbers, never strings/px. fontFamily exactly one of Arial, Georgia, Verdana, Trebuchet MS. meta.goal one of sale,invite,announcement,reminder,welcome,reactivation,promo,education,custom. meta.tone one of business,friendly,premium,tech,energetic,minimal,expert. meta.length short,medium,long. image/pattern blocks require image with assetId or prompt, never empty decorative blocks.' : '';
   const system = `${contract}\n${themeContract}\n${instructions}\nОбязательная JSON Schema: ${JSON.stringify(schema)}`;
   const userInput = JSON.stringify({ outputContract: `${contract}\n${themeContract}`, task: input });
@@ -40,7 +41,7 @@ async function aiJson(provider: Provider, request: Request, name: string, schema
   }
   if (typeof text !== "string") throw new Error("ИИ не вернул документ.");
   // No Markdown recovery or raw HTML fallback: one bounded repair handles invalid output.
-  const value: unknown = JSON.parse(text);
+  const value: unknown = withEmailIconDefaults(JSON.parse(text));
   try { validateEmailSchema(value, schema); }
   catch (error) { throw new EmailJsonError(error instanceof Error ? error.message : "Некорректная структура.", value); }
   return { value, model };
@@ -138,11 +139,12 @@ export async function emailAiStudio(request: Request, action: string, input: unk
   const selected = action === "rewrite-block" ? context?.email.blocks.find(b => b.id === row.blockId) : undefined;
   if (action === "rewrite-block" && !selected) throw new ApiRequestError("Выберите блок для изменения.");
   const knownAssets = new Map(context?.assets);
+  if (brief.visuals !== "none") for (const icon of emailIcons) knownAssets.set(`icon-${icon.id}`, emailIconUrl(icon.id));
   for (const asset of brief.assets) {
     const stored = await getEmailAssetRecord(request, asset.id);
     knownAssets.set(asset.id, stored.url);
   }
-  const payload = { brief, sourceOfTruth: emailSourceOfTruth(brief, existingText), email: selected ? undefined : context?.email, block: selected, blockOnly: Boolean(selected), instruction, availableAssets: [...knownAssets.keys()] };
+  const payload = { brief, sourceOfTruth: emailSourceOfTruth(brief, existingText), email: selected ? undefined : context?.email, block: selected, blockOnly: Boolean(selected), instruction, availableAssets: [...knownAssets.keys()], iconLibrary: brief.visuals === "none" ? [] : emailIcons.map(({ id, name, keywords }) => ({ id, name, keywords, assetId: `icon-${id}` })) };
   let email: AiEmailDocument | undefined; let failedDraft: unknown; let model = provider.model; let repaired = false;
   const generate = async (repair?: string[]) => {
     const result = await aiJson(provider, request, selected ? "email_block" : "email_document", selected ? aiEmailBlockSchema : aiEmailDocumentSchema, `${action === "generate" ? EMAIL_STRATEGIST_PROMPT : EMAIL_EDIT_PROMPT}${repair ? "\nИсправь ТОЛЬКО перечисленные ошибки в previousDraft. Не создавай новый дизайн и не переписывай остальные блоки. Верни полный исправленный JSON." : ""}`, { ...payload, previousDraft: failedDraft || email, repairIssues: repair }, Boolean(repair));
@@ -168,7 +170,7 @@ export async function emailAiStudio(request: Request, action: string, input: unk
     if (selected && current) {
       const replacement = mapped.blocks.find(b => b.id === selected.id);
       if (!replacement) throw new Error("ИИ не вернул выбранный блок.");
-      document = { ...current, aiMetadata: metadata, blocks: current.blocks.map(block => block.id === selected.id ? { ...block, content: replacement.content, badge: replacement.badge, href: replacement.href, label: replacement.label, variant: replacement.variant, backgroundColor: replacement.backgroundColor, textColor: replacement.textColor, imageHref: replacement.imageHref, imageAlt: replacement.imageAlt } : block) };
+      document = { ...current, aiMetadata: metadata, blocks: current.blocks.map(block => block.id === selected.id ? { ...block, content: replacement.content, badge: replacement.badge, href: replacement.href, label: replacement.label, variant: replacement.variant, backgroundColor: replacement.backgroundColor, textColor: replacement.textColor, imageHref: replacement.imageHref, imageAlt: replacement.imageAlt, itemIcons: replacement.itemIcons } : block) };
     } else if (current) {
       const changeDesign = /дизайн|оформлен|стил|композици|цвет|палитр|шрифт|вариант|премиальн|технологич|макет|фон|layout|design/iu.test(instruction);
       document = { ...mapped, templateId: current.templateId };
@@ -176,7 +178,7 @@ export async function emailAiStudio(request: Request, action: string, input: unk
         // Copy edits do not erase manual typography, frame, spacing or untouched variants.
         document = { ...current, subject: mapped.subject, previewText: mapped.previewText, aiMetadata: metadata, blocks: mapped.blocks.map(next => {
           const old = current.blocks.find(block => block.id === next.id && block.type === next.type);
-          return old ? { ...old, content: next.content, badge: next.badge, href: next.href, label: next.label, imageHref: next.imageHref, imageAlt: next.imageAlt, aiRole: next.aiRole, variant: old.variant || next.variant } : next;
+          return old ? { ...old, content: next.content, badge: next.badge, href: next.href, label: next.label, imageHref: next.imageHref, imageAlt: next.imageAlt, itemIcons: next.itemIcons, aiRole: next.aiRole, variant: old.variant || next.variant } : next;
         }) };
       }
     }

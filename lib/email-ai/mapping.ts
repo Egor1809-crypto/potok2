@@ -1,3 +1,4 @@
+import { emailIcons } from "@/lib/email-icons";
 import type { AiEmailBlock, AiEmailBrief, AiEmailDocument, AiEmailMetadata } from "@/types/email-ai";
 import type { EmailBuilderBlockInput, EmailBuilderDocumentInput } from "@/types/api";
 import { readableColor } from "@/lib/design-readability";
@@ -37,14 +38,17 @@ export function mapAiEmailToBuilderDocument(ai: AiEmailDocument, brief: AiEmailB
     } else if (["image", "pattern"].includes(source.type)) {
       if (!image) continue;
       base.type = source.type as "image" | "pattern"; base.content = source.image?.alt || ""; base.href = image; base.paddingTop = 8; base.paddingBottom = 8;
+      if (emailIcons.some(icon => source.image?.assetId === `icon-${icon.id}`)) { base.widthPercent = 10; base.borderRadius = 0; }
     } else if (["benefits", "cards", "speakers", "products"].includes(source.type)) {
       if (source.title) blocks.push({ ...base, id: childId(source.id, "heading"), type: "heading", aiRole: "text", variant: "text-default", content: source.title, fontSize: 24, fontWeight: 700, paddingBottom: 8 });
       if (source.text && source.items.length) blocks.push({ ...base, id: childId(source.id, "intro"), content: source.text, aiRole: "text", variant: "text-default", paddingBottom: 8 });
       base.type = source.variant.endsWith("list") ? "checklist" : "columns";
       base.content = source.items.map(item => part(join(item.title, item.text, item.value, item.label))).join("|");
       if (!base.content) base.content = source.text;
+      if (brief.visuals !== "none") base.itemIcons = source.items.map(item => item.iconId || "");
     } else if (source.type === "stats") {
       if (source.title || source.text) blocks.push({ ...base, id: childId(source.id, "intro"), content: join(source.title, source.text), aiRole: "text", variant: "text-default" });
+      if (brief.visuals !== "none") base.itemIcons = source.items.map(item => item.iconId || "");
       base.type = "stats"; base.content = source.items.flatMap(item => [part(item.value), part(join(item.label, item.title === item.label ? "" : item.title, item.text))]).join("|");
     } else if (source.type === "quote" || source.type === "review") {
       base.type = "quote"; base.content = [source.text, source.title].map(part).join("|");
@@ -82,7 +86,7 @@ export function builderToAiEmail(document: EmailBuilderDocumentInput, brief: AiE
     const assetId = imageUrl ? `existing-${block.id}` : null;
     if (imageUrl && assetId) assets.set(assetId, imageUrl);
     const parts = block.content.split("|");
-    const items = block.type === "stats" ? parts.flatMap((value, index) => index % 2 ? [] : [{ value, label: parts[index + 1] || "", title: "", text: "" }]) : ["columns", "checklist"].includes(block.type) ? parts.map(value => ({ title: "", text: value, value: "", label: "" })) : [];
+    const items = block.type === "stats" ? parts.flatMap((value, index) => index % 2 ? [] : [{ value, label: parts[index + 1] || "", title: "", text: "", iconId: block.itemIcons?.[index / 2] || null }]) : ["columns", "checklist"].includes(block.type) ? parts.map((value, index) => ({ title: "", text: value, value: "", label: "", iconId: block.itemIcons?.[index] || null })) : [];
     return { id: block.id, type, variant: block.variant || defaultVariant(type), title: block.type === "hero" ? parts[0] : block.type === "quote" ? parts[1] || "" : block.type === "notice" ? parts[1] || "" : block.type === "logo" ? block.content : "", text: block.type === "hero" ? parts.slice(1).join("|") : block.type === "quote" ? parts[0] : block.type === "notice" ? parts.slice(2).join("|") : items.length || block.type === "button" ? "" : block.content, badge: block.type === "notice" ? parts[0] : block.badge || "", items, button: (block.type === "button" || block.type === "hero") && block.href ? { text: block.label || block.content, url: block.href } : null, image: assetId ? { assetId, alt: block.imageAlt || block.content, prompt: null } : null, backgroundColor: block.backgroundColor === "transparent" ? null : block.backgroundColor, textColor: block.textColor };
   });
   return { email: { version: "1.0", subject: document.subject, preheader: document.previewText, meta: { goal: brief.goal, language: "ru", tone: brief.tone, length: brief.length }, theme: { emailWidth: Math.max(600, Math.min(680, document.contentWidth)), backgroundColor: document.workspaceBackground, contentBackgroundColor: document.bodyBackground, textColor: "#202632", mutedTextColor: "#667080", primaryColor: document.accentColor, accentColor: document.accentColor, borderColor: document.frameColor || "#E5E7EB", borderRadius: document.frameRadius || 0, fontFamily: document.blocks[0]?.fontFamily || "Arial" }, blocks }, assets };

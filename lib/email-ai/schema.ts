@@ -1,3 +1,4 @@
+import { emailIconIds } from "@/lib/email-icons";
 import type { AiEmailBlock, AiEmailBlockType, AiEmailBrief, AiEmailDocument, AiEmailReview } from "@/types/email-ai";
 import { emailBlockVariants } from "./variants";
 import { safeEmailUrl } from "./urls";
@@ -62,7 +63,7 @@ export function parseAiEmailBlock(value: unknown): AiEmailBlock {
   const button = row.button == null ? null : object(row.button);
   const result: AiEmailBlock = {
     id, type, variant, title: string(row.title, 500), text: string(row.text, 6000), badge: string(row.badge, 150),
-    items: list(row.items, 12).map(value => { const item = object(value); return { title: string(item.title, 300), text: string(item.text, 1500), value: string(item.value, 100), label: string(item.label, 300) }; }),
+    items: list(row.items, 12).map(value => { const item = object(value); return { title: string(item.title, 300), text: string(item.text, 1500), value: string(item.value, 100), label: string(item.label, 300), iconId: item.iconId == null ? null : choice(item.iconId, emailIconIds) }; }),
     button: button ? { text: string(button.text, 100), url: safeEmailUrl(button.url) } : null,
     image: image ? { assetId: image.assetId == null ? null : string(image.assetId, 160), alt: string(image.alt, 500), prompt: image.prompt == null ? null : string(image.prompt, 800) } : null,
     backgroundColor: row.backgroundColor == null ? null : color(row.backgroundColor), textColor: row.textColor == null ? null : color(row.textColor),
@@ -74,6 +75,7 @@ export function parseAiEmailBlock(value: unknown): AiEmailBlock {
 }
 
 export function parseAiEmailDocument(value: unknown): AiEmailDocument {
+  value = withEmailIconDefaults(value);
   validateEmailSchema(value, aiEmailDocumentSchema);
   const row = object(value); const meta = object(row.meta); const theme = object(row.theme);
   if (row.version !== "1.0" || "rawHtml" in row || "html" in row) throw new Error("ИИ должен вернуть структуру письма, а не HTML.");
@@ -97,7 +99,7 @@ const enumeration = (values: readonly string[]) => ({ type: "string", enum: valu
 const shape = (properties: Record<string, unknown>) => ({ type: "object", additionalProperties: false, required: Object.keys(properties), properties });
 const nullable = (schema: Record<string, unknown>) => ({ anyOf: [schema, { type: "null" }] });
 const colors = Object.fromEntries(["backgroundColor", "contentBackgroundColor", "textColor", "mutedTextColor", "primaryColor", "accentColor", "borderColor"].map(name => [name, { type: "string", pattern: "^#[a-fA-F0-9]{6}$" }]));
-export const aiEmailBlockSchema = shape({ id: text(120), type: enumeration(Object.keys(emailBlockVariants)), variant: enumeration(Object.values(emailBlockVariants).flat()), title: text(500), text: text(6000), badge: text(150), items: { type: "array", maxItems: 12, items: shape({ title: text(300), text: text(1500), value: text(100), label: text(300) }) }, button: nullable(shape({ text: text(100), url: text(2000) })), image: nullable(shape({ assetId: nullable(text(160)), alt: text(500), prompt: nullable(text(800)) })), backgroundColor: nullable(colors.backgroundColor as Record<string, unknown>), textColor: nullable(colors.textColor as Record<string, unknown>) });
+export const aiEmailBlockSchema = shape({ id: text(120), type: enumeration(Object.keys(emailBlockVariants)), variant: enumeration(Object.values(emailBlockVariants).flat()), title: text(500), text: text(6000), badge: text(150), items: { type: "array", maxItems: 12, items: shape({ title: text(300), text: text(1500), value: text(100), label: text(300), iconId: nullable(enumeration(emailIconIds)) }) }, button: nullable(shape({ text: text(100), url: text(2000) })), image: nullable(shape({ assetId: nullable(text(160)), alt: text(500), prompt: nullable(text(800)) })), backgroundColor: nullable(colors.backgroundColor as Record<string, unknown>), textColor: nullable(colors.textColor as Record<string, unknown>) });
 export const aiEmailDocumentSchema = shape({ version: { type: "string", const: "1.0" }, subject: text(150), preheader: text(250), meta: shape({ goal: enumeration(goals), language: text(20), tone: enumeration(tones), length: enumeration(lengths) }), theme: shape({ emailWidth: { type: "number", minimum: 600, maximum: 680 }, ...colors, borderRadius: { type: "number", minimum: 0, maximum: 24 }, fontFamily: enumeration(fonts) }), blocks: { type: "array", minItems: 1, maxItems: 24, items: aiEmailBlockSchema } });
 export const aiEmailReviewSchema = shape({ findings: { type: "array", maxItems: 6, items: shape({ category: enumeration(["clarity", "repetition", "brief", "cta"]), blockId: nullable(text(160)), evidence: text(400), message: text(600), suggestion: text(600) }) } });
 export const subjectVariantsSchema = shape({ variants: { type: "array", minItems: 3, maxItems: 3, items: shape({ subject: text(150), preheader: text(250) }) } });
@@ -129,4 +131,11 @@ export function validateEmailSchema(value: unknown, schema: Record<string, unkno
     if (schema.additionalProperties === false && Object.keys(row).some(key => !(key in properties))) fail();
     for (const [key, item] of Object.entries(row)) if (key in properties) validateEmailSchema(item, object(properties[key]), `${path}.${key}`);
   }
+}
+
+/** Older generated items have no icon field; null preserves their appearance. */
+export function withEmailIconDefaults(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const row = value as Record<string, unknown>;
+  return { ...row, ...(Array.isArray(row.blocks) ? { blocks: row.blocks.map(withEmailIconDefaults) } : {}), ...(Array.isArray(row.items) ? { items: row.items.map(item => item && typeof item === "object" && !Array.isArray(item) ? { iconId: null, ...item } : item) } : {}) };
 }

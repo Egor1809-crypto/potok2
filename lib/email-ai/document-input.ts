@@ -1,3 +1,4 @@
+import { emailIconIds } from "@/lib/email-icons";
 // Shared validation and normalization for persistence and editor identities.
 import { checkEmailHtml } from "@/lib/email-import/formats";
 import type { EmailBuilderBlockInput, EmailBuilderDocumentInput } from "@/types/api";
@@ -122,6 +123,7 @@ export function parseEmailBuilderDocument(
       ...(block.badge ? { badge: text(block.badge, "Надпись над блоком", 150) } : {}),
       ...(isEmailVariant(block.variant) ? { variant: block.variant } : {}),
       ...(block.imageHref ? { imageHref: safeHttpsUrl(block.imageHref, "Изображение первого экрана", true), imageAlt: text(block.imageAlt ?? "", "Описание изображения", 1000) } : {}),
+      ...(Array.isArray(block.itemIcons) ? { itemIcons: block.itemIcons.slice(0, 12).map(id => typeof id === "string" && emailIconIds.includes(id) ? id : "") } : {}),
       content: text(block.content, `Контент блока ${index + 1}`, 20_000),
       ...(block.label === undefined ? {} : { label: text(block.label, `Подпись блока ${index + 1}`, 2_000) }),
       ...(href ? { href } : {}),

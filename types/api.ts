@@ -171,6 +171,7 @@ export type EmailBuilderBlockInput = {
   variant?: string;
   imageHref?: string;
   imageAlt?: string;
+  itemIcons?: string[];
   badge?: string;
   id: string;
   type:
