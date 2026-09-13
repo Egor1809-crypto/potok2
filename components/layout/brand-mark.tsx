@@ -23,19 +23,19 @@ export function BrandMark({
       href={href}
       aria-label={`${BRAND_NAME}: обзор`}
       className={cx(
-        "inline-flex min-w-0 items-center gap-2.5 rounded-lg outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-surface",
+        "inline-flex min-w-0 items-center gap-3 rounded-lg outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-surface",
         className,
       )}
     >
       <Image
         src={brandConfig.logoPath}
         alt=""
-        width={32}
-        height={32}
-        className="size-8 shrink-0 rounded-[10px] object-cover shadow-[0_1px_2px_rgba(25,22,55,0.2),0_6px_18px_rgba(99,91,255,0.18)]"
+        width={44}
+        height={44}
+        className="size-11 shrink-0 rounded-xl object-cover shadow-[0_1px_2px_rgba(25,22,55,0.2),0_6px_18px_rgba(99,91,255,0.18)]"
       />
       {!compact ? (
-        <span className="truncate text-[15px] font-semibold tracking-[0.08em] text-text-strong">
+        <span className="truncate text-2xl font-semibold leading-tight tracking-[0.02em] text-text-strong">
           {BRAND_NAME}
         </span>
       ) : null}

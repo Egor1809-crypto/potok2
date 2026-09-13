@@ -12,16 +12,16 @@ export function MarketingHeader() {
   return (
     <header className="fixed inset-x-0 top-0 z-50 border-b border-border bg-surface/85 backdrop-blur-xl">
       <div className="container-shell flex h-[72px] items-center justify-between">
-        <Link href="/" className="group flex items-center gap-2.5" aria-label={`${BRAND_NAME}: главная`}>
+        <Link href="/" className="group flex shrink-0 items-center gap-3" aria-label={`${BRAND_NAME}: главная`}>
           <Image
             src={brandConfig.logoPath}
             alt=""
-            width={32}
-            height={32}
+            width={44}
+            height={44}
             priority
-            className="size-8 rounded-[9px] object-cover shadow-[0_6px_18px_rgba(124,53,242,.25)] transition-transform group-hover:-rotate-3"
+            className="size-11 shrink-0 rounded-xl object-cover shadow-[0_6px_18px_rgba(124,53,242,.25)] transition-transform group-hover:-rotate-3"
           />
-          <span className="text-[15px] font-semibold tracking-[.12em] text-text-strong">{BRAND_NAME}</span>
+          <span className="whitespace-nowrap text-2xl font-semibold leading-tight tracking-[0.02em] text-text-strong">{BRAND_NAME}</span>
         </Link>
 
         <nav className="hidden items-center gap-6 xl:flex" aria-label="Главная навигация">
