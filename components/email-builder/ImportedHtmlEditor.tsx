@@ -2,10 +2,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
-import { ImageAssetPicker } from "./ImageAssetPicker";
+import { LetterImageControls } from "./LetterImageControls";
 import { editLetterAttribute, editLetterStyle, editLetterText, insertLetterIcon, letterElements, letterLink, selectableLetterHtml } from "@/lib/email-import/visual-editor";
 import type { BuilderDocument, PreviewMode } from "./builder-types";
-import { LetterImageCrop } from "./LetterImageCrop";
 import { EmailIconPicker } from "./EmailIconPicker";
 import { emailIconMarkup } from "@/lib/email-icons";
 import { LetterLinkEditor } from "./LetterLinkEditor";
@@ -75,24 +74,7 @@ export function ImportedHtmlEditor({ document: letter, onChange, previewMode, fo
           <div role="alert" className="text-xs text-danger">{error}</div>
           {item ? <div key={`${item.index}:${item.tag}`} className="grid gap-4">
             {item.texts.map((text, index) => <label key={index} className="grid gap-1.5 text-xs font-medium">{item.texts.length > 1 ? `Текст · часть ${index + 1}` : "Текст"}<textarea aria-label={item.texts.length > 1 ? `Текст · часть ${index + 1}` : "Текст"} key={text.value} defaultValue={text.value} rows={3} className="w-full rounded-lg border border-border bg-surface p-2 text-sm" onBlur={event => { if (event.target.value !== text.value) update(source => editLetterText(source, item.index, index, event.target.value)); }} /></label>)}
-            {item.kind === "image" && <>
-              <label className="grid gap-1.5 text-xs font-medium">Описание изображения<input className="rounded-lg border border-border p-2" key={item.attributes.alt} defaultValue={item.attributes.alt || ""} onBlur={event => { if (event.target.value !== (item.attributes.alt || "")) update(source => editLetterAttribute(source, item.index, "alt", event.target.value)); }} /></label>
-              <label className="grid gap-1.5 text-xs font-medium">Ширина, пикс.<input aria-label="Ширина изображения" type="number" min={16} max={1600} key={item.attributes.width} defaultValue={/^\d+$/.test(item.attributes.width || "") ? Number(item.attributes.width) : /(?:^|;)\s*width:\s*(\d+)px/i.exec(item.attributes.style || "")?.[1] || ""} placeholder="Авто" className="rounded-lg border border-border p-2" onBlur={event => { if (event.target.value === event.target.defaultValue) return; const value = event.target.value ? Math.max(16, Math.min(1600, Number(event.target.value))) : 0; update(source => editLetterStyle(editLetterAttribute(editLetterAttribute(source, item.index, "width", value ? String(value) : null), item.index, "height", null), item.index, { width: value ? `${value}px` : "auto", "max-width": "100%", height: "auto" })); }} /></label>
-              <label className="grid gap-1.5 text-xs font-medium">Выравнивание<Select value={item.attributes.align || "left"} onChange={event => update(source => editLetterStyle(editLetterAttribute(source, item.index, "align", event.target.value), item.index, { display: "block", "margin-left": event.target.value === "left" ? "0" : "auto", "margin-right": event.target.value === "right" ? "0" : "auto", float: "none" }))} options={[{ value: "left", label: "Слева" }, { value: "center", label: "По центру" }, { value: "right", label: "Справа" }]} /></label>
-              <LetterImageCrop source={item.attributes["data-potok-original-src"] || item.attributes.src} initial={item.attributes["data-potok-crop"]} onApply={(url, crop) => update(source => {
-                let next = editLetterAttribute(source, item.index, "src", url);
-                next = editLetterAttribute(next, item.index, "srcset", null);
-                next = editLetterAttribute(next, item.index, "height", null);
-                next = editLetterAttribute(next, item.index, "data-potok-original-src", item.attributes["data-potok-original-src"] || item.attributes.src);
-                next = editLetterAttribute(next, item.index, "data-potok-crop", crop);
-                return editLetterStyle(next, item.index, { height: "auto", "object-fit": "contain" });
-              })} />
-              <details className="rounded-lg border border-border p-3"><summary className="cursor-pointer text-sm font-medium">Заменить изображение</summary><div className="mt-3"><ImageAssetPicker kind="photo" value={item.attributes.src} onSelect={(url, name) => update(source => {
-                let next = editLetterAttribute(editLetterAttribute(source, item.index, "src", url), item.index, "srcset", null);
-                next = editLetterAttribute(editLetterAttribute(next, item.index, "data-potok-original-src", null), item.index, "data-potok-crop", null);
-                return editLetterAttribute(next, item.index, "alt", name);
-              })} /></div></details>
-            </>}
+            {item.kind === "image" && <LetterImageControls item={item} update={update} />}
             {item.kind !== "image" && <label className="grid gap-1.5 text-xs font-medium">Выравнивание текста<Select value={/text-align:\s*(left|center|right)/i.exec(item.attributes.style || "")?.[1] || "left"} onChange={event => update(source => editLetterStyle(source, item.index, { "text-align": event.target.value }))} options={[{ value: "left", label: "Слева" }, { value: "center", label: "По центру" }, { value: "right", label: "Справа" }]} /></label>}
             <div className="grid grid-cols-2 gap-2">{(["top", "bottom"] as const).map(side => <label key={side} className="grid gap-1.5 text-xs font-medium">{side === "top" ? "Отступ сверху" : "Отступ снизу"}<input type="number" min={0} max={160} key={item.attributes.style} defaultValue={new RegExp(`padding-${side}:\\s*(\\d+)`).exec(item.attributes.style || "")?.[1] || ""} placeholder="Авто" className="min-w-0 rounded-lg border border-border p-2" onBlur={event => { if (event.target.value && event.target.value !== event.target.defaultValue) update(source => editLetterStyle(source, item.index, { [`padding-${side}`]: `${Math.max(0, Math.min(160, Number(event.target.value)))}px` })); }} /></label>)}</div>
             <details className="rounded-lg border border-border p-3"><summary className="cursor-pointer text-sm font-medium">Добавить значок рядом</summary><div className="mt-3"><EmailIconPicker onSelect={id => update(source => insertLetterIcon(source, item.index, emailIconMarkup(id)))} /></div></details>

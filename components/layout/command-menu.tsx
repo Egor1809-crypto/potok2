@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowUpRight, Search, X } from "lucide-react";
+import { ArrowUpRight, Search, X } from "@/components/ui/icons";
 import { cn } from "@/components/ui/utils";
 import { nextSearchIndex, searchNavigation } from "@/lib/navigation-search";
 import { containTabFocus } from "./focus-management";

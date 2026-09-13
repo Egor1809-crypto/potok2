@@ -14,7 +14,7 @@ import {
   Settings2,
   ShieldCheck,
   Unplug,
-} from "lucide-react";
+} from "@/components/ui/icons";
 
 import { TelegramConnectionPanel } from "./TelegramConnectionPanel";
 import { PageHeader } from "@/components/shared/PageHeader";

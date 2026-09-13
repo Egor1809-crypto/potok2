@@ -5,6 +5,7 @@ import type { BuilderDocument } from "@/components/email-builder/builder-types";
 import { importedSource, addImportViewport, type ImportDirection } from "@/lib/email-import/director";
 import type { ImportResource } from "@/lib/email-import/import-letter";
 import { prepareDirectorCrops, publishDirectorCrops } from "@/lib/email-import/director-crops";
+import { DirectorImagePanel } from "./DirectorImagePanel";
 import { LetterPreview } from "./LetterPreview";
 
 export function ImportedLetterDirector({ document, onApply }: { document: BuilderDocument; onApply: (document: BuilderDocument, message: string) => void }) {
@@ -15,6 +16,7 @@ export function ImportedLetterDirector({ document, onApply }: { document: Builde
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<"original" | "proposal">("original");
   const [mobile, setMobile] = useState(false);
+  const [editImages, setEditImages] = useState(false);
   const operation = useRef<AbortController | null>(null);
   const resources = useRef<ImportResource[]>([]);
   const current = result?.sourceHtml === html ? result : null;
@@ -31,7 +33,7 @@ export function ImportedLetterDirector({ document, onApply }: { document: Builde
       if (controller.signal.aborted) { for (const resource of prepared.resources) URL.revokeObjectURL(resource.url); return; }
       for (const resource of resources.current) URL.revokeObjectURL(resource.url);
       resources.current = prepared.resources;
-      setResult({ ...body, ...prepared, sourceHtml: html }); setPreview(prepared.html ? "proposal" : "original");
+      setResult({ ...body, ...prepared, sourceHtml: html }); setPreview(prepared.html ? "proposal" : "original"); setEditImages(Boolean(prepared.html && body.crops.length));
     } catch (error) { if (!controller.signal.aborted) setError(error instanceof Error ? error.message : "Не удалось разобрать письмо."); }
     finally { if (!controller.signal.aborted) setBusy(""); }
   }
@@ -57,6 +59,11 @@ export function ImportedLetterDirector({ document, onApply }: { document: Builde
     </div>
     <div className="min-w-0 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3"><div role="group" aria-label="Сравнение письма" className="flex gap-1 rounded-lg bg-surface-subtle p-1"><Button size="sm" variant={preview === "original" ? "primary" : "ghost"} aria-pressed={preview === "original"} onClick={() => setPreview("original")}>Исходник</Button><Button size="sm" disabled={!current?.html} variant={preview === "proposal" ? "primary" : "ghost"} aria-pressed={preview === "proposal"} onClick={() => setPreview("proposal")}>Предложение</Button></div><Button size="sm" variant="secondary" aria-pressed={mobile} onClick={() => setMobile(value => !value)}>{mobile ? "На компьютере" : "На телефоне"}</Button></div>
+      <Button size="sm" variant={editImages ? "primary" : "secondary"} disabled={Boolean(busy)} aria-pressed={editImages} onClick={() => setEditImages(value => !value)}>Настроить изображения</Button>
+      {editImages && <fieldset disabled={Boolean(busy)} className="min-w-0"><DirectorImagePanel html={preview === "proposal" && current?.html ? current.html : html} onChange={next => {
+        if (preview === "proposal" && current) setResult({ ...current, html: next });
+        else onApply({ ...document, rawHtml: next }, "Изображение изменено. Сохраните копию в библиотеку.");
+      }} /></fieldset>}
       <div className={mobile ? "mx-auto w-full max-w-[390px]" : "w-full"}><LetterPreview html={preview === "proposal" && current?.html ? current.html : html} resources={preview === "proposal" ? current?.resources : undefined} title={preview === "proposal" ? "Предложение арт-директора" : "Исходное импортированное письмо"} className="h-[68vh] min-h-96" /></div>
     </div>
   </div>;

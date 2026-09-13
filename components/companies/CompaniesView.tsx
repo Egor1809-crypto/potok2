@@ -15,7 +15,7 @@ import {
   Search,
   UsersRound,
   X,
-} from "lucide-react";
+} from "@/components/ui/icons";
 import { useMemo, useRef, useState } from "react";
 
 const shortDateFormatter = new Intl.DateTimeFormat("ru-RU", {

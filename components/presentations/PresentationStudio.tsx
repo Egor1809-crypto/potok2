@@ -35,7 +35,7 @@ import {
   Star,
   Trash2,
   Type,
-} from "lucide-react";
+} from "@/components/ui/icons";
 
 import { ImageAssetPicker } from "@/components/email-builder/ImageAssetPicker";
 import {

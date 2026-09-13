@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Check, Minus } from "lucide-react";
+import { Check, Minus } from "@/components/ui/icons";
 import { cn } from "./utils";
 
 export interface CheckboxProps

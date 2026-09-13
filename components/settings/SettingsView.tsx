@@ -15,7 +15,7 @@ import {
   Settings2,
   ShieldCheck,
   UserRound,
-} from "lucide-react";
+} from "@/components/ui/icons";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { demoUser, workspaceConfig } from "@/config/brand";

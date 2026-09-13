@@ -1,4 +1,4 @@
-import { ArrowRight, Check, Play } from "lucide-react";
+import { ArrowRight, Check, Play } from "@/components/ui/icons";
 import Image from "next/image";
 import Link from "next/link";
 import { FeatureShowcase } from "./FeatureShowcase";

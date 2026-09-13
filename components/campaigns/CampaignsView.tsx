@@ -17,7 +17,7 @@ import {
   Send,
   SendHorizontal,
   UsersRound,
-} from "lucide-react";
+} from "@/components/ui/icons";
 
 import type { CampaignDeliveryChannel } from "@/types";
 import type {

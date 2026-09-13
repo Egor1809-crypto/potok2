@@ -14,7 +14,7 @@ import {
   ShieldCheck,
   Sparkles,
   WandSparkles,
-} from "lucide-react";
+} from "@/components/ui/icons";
 
 import { AppShell } from "@/components/layout/AppShell";
 import {

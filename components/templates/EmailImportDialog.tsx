@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Code2, Upload } from "lucide-react";
+import { Code2, Upload } from "@/components/ui/icons";
 import { Alert, Button, FormField, Modal, Select, Tabs, TabsContent, TabsList, TabsTrigger, Textarea } from "@/components/ui";
 import { importAccept } from "@/lib/email-import/formats";
 import { MAX_HTML_CODE_LENGTH, type CodeImportInput, type CodeImportMode } from "@/lib/email-import/code";

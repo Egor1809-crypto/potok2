@@ -4,7 +4,7 @@ import { confirmAction } from "@/components/ui/confirm-action";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { ArrowLeft, FileText, PenTool, RefreshCw, SearchX, Sparkles, Upload } from "lucide-react";
+import { ArrowLeft, FileText, PenTool, RefreshCw, SearchX, Sparkles, Upload } from "@/components/ui/icons";
 
 import { importLetter, uploadImportedResources, type ImportedLetter } from "@/lib/email-import/import-letter";
 import { importCodeLetter, type CodeImportInput } from "@/lib/email-import/code";

@@ -2,7 +2,7 @@
 
 import { Select } from "@/components/ui/select";
 
-import { FileText, LoaderCircle, Upload, X } from "lucide-react";
+import { FileText, LoaderCircle, Upload, X } from "@/components/ui/icons";
 import { useEffect, useRef, useState } from "react";
 
 import type { ApiError, EmailAssetMutationResponse, EmailAssetRecord, EmailAssetsListResponse } from "@/types/api";

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Check } from "lucide-react";
+import { Check } from "@/components/ui/icons";
 import type { EmailTemplateRecord } from "@/types/api";
 import { LetterPreview } from "./LetterPreview";
 

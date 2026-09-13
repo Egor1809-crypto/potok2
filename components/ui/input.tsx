@@ -3,7 +3,7 @@
 /* eslint-disable react/prop-types */
 
 import * as React from "react";
-import { Search, X } from "lucide-react";
+import { Search, X } from "@/components/ui/icons";
 import { cn } from "./utils";
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {

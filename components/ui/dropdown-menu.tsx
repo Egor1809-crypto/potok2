@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Check, ChevronRight } from "lucide-react";
+import { Check, ChevronRight } from "@/components/ui/icons";
 import { cn } from "./utils";
 
 interface DropdownContextValue {

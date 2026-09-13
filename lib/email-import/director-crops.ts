@@ -1,5 +1,7 @@
+import { imageCropPixels } from "./crop-geometry";
 import type { ImportCrop } from "./director";
 import type { ImportResource } from "./import-letter";
+import { fitLetterImage } from "./image-layout";
 import { letterElements, editLetterAttribute } from "./visual-editor";
 
 export async function prepareDirectorCrops(html: string, crops: ImportCrop[], signal: AbortSignal) {
@@ -15,8 +17,7 @@ export async function prepareDirectorCrops(html: string, crops: ImportCrop[], si
       if (!blob.type.startsWith("image/") || blob.size > 20_000_000) throw new Error("Невозможно подготовить фрагмент изображения.");
       const bitmap = await createImageBitmap(blob);
       try {
-        const sx = Math.floor(crop.x * bitmap.width), sy = Math.floor(crop.y * bitmap.height);
-        const sw = Math.min(bitmap.width - sx, Math.round(crop.width * bitmap.width)), sh = Math.min(bitmap.height - sy, Math.round(crop.height * bitmap.height));
+        const {x:sx,y:sy,width:sw,height:sh} = imageCropPixels({x:crop.x*100,y:crop.y*100,width:crop.width*100,height:crop.height*100},bitmap.width,bitmap.height);
         if (sw < 2 || sh < 2) throw new Error("ИИ выбрал слишком маленький фрагмент изображения. Уточните команду.");
         const scale = Math.min(1, 1600 / sw, 2400 / sh), canvas = document.createElement("canvas");
         canvas.width = Math.max(1, Math.round(sw * scale)); canvas.height = Math.max(1, Math.round(sh * scale));
@@ -30,6 +31,7 @@ export async function prepareDirectorCrops(html: string, crops: ImportCrop[], si
         // Keep the source so a person can correct the crop after saving/reopening.
         for (const element of letterElements(html).filter(element => element.attributes.src === resource.url).reverse()) {
           html = editLetterAttribute(html, element.index, "data-potok-original-src", crop.source);
+          html = fitLetterImage(html, element.index);
           html = editLetterAttribute(html, element.index, "data-potok-crop", JSON.stringify({ x: crop.x * 100, y: crop.y * 100, width: crop.width * 100, height: crop.height * 100 }));
         }
       } finally { bitmap.close(); }
@@ -40,6 +42,7 @@ export async function prepareDirectorCrops(html: string, crops: ImportCrop[], si
 
 export async function publishDirectorCrops(html: string, resources: ImportResource[], signal: AbortSignal) {
   for (const resource of resources) {
+    if (!html.includes(resource.url)) continue;
     signal.throwIfAborted();
     if (!resource.uploadedUrl) {
       const form = new FormData(); form.set("kind", "photo"); form.set("file", resource.blob, resource.name);

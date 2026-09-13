@@ -3,7 +3,7 @@
 import { Select } from "@/components/ui/select";
 
 import { useCallback, useEffect, useState } from "react";
-import { Copy, Plus, ShieldCheck, UsersRound } from "lucide-react";
+import { Copy, Plus, ShieldCheck, UsersRound } from "@/components/ui/icons";
 import { Modal } from "@/components/ui/modal";
 import { emptyContactAccess } from "@/lib/team-access";
 import type { ContactAccessScope, ParticipantRecord, TeamRole } from "@/types/api";

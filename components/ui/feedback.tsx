@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Inbox, LoaderCircle } from "lucide-react";
+import { Inbox, LoaderCircle } from "@/components/ui/icons";
 import { Button, type ButtonProps } from "./button";
 import { cn } from "./utils";
 

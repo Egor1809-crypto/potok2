@@ -14,7 +14,7 @@ import {
   MousePointerClick,
   Send,
   ShieldAlert,
-} from "lucide-react";
+} from "@/components/ui/icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type {

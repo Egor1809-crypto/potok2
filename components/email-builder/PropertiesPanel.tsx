@@ -15,7 +15,7 @@ import {
   Box,
   Maximize2,
   Shapes,
-} from "lucide-react";
+} from "@/components/ui/icons";
 
 import {
   Badge,

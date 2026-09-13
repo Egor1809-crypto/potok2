@@ -11,7 +11,7 @@ import {
   Save,
   Smartphone,
   Undo2,
-} from "lucide-react";
+} from "@/components/ui/icons";
 
 import { Button, IconButton, Tooltip, buttonVariants } from "@/components/ui";
 import { cn } from "@/components/ui/utils";

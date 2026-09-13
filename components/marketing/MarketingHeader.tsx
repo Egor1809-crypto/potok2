@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Menu, X } from "lucide-react";
+import { ArrowRight, Menu, X } from "@/components/ui/icons";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";

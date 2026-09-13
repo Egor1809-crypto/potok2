@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Eye, EyeOff, LockKeyhole, UsersRound } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, LockKeyhole, UsersRound } from "@/components/ui/icons";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { BrandMark } from "@/components/layout/brand-mark";

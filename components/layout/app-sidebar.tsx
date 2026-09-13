@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, X } from "@/components/ui/icons";
 import { useEffect, useState } from "react";
 
 import { Avatar } from "@/components/ui/avatar";

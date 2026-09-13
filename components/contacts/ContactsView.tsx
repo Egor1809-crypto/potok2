@@ -24,7 +24,7 @@ import {
   Upload,
   UsersRound,
   X,
-} from "lucide-react";
+} from "@/components/ui/icons";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 

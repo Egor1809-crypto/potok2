@@ -9,7 +9,7 @@ import {
   Search,
   SendHorizontal,
   UsersRound,
-} from "lucide-react";
+} from "@/components/ui/icons";
 import Image from "next/image";
 import { BRAND_NAME, brandConfig } from "@/config/brand";
 

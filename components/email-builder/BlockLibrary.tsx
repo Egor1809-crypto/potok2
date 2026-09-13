@@ -34,8 +34,8 @@ import {
   FileCheck2,
   GitCompareArrows,
   ShieldCheck,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+} from "@/components/ui/icons";
+import type { LucideIcon } from "@/components/ui/icons";
 
 import type { EmailBlockType } from "@/types";
 import { cn } from "@/components/ui/utils";

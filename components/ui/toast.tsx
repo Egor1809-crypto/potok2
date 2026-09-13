@@ -7,7 +7,7 @@ import {
   CheckCircle2,
   Info,
   X,
-} from "lucide-react";
+} from "@/components/ui/icons";
 import { cn } from "./utils";
 
 export type ToastTone = "success" | "error" | "warning" | "info";

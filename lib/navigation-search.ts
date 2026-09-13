@@ -1,4 +1,4 @@
-import { FileInput, Megaphone, Plug2, Upload } from "lucide-react";
+import { FileInput, Megaphone, Plug2, Upload } from "@/components/ui/icons";
 import { productNavigation, quickCreateRoutes, type ProductNavItem } from "@/components/layout/navigation";
 
 export type NavigationResult = ProductNavItem & { kind: "section" | "action"; category: string };

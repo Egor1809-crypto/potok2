@@ -9,7 +9,7 @@ import {
   Sparkles,
   Upload,
   WandSparkles,
-} from "lucide-react";
+} from "@/components/ui/icons";
 
 import {
   Alert,

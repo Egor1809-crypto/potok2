@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { CircleHelp, Sparkles, X } from "lucide-react";
+import { CircleHelp, Sparkles, X } from "@/components/ui/icons";
 
 import { Button } from "@/components/ui/button";
 

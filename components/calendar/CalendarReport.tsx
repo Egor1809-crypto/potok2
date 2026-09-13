@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw } from "@/components/ui/icons";
 import { Badge, Button, Input, buttonVariants } from "@/components/ui";
 import { reportLabels, type CalendarReport as Report, type ReportState } from "@/lib/calendar/report";
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, LayoutTemplate, Sparkles, WandSparkles } from "lucide-react";
+import { Check, LayoutTemplate, Sparkles, WandSparkles } from "@/components/ui/icons";
 
 import { cn } from "@/components/ui/utils";
 

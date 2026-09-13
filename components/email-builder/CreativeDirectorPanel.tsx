@@ -10,7 +10,7 @@ import {
   ShieldCheck,
   Sparkles,
   WandSparkles,
-} from "lucide-react";
+} from "@/components/ui/icons";
 
 import { Badge, Button, Modal } from "@/components/ui";
 import { cn } from "@/components/ui/utils";

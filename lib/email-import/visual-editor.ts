@@ -61,13 +61,48 @@ export function editLetterAttribute(html: string, index: number, name: "src" | "
 export function editLetterStyle(html: string, index: number, changes: Record<string, string>) {
   const element = letterElements(html)[index];
   if (!element) throw new Error("Выберите элемент письма.");
-  let style = element.attributes.style || "";
+  return styleAttribute(html, element.node, changes);
+}
+function styleAttribute(html: string, node: Element, changes: Record<string, string>) {
+  let style = node.attrs.find(attr => attr.name === "style")?.value || "";
   for (const [property, value] of Object.entries(changes)) {
     if (!/^[a-z-]+$/.test(property) || /[<>"{};]/.test(value)) throw new Error("Некорректное оформление.");
     style = style.replace(new RegExp(`(^|;)\\s*${property}\\s*:[^;]*(?=;|$)`, "gi"), "$1");
     style += `${style.trim().endsWith(";") || !style.trim() ? "" : ";"}${property}:${value};`;
   }
-  return editLetterAttribute(html, index, "style", style);
+  return attribute(html, node, "style", style);
+}
+
+/** An image with height:auto is still clipped by a fixed-height wrapper. Touch
+ * only restrictive properties on its ancestors, retaining tables and columns. */
+export function clearLetterImageClipping(html: string, index: number, alignLink = false) {
+  const item = letterElements(html)[index];
+  let node = item?.node.parentNode;
+  while (node && isElement(node) && !["body", "html"].includes(node.tagName)) {
+    // Stop at a shared section: fixing one picture must not reflow its siblings.
+    const countImages = (current: Node): number => (isElement(current) && current.tagName === "img" ? 1 : 0) + children(current).reduce((sum, child) => sum + countImages(child), 0);
+    if (textParts(node).some(text => text.value.trim()) || countImages(node) > 1) break;
+    if (node.sourceCodeLocation?.startTag) {
+      const style = node.attrs.find(attr => attr.name === "style")?.value || "";
+      const changes: Record<string, string> = {};
+      for (const property of ["height", "min-height", "max-height", "overflow", "overflow-x", "overflow-y", "position", "transform", "clip-path", "margin", "margin-left", "margin-top", "margin-right", "margin-bottom"]) {
+        const value = new RegExp(`(?:^|;)\\s*${property}\\s*:\\s*([^;]+)`, "i").exec(style)?.[1];
+        if (!value) continue;
+        if (property === "height") changes[property] = "auto !important";
+        else if (property === "min-height") changes[property] = "0 !important";
+        else if (property === "max-height") changes[property] = "none !important";
+        else if (property.startsWith("overflow") && /hidden|clip/i.test(value)) changes[property] = "visible !important";
+        else if (property === "position" && /absolute|fixed/i.test(value)) changes[property] = "static !important";
+        else if (["transform", "clip-path"].includes(property)) changes[property] = "none !important";
+        else if (property.startsWith("margin") && /-\d/.test(value)) changes[property] = "0 !important";
+      }
+      if (alignLink && node.tagName === "a" && !textParts(node).some(text => text.value.trim())) { changes.display = "block"; changes.width = "100%"; }
+      // Ancestors precede descendants in source, so these edits keep earlier offsets valid.
+      if (Object.keys(changes).length) html = styleAttribute(html, node, changes);
+    }
+    node = node.parentNode;
+  }
+  return html;
 }
 export function editLetterText(html: string, index: number, part: number, value: string) {
   const text = letterElements(html)[index]?.texts[part];

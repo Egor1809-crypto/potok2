@@ -101,3 +101,10 @@ test('unreadable images never become a successful visual audit or silently switc
   await assert.rejects(api.directImportedEmail(request(),{html:imageLetter,action:'review'}),error=>error.status===422&&/прочитать/.test(error.message));
   assert.equal(calls,1);
 });
+
+test('reconstruction rejects an entire source page pasted behind duplicated live text',async()=>{
+ const api=await load();
+ const repeated='<html><body><h1>Приглашаем на ознакомительное собрание</h1><img src="'+asset+'"></body></html>';
+ assert.throws(()=>api.parseImportDirection(output({html:repeated}),imageLetter,'rebuild','Сделай редактируемое письмо',[asset]),/целую страницу/);
+ assert.throws(()=>api.parseImportDirection(output({html:repeated.replace(asset,'{{crop:hero}}'),crops:[{id:'hero',source:asset,x:0,y:0,width:1,height:1}]}),imageLetter,'rebuild','Сделай редактируемое письмо',[asset]),/целую страницу/);
+});

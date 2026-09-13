@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowRight, Copy, ExternalLink, MessageCircleMore, RefreshCw, ShieldCheck, Unplug } from "lucide-react";
+import { ArrowRight, Copy, ExternalLink, MessageCircleMore, RefreshCw, ShieldCheck, Unplug } from "@/components/ui/icons";
 import { Alert, Badge, Button, FormField, Input, Modal, buttonVariants } from "@/components/ui";
 import type { TelegramConnectionInfo } from "@/types/telegram";
 

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { createPortal } from "react-dom";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { ChevronRight, Plug2 } from "lucide-react";
+import { ChevronRight, Plug2 } from "@/components/ui/icons";
 import { cn } from "@/components/ui/utils";
 import { BrandMark } from "./brand-mark";
 import { isProductRouteActive, productNavigation, type ProductNavItem } from "./navigation";

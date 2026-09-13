@@ -14,7 +14,7 @@ import {
   ShieldCheck,
   Sparkles,
   UsersRound,
-} from "lucide-react";
+} from "@/components/ui/icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { postContactsBatch } from "@/components/imports/import-api";

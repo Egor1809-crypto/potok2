@@ -18,7 +18,7 @@ import {
   ShieldCheck,
   Trash2,
   UsersRound,
-} from "lucide-react";
+} from "@/components/ui/icons";
 
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Alert, Badge, Button, buttonVariants, cn } from "@/components/ui";

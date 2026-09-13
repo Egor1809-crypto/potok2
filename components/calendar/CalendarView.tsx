@@ -6,7 +6,7 @@ import { russianTimeZones } from "@/lib/russian-timezones";
 import { CalendarReport } from "./CalendarReport";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Filter, Plus, X } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Filter, Plus, X } from "@/components/ui/icons";
 
 import { getCampaignChannelDefinition } from "@/components/campaigns/campaignChannels";
 import { PageHeader } from "@/components/shared/PageHeader";

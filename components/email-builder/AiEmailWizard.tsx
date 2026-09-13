@@ -1,6 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
-import { ArrowRight, LoaderCircle, Paperclip, X } from "lucide-react";
+import { ArrowRight, LoaderCircle, Paperclip, X } from "@/components/ui/icons";
 import { Button, FormField, Input, Select, Textarea } from "@/components/ui";
 import type { AiEmailBrief } from "@/types/email-ai";
 import type { EmailAssetMutationResponse } from "@/types/api";

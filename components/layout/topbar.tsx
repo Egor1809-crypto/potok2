@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { CalendarDays, LogOut, Plus, Search } from "lucide-react";
+import { CalendarDays, LogOut, Plus, Search } from "@/components/ui/icons";
 
 import { Avatar } from "@/components/ui/avatar";
 import { IconButton, buttonVariants } from "@/components/ui/button";

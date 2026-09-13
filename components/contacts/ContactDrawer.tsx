@@ -15,7 +15,7 @@ import {
   SendHorizontal,
   ShieldCheck,
   X,
-} from "lucide-react";
+} from "@/components/ui/icons";
 import { useMemo, useRef } from "react";
 
 import { useDrawerAccessibility } from "@/components/shared/useDrawerAccessibility";

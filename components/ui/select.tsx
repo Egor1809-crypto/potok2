@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronDown } from "lucide-react";
+import { Check, ChevronDown } from "@/components/ui/icons";
 import { cn } from "./utils";
 
 export interface SelectOption { label: string; value: string; disabled?: boolean }

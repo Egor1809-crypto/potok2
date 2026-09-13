@@ -1,5 +1,5 @@
 "use client";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown } from "@/components/ui/icons";
 import { useEffect, useRef, useState } from "react";
 import { Button, FormField, Input, Modal } from "@/components/ui";
 import { emptyAiEmailBrief } from "@/lib/email-ai/defaults";

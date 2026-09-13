@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ImagePlus, LoaderCircle, Upload } from "lucide-react";
+import { ImagePlus, LoaderCircle, Upload } from "@/components/ui/icons";
 
 import type { ApiError, EmailAssetMutationResponse, EmailAssetRecord, EmailAssetsListResponse } from "@/types/api";
 import { EmailIconPicker } from "./EmailIconPicker";

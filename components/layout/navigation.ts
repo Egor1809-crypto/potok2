@@ -15,8 +15,8 @@ import {
   Settings,
   UsersRound,
   Wrench,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+} from "@/components/ui/icons";
+import type { LucideIcon } from "@/components/ui/icons";
 
 export type ProductNavItem = {
   label: string;

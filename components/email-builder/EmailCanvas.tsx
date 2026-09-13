@@ -13,7 +13,7 @@ import {
   Linkedin,
   Plus,
   Trash2,
-} from "lucide-react";
+} from "@/components/ui/icons";
 
 import { IconButton } from "@/components/ui/button";
 import { cn } from "@/components/ui/utils";

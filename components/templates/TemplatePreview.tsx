@@ -10,7 +10,7 @@ import {
   Sparkles,
   Star,
   Trash2,
-} from "lucide-react";
+} from "@/components/ui/icons";
 
 import type { EmailTemplateRecord } from "@/types/api";
 import { BRAND_NAME } from "@/config/brand";

@@ -24,7 +24,7 @@ import {
   Sparkles,
   SquareDashedMousePointer,
   WandSparkles,
-} from "lucide-react";
+} from "@/components/ui/icons";
 
 import type { EmailBlockType, TemplateCategory } from "@/types";
 import type {

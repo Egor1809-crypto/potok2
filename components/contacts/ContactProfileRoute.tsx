@@ -6,7 +6,7 @@ import type {
   ContactMutationResponse,
   ContactsListResponse,
 } from "@/types/api";
-import { ArrowLeft, LoaderCircle, UserRoundX } from "lucide-react";
+import { ArrowLeft, LoaderCircle, UserRoundX } from "@/components/ui/icons";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";

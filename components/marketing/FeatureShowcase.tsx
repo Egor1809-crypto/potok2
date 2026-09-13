@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlignCenter, ArrowRight, ChevronDown, Columns3, Image as ImageIcon, Link2, MousePointer2, Plus, Type } from "lucide-react";
+import { AlignCenter, ArrowRight, ChevronDown, Columns3, Image as ImageIcon, Link2, MousePointer2, Plus, Type } from "@/components/ui/icons";
 
 function FeatureHeading({ eyebrow, title, copy }: { eyebrow: string; title: string; copy: string }) {
   return (

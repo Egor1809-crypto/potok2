@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { AlertCircle, Download, FileCode2, FileJson2, FileText, Printer, X } from "lucide-react";
+import { AlertCircle, Download, FileCode2, FileJson2, FileText, Printer, X } from "@/components/ui/icons";
 
 import { LetterPreview } from "@/components/templates/LetterPreview";
 import { Button, Modal } from "@/components/ui";

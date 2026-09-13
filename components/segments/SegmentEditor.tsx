@@ -10,7 +10,7 @@ import type {
   SegmentRuleField,
   SegmentRuleOperator,
 } from "@/types/api";
-import { AlertTriangle, Plus, Save, Trash2, X } from "lucide-react";
+import { AlertTriangle, Plus, Save, Trash2, X } from "@/components/ui/icons";
 import { useMemo, useRef, useState } from "react";
 
 type RuleDraft = Omit<SegmentRule, "value"> & {
