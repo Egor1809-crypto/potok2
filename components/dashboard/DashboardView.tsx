@@ -29,7 +29,7 @@ import {
   UserSearch,
   Zap,
 } from "@/components/ui/icons";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   CampaignRecord,
@@ -39,6 +39,8 @@ import type {
   UniSenderLifetimeStatsResponse,
   WorkspaceSnapshot,
 } from "@/types/api";
+
+const REFRESH_INTERVAL = 3 * 60_000;
 
 const number = new Intl.NumberFormat("ru-RU");
 function formatDate(value: string, timeZone: string) {
@@ -97,20 +99,26 @@ export function DashboardView() {
   const [providerRefreshing, setProviderRefreshing] = useState(false);
   const [providerRefreshProgress, setProviderRefreshProgress] = useState(0);
 
-  const refreshProviderStats = useCallback(async (full = false) => {
+  const activeRefresh = useRef<AbortController | null>(null);
+  const lastRefreshStarted = useRef(0);
+
+  const refreshProviderStats = useCallback(async (signal: AbortSignal) => {
     setProviderRefreshing(true);
     setProviderRefreshProgress(0);
     try {
       let cursor = 0;
-      let keepRefreshing = true;
-      while (keepRefreshing) {
+      let failed = 0;
+      while (!signal.aborted) {
         const response = await fetch("/api/analytics/unisender-summary", {
           method: "POST",
           headers: { Accept: "application/json", "Content-Type": "application/json" },
-          body: JSON.stringify({ mode: full ? "full" : "quick", cursor }),
+          body: JSON.stringify({ mode: "full", cursor }),
+          signal: AbortSignal.any([signal, AbortSignal.timeout(90_000)]),
         });
-        if (!response.ok) return;
+        if (!response.ok) throw new Error("Не удалось обновить статистику рассылок. Повторим автоматически.");
         const payload = await response.json() as UniSenderLifetimeStatsResponse;
+        if (signal.aborted) return;
+        failed += payload.sync.failed;
         setSnapshot((current) => current ? {
           ...current,
           stats: {
@@ -122,47 +130,82 @@ export function DashboardView() {
         setProviderRefreshProgress(payload.sync.total > 0
           ? Math.min(100, Math.round(((payload.sync.nextCursor ?? payload.sync.total) / payload.sync.total) * 100))
           : 100);
-        keepRefreshing = full && !payload.sync.complete && payload.sync.nextCursor !== null;
-        if (payload.sync.nextCursor !== null) cursor = payload.sync.nextCursor;
+        if (payload.sync.complete || payload.sync.nextCursor === null) break;
+        if (payload.sync.nextCursor <= cursor) throw new Error("Обновление статистики остановилось. Повторим автоматически.");
+        cursor = payload.sync.nextCursor;
       }
+      if (failed > 0) throw new Error("Часть статистики пока не обновилась. Повторим автоматически.");
     } finally {
-      setProviderRefreshing(false);
+      if (!signal.aborted) setProviderRefreshing(false);
     }
   }, []);
 
   const load = useCallback(async () => {
+    if (activeRefresh.current) return;
+    const controller = new AbortController();
+    activeRefresh.current = controller;
+    lastRefreshStarted.current = Date.now();
+    const { signal } = controller;
+    // Bound a stalled request without interrupting a full paginated sync.
+    const fetchDashboard = (url: string) => fetch(url, { cache: "no-store", signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]) });
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/workspace?scope=dashboard", { cache: "no-store" });
+      const response = await fetchDashboard("/api/workspace?scope=dashboard");
       const payload: unknown = await response.json().catch(() => null);
       if (!response.ok) throw new Error(errorMessage(payload));
-      setSnapshot(unwrap(payload));
-      void refreshProviderStats(false);
-      const [presentationsResult, imagesResult] = await Promise.allSettled([
-        fetch("/api/presentations", { cache: "no-store" }).then(async (result) => {
-          if (!result.ok) throw new Error("Презентации недоступны");
-          return result.json() as Promise<PresentationsListResponse>;
-        }),
-        fetch("/api/image-studio", { cache: "no-store" }).then(async (result) => {
-          if (!result.ok) throw new Error("Медиатека недоступна");
-          return result.json() as Promise<ImageStudioStatusResponse>;
+      const next = unwrap(payload);
+      if (signal.aborted) return;
+      // Keep the complete provider totals until reconciliation returns them;
+      // the workspace response may contain only a recent campaign window.
+      setSnapshot(current => current ? { ...next, stats: { ...next.stats, unisenderLifetime: current.stats.unisenderLifetime, unisenderByParticipant: current.stats.unisenderByParticipant } } : next);
+      await Promise.all([
+        refreshProviderStats(signal),
+        Promise.allSettled([
+          fetchDashboard("/api/presentations").then(async result => {
+            if (!result.ok) throw new Error("Презентации недоступны");
+            return result.json() as Promise<PresentationsListResponse>;
+          }),
+          fetchDashboard("/api/image-studio").then(async result => {
+            if (!result.ok) throw new Error("Медиатека недоступна");
+            return result.json() as Promise<ImageStudioStatusResponse>;
+          }),
+        ]).then(([presentationsResult, imagesResult]) => {
+          if (!signal.aborted) setCreativeCounts(current => ({
+            presentations: presentationsResult.status === "fulfilled" ? presentationsResult.value.presentations.length : current.presentations,
+            images: imagesResult.status === "fulfilled" ? imagesResult.value.assets.length : current.images,
+          }));
         }),
       ]);
-      setCreativeCounts({
-        presentations: presentationsResult.status === "fulfilled" ? presentationsResult.value.presentations.length : 0,
-        images: imagesResult.status === "fulfilled" ? imagesResult.value.assets.length : 0,
-      });
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Не удалось загрузить данные");
+      if (!signal.aborted) setError(reason instanceof Error && reason.name !== "TimeoutError" && reason.name !== "TypeError"
+        ? reason.message
+        : "Не удалось обновить данные. Повторим автоматически.");
     } finally {
-      setLoading(false);
+      controller.abort();
+      if (activeRefresh.current === controller) {
+        activeRefresh.current = null;
+        setLoading(false);
+        setProviderRefreshing(false);
+      }
     }
   }, [refreshProviderStats]);
 
   useEffect(() => {
-    const frame = window.requestAnimationFrame(() => void load());
-    return () => window.cancelAnimationFrame(frame);
+    const refresh = () => { if (!document.hidden) void load(); };
+    const frame = window.requestAnimationFrame(refresh);
+    const interval = window.setInterval(refresh, REFRESH_INTERVAL);
+    const onVisible = () => {
+      if (Date.now() - lastRefreshStarted.current >= REFRESH_INTERVAL) refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+      activeRefresh.current?.abort();
+      activeRefresh.current = null;
+    };
   }, [load]);
 
   const recentCampaigns = useMemo(
@@ -216,38 +259,29 @@ export function DashboardView() {
 
   return (
     <div className="space-y-6">
-      <section className="grid min-w-0 gap-5 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm sm:grid-cols-[minmax(0,1fr)_232px] sm:items-start sm:p-7">
-        <div className="flex min-w-0 flex-wrap items-center justify-between gap-4">
-          <h1 className="text-[28px] font-semibold tracking-[-.04em] sm:text-[32px]">Главная</h1>
+      {error ? <p role="alert" className="rounded-xl border border-warning/30 bg-warning-subtle px-4 py-3 text-sm text-text-strong">{error}</p> : null}
+      <section aria-label="Сводка рассылок" aria-busy={loading} className="grid min-w-0 gap-5 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm sm:grid-cols-[minmax(0,1fr)_232px] sm:items-start sm:p-7">
+        <div className="min-w-0">
+          <h1 className="sr-only">Обзор рассылок</h1>
           <div className="flex min-w-0 flex-wrap gap-2"><Link href="/templates" className="btn btn-secondary w-fit gap-2"><LayoutTemplate aria-hidden="true" className="size-6" />Выбрать шаблон</Link><Link href="/email-builder?new=1" className="btn btn-primary w-fit gap-2"><Plus aria-hidden="true" className="size-6" />Создать письмо</Link><Link href="/campaigns" className="btn btn-secondary w-fit gap-2"><SendHorizontal aria-hidden="true" className="size-6" />Рассылка писем</Link></div>
+          <div className="mt-6 grid min-w-0 grid-cols-1 gap-x-5 gap-y-6 min-[360px]:grid-cols-2 xl:grid-cols-4">
+            {providerMetrics.map(({ label, value, note, Icon, tone }) => (
+              <article key={label} aria-label={label} className="min-w-0">
+                <span className={`grid size-10 place-items-center rounded-xl ${tone}`}><Icon aria-hidden="true" className="size-7" /></span>
+                <p className="mt-3 break-words text-[30px] font-semibold tabular-nums tracking-[-.045em]">{number.format(value)}</p>
+                <p className="mt-1 text-[12px] font-semibold">{label}</p>
+                <p className="mt-1 text-[10px] text-[var(--text-subtle)]">{note}</p>
+              </article>
+            ))}
+          </div>
+          <p className="mt-5 text-xs text-text-subtle" role="status">{providerRefreshing ? `Обновляем данные… ${providerRefreshProgress}%` : "UniSender · за всё время · обновление каждые 3 минуты"}</p>
         </div>
         <div className="flex min-w-0 justify-center sm:justify-end"><MiniCalendar campaigns={snapshot.calendarSchedule ?? snapshot.campaigns} /></div>
       </section>
 
-      <section className="card min-w-0 overflow-hidden" aria-labelledby="unisender-lifetime-title">
-        <div className="flex flex-col gap-3 border-b border-[var(--border)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <div>
-            <h2 id="unisender-lifetime-title" className="mt-1 text-[17px] font-semibold">Общие результаты рассылок</h2>
-            <p className="mt-1 text-[11px] text-[var(--text-subtle)]">UniSender, за всё время.</p>
-          </div>
-          <button type="button" onClick={() => void refreshProviderStats(true)} disabled={providerRefreshing} className="btn btn-secondary w-fit gap-2">
-            <RefreshCw aria-hidden="true" className={`size-6 ${providerRefreshing ? "animate-spin" : ""}`} />
-            {providerRefreshing ? `Обновляем… ${providerRefreshProgress}%` : "Обновить все данные"}
-          </button>
-        </div>
-        <div className="grid gap-px bg-[var(--border)] sm:grid-cols-2 xl:grid-cols-4">
-          {providerMetrics.map(({ label, value, note, Icon, tone }) => (
-            <article key={label} className="bg-[var(--surface)] p-5 sm:p-6">
-              <span className={`grid size-10 place-items-center rounded-xl ${tone}`}><Icon aria-hidden="true" className="size-7" /></span>
-              <p className="mt-5 text-[30px] font-semibold tracking-[-.045em]">{number.format(value)}</p>
-              <p className="mt-1 text-[12px] font-semibold">{label}</p>
-              <p className="mt-1 text-[10px] text-[var(--text-subtle)]">{note}</p>
-            </article>
-          ))}
-        </div>
-        <div className="border-t border-[var(--border)] px-5 py-4 sm:px-6">
+      <section className="card min-w-0 overflow-hidden px-5 py-4 sm:px-6" aria-labelledby="participant-stats-title">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-            <div><h3 className="text-[13px] font-semibold">По авторам рассылок</h3></div>
+            <h2 id="participant-stats-title" className="text-[13px] font-semibold">По авторам рассылок</h2>
             <Link href="/analytics" className="text-[11px] font-semibold text-[var(--primary)]">Подробная аналитика →</Link>
           </div>
           <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
@@ -259,7 +293,6 @@ export function DashboardView() {
               </article>;
             })}
           </div>
-        </div>
       </section>
 
       <section id="creative-studio" className="grid scroll-mt-24 gap-3 md:grid-cols-3" aria-label="Творческие модули">
