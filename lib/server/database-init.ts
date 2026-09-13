@@ -40,7 +40,9 @@ const GEORGIY_ACCOUNT = {
   passwordHash: "O_BOOK6MzwR8IF_QYoE_jsmUjxxTOuCR41us-jWer4E",
 } as const;
 
-let initialization: Promise<void> | null = null;
+// Cache only a completed result. Pending D1 work belongs to its Worker request:
+// if that request is canceled, sharing its promise can strand later logins.
+let initialized = false;
 // A Worker isolate is short-lived in production. Running the entire DDL and
 // template-seeding routine in every new isolate made even a simple page load
 // wait several seconds for D1. Keep a durable completion marker instead.
@@ -1745,43 +1747,41 @@ async function applyTeamDirectoryCorrections() {
   ).run();
 }
 
-export async function ensureSystemDatabase(): Promise<void> {
-  if (!initialization) {
-    initialization = (async () => {
-      const d1 = getD1();
-      // This tiny table is safe to create before the full schema and lets a
-      // warm or newly-created Worker skip the expensive initialization path.
-      await d1
-        .prepare(
-          `CREATE TABLE IF NOT EXISTS system_state (
-            key TEXT PRIMARY KEY NOT NULL,
-            value TEXT NOT NULL,
-            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-          )`,
-        )
-        .run();
-      const marker = await d1
-        .prepare("SELECT value FROM system_state WHERE key = ?")
-        .bind("runtime-schema-version")
-        .first<{ value: string }>();
-      if (marker?.value === RUNTIME_SCHEMA_VERSION) {
-        await applyTeamDirectoryCorrections();
-        return;
-      }
-      await createSchema();
-      await seedDatabase(new Request("http://potok.internal/system"));
-      await applyTeamDirectoryCorrections();
-      await d1
-        .prepare(
-          `INSERT INTO system_state (key, value, updated_at) VALUES (?, ?, ?)
-           ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
-        )
-        .bind("runtime-schema-version", RUNTIME_SCHEMA_VERSION, new Date().toISOString())
-        .run();
-    })().catch((error) => {
-      initialization = null;
-      throw error;
-    });
+async function initializeSystemDatabase(): Promise<void> {
+  const d1 = getD1();
+  // This tiny table is safe to create before the full schema and lets a
+  // warm or newly-created Worker skip the expensive initialization path.
+  await d1
+    .prepare(
+      `CREATE TABLE IF NOT EXISTS system_state (
+        key TEXT PRIMARY KEY NOT NULL,
+        value TEXT NOT NULL,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    )
+    .run();
+  const marker = await d1
+    .prepare("SELECT value FROM system_state WHERE key = ?")
+    .bind("runtime-schema-version")
+    .first<{ value: string }>();
+  if (marker?.value === RUNTIME_SCHEMA_VERSION) {
+    await applyTeamDirectoryCorrections();
+    return;
   }
-  await initialization;
+  await createSchema();
+  await seedDatabase(new Request("http://potok.internal/system"));
+  await applyTeamDirectoryCorrections();
+  await d1
+    .prepare(
+      `INSERT INTO system_state (key, value, updated_at) VALUES (?, ?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+    )
+    .bind("runtime-schema-version", RUNTIME_SCHEMA_VERSION, new Date().toISOString())
+    .run();
+}
+
+export async function ensureSystemDatabase(): Promise<void> {
+  if (initialized) return;
+  await initializeSystemDatabase();
+  initialized = true;
 }

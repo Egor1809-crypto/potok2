@@ -1,16 +1,15 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Eye, EyeOff, LockKeyhole, UsersRound } from "@/components/ui/icons";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 import { BrandMark } from "@/components/layout/brand-mark";
 
 const TEAM_NAME = "ТехнологИИ Права";
 
 export function AuthScreen({ mode }: { mode: "login" | "register" }) {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [login, setLogin] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -20,34 +19,62 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
   const [firstAccount, setFirstAccount] = useState<boolean | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const activeRequest = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    fetch("/api/auth/status", { cache: "no-store" })
-      .then((response) => response.json())
+    // Login does not need the registration check. Each request owns its work.
+    if (mode !== "register") return;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 15_000);
+    fetch("/api/auth/status", { cache: "no-store", signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Registration status unavailable");
+        return response.json();
+      })
       .then((payload) => setFirstAccount(Boolean((payload as { firstAccountAvailable?: boolean }).firstAccountAvailable)))
-      .catch(() => setFirstAccount(false));
-  }, []);
+      .catch(() => setFirstAccount(false))
+      .finally(() => window.clearTimeout(timeout));
+    return () => { window.clearTimeout(timeout); controller.abort(); };
+  }, [mode]);
+
+  useEffect(() => () => activeRequest.current?.abort(), []);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (activeRequest.current) return;
+    const controller = new AbortController();
+    activeRequest.current = controller;
+    let timedOut = false;
+    const timeout = window.setTimeout(() => { timedOut = true; controller.abort(); }, 15_000);
     setBusy(true);
     setError("");
     try {
       const response = await fetch(`/api/auth/${mode}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify(mode === "register"
           ? { team: TEAM_NAME, displayName, login, password, inviteCode: firstAccount ? undefined : inviteCode }
           : { login, password }),
       });
-      const payload = await response.json() as { error?: string };
-      if (!response.ok) throw new Error(payload.error || "Не удалось войти.");
+      let payload: { error?: string };
+      try { payload = await response.json(); }
+      catch (error) {
+        if (controller.signal.aborted) throw error;
+        throw new Error("Сервер временно недоступен. Попробуйте войти ещё раз.");
+      }
+      if (!response.ok) throw new Error(payload.error || "Не удалось войти. Попробуйте ещё раз.");
       const next = searchParams.get("next");
-      router.replace(next?.startsWith("/") && !next.startsWith("//") ? next : "/dashboard");
-      router.refresh();
+      const destination = new URL(next?.startsWith("/") ? next : "/dashboard", window.location.origin);
+      // Start the authenticated page with the new cookie, without racing a
+      // client-side redirect against a refresh of the old login route.
+      window.location.replace(destination.origin === window.location.origin ? destination.pathname + destination.search + destination.hash : "/dashboard");
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Не удалось выполнить операцию.");
+      if (timedOut) setError("Сервер не ответил за 15 секунд. Попробуйте войти ещё раз — логин и пароль сохранены в форме.");
+      else if (!controller.signal.aborted) setError(submitError instanceof TypeError ? "Не удалось связаться с сервером. Проверьте подключение и попробуйте ещё раз." : submitError instanceof Error ? submitError.message : "Не удалось выполнить операцию.");
     } finally {
+      window.clearTimeout(timeout);
+      activeRequest.current = null;
       setBusy(false);
     }
   }
@@ -77,7 +104,7 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
               : "Продолжите работу с общей базой команды."}
           </p>
 
-          <form className="mt-8 space-y-5" onSubmit={submit}>
+          <form className="mt-8 space-y-5" onSubmit={submit} aria-busy={busy}>
             {isRegister && <label className="block"><span className="mb-2 block text-sm font-semibold">Команда</span><input value={TEAM_NAME} readOnly className="h-12 w-full rounded-xl border border-border bg-surface-subtle px-4 text-base font-medium" /></label>}
             {isRegister && <label className="block"><span className="mb-2 block text-sm font-semibold">Ваше имя</span><input autoComplete="name" value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Например, Егор Шабалин" required minLength={2} maxLength={100} className="h-12 w-full rounded-xl border border-border bg-surface px-4 text-base outline-none focus:border-primary focus:ring-4 focus:ring-primary/10" /><span className="mt-2 block text-sm text-text-muted">Так коллеги увидят ответственного за контакт. Администратор назначает доступ к базам и группам.</span></label>}
             <label className="block"><span className="mb-2 block text-sm font-semibold">Логин</span><input autoComplete="username" value={login} onChange={(event) => setLogin(event.target.value)} placeholder="Например, egor" required minLength={3} className="h-12 w-full rounded-xl border border-border bg-surface px-4 text-base outline-none focus:border-primary focus:ring-4 focus:ring-primary/10" /></label>
