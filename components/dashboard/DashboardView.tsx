@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { MiniCalendar } from "./MiniCalendar";
 import {
   ArrowRight,
   Blocks,
@@ -221,16 +222,17 @@ export function DashboardView() {
 
   return (
     <div className="space-y-6">
-      <section className="grid gap-5 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm md:grid-cols-[minmax(0,1fr)_auto] md:items-center sm:p-7">
+      <section className="grid min-w-0 gap-5 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm sm:grid-cols-[minmax(0,1fr)_232px] sm:items-center sm:p-7">
         <div>
           <p className="section-eyebrow">{snapshot.workspace.name}</p>
           <h1 className="text-[28px] font-semibold tracking-[-.04em] sm:text-[32px]">{firstName ? `${firstName}, что создаём сегодня?` : "Что создаём сегодня?"}</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-muted)]">Письмо, презентация и изображения живут в одной студии. Найденные контакты проходят вашу проверку, а готовые материалы можно повторно использовать в проектах.</p>
+          <div className="mt-5 flex flex-wrap gap-2"><Link href="/templates" className="btn btn-secondary w-fit gap-2"><LayoutTemplate aria-hidden="true" className="size-6" />Выбрать шаблон</Link><Link href="/email-builder?new=1" className="btn btn-primary w-fit gap-2"><Plus aria-hidden="true" className="size-6" />Создать письмо</Link><Link href="/campaigns" className="btn btn-secondary w-fit gap-2"><SendHorizontal aria-hidden="true" className="size-6" />Рассылка писем</Link></div>
         </div>
-        <div className="flex flex-wrap gap-2"><Link href="/templates" className="btn btn-secondary w-fit gap-2"><LayoutTemplate aria-hidden="true" className="size-6" />Выбрать шаблон</Link><Link href="/email-builder?new=1" className="btn btn-primary w-fit gap-2"><Plus aria-hidden="true" className="size-6" />Создать письмо</Link><Link href="/campaigns" className="btn btn-secondary w-fit gap-2"><SendHorizontal aria-hidden="true" className="size-6" />Рассылка писем</Link></div>
+        <div className="flex min-w-0 justify-center sm:justify-end"><MiniCalendar campaigns={snapshot.calendarSchedule ?? snapshot.campaigns} /></div>
       </section>
 
-      <section className="card overflow-hidden" aria-labelledby="unisender-lifetime-title">
+      <section className="card min-w-0 overflow-hidden" aria-labelledby="unisender-lifetime-title">
         <div className="flex flex-col gap-3 border-b border-[var(--border)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div>
             <p className="section-eyebrow">UniSender · за всё время</p>
@@ -285,7 +287,7 @@ export function DashboardView() {
           <WorkflowStep index="04" Icon={SendHorizontal} title="Использовать" text="Скачайте результат или передайте готовое письмо в рассылку." />
         </ol>
         <div className="mt-4 flex flex-wrap gap-2 border-t border-[var(--border)] pt-4">
-          <Link href="/templates?import=1" className="btn btn-secondary gap-2"><Upload aria-hidden="true" className="size-6" />Импортировать свой макет</Link>
+          <Link href="/templates?import=1" className="btn btn-secondary max-w-full gap-2 whitespace-normal text-left"><Upload aria-hidden="true" className="size-6" />Импортировать свой макет</Link>
           <Link href="/templates" className="btn btn-ghost gap-2">Открыть шаблоны<ArrowRight aria-hidden="true" className="size-6" /></Link>
         </div>
       </section>
@@ -312,9 +314,9 @@ export function DashboardView() {
         ))}
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(300px,.75fr)]">
-        <div className="card overflow-hidden">
-          <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4 sm:px-6">
+      <section className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(300px,.75fr)]">
+        <div className="card min-w-0 overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] px-5 py-4 sm:px-6">
             <div><h2 className="text-[15px] font-semibold">Кампании</h2><p className="mt-1 text-[11px] text-[var(--text-subtle)]">Черновики, блокировки и запуски из базы</p></div>
             <Link href="/campaigns" className="text-[12px] font-semibold text-[var(--primary)]">Все кампании</Link>
           </div>
@@ -355,11 +357,11 @@ function getNextAction(snapshot: WorkspaceSnapshot) {
 
 function CampaignRow({ campaign, timeZone }: { campaign: CampaignRecord; timeZone: string }) {
   return (
-    <Link href={`/campaigns/${campaign.id}`} className="flex items-center gap-3 px-5 py-4 transition hover:bg-[var(--surface-subtle)] sm:px-6">
+    <Link href={`/campaigns/${campaign.id}`} className="grid grid-cols-[36px_minmax(0,1fr)_24px] items-center gap-x-3 gap-y-2 px-5 py-4 transition hover:bg-[var(--surface-subtle)] sm:flex sm:px-6">
       <span className={`grid size-9 shrink-0 place-items-center rounded-xl ${campaign.status === "blocked" ? "bg-[var(--warning-subtle)] text-[var(--warning)]" : "bg-[var(--primary-subtle)] text-[var(--primary)]"}`}><Megaphone aria-hidden="true" className="size-6" /></span>
       <span className="min-w-0 flex-1"><span className="block truncate text-[12px] font-semibold">{campaign.name}</span><span className="mt-1 block truncate text-[10px] text-[var(--text-subtle)]">{campaign.audienceLabel} · {formatDate(campaign.updatedAt, timeZone)}</span></span>
-      <span className={`badge ${statusTone[campaign.status]}`}>{statusLabel[campaign.status]}</span>
-      <ArrowRight aria-hidden="true" className="size-6 shrink-0 text-[var(--text-subtle)]" />
+      <span className={`badge col-start-2 row-start-2 justify-self-start ${statusTone[campaign.status]}`}>{statusLabel[campaign.status]}</span>
+      <ArrowRight aria-hidden="true" className="col-start-3 row-start-1 size-6 shrink-0 text-[var(--text-subtle)]" />
     </Link>
   );
 }
@@ -368,7 +370,7 @@ function ReadinessStep({ ready, label, action, href }: { ready: boolean; label: 
   return (
     <li className="flex items-center gap-3 rounded-lg py-2.5">
       <span className={`grid size-6 shrink-0 place-items-center rounded-full ${ready ? "bg-[var(--success-subtle)] text-[var(--success)]" : "bg-[var(--warning-subtle)] text-[var(--warning)]"}`}>{ready ? <Check aria-hidden="true" className="size-5" /> : <Clock3 aria-hidden="true" className="size-5" />}</span>
-      <span className="flex-1 text-[12px] font-medium">{label}</span>
+      <span className="min-w-0 flex-1 break-words text-[12px] font-medium">{label}</span>
       {!ready && <Link href={href} className="text-[11px] font-semibold text-[var(--primary)]">{action}</Link>}
     </li>
   );

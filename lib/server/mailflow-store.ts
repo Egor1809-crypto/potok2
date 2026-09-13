@@ -735,7 +735,7 @@ export async function getWorkspaceBootstrap(request: Request) {
       .where(and(eq(campaigns.workspaceId, WORKSPACE_ID), campaignAccessSql(actor.participant)))
       .orderBy(desc(campaigns.updatedAt))
       .limit(250);
-    const [campaignRecords, segmentRows, integrationRows, planRows, jobRows, eventRows, statsRows, campaignStatsRows, templateCountRows, memberRows] = await Promise.all([
+    const [campaignRecords, segmentRows, integrationRows, planRows, jobRows, eventRows, statsRows, campaignStatsRows, templateCountRows, memberRows, calendarSchedule] = await Promise.all([
       campaignSummaryRecords(actor.participant, { limit: 250 }),
       db.select().from(segments).where(eq(segments.workspaceId, WORKSPACE_ID)).orderBy(desc(segments.updatedAt)),
       db.select().from(integrations).where(eq(integrations.workspaceId, WORKSPACE_ID)).orderBy(integrations.providerId),
@@ -751,12 +751,17 @@ export async function getWorkspaceBootstrap(request: Request) {
       }).from(campaigns).where(and(eq(campaigns.workspaceId, WORKSPACE_ID), campaignAccessSql(actor.participant))),
       db.select({ total: sql<number>`count(*)` }).from(emailTemplates).where(eq(emailTemplates.workspaceId, WORKSPACE_ID)),
       db.select().from(participants).where(and(eq(participants.workspaceId, WORKSPACE_ID), eq(participants.status, "active"))).orderBy(participants.createdAt),
+      // Calendar markers cover all active plans, independently of the 250-item activity list.
+      scope === "dashboard" ? db.select({ status: campaigns.status, scheduledAt: campaigns.scheduledAt }).from(campaigns)
+        .where(and(eq(campaigns.workspaceId, WORKSPACE_ID), campaignAccessSql(actor.participant),
+          inArray(campaigns.status, ["scheduled", "sending"]), isNotNull(campaigns.scheduledAt))) : Promise.resolve([]),
     ]);
     const integrationRecords = integrationRows.filter((row) => PROVIDERS.includes(row.providerId)).map(toIntegrationRecord);
     return {
       ...base,
       members: memberRows.map(toParticipant),
       campaigns: campaignRecords,
+      ...(scope === "dashboard" ? { calendarSchedule } : {}),
       deliveryPlans: planRows.map(toDeliveryPlan),
       deliveryJobs: jobRows.map(toDeliveryJob),
       events: eventRows.map(toCampaignEvent),

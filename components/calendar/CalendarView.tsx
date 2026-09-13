@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { calendarDayKey as dateKeyInTimezone, parseCalendarDate } from "@/lib/calendar/dates";
 import { useCalendarTimeZone } from "@/lib/calendar-timezone";
 import { russianTimeZones } from "@/lib/russian-timezones";
 import { CalendarReport } from "./CalendarReport";
@@ -36,17 +37,6 @@ function formatTime(value: string, timezone: string) {
   return new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: timezone }).format(new Date(value));
 }
 
-function dateKeyInTimezone(value: string, timezone: string) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    timeZone: timezone,
-  }).formatToParts(new Date(value));
-  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? "";
-  return `${part("year")}-${part("month")}-${part("day")}`;
-}
-
 function audienceLabel(campaign: CampaignRecord, snapshot: WorkspaceSnapshot) {
   if (campaign.audienceType === "segment") {
     return snapshot.segments.find((segment) => segment.id === campaign.segmentId)?.name ?? "Удалённая группа";
@@ -71,6 +61,7 @@ const statusLabel: Record<CampaignRecord["status"], string> = {
 export function CalendarView() {
   const params = useSearchParams();
   const targetCampaignId = params.get("campaign");
+  const targetDay = parseCalendarDate(params.get("date")) ? params.get("date") : null;
   const [view, setView] = React.useState<"calendar" | "report">("calendar");
   const [loading, setLoading] = React.useState(false);
   const inFlight = React.useRef(false);
@@ -132,6 +123,17 @@ export function CalendarView() {
       window.removeEventListener("focus", refresh);
     };
   }, [load]);
+
+  React.useEffect(() => {
+    if (!targetDay) return;
+    const [year, monthNumber] = targetDay.split("-").map(Number);
+    const frame = requestAnimationFrame(() => {
+      setMonth(new Date(year, monthNumber - 1, 1));
+      setSelectedDay(targetDay);
+      setView("calendar");
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [targetDay]);
 
   const targetScheduledAt = snapshot?.campaigns.find((item) => item.id === targetCampaignId)?.scheduledAt;
   React.useEffect(() => {

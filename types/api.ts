@@ -826,6 +826,7 @@ export type WorkspaceHistoryWindow = {
 };
 
 export type WorkspaceSnapshot = {
+  calendarSchedule?: Pick<CampaignRecord, "status" | "scheduledAt">[];
   calendarReport?: import("@/lib/calendar/report").CalendarReport;
   workspace: WorkspaceRecord;
   participant: ParticipantRecord;

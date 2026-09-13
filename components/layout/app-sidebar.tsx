@@ -8,7 +8,7 @@ import { useEffect, useState } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { IconButton, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/components/ui/utils";
-import { demoUser, workspaceConfig } from "@/config/brand";
+import { demoUser } from "@/config/brand";
 
 import { BrandMark } from "./brand-mark";
 import { isProductRouteActive, productNavigation } from "./navigation";
@@ -31,38 +31,22 @@ export function AppSidebar({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const currentLocation = `${pathname}${searchParams.size ? `?${searchParams.toString()}` : ""}`;
-  const [workspaceName, setWorkspaceName] = useState<string>(workspaceConfig.name);
   const [participantName, setParticipantName] = useState<string>(demoUser.name);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(() => new Set(["Шаблоны", "Конструктор"]));
 
   useEffect(() => {
-    const onWorkspaceUpdate = (event: Event) => {
-      const detail = (event as CustomEvent<{ name?: string }>).detail;
-      if (detail?.name) setWorkspaceName(detail.name);
-    };
-    window.addEventListener("mailflow:workspace-updated", onWorkspaceUpdate);
     const frame = window.requestAnimationFrame(() => {
       void fetch("/api/workspace?scope=identity", { cache: "force-cache" })
-        .then((response) => response.ok ? response.json() as Promise<{ workspace?: { name?: string }; participant?: { displayName?: string } }> : null)
+        .then((response) => response.ok ? response.json() as Promise<{ participant?: { displayName?: string } }> : null)
         .then((payload) => {
-          if (payload?.workspace?.name) setWorkspaceName(payload.workspace.name);
           if (payload?.participant?.displayName) setParticipantName(payload.participant.displayName);
         })
         .catch(() => undefined);
     });
     return () => {
       window.cancelAnimationFrame(frame);
-      window.removeEventListener("mailflow:workspace-updated", onWorkspaceUpdate);
     };
   }, []);
-
-  const workspaceInitials = workspaceName
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 2)
-    .toLocaleUpperCase("ru-RU");
 
   return (
     <aside
@@ -73,7 +57,7 @@ export function AppSidebar({
         className,
       )}
     >
-      <div className="flex h-[var(--topbar-height)] shrink-0 items-center justify-between border-b border-border/70 px-5">
+      <div className="flex h-[var(--topbar-height)] shrink-0 items-center justify-between px-5">
         <BrandMark />
         {!mobile && onCollapse ? <button data-sidebar-collapse type="button" onClick={onCollapse} aria-label="Свернуть левую панель" title="Свернуть левую панель" aria-expanded="true" aria-controls="platform-sidebar" className="grid size-10 shrink-0 place-items-center rounded-lg text-text-muted hover:bg-surface-subtle"><ChevronLeft aria-hidden="true" className="size-7" /></button> : null}
         {mobile ? (
@@ -89,25 +73,9 @@ export function AppSidebar({
         ) : null}
       </div>
 
-      <div className="shrink-0 px-3 pb-2 pt-4">
-        <div className="flex items-center gap-3 rounded-xl border border-border bg-surface-subtle/70 px-3 py-2.5">
-          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary-subtle text-[10px] font-bold tracking-wide text-primary">
-            {workspaceInitials || "MF"}
-          </span>
-          <span className="min-w-0">
-            <span className="block truncate text-[12px] font-semibold text-text-strong">
-              {workspaceName}
-            </span>
-            <span className="block truncate text-[10px] text-text-muted">
-              Единое рабочее пространство
-            </span>
-          </span>
-        </div>
-      </div>
-
       <nav
         aria-label="Основные разделы"
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-4 pt-2"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-4 pt-3"
       >
         {productNavigation.map((group) => (
           <div key={group.label} className="mb-4 last:mb-0">

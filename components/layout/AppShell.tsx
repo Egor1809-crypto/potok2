@@ -99,7 +99,6 @@ export function AppShell({
           <Topbar
             currentSection={title ?? getProductSection(pathname)}
             onSearchClick={() => changeSearchOpen(true)}
-            action={action}
           />
           <main
             id="main-content"
@@ -117,6 +116,7 @@ export function AppShell({
                 contentClassName,
               )}
             >
+              {action && <div className="mb-4 flex flex-wrap justify-end gap-2">{action}</div>}
               {children}
             </div>
           </main>

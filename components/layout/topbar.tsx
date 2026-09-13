@@ -1,23 +1,21 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, LogOut, Plus, Search } from "@/components/ui/icons";
+import { LogOut, Search } from "@/components/ui/icons";
 
 import { Avatar } from "@/components/ui/avatar";
-import { IconButton, buttonVariants } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/button";
 import { demoUser } from "@/config/brand";
 
 type TopbarProps = {
   currentSection: string;
   onSearchClick: () => void;
-  action?: ReactNode;
 };
 
 export function Topbar({
   currentSection,
   onSearchClick,
-  action,
 }: TopbarProps) {
   const [participantName, setParticipantName] = useState<string>(demoUser.name);
   const [participantColor, setParticipantColor] = useState("#6558E8");
@@ -38,16 +36,16 @@ export function Topbar({
   }, []);
 
   return (
-    <header className="sticky top-0 z-40 flex h-[var(--topbar-height)] shrink-0 items-center justify-between gap-3 border-b border-border bg-surface px-4 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-40 grid h-[var(--topbar-height)] shrink-0 grid-cols-[40px_minmax(0,1fr)_40px] items-center gap-2 bg-background px-4 sm:grid-cols-[minmax(88px,1fr)_minmax(0,400px)_minmax(88px,1fr)] sm:px-6 lg:px-8">
       <span className="sr-only">Текущий раздел: {currentSection}</span>
 
-      <div className="flex min-w-0 items-center gap-2.5">
+      <div className="col-start-2 row-start-1 flex min-w-0 items-center justify-center">
         <button
           type="button"
           onClick={onSearchClick}
           aria-label="Поиск разделов и действий"
           aria-haspopup="dialog"
-          className="flex min-h-10 items-center gap-2 rounded-lg px-2 text-left text-sm text-text-muted hover:bg-surface-subtle sm:w-56"
+          className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm text-text-muted hover:bg-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
         >
           <Search aria-hidden="true" className="size-5" />
           <span className="min-w-0 flex-1 truncate">Поиск</span>
@@ -55,33 +53,7 @@ export function Topbar({
         </button>
       </div>
 
-      <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-        {action ? (
-          <div className="flex items-center">{action}</div>
-        ) : (
-          <Link
-            href="/dashboard#creative-studio"
-            aria-label="Создать проект"
-            className={buttonVariants({
-              variant: "primary",
-              size: "sm",
-              className: "px-2.5 sm:px-3",
-            })}
-          >
-            <Plus aria-hidden="true" className="size-6" />
-            <span className="hidden sm:inline">Создать</span>
-          </Link>
-        )}
-
-        <Link
-          href="/calendar"
-          aria-label="Открыть календарь рассылок"
-          className="hidden h-9 items-center gap-2 rounded-lg border border-primary/25 bg-primary/5 px-3 text-[12px] font-semibold text-primary shadow-[0_1px_2px_rgba(101,88,232,0.1)] transition hover:-translate-y-px hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-primary/30 md:inline-flex"
-        >
-          <CalendarDays aria-hidden="true" className="size-6" />
-          Календарь
-        </Link>
-
+      <div className="col-start-3 row-start-1 flex shrink-0 items-center justify-self-end gap-1.5 sm:gap-2">
         <Link
           href="/settings"
           aria-label={`${participantName}: профиль участника и настройки`}
