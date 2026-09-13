@@ -58,22 +58,30 @@ test('a corrected crop retains original asset and crop coordinates through savin
  assert.equal(find(html,'image').attributes['data-potok-original-src'],'https://example.org/hero.png');
 });
 test('all 18 library icons are real transparent PNGs with visible artwork',async()=>{
- assert.equal(icons.emailIcons.length,18);
- for(const icon of icons.emailIcons){
+ assert.equal(icons.colorEmailIcons.length,18);
+ for(const icon of icons.colorEmailIcons){
   const file=await readFile('public'+icon.path);const {data,info}=await sharp(file).raw().toBuffer({resolveWithObject:true});
   assert.equal(info.width,192);assert.equal(info.height,192);assert.equal(info.channels,4);assert.equal(data[3],0);
   let drawn=0;for(let i=3;i<data.length;i+=4)if(data[i]>0)drawn++;assert.ok(drawn>500 && drawn<192*192*.85,icon.id);
  }
 });
-test('AI card icons stay editable, survive save/load, and compile to transparent library PNGs',()=>{
+for (const selectedIcons of [['lock','people','chart'],['rune-identity-lock','rune-identity-users','rune-layouts-grid-2x2']]) test('AI card icons stay editable, survive save/load and compile: '+selectedIcons[0],()=>{
  const brief=schema.parseAiEmailBrief({description:'Безопасность, команда и аналитика',visuals:'auto'});
- const ai={version:'1.0',subject:'Инструменты команды',preheader:'Удобно работать вместе',meta:{goal:'announcement',language:'ru',tone:'tech',length:'short'},theme:{emailWidth:640,backgroundColor:'#080D15',contentBackgroundColor:'#111725',textColor:'#F2F4FF',mutedTextColor:'#AAB3C7',primaryColor:'#547DFA',accentColor:'#8F63EB',borderColor:'#354256',borderRadius:12,fontFamily:'Arial'},blocks:[{id:'features',type:'benefits',variant:'benefits-3-column',title:'Возможности',text:'',badge:'',items:['lock','people','chart'].map((iconId,i)=>({title:['Защита','Команда','Аналитика'][i],text:'Для вашей работы',value:'',label:'',iconId})),button:null,image:null,backgroundColor:null,textColor:null}]};
+ const ai={version:'1.0',subject:'Инструменты команды',preheader:'Удобно работать вместе',meta:{goal:'announcement',language:'ru',tone:'tech',length:'short'},theme:{emailWidth:640,backgroundColor:'#080D15',contentBackgroundColor:'#111725',textColor:'#F2F4FF',mutedTextColor:'#AAB3C7',primaryColor:'#547DFA',accentColor:'#8F63EB',borderColor:'#354256',borderRadius:12,fontFamily:'Arial'},blocks:[{id:'features',type:'benefits',variant:'benefits-3-column',title:'Возможности',text:'',badge:'',items:selectedIcons.map((iconId,i)=>({title:['Защита','Команда','Аналитика'][i],text:'Для вашей работы',value:'',label:'',iconId})),button:null,image:null,backgroundColor:null,textColor:null}]};
  const parsed=schema.parseAiEmailDocument(ai);const mapped=mapper.mapAiEmailToBuilderDocument(parsed,brief,new Map());
  const persisted=compiler.parseEmailBuilderDocument(JSON.parse(JSON.stringify(mapped)));
  const rendered=compiler.compileEmailDocument(persisted);
- for(const id of ['lock','people','chart'])assert.match(rendered,new RegExp('/email-icons/'+id+'\\.png'));
+ for(const id of selectedIcons)assert.match(rendered,new RegExp('/email-icons/'+id+'\\.png'));
  const context=mapper.builderToAiEmail(persisted,brief);
- assert.deepEqual(JSON.parse(JSON.stringify(context.email.blocks.find(b=>b.id==='features').items.map(i=>i.iconId))),['lock','people','chart']);
+ assert.deepEqual(JSON.parse(JSON.stringify(context.email.blocks.find(b=>b.id==='features').items.map(i=>i.iconId))),selectedIcons);
  const without=mapper.mapAiEmailToBuilderDocument(parsed,{...brief,visuals:'none'},new Map());assert.doesNotMatch(compiler.compileEmailDocument(without),/email-icons/);
  const bad=structuredClone(ai);bad.blocks[0].items[0].iconId='https://tracker.example/pixel';assert.throws(()=>schema.parseAiEmailDocument(bad));
+});
+
+test('small standalone icons remain small after saving and compiling, with bounded image widths',()=>{
+ const document={templateId:'',subject:'Значок',previewText:'',accentColor:'#123456',bodyBackground:'#ffffff',workspaceBackground:'#ffffff',contentWidth:640,blocks:[{id:'pixel-icon',type:'image',content:'Замок',href:icons.emailIconUrl('rune-identity-lock'),widthPercent:10,paddingTop:8,paddingBottom:8,backgroundColor:'#ffffff',textColor:'#111111',fontSize:16,borderRadius:0}]};
+ const parsed=compiler.parseEmailBuilderDocument(document);
+ assert.equal(parsed.blocks[0].widthPercent,10);
+ assert.match(compiler.compileEmailDocument(parsed),/width:10%/);
+ for(const widthPercent of [0,4,101]) assert.throws(()=>compiler.parseEmailBuilderDocument({...document,blocks:[{...document.blocks[0],widthPercent}]}));
 });

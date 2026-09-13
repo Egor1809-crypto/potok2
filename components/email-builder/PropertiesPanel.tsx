@@ -381,7 +381,7 @@ export function PropertiesPanel({
         </PropertySection>
 
         <PropertySection icon={Box} title="Размер и рамка">
-          <RangeField label="Ширина" value={block.widthPercent} min={25} max={100} onChange={(widthPercent) => onUpdateBlock({ widthPercent })} />
+          <RangeField label="Ширина" value={block.widthPercent} min={block.type === "image" || block.type === "logo" ? 5 : 25} max={100} onChange={(widthPercent) => onUpdateBlock({ widthPercent })} />
           <RangeField label="Рамка" value={block.borderWidth} min={0} max={8} onChange={(borderWidth) => onUpdateBlock({ borderWidth })} />
           <ColorField label="Цвет рамки" value={block.borderColor} onChange={(borderColor) => onUpdateBlock({ borderColor })} />
           {block.type === "button" ? (

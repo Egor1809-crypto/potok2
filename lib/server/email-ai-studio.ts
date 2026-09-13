@@ -1,7 +1,8 @@
-import { emailIcons, emailIconUrl } from "@/lib/email-icons";
+import { selectEmailIcons } from "@/lib/email-ai/icon-selection";
+import { emailIconUrl } from "@/lib/email-icons";
 import type { AiEmailBrief, AiEmailDocument, AiEmailReview, AiEmailEditorialReview, AiEmailStudioResponse } from "@/types/email-ai";
 import type { EmailBuilderDocumentInput, EmailAiSuggestion } from "@/types/api";
-import { aiEmailBlockSchema, aiEmailDocumentSchema, aiEmailReviewSchema, object, parseAiEmailBlock, parseAiEmailBrief, parseAiEmailDocument, subjectVariantsSchema, validateEmailSchema, withEmailIconDefaults } from "@/lib/email-ai/schema";
+import { aiEmailSchemasForIcons, aiEmailReviewSchema, object, parseAiEmailBlock, parseAiEmailBrief, parseAiEmailDocument, subjectVariantsSchema, validateEmailSchema, withEmailIconDefaults } from "@/lib/email-ai/schema";
 import { EMAIL_EDIT_PROMPT, EMAIL_REVIEW_PROMPT, EMAIL_STRATEGIST_PROMPT } from "@/lib/email-ai/prompts";
 import { builderToAiEmail, mapAiEmailToBuilderDocument } from "@/lib/email-ai/mapping";
 import { emailFactIssues, emailSourceOfTruth } from "@/lib/email-ai/facts";
@@ -138,16 +139,18 @@ export async function emailAiStudio(request: Request, action: string, input: unk
 
   const selected = action === "rewrite-block" ? context?.email.blocks.find(b => b.id === row.blockId) : undefined;
   if (action === "rewrite-block" && !selected) throw new ApiRequestError("Выберите блок для изменения.");
+  const iconLibrary = brief.visuals === "none" ? [] : selectEmailIcons([brief.description, brief.requiredContent, ...brief.requiredFacts, instruction].join(" "), context?.email.blocks.flatMap(block => block.items.map(item => item.iconId || "")) ?? []);
+  const iconSchemas = aiEmailSchemasForIcons(iconLibrary.map(icon => icon.id));
   const knownAssets = new Map(context?.assets);
-  if (brief.visuals !== "none") for (const icon of emailIcons) knownAssets.set(`icon-${icon.id}`, emailIconUrl(icon.id));
+  for (const icon of iconLibrary) knownAssets.set(`icon-${icon.id}`, emailIconUrl(icon.id));
   for (const asset of brief.assets) {
     const stored = await getEmailAssetRecord(request, asset.id);
     knownAssets.set(asset.id, stored.url);
   }
-  const payload = { brief, sourceOfTruth: emailSourceOfTruth(brief, existingText), email: selected ? undefined : context?.email, block: selected, blockOnly: Boolean(selected), instruction, availableAssets: [...knownAssets.keys()], iconLibrary: brief.visuals === "none" ? [] : emailIcons.map(({ id, name, keywords }) => ({ id, name, keywords, assetId: `icon-${id}` })) };
+  const payload = { brief, sourceOfTruth: emailSourceOfTruth(brief, existingText), email: selected ? undefined : context?.email, block: selected, blockOnly: Boolean(selected), instruction, availableAssets: [...knownAssets.keys()], iconLibrary: iconLibrary.map(({ id, name, collection, category }) => ({ id, name, collection, category, assetId: `icon-${id}` })) };
   let email: AiEmailDocument | undefined; let failedDraft: unknown; let model = provider.model; let repaired = false;
   const generate = async (repair?: string[]) => {
-    const result = await aiJson(provider, request, selected ? "email_block" : "email_document", selected ? aiEmailBlockSchema : aiEmailDocumentSchema, `${action === "generate" ? EMAIL_STRATEGIST_PROMPT : EMAIL_EDIT_PROMPT}${repair ? "\nИсправь ТОЛЬКО перечисленные ошибки в previousDraft. Не создавай новый дизайн и не переписывай остальные блоки. Верни полный исправленный JSON." : ""}`, { ...payload, previousDraft: failedDraft || email, repairIssues: repair }, Boolean(repair));
+    const result = await aiJson(provider, request, selected ? "email_block" : "email_document", selected ? iconSchemas.block : iconSchemas.document, `${action === "generate" ? EMAIL_STRATEGIST_PROMPT : EMAIL_EDIT_PROMPT}${repair ? "\nИсправь ТОЛЬКО перечисленные ошибки в previousDraft. Не создавай новый дизайн и не переписывай остальные блоки. Верни полный исправленный JSON." : ""}`, { ...payload, previousDraft: failedDraft || email, repairIssues: repair }, Boolean(repair));
     failedDraft = result.value;
     model = result.model;
     if (selected) {

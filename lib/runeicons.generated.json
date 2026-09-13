@@ -1,0 +1,1292 @@
+[
+  {
+    "id": "rune-arrows-arrow-down-left",
+    "folder": "arrows",
+    "basename": "arrow-down-left",
+    "path": "/email-icons/rune-arrows-arrow-down-left.png"
+  },
+  {
+    "id": "rune-arrows-arrow-down-right",
+    "folder": "arrows",
+    "basename": "arrow-down-right",
+    "path": "/email-icons/rune-arrows-arrow-down-right.png"
+  },
+  {
+    "id": "rune-arrows-arrow-down-to-line",
+    "folder": "arrows",
+    "basename": "arrow-down-to-line",
+    "path": "/email-icons/rune-arrows-arrow-down-to-line.png"
+  },
+  {
+    "id": "rune-arrows-arrow-down",
+    "folder": "arrows",
+    "basename": "arrow-down",
+    "path": "/email-icons/rune-arrows-arrow-down.png"
+  },
+  {
+    "id": "rune-arrows-arrow-left-right",
+    "folder": "arrows",
+    "basename": "arrow-left-right",
+    "path": "/email-icons/rune-arrows-arrow-left-right.png"
+  },
+  {
+    "id": "rune-arrows-arrow-left",
+    "folder": "arrows",
+    "basename": "arrow-left",
+    "path": "/email-icons/rune-arrows-arrow-left.png"
+  },
+  {
+    "id": "rune-arrows-arrow-right",
+    "folder": "arrows",
+    "basename": "arrow-right",
+    "path": "/email-icons/rune-arrows-arrow-right.png"
+  },
+  {
+    "id": "rune-arrows-arrow-up-down",
+    "folder": "arrows",
+    "basename": "arrow-up-down",
+    "path": "/email-icons/rune-arrows-arrow-up-down.png"
+  },
+  {
+    "id": "rune-arrows-arrow-up-from-line",
+    "folder": "arrows",
+    "basename": "arrow-up-from-line",
+    "path": "/email-icons/rune-arrows-arrow-up-from-line.png"
+  },
+  {
+    "id": "rune-arrows-arrow-up-left",
+    "folder": "arrows",
+    "basename": "arrow-up-left",
+    "path": "/email-icons/rune-arrows-arrow-up-left.png"
+  },
+  {
+    "id": "rune-arrows-arrow-up-right",
+    "folder": "arrows",
+    "basename": "arrow-up-right",
+    "path": "/email-icons/rune-arrows-arrow-up-right.png"
+  },
+  {
+    "id": "rune-arrows-arrow-up",
+    "folder": "arrows",
+    "basename": "arrow-up",
+    "path": "/email-icons/rune-arrows-arrow-up.png"
+  },
+  {
+    "id": "rune-arrows-chevron-down",
+    "folder": "arrows",
+    "basename": "chevron-down",
+    "path": "/email-icons/rune-arrows-chevron-down.png"
+  },
+  {
+    "id": "rune-arrows-chevron-left",
+    "folder": "arrows",
+    "basename": "chevron-left",
+    "path": "/email-icons/rune-arrows-chevron-left.png"
+  },
+  {
+    "id": "rune-arrows-chevron-right",
+    "folder": "arrows",
+    "basename": "chevron-right",
+    "path": "/email-icons/rune-arrows-chevron-right.png"
+  },
+  {
+    "id": "rune-arrows-chevron-up",
+    "folder": "arrows",
+    "basename": "chevron-up",
+    "path": "/email-icons/rune-arrows-chevron-up.png"
+  },
+  {
+    "id": "rune-arrows-corner-down-right",
+    "folder": "arrows",
+    "basename": "corner-down-right",
+    "path": "/email-icons/rune-arrows-corner-down-right.png"
+  },
+  {
+    "id": "rune-arrows-move",
+    "folder": "arrows",
+    "basename": "move",
+    "path": "/email-icons/rune-arrows-move.png"
+  },
+  {
+    "id": "rune-arrows-rotate-ccw",
+    "folder": "arrows",
+    "basename": "rotate-ccw",
+    "path": "/email-icons/rune-arrows-rotate-ccw.png"
+  },
+  {
+    "id": "rune-arrows-rotate-cw",
+    "folder": "arrows",
+    "basename": "rotate-cw",
+    "path": "/email-icons/rune-arrows-rotate-cw.png"
+  },
+  {
+    "id": "rune-arrows-skip-forward",
+    "folder": "arrows",
+    "basename": "skip-forward",
+    "path": "/email-icons/rune-arrows-skip-forward.png"
+  },
+  {
+    "id": "rune-arrows-step-back",
+    "folder": "arrows",
+    "basename": "step-back",
+    "path": "/email-icons/rune-arrows-step-back.png"
+  },
+  {
+    "id": "rune-arrows-unfold-horizontal",
+    "folder": "arrows",
+    "basename": "unfold-horizontal",
+    "path": "/email-icons/rune-arrows-unfold-horizontal.png"
+  },
+  {
+    "id": "rune-arrows-unfold-vertical",
+    "folder": "arrows",
+    "basename": "unfold-vertical",
+    "path": "/email-icons/rune-arrows-unfold-vertical.png"
+  },
+  {
+    "id": "rune-code-braces",
+    "folder": "code",
+    "basename": "braces",
+    "path": "/email-icons/rune-code-braces.png"
+  },
+  {
+    "id": "rune-code-code-xml",
+    "folder": "code",
+    "basename": "code-xml",
+    "path": "/email-icons/rune-code-code-xml.png"
+  },
+  {
+    "id": "rune-code-code",
+    "folder": "code",
+    "basename": "code",
+    "path": "/email-icons/rune-code-code.png"
+  },
+  {
+    "id": "rune-code-compass",
+    "folder": "code",
+    "basename": "compass",
+    "path": "/email-icons/rune-code-compass.png"
+  },
+  {
+    "id": "rune-code-copy",
+    "folder": "code",
+    "basename": "copy",
+    "path": "/email-icons/rune-code-copy.png"
+  },
+  {
+    "id": "rune-code-drafting-compass",
+    "folder": "code",
+    "basename": "drafting-compass",
+    "path": "/email-icons/rune-code-drafting-compass.png"
+  },
+  {
+    "id": "rune-code-git-branch",
+    "folder": "code",
+    "basename": "git-branch",
+    "path": "/email-icons/rune-code-git-branch.png"
+  },
+  {
+    "id": "rune-code-git-commit-horizontal",
+    "folder": "code",
+    "basename": "git-commit-horizontal",
+    "path": "/email-icons/rune-code-git-commit-horizontal.png"
+  },
+  {
+    "id": "rune-code-group",
+    "folder": "code",
+    "basename": "group",
+    "path": "/email-icons/rune-code-group.png"
+  },
+  {
+    "id": "rune-code-link-2",
+    "folder": "code",
+    "basename": "link-2",
+    "path": "/email-icons/rune-code-link-2.png"
+  },
+  {
+    "id": "rune-code-link",
+    "folder": "code",
+    "basename": "link",
+    "path": "/email-icons/rune-code-link.png"
+  },
+  {
+    "id": "rune-code-server-cog",
+    "folder": "code",
+    "basename": "server-cog",
+    "path": "/email-icons/rune-code-server-cog.png"
+  },
+  {
+    "id": "rune-code-server",
+    "folder": "code",
+    "basename": "server",
+    "path": "/email-icons/rune-code-server.png"
+  },
+  {
+    "id": "rune-code-terminal",
+    "folder": "code",
+    "basename": "terminal",
+    "path": "/email-icons/rune-code-terminal.png"
+  },
+  {
+    "id": "rune-code-ungroup",
+    "folder": "code",
+    "basename": "ungroup",
+    "path": "/email-icons/rune-code-ungroup.png"
+  },
+  {
+    "id": "rune-documents-archive",
+    "folder": "documents",
+    "basename": "archive",
+    "path": "/email-icons/rune-documents-archive.png"
+  },
+  {
+    "id": "rune-documents-box",
+    "folder": "documents",
+    "basename": "box",
+    "path": "/email-icons/rune-documents-box.png"
+  },
+  {
+    "id": "rune-documents-clipboard-list",
+    "folder": "documents",
+    "basename": "clipboard-list",
+    "path": "/email-icons/rune-documents-clipboard-list.png"
+  },
+  {
+    "id": "rune-documents-clipboard",
+    "folder": "documents",
+    "basename": "clipboard",
+    "path": "/email-icons/rune-documents-clipboard.png"
+  },
+  {
+    "id": "rune-documents-file-down",
+    "folder": "documents",
+    "basename": "file-down",
+    "path": "/email-icons/rune-documents-file-down.png"
+  },
+  {
+    "id": "rune-documents-file-image",
+    "folder": "documents",
+    "basename": "file-image",
+    "path": "/email-icons/rune-documents-file-image.png"
+  },
+  {
+    "id": "rune-documents-file-lock",
+    "folder": "documents",
+    "basename": "file-lock",
+    "path": "/email-icons/rune-documents-file-lock.png"
+  },
+  {
+    "id": "rune-documents-file-pen-line",
+    "folder": "documents",
+    "basename": "file-pen-line",
+    "path": "/email-icons/rune-documents-file-pen-line.png"
+  },
+  {
+    "id": "rune-documents-file-pen",
+    "folder": "documents",
+    "basename": "file-pen",
+    "path": "/email-icons/rune-documents-file-pen.png"
+  },
+  {
+    "id": "rune-documents-file-plus",
+    "folder": "documents",
+    "basename": "file-plus",
+    "path": "/email-icons/rune-documents-file-plus.png"
+  },
+  {
+    "id": "rune-documents-file-symlink",
+    "folder": "documents",
+    "basename": "file-symlink",
+    "path": "/email-icons/rune-documents-file-symlink.png"
+  },
+  {
+    "id": "rune-documents-file-text",
+    "folder": "documents",
+    "basename": "file-text",
+    "path": "/email-icons/rune-documents-file-text.png"
+  },
+  {
+    "id": "rune-documents-file",
+    "folder": "documents",
+    "basename": "file",
+    "path": "/email-icons/rune-documents-file.png"
+  },
+  {
+    "id": "rune-documents-folder-closed",
+    "folder": "documents",
+    "basename": "folder-closed",
+    "path": "/email-icons/rune-documents-folder-closed.png"
+  },
+  {
+    "id": "rune-documents-folder-input",
+    "folder": "documents",
+    "basename": "folder-input",
+    "path": "/email-icons/rune-documents-folder-input.png"
+  },
+  {
+    "id": "rune-documents-folder-open",
+    "folder": "documents",
+    "basename": "folder-open",
+    "path": "/email-icons/rune-documents-folder-open.png"
+  },
+  {
+    "id": "rune-documents-folder-plus",
+    "folder": "documents",
+    "basename": "folder-plus",
+    "path": "/email-icons/rune-documents-folder-plus.png"
+  },
+  {
+    "id": "rune-documents-folder-symlink",
+    "folder": "documents",
+    "basename": "folder-symlink",
+    "path": "/email-icons/rune-documents-folder-symlink.png"
+  },
+  {
+    "id": "rune-documents-folder-up",
+    "folder": "documents",
+    "basename": "folder-up",
+    "path": "/email-icons/rune-documents-folder-up.png"
+  },
+  {
+    "id": "rune-documents-folder",
+    "folder": "documents",
+    "basename": "folder",
+    "path": "/email-icons/rune-documents-folder.png"
+  },
+  {
+    "id": "rune-documents-folders",
+    "folder": "documents",
+    "basename": "folders",
+    "path": "/email-icons/rune-documents-folders.png"
+  },
+  {
+    "id": "rune-documents-import",
+    "folder": "documents",
+    "basename": "import",
+    "path": "/email-icons/rune-documents-import.png"
+  },
+  {
+    "id": "rune-documents-inbox",
+    "folder": "documents",
+    "basename": "inbox",
+    "path": "/email-icons/rune-documents-inbox.png"
+  },
+  {
+    "id": "rune-documents-paperclip",
+    "folder": "documents",
+    "basename": "paperclip",
+    "path": "/email-icons/rune-documents-paperclip.png"
+  },
+  {
+    "id": "rune-documents-save",
+    "folder": "documents",
+    "basename": "save",
+    "path": "/email-icons/rune-documents-save.png"
+  },
+  {
+    "id": "rune-gadgets-battery-full",
+    "folder": "gadgets",
+    "basename": "battery-full",
+    "path": "/email-icons/rune-gadgets-battery-full.png"
+  },
+  {
+    "id": "rune-gadgets-battery-low",
+    "folder": "gadgets",
+    "basename": "battery-low",
+    "path": "/email-icons/rune-gadgets-battery-low.png"
+  },
+  {
+    "id": "rune-gadgets-battery-medium",
+    "folder": "gadgets",
+    "basename": "battery-medium",
+    "path": "/email-icons/rune-gadgets-battery-medium.png"
+  },
+  {
+    "id": "rune-gadgets-laptop",
+    "folder": "gadgets",
+    "basename": "laptop",
+    "path": "/email-icons/rune-gadgets-laptop.png"
+  },
+  {
+    "id": "rune-gadgets-printer",
+    "folder": "gadgets",
+    "basename": "printer",
+    "path": "/email-icons/rune-gadgets-printer.png"
+  },
+  {
+    "id": "rune-gadgets-tablet",
+    "folder": "gadgets",
+    "basename": "tablet",
+    "path": "/email-icons/rune-gadgets-tablet.png"
+  },
+  {
+    "id": "rune-gadgets-tv",
+    "folder": "gadgets",
+    "basename": "tv",
+    "path": "/email-icons/rune-gadgets-tv.png"
+  },
+  {
+    "id": "rune-gadgets-watch",
+    "folder": "gadgets",
+    "basename": "watch",
+    "path": "/email-icons/rune-gadgets-watch.png"
+  },
+  {
+    "id": "rune-identity-fingerprint-pattern",
+    "folder": "identity",
+    "basename": "fingerprint-pattern",
+    "path": "/email-icons/rune-identity-fingerprint-pattern.png"
+  },
+  {
+    "id": "rune-identity-lock-open",
+    "folder": "identity",
+    "basename": "lock-open",
+    "path": "/email-icons/rune-identity-lock-open.png"
+  },
+  {
+    "id": "rune-identity-lock",
+    "folder": "identity",
+    "basename": "lock",
+    "path": "/email-icons/rune-identity-lock.png"
+  },
+  {
+    "id": "rune-identity-log-in",
+    "folder": "identity",
+    "basename": "log-in",
+    "path": "/email-icons/rune-identity-log-in.png"
+  },
+  {
+    "id": "rune-identity-log-out",
+    "folder": "identity",
+    "basename": "log-out",
+    "path": "/email-icons/rune-identity-log-out.png"
+  },
+  {
+    "id": "rune-identity-shield-check",
+    "folder": "identity",
+    "basename": "shield-check",
+    "path": "/email-icons/rune-identity-shield-check.png"
+  },
+  {
+    "id": "rune-identity-shield-x",
+    "folder": "identity",
+    "basename": "shield-x",
+    "path": "/email-icons/rune-identity-shield-x.png"
+  },
+  {
+    "id": "rune-identity-shield",
+    "folder": "identity",
+    "basename": "shield",
+    "path": "/email-icons/rune-identity-shield.png"
+  },
+  {
+    "id": "rune-identity-user-cog",
+    "folder": "identity",
+    "basename": "user-cog",
+    "path": "/email-icons/rune-identity-user-cog.png"
+  },
+  {
+    "id": "rune-identity-user-minus",
+    "folder": "identity",
+    "basename": "user-minus",
+    "path": "/email-icons/rune-identity-user-minus.png"
+  },
+  {
+    "id": "rune-identity-user-plus",
+    "folder": "identity",
+    "basename": "user-plus",
+    "path": "/email-icons/rune-identity-user-plus.png"
+  },
+  {
+    "id": "rune-identity-user-round-plus",
+    "folder": "identity",
+    "basename": "user-round-plus",
+    "path": "/email-icons/rune-identity-user-round-plus.png"
+  },
+  {
+    "id": "rune-identity-users",
+    "folder": "identity",
+    "basename": "users",
+    "path": "/email-icons/rune-identity-users.png"
+  },
+  {
+    "id": "rune-indicators-check",
+    "folder": "indicators",
+    "basename": "check",
+    "path": "/email-icons/rune-indicators-check.png"
+  },
+  {
+    "id": "rune-indicators-circle-alert",
+    "folder": "indicators",
+    "basename": "circle-alert",
+    "path": "/email-icons/rune-indicators-circle-alert.png"
+  },
+  {
+    "id": "rune-indicators-circle-check",
+    "folder": "indicators",
+    "basename": "circle-check",
+    "path": "/email-icons/rune-indicators-circle-check.png"
+  },
+  {
+    "id": "rune-indicators-circle-dot",
+    "folder": "indicators",
+    "basename": "circle-dot",
+    "path": "/email-icons/rune-indicators-circle-dot.png"
+  },
+  {
+    "id": "rune-indicators-circle-question-mark",
+    "folder": "indicators",
+    "basename": "circle-question-mark",
+    "path": "/email-icons/rune-indicators-circle-question-mark.png"
+  },
+  {
+    "id": "rune-indicators-circle-stop",
+    "folder": "indicators",
+    "basename": "circle-stop",
+    "path": "/email-icons/rune-indicators-circle-stop.png"
+  },
+  {
+    "id": "rune-indicators-circle-user",
+    "folder": "indicators",
+    "basename": "circle-user",
+    "path": "/email-icons/rune-indicators-circle-user.png"
+  },
+  {
+    "id": "rune-indicators-circle-x",
+    "folder": "indicators",
+    "basename": "circle-x",
+    "path": "/email-icons/rune-indicators-circle-x.png"
+  },
+  {
+    "id": "rune-indicators-cross",
+    "folder": "indicators",
+    "basename": "cross",
+    "path": "/email-icons/rune-indicators-cross.png"
+  },
+  {
+    "id": "rune-indicators-info",
+    "folder": "indicators",
+    "basename": "info",
+    "path": "/email-icons/rune-indicators-info.png"
+  },
+  {
+    "id": "rune-indicators-minus",
+    "folder": "indicators",
+    "basename": "minus",
+    "path": "/email-icons/rune-indicators-minus.png"
+  },
+  {
+    "id": "rune-indicators-plus",
+    "folder": "indicators",
+    "basename": "plus",
+    "path": "/email-icons/rune-indicators-plus.png"
+  },
+  {
+    "id": "rune-indicators-square-arrow-out-up-right",
+    "folder": "indicators",
+    "basename": "square-arrow-out-up-right",
+    "path": "/email-icons/rune-indicators-square-arrow-out-up-right.png"
+  },
+  {
+    "id": "rune-indicators-square-arrow-up-right",
+    "folder": "indicators",
+    "basename": "square-arrow-up-right",
+    "path": "/email-icons/rune-indicators-square-arrow-up-right.png"
+  },
+  {
+    "id": "rune-indicators-square-check",
+    "folder": "indicators",
+    "basename": "square-check",
+    "path": "/email-icons/rune-indicators-square-check.png"
+  },
+  {
+    "id": "rune-indicators-square-stop",
+    "folder": "indicators",
+    "basename": "square-stop",
+    "path": "/email-icons/rune-indicators-square-stop.png"
+  },
+  {
+    "id": "rune-indicators-triangle-alert",
+    "folder": "indicators",
+    "basename": "triangle-alert",
+    "path": "/email-icons/rune-indicators-triangle-alert.png"
+  },
+  {
+    "id": "rune-indicators-x",
+    "folder": "indicators",
+    "basename": "x",
+    "path": "/email-icons/rune-indicators-x.png"
+  },
+  {
+    "id": "rune-layouts-columns-3",
+    "folder": "layouts",
+    "basename": "columns-3",
+    "path": "/email-icons/rune-layouts-columns-3.png"
+  },
+  {
+    "id": "rune-layouts-grid-2x2",
+    "folder": "layouts",
+    "basename": "grid-2x2",
+    "path": "/email-icons/rune-layouts-grid-2x2.png"
+  },
+  {
+    "id": "rune-layouts-grid-3x3",
+    "folder": "layouts",
+    "basename": "grid-3x3",
+    "path": "/email-icons/rune-layouts-grid-3x3.png"
+  },
+  {
+    "id": "rune-layouts-grip-horizontal",
+    "folder": "layouts",
+    "basename": "grip-horizontal",
+    "path": "/email-icons/rune-layouts-grip-horizontal.png"
+  },
+  {
+    "id": "rune-layouts-grip-vertical",
+    "folder": "layouts",
+    "basename": "grip-vertical",
+    "path": "/email-icons/rune-layouts-grip-vertical.png"
+  },
+  {
+    "id": "rune-layouts-kanban",
+    "folder": "layouts",
+    "basename": "kanban",
+    "path": "/email-icons/rune-layouts-kanban.png"
+  },
+  {
+    "id": "rune-layouts-layers-2",
+    "folder": "layouts",
+    "basename": "layers-2",
+    "path": "/email-icons/rune-layouts-layers-2.png"
+  },
+  {
+    "id": "rune-layouts-layout-grid",
+    "folder": "layouts",
+    "basename": "layout-grid",
+    "path": "/email-icons/rune-layouts-layout-grid.png"
+  },
+  {
+    "id": "rune-layouts-menu",
+    "folder": "layouts",
+    "basename": "menu",
+    "path": "/email-icons/rune-layouts-menu.png"
+  },
+  {
+    "id": "rune-layouts-panel-bottom",
+    "folder": "layouts",
+    "basename": "panel-bottom",
+    "path": "/email-icons/rune-layouts-panel-bottom.png"
+  },
+  {
+    "id": "rune-layouts-panel-left-close",
+    "folder": "layouts",
+    "basename": "panel-left-close",
+    "path": "/email-icons/rune-layouts-panel-left-close.png"
+  },
+  {
+    "id": "rune-layouts-panel-left",
+    "folder": "layouts",
+    "basename": "panel-left",
+    "path": "/email-icons/rune-layouts-panel-left.png"
+  },
+  {
+    "id": "rune-layouts-panel-right-close",
+    "folder": "layouts",
+    "basename": "panel-right-close",
+    "path": "/email-icons/rune-layouts-panel-right-close.png"
+  },
+  {
+    "id": "rune-layouts-panel-top",
+    "folder": "layouts",
+    "basename": "panel-top",
+    "path": "/email-icons/rune-layouts-panel-top.png"
+  },
+  {
+    "id": "rune-messaging-contact",
+    "folder": "messaging",
+    "basename": "contact",
+    "path": "/email-icons/rune-messaging-contact.png"
+  },
+  {
+    "id": "rune-messaging-mail-check",
+    "folder": "messaging",
+    "basename": "mail-check",
+    "path": "/email-icons/rune-messaging-mail-check.png"
+  },
+  {
+    "id": "rune-messaging-mail-plus",
+    "folder": "messaging",
+    "basename": "mail-plus",
+    "path": "/email-icons/rune-messaging-mail-plus.png"
+  },
+  {
+    "id": "rune-messaging-mail",
+    "folder": "messaging",
+    "basename": "mail",
+    "path": "/email-icons/rune-messaging-mail.png"
+  },
+  {
+    "id": "rune-messaging-message-circle-warning",
+    "folder": "messaging",
+    "basename": "message-circle-warning",
+    "path": "/email-icons/rune-messaging-message-circle-warning.png"
+  },
+  {
+    "id": "rune-messaging-message-circle",
+    "folder": "messaging",
+    "basename": "message-circle",
+    "path": "/email-icons/rune-messaging-message-circle.png"
+  },
+  {
+    "id": "rune-messaging-message-square-text",
+    "folder": "messaging",
+    "basename": "message-square-text",
+    "path": "/email-icons/rune-messaging-message-square-text.png"
+  },
+  {
+    "id": "rune-messaging-message-square",
+    "folder": "messaging",
+    "basename": "message-square",
+    "path": "/email-icons/rune-messaging-message-square.png"
+  },
+  {
+    "id": "rune-messaging-phone-incoming",
+    "folder": "messaging",
+    "basename": "phone-incoming",
+    "path": "/email-icons/rune-messaging-phone-incoming.png"
+  },
+  {
+    "id": "rune-messaging-phone-outgoing",
+    "folder": "messaging",
+    "basename": "phone-outgoing",
+    "path": "/email-icons/rune-messaging-phone-outgoing.png"
+  },
+  {
+    "id": "rune-messaging-phone",
+    "folder": "messaging",
+    "basename": "phone",
+    "path": "/email-icons/rune-messaging-phone.png"
+  },
+  {
+    "id": "rune-messaging-send",
+    "folder": "messaging",
+    "basename": "send",
+    "path": "/email-icons/rune-messaging-send.png"
+  },
+  {
+    "id": "rune-metrics-activity",
+    "folder": "metrics",
+    "basename": "activity",
+    "path": "/email-icons/rune-metrics-activity.png"
+  },
+  {
+    "id": "rune-metrics-chart-area",
+    "folder": "metrics",
+    "basename": "chart-area",
+    "path": "/email-icons/rune-metrics-chart-area.png"
+  },
+  {
+    "id": "rune-metrics-chart-bar",
+    "folder": "metrics",
+    "basename": "chart-bar",
+    "path": "/email-icons/rune-metrics-chart-bar.png"
+  },
+  {
+    "id": "rune-metrics-chart-line",
+    "folder": "metrics",
+    "basename": "chart-line",
+    "path": "/email-icons/rune-metrics-chart-line.png"
+  },
+  {
+    "id": "rune-metrics-chart-pie",
+    "folder": "metrics",
+    "basename": "chart-pie",
+    "path": "/email-icons/rune-metrics-chart-pie.png"
+  },
+  {
+    "id": "rune-metrics-sliders-horizontal",
+    "folder": "metrics",
+    "basename": "sliders-horizontal",
+    "path": "/email-icons/rune-metrics-sliders-horizontal.png"
+  },
+  {
+    "id": "rune-metrics-sliders-vertical",
+    "folder": "metrics",
+    "basename": "sliders-vertical",
+    "path": "/email-icons/rune-metrics-sliders-vertical.png"
+  },
+  {
+    "id": "rune-metrics-trending-up",
+    "folder": "metrics",
+    "basename": "trending-up",
+    "path": "/email-icons/rune-metrics-trending-up.png"
+  },
+  {
+    "id": "rune-money-credit-card",
+    "folder": "money",
+    "basename": "credit-card",
+    "path": "/email-icons/rune-money-credit-card.png"
+  },
+  {
+    "id": "rune-money-dollar-sign",
+    "folder": "money",
+    "basename": "dollar-sign",
+    "path": "/email-icons/rune-money-dollar-sign.png"
+  },
+  {
+    "id": "rune-money-euro",
+    "folder": "money",
+    "basename": "euro",
+    "path": "/email-icons/rune-money-euro.png"
+  },
+  {
+    "id": "rune-money-gift",
+    "folder": "money",
+    "basename": "gift",
+    "path": "/email-icons/rune-money-gift.png"
+  },
+  {
+    "id": "rune-money-indian-rupee",
+    "folder": "money",
+    "basename": "indian-rupee",
+    "path": "/email-icons/rune-money-indian-rupee.png"
+  },
+  {
+    "id": "rune-money-package",
+    "folder": "money",
+    "basename": "package",
+    "path": "/email-icons/rune-money-package.png"
+  },
+  {
+    "id": "rune-money-pound-sterling",
+    "folder": "money",
+    "basename": "pound-sterling",
+    "path": "/email-icons/rune-money-pound-sterling.png"
+  },
+  {
+    "id": "rune-money-receipt",
+    "folder": "money",
+    "basename": "receipt",
+    "path": "/email-icons/rune-money-receipt.png"
+  },
+  {
+    "id": "rune-money-shopping-bag",
+    "folder": "money",
+    "basename": "shopping-bag",
+    "path": "/email-icons/rune-money-shopping-bag.png"
+  },
+  {
+    "id": "rune-money-shopping-basket",
+    "folder": "money",
+    "basename": "shopping-basket",
+    "path": "/email-icons/rune-money-shopping-basket.png"
+  },
+  {
+    "id": "rune-money-shopping-cart",
+    "folder": "money",
+    "basename": "shopping-cart",
+    "path": "/email-icons/rune-money-shopping-cart.png"
+  },
+  {
+    "id": "rune-money-tag",
+    "folder": "money",
+    "basename": "tag",
+    "path": "/email-icons/rune-money-tag.png"
+  },
+  {
+    "id": "rune-money-truck",
+    "folder": "money",
+    "basename": "truck",
+    "path": "/email-icons/rune-money-truck.png"
+  },
+  {
+    "id": "rune-money-wallet",
+    "folder": "money",
+    "basename": "wallet",
+    "path": "/email-icons/rune-money-wallet.png"
+  },
+  {
+    "id": "rune-nature-cloud-download",
+    "folder": "nature",
+    "basename": "cloud-download",
+    "path": "/email-icons/rune-nature-cloud-download.png"
+  },
+  {
+    "id": "rune-nature-cloud-rain",
+    "folder": "nature",
+    "basename": "cloud-rain",
+    "path": "/email-icons/rune-nature-cloud-rain.png"
+  },
+  {
+    "id": "rune-nature-cloud-snow",
+    "folder": "nature",
+    "basename": "cloud-snow",
+    "path": "/email-icons/rune-nature-cloud-snow.png"
+  },
+  {
+    "id": "rune-nature-cloud-upload",
+    "folder": "nature",
+    "basename": "cloud-upload",
+    "path": "/email-icons/rune-nature-cloud-upload.png"
+  },
+  {
+    "id": "rune-nature-cloud",
+    "folder": "nature",
+    "basename": "cloud",
+    "path": "/email-icons/rune-nature-cloud.png"
+  },
+  {
+    "id": "rune-nature-earth",
+    "folder": "nature",
+    "basename": "earth",
+    "path": "/email-icons/rune-nature-earth.png"
+  },
+  {
+    "id": "rune-nature-moon",
+    "folder": "nature",
+    "basename": "moon",
+    "path": "/email-icons/rune-nature-moon.png"
+  },
+  {
+    "id": "rune-nature-sun",
+    "folder": "nature",
+    "basename": "sun",
+    "path": "/email-icons/rune-nature-sun.png"
+  },
+  {
+    "id": "rune-nature-sunrise",
+    "folder": "nature",
+    "basename": "sunrise",
+    "path": "/email-icons/rune-nature-sunrise.png"
+  },
+  {
+    "id": "rune-nature-sunset",
+    "folder": "nature",
+    "basename": "sunset",
+    "path": "/email-icons/rune-nature-sunset.png"
+  },
+  {
+    "id": "rune-nature-wind",
+    "folder": "nature",
+    "basename": "wind",
+    "path": "/email-icons/rune-nature-wind.png"
+  },
+  {
+    "id": "rune-other-apple",
+    "folder": "other",
+    "basename": "apple",
+    "path": "/email-icons/rune-other-apple.png"
+  },
+  {
+    "id": "rune-other-globe",
+    "folder": "other",
+    "basename": "globe",
+    "path": "/email-icons/rune-other-globe.png"
+  },
+  {
+    "id": "rune-other-wifi-low",
+    "folder": "other",
+    "basename": "wifi-low",
+    "path": "/email-icons/rune-other-wifi-low.png"
+  },
+  {
+    "id": "rune-other-wifi",
+    "folder": "other",
+    "basename": "wifi",
+    "path": "/email-icons/rune-other-wifi.png"
+  },
+  {
+    "id": "rune-other-zap",
+    "folder": "other",
+    "basename": "zap",
+    "path": "/email-icons/rune-other-zap.png"
+  },
+  {
+    "id": "rune-playback-camera",
+    "folder": "playback",
+    "basename": "camera",
+    "path": "/email-icons/rune-playback-camera.png"
+  },
+  {
+    "id": "rune-playback-clapperboard",
+    "folder": "playback",
+    "basename": "clapperboard",
+    "path": "/email-icons/rune-playback-clapperboard.png"
+  },
+  {
+    "id": "rune-playback-film",
+    "folder": "playback",
+    "basename": "film",
+    "path": "/email-icons/rune-playback-film.png"
+  },
+  {
+    "id": "rune-playback-image-plus",
+    "folder": "playback",
+    "basename": "image-plus",
+    "path": "/email-icons/rune-playback-image-plus.png"
+  },
+  {
+    "id": "rune-playback-image",
+    "folder": "playback",
+    "basename": "image",
+    "path": "/email-icons/rune-playback-image.png"
+  },
+  {
+    "id": "rune-playback-images",
+    "folder": "playback",
+    "basename": "images",
+    "path": "/email-icons/rune-playback-images.png"
+  },
+  {
+    "id": "rune-playback-mic-off",
+    "folder": "playback",
+    "basename": "mic-off",
+    "path": "/email-icons/rune-playback-mic-off.png"
+  },
+  {
+    "id": "rune-playback-mic",
+    "folder": "playback",
+    "basename": "mic",
+    "path": "/email-icons/rune-playback-mic.png"
+  },
+  {
+    "id": "rune-playback-pause",
+    "folder": "playback",
+    "basename": "pause",
+    "path": "/email-icons/rune-playback-pause.png"
+  },
+  {
+    "id": "rune-playback-play",
+    "folder": "playback",
+    "basename": "play",
+    "path": "/email-icons/rune-playback-play.png"
+  },
+  {
+    "id": "rune-playback-video",
+    "folder": "playback",
+    "basename": "video",
+    "path": "/email-icons/rune-playback-video.png"
+  },
+  {
+    "id": "rune-playback-volume-1",
+    "folder": "playback",
+    "basename": "volume-1",
+    "path": "/email-icons/rune-playback-volume-1.png"
+  },
+  {
+    "id": "rune-playback-volume-2",
+    "folder": "playback",
+    "basename": "volume-2",
+    "path": "/email-icons/rune-playback-volume-2.png"
+  },
+  {
+    "id": "rune-schedule-alarm-clock",
+    "folder": "schedule",
+    "basename": "alarm-clock",
+    "path": "/email-icons/rune-schedule-alarm-clock.png"
+  },
+  {
+    "id": "rune-schedule-calendar",
+    "folder": "schedule",
+    "basename": "calendar",
+    "path": "/email-icons/rune-schedule-calendar.png"
+  },
+  {
+    "id": "rune-schedule-clock-alert",
+    "folder": "schedule",
+    "basename": "clock-alert",
+    "path": "/email-icons/rune-schedule-clock-alert.png"
+  },
+  {
+    "id": "rune-schedule-clock",
+    "folder": "schedule",
+    "basename": "clock",
+    "path": "/email-icons/rune-schedule-clock.png"
+  },
+  {
+    "id": "rune-schedule-history",
+    "folder": "schedule",
+    "basename": "history",
+    "path": "/email-icons/rune-schedule-history.png"
+  },
+  {
+    "id": "rune-schedule-refresh-cw",
+    "folder": "schedule",
+    "basename": "refresh-cw",
+    "path": "/email-icons/rune-schedule-refresh-cw.png"
+  },
+  {
+    "id": "rune-schedule-repeat",
+    "folder": "schedule",
+    "basename": "repeat",
+    "path": "/email-icons/rune-schedule-repeat.png"
+  },
+  {
+    "id": "rune-senses-ear",
+    "folder": "senses",
+    "basename": "ear",
+    "path": "/email-icons/rune-senses-ear.png"
+  },
+  {
+    "id": "rune-senses-eye-closed",
+    "folder": "senses",
+    "basename": "eye-closed",
+    "path": "/email-icons/rune-senses-eye-closed.png"
+  },
+  {
+    "id": "rune-senses-eye-off",
+    "folder": "senses",
+    "basename": "eye-off",
+    "path": "/email-icons/rune-senses-eye-off.png"
+  },
+  {
+    "id": "rune-senses-eye",
+    "folder": "senses",
+    "basename": "eye",
+    "path": "/email-icons/rune-senses-eye.png"
+  },
+  {
+    "id": "rune-senses-hand",
+    "folder": "senses",
+    "basename": "hand",
+    "path": "/email-icons/rune-senses-hand.png"
+  },
+  {
+    "id": "rune-senses-pointer",
+    "folder": "senses",
+    "basename": "pointer",
+    "path": "/email-icons/rune-senses-pointer.png"
+  },
+  {
+    "id": "rune-senses-thumbs-down",
+    "folder": "senses",
+    "basename": "thumbs-down",
+    "path": "/email-icons/rune-senses-thumbs-down.png"
+  },
+  {
+    "id": "rune-senses-thumbs-up",
+    "folder": "senses",
+    "basename": "thumbs-up",
+    "path": "/email-icons/rune-senses-thumbs-up.png"
+  },
+  {
+    "id": "rune-tools-bell-off",
+    "folder": "tools",
+    "basename": "bell-off",
+    "path": "/email-icons/rune-tools-bell-off.png"
+  },
+  {
+    "id": "rune-tools-bookmark",
+    "folder": "tools",
+    "basename": "bookmark",
+    "path": "/email-icons/rune-tools-bookmark.png"
+  },
+  {
+    "id": "rune-tools-flag-triangle-right",
+    "folder": "tools",
+    "basename": "flag-triangle-right",
+    "path": "/email-icons/rune-tools-flag-triangle-right.png"
+  },
+  {
+    "id": "rune-tools-flag",
+    "folder": "tools",
+    "basename": "flag",
+    "path": "/email-icons/rune-tools-flag.png"
+  },
+  {
+    "id": "rune-tools-funnel",
+    "folder": "tools",
+    "basename": "funnel",
+    "path": "/email-icons/rune-tools-funnel.png"
+  },
+  {
+    "id": "rune-tools-heart",
+    "folder": "tools",
+    "basename": "heart",
+    "path": "/email-icons/rune-tools-heart.png"
+  },
+  {
+    "id": "rune-tools-house",
+    "folder": "tools",
+    "basename": "house",
+    "path": "/email-icons/rune-tools-house.png"
+  },
+  {
+    "id": "rune-tools-list-filter",
+    "folder": "tools",
+    "basename": "list-filter",
+    "path": "/email-icons/rune-tools-list-filter.png"
+  },
+  {
+    "id": "rune-tools-map-pin",
+    "folder": "tools",
+    "basename": "map-pin",
+    "path": "/email-icons/rune-tools-map-pin.png"
+  },
+  {
+    "id": "rune-tools-map",
+    "folder": "tools",
+    "basename": "map",
+    "path": "/email-icons/rune-tools-map.png"
+  },
+  {
+    "id": "rune-tools-pencil",
+    "folder": "tools",
+    "basename": "pencil",
+    "path": "/email-icons/rune-tools-pencil.png"
+  },
+  {
+    "id": "rune-tools-scissors",
+    "folder": "tools",
+    "basename": "scissors",
+    "path": "/email-icons/rune-tools-scissors.png"
+  },
+  {
+    "id": "rune-tools-search",
+    "folder": "tools",
+    "basename": "search",
+    "path": "/email-icons/rune-tools-search.png"
+  },
+  {
+    "id": "rune-tools-settings-2",
+    "folder": "tools",
+    "basename": "settings-2",
+    "path": "/email-icons/rune-tools-settings-2.png"
+  },
+  {
+    "id": "rune-tools-settings",
+    "folder": "tools",
+    "basename": "settings",
+    "path": "/email-icons/rune-tools-settings.png"
+  },
+  {
+    "id": "rune-tools-share-2",
+    "folder": "tools",
+    "basename": "share-2",
+    "path": "/email-icons/rune-tools-share-2.png"
+  },
+  {
+    "id": "rune-tools-sparkles",
+    "folder": "tools",
+    "basename": "sparkles",
+    "path": "/email-icons/rune-tools-sparkles.png"
+  },
+  {
+    "id": "rune-tools-star",
+    "folder": "tools",
+    "basename": "star",
+    "path": "/email-icons/rune-tools-star.png"
+  },
+  {
+    "id": "rune-tools-trash-2",
+    "folder": "tools",
+    "basename": "trash-2",
+    "path": "/email-icons/rune-tools-trash-2.png"
+  },
+  {
+    "id": "rune-tools-trash",
+    "folder": "tools",
+    "basename": "trash",
+    "path": "/email-icons/rune-tools-trash.png"
+  }
+]

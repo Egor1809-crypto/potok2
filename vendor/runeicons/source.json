@@ -1,0 +1,7 @@
+{
+  "repository": "https://github.com/Nexvyn/runeicons",
+  "revision": "f649e467d1bc9f272aae3f8daa329d4c924e7340",
+  "collection": "public/pixelated",
+  "count": 215,
+  "changes": "Rune Icons by Nexvyn and contributors. Source: https://github.com/Nexvyn/runeicons at f649e467d1bc9f272aae3f8daa329d4c924e7340. Modified by Potok: glyph color changed to #7c35f2 and SVG rasterized as a transparent PNG. Original paths retained. Licensed under Apache License 2.0."
+}

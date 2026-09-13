@@ -68,7 +68,7 @@ export function ImageAssetPicker({ kind, value, onSelect, destinationLabel = "п
   const pickerLabel = kind === "logo" ? "логотип" : "фотографию";
   return (
     <div className="grid gap-2.5">
-      {kind === "photo" && <details className="rounded-lg border border-border p-3"><summary className="cursor-pointer text-xs font-medium">Значки без фона · 18</summary><div className="mt-3"><EmailIconPicker onSelect={id => onSelect(emailIconUrl(id), emailIcons.find(icon => icon.id === id)!.name)} /></div></details>}
+      {kind === "photo" && <details className="rounded-lg border border-border p-3"><summary className="cursor-pointer text-xs font-medium">Значки без фона · {emailIcons.length}</summary><div className="mt-3"><EmailIconPicker onSelect={id => onSelect(emailIconUrl(id), emailIcons.find(icon => icon.id === id)!.name)} /></div></details>}
       <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/gif" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; if (file) void upload(file); }} />
       <div
         role="button"

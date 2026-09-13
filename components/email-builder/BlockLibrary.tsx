@@ -131,8 +131,8 @@ export function BlockLibrary({
         </p>
         <label className="mt-3 flex h-9 items-center gap-2 rounded-lg border border-border bg-surface-subtle px-3 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10">
           <Search aria-hidden="true" className="size-3.5 text-text-subtle" />
-          <span className="sr-only">Найти блок</span>
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={tab === "decor" ? "Найти узор" : "Найти блок"} className="min-w-0 flex-1 border-0 bg-transparent text-[11px] text-text-strong outline-none placeholder:text-text-subtle" />
+          <span className="sr-only">{tab === "icons" ? "Найти значок" : "Найти блок"}</span>
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={tab === "icons" ? "Найти значок" : tab === "decor" ? "Найти узор" : "Найти блок"} className="min-w-0 flex-1 border-0 bg-transparent text-[11px] text-text-strong outline-none placeholder:text-text-subtle" />
         </label>
         <div className="mt-3 grid grid-cols-2 gap-1 rounded-lg bg-surface-subtle p-1" role="tablist" aria-label="Тип элементов">
           <LibraryTab active={tab === "content"} onClick={() => setTab("content")} icon={AlignJustify}>Контент</LibraryTab>
@@ -251,7 +251,7 @@ export function BlockLibrary({
         </div>
         )}
 
-        {tab !== "frame" && tab !== "decor" && visibleItems.length === 0 ? <p className="py-8 text-center text-[11px] text-text-muted">Подходящих элементов нет</p> : null}
+        {tab !== "frame" && tab !== "decor" && tab !== "icons" && visibleItems.length === 0 ? <p className="py-8 text-center text-[11px] text-text-muted">Подходящих элементов нет</p> : null}
 
         <div className="mt-4 rounded-[11px] border border-primary/15 bg-primary-subtle/55 p-3">
           <div className="flex items-center gap-2 text-[11px] font-semibold text-primary">

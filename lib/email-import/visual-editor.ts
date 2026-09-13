@@ -55,7 +55,7 @@ export function editLetterAttribute(html: string, index: number, name: "src" | "
   const element = letterElements(html)[index];
   if (!element) throw new Error("Элемент изменился. Выберите его снова.");
   if (name === "href" && value) safeEmailUrl(value);
-  if (name === "src" && value && !/^\/email-icons\/[a-z-]+\.png$/.test(value) && !/^\/api\/assets\/[\w-]+$/.test(value)) safeEmailUrl(value, true, process.env.NODE_ENV === "development");
+  if (name === "src" && value && !/^\/email-icons\/[a-z0-9-]+\.png$/.test(value) && !/^\/api\/assets\/[\w-]+$/.test(value)) safeEmailUrl(value, true, process.env.NODE_ENV === "development");
   return attribute(html, element.node, name, value);
 }
 export function editLetterStyle(html: string, index: number, changes: Record<string, string>) {

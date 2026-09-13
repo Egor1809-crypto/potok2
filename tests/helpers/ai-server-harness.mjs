@@ -29,6 +29,11 @@ export async function loadAiServer(entry, { env = {}, fetch = globalThis.fetch, 
   async function load(file) {
     if (modules.has(file)) return modules.get(file);
     const source = readFileSync(path.join(root, file), "utf8");
+    if (file.endsWith(".json")) {
+      const jsonModule = synthetic({ default: JSON.parse(source) });
+      modules.set(file, jsonModule);
+      return jsonModule;
+    }
     const code = ts.transpileModule(source + (file === entry && expose.length ? `\nexport { ${expose.join(", ")} };` : ""), { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
     const loadedModule = new vm.SourceTextModule(code, { context, identifier: file });
     modules.set(file, loadedModule);

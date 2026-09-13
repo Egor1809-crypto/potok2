@@ -144,7 +144,7 @@ export function parseEmailBuilderDocument(
       paddingRight: block.paddingRight === undefined ? 40 : number(block.paddingRight, `Правый отступ блока ${index + 1}`, 0, 80),
       borderWidth: block.borderWidth === undefined ? 0 : number(block.borderWidth, `Граница блока ${index + 1}`, 0, 8),
       borderColor: block.borderColor === undefined ? "#e5e7eb" : color(block.borderColor, `Граница блока ${index + 1}`),
-      widthPercent: block.widthPercent === undefined ? 100 : number(block.widthPercent, `Ширина блока ${index + 1}`, 25, 100),
+      widthPercent: block.widthPercent === undefined ? 100 : number(block.widthPercent, `Ширина блока ${index + 1}`, block.type === "image" || block.type === "logo" ? 5 : 25, 100),
       buttonStyle: block.buttonStyle === "outline" || block.buttonStyle === "soft" ? block.buttonStyle : "solid",
     };
   });

@@ -22,7 +22,7 @@ export function LetterImageCrop({ source, initial, onApply }: { source: string; 
     void (async () => {
       try {
         const url = new URL(source, location.href);
-        const local = /^\/api\/assets\/[\w-]+$|^\/email-icons\/[a-z-]+\.png$/.test(url.pathname);
+        const local = /^\/api\/assets\/[\w-]+$|^\/email-icons\/[a-z0-9-]+\.png$/.test(url.pathname);
         const response = await fetch(local ? url.pathname : source, { signal: abort.signal, credentials: local ? "same-origin" : "omit" });
         if (!response.ok) throw new Error("Изображение недоступно. Загрузите его через «Заменить изображение».");
         const blob = await response.blob();
