@@ -265,9 +265,8 @@ export function ContactFinderView() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Контакты → проверка → база"
         title="Поиск публичных контактов"
-        description="Глубокий парсер находит деловые email и телефоны в страницах, sitemap, структурированных данных и защищённых от спама записях. Поток показывает источник каждого результата и ничего не сохраняет без вашего выбора."
+        description="Найдите email и телефоны на сайте, проверьте результаты и добавьте нужные контакты."
         action={
           <Link href="/contacts" className={buttonVariants({ variant: "outline" })}>
             <UsersRound aria-hidden="true" className="size-6" />

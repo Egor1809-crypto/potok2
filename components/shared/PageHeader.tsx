@@ -5,7 +5,6 @@ import { cn } from "@/components/ui/utils";
 export type PageHeaderProps = Omit<HTMLAttributes<HTMLDivElement>, "title"> & {
   title: ReactNode;
   description?: ReactNode;
-  eyebrow?: ReactNode;
   meta?: ReactNode;
   action?: ReactNode;
 };
@@ -17,7 +16,6 @@ export type PageHeaderProps = Omit<HTMLAttributes<HTMLDivElement>, "title"> & {
 export function PageHeader({
   title,
   description,
-  eyebrow,
   meta,
   action,
   className,
@@ -32,11 +30,6 @@ export function PageHeader({
       {...props}
     >
       <div className="min-w-0">
-        {eyebrow ? (
-          <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
-            {eyebrow}
-          </div>
-        ) : null}
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-2.5 gap-y-1">
           <h1 className="m-0 text-[24px] leading-[1.2] font-semibold tracking-[-0.035em] text-text-strong sm:text-[28px]">
             {title}

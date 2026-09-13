@@ -251,9 +251,6 @@ export function SegmentEditor({
       >
         <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4 sm:px-6">
           <div>
-            <p className="section-eyebrow">
-              {segment ? "Настройка аудитории" : "Новая аудитория"}
-            </p>
             <h2
               id="segment-editor-title"
               className="mt-1 text-lg font-semibold tracking-[-.02em]"

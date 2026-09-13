@@ -45,7 +45,7 @@ export function Topbar({
           onClick={onSearchClick}
           aria-label="Поиск разделов и действий"
           aria-haspopup="dialog"
-          className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm text-text-muted hover:bg-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+          className="flex min-h-11 w-full items-center gap-3 rounded-xl border border-border-strong bg-surface px-3 text-left text-sm text-text-muted hover:border-primary/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
         >
           <Search aria-hidden="true" className="size-5" />
           <span className="min-w-0 flex-1 truncate">Поиск</span>

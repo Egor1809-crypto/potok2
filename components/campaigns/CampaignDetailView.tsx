@@ -241,7 +241,6 @@ export function CampaignDetailView({
       </Link>
 
       <PageHeader
-        eyebrow="Кампания"
         title={item.name}
         description={campaignSummary(item)}
         meta={<Badge variant={meta.badge} dot>{meta.label}</Badge>}

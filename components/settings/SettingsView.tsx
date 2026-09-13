@@ -194,16 +194,15 @@ export function SettingsView() {
   return (
     <div className="space-y-6">
       <header className="max-w-3xl">
-        <p className="section-eyebrow">Рабочее пространство</p>
         <h1 className="text-[28px] font-semibold tracking-[-.035em] text-[var(--text-strong)]">Аккаунт и настройки</h1>
         <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
-          Настройки компании и отправки. Роли и назначения контактов находятся в разделе «Команда».
+          Роли и доступ к контактам — в разделе «Команда».
         </p>
       </header>
 
       <div className="grid gap-5 lg:grid-cols-[248px_minmax(0,760px)]">
         <nav className="card h-fit p-2" aria-label="Разделы настроек">
-          {sections.map(({ id, label, description, Icon }) => (
+          {sections.map(({ id, label, Icon }) => (
             <button
               key={id}
               type="button"
@@ -213,7 +212,6 @@ export function SettingsView() {
               <Icon aria-hidden="true" className="mt-0.5 size-6 shrink-0" />
               <span>
                 <span className="block text-[13px] font-semibold">{label}</span>
-                <span className={`mt-0.5 block text-[11px] leading-4 ${section === id ? "text-[var(--primary)]/70" : "text-[var(--text-subtle)]"}`}>{description}</span>
               </span>
             </button>
           ))}

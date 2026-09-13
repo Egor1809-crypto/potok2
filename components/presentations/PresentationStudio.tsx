@@ -2761,9 +2761,7 @@ export function PresentationStudio() {
   return (
     <div className="presentation-studio-home grid h-full min-h-0 auto-rows-max content-start gap-7 overflow-y-auto overscroll-contain pr-1">
       <PageHeader
-        eyebrow="ПРЕЗЕНТАЦИИ «ПОТОК»"
-        title="Студия презентаций"
-        description="Соберите историю вручную, превратите готовое письмо в слайды или получите связный черновик от ИИ. Каждый проект сохраняется в рабочем пространстве и скачивается настоящим файлом PowerPoint."
+        title="Презентации"
         action={
           <>
             <Button
@@ -2791,42 +2789,6 @@ export function PresentationStudio() {
         }
       />
       {error ? <Alert tone="danger">{error}</Alert> : null}
-      <div className="grid gap-3 rounded-xl border border-border bg-surface p-4 sm:grid-cols-3">
-        {[
-          {
-            icon: Mail,
-            title: "1. Возьмите основу",
-            text: "Создайте с нуля, выберите сценарий или перенесите структуру email-шаблона.",
-          },
-          {
-            icon: LayoutTemplate,
-            title: "2. Соберите историю",
-            text: "Меняйте порядок, композицию, текст, тему и изображения для каждого слайда.",
-          },
-          {
-            icon: Download,
-            title: "3. Используйте результат",
-            text: "Сохраните проект, поделитесь внутренней ссылкой или скачайте редактируемый PPTX.",
-          },
-        ].map(({ icon: Icon, title, text }) => (
-          <div
-            key={title}
-            className="flex gap-3 rounded-lg bg-surface-subtle/55 p-3"
-          >
-            <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary-subtle text-primary">
-              <Icon className="size-6" />
-            </span>
-            <div>
-              <p className="m-0 text-[12px] font-semibold text-text-strong">
-                {title}
-              </p>
-              <p className="mb-0 mt-1 text-[11px] leading-4 text-text-muted">
-                {text}
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
       <div className="min-h-[50px] w-full shrink-0 overflow-x-auto pb-1">
         <nav
           className="flex min-h-12 w-max items-center gap-1 rounded-xl border border-border bg-surface p-1"
@@ -2868,16 +2830,11 @@ export function PresentationStudio() {
       <section>
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 className="m-0 text-[18px] font-semibold tracking-[-0.025em]">
+            <h2 className={libraryView === "favorites" ? "m-0 text-[18px] font-semibold" : "sr-only"}>
               {libraryView === "favorites"
                 ? "Избранные презентации"
                 : "Ваши презентации"}
             </h2>
-            <p className="mb-0 mt-1 text-[12px] text-text-muted">
-              {presentations.length
-                ? `${presentations.length} ${presentations.length % 10 === 1 && presentations.length % 100 !== 11 ? "проект" : presentations.length % 10 >= 2 && presentations.length % 10 <= 4 && (presentations.length % 100 < 12 || presentations.length % 100 > 14) ? "проекта" : "проектов"} в рабочем пространстве`
-                : "Созданные проекты появятся здесь"}
-            </p>
           </div>
           <SearchInput
             value={query}
@@ -2982,15 +2939,11 @@ export function PresentationStudio() {
       <section id="presentation-template-library" className="scroll-mt-6">
         <div className="mb-4 flex flex-col justify-between gap-3 lg:flex-row lg:items-end">
           <div>
-            <h2 className="m-0 text-[18px] font-semibold tracking-[-0.025em]">
+            <h2 className={libraryView === "favorites" ? "m-0 text-[18px] font-semibold" : "sr-only"}>
               {libraryView === "favorites"
                 ? "Избранные шаблоны"
                 : "Шаблоны презентаций"}
             </h2>
-            <p className="mb-0 mt-1 text-[12px] text-text-muted">
-              Разные сценарии, композиции и визуальные темы — от строгого отчёта
-              до яркого выступления.
-            </p>
           </div>
           <div className="grid gap-2 sm:grid-cols-[240px_210px]">
             <SearchInput
@@ -3028,7 +2981,7 @@ export function PresentationStudio() {
                   />
                 </div>
                 <div className="px-1 pt-3">
-                  <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-primary">
+                  <span className="text-[11px] text-text-muted">
                     {template.useCase}
                   </span>
                   <h3 className="mb-0 mt-1 text-[14px] font-semibold">

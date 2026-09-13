@@ -49,7 +49,7 @@ export function CommunicationsView() {
     } }
     async function addReply(event: React.FormEvent<HTMLFormElement>) { event.preventDefault(); const form = event.currentTarget; const f = new FormData(form); const ok = await mutate({ action: "reply", contactId: f.get("contactId"), externalId: f.get("externalId"), subject: f.get("subject"), body: f.get("body") }); if (ok)
         form.reset(); }
-    return <div className="space-y-5"><PageHeader title="Коммуникации" eyebrow="Контакты и диалоги" description="Нагрузка, основания для обращения, ответы и следующие действия команды."/>
+    return <div className="space-y-5"><PageHeader title="Коммуникации"/>
     <div className="flex flex-wrap gap-2" aria-label="Разделы коммуникаций">{[["contacts", "Нагрузка и паспорта"], ["replies", "Ответы"], ["tasks", "Задачи"], ["settings", "Правила и подключение"]].map(([id, label]) => <Button key={id} variant={tab === id ? "primary" : "secondary"} aria-pressed={tab === id} onClick={() => setTab(id)}>{label}</Button>)}</div>
     {error ? <Alert tone="danger" title="Не удалось выполнить действие">{error}<Button onClick={() => void load()} variant="ghost">Повторить</Button></Alert> : null}<p role="status" className="text-sm text-text-muted">{notice}</p>
     {!data ? <p>Загружаем коммуникации…</p> : <>

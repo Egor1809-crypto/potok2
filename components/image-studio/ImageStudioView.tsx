@@ -278,19 +278,9 @@ export function ImageStudioView() {
       <div className="grid h-full min-h-0 gap-6 overflow-y-auto overscroll-contain pr-1">
         <header className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
           <div className="max-w-3xl">
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary-subtle px-3 py-1.5 text-[11px] font-semibold text-primary">
-              <Sparkles aria-hidden="true" className="size-5" /> Визуальная
-              студия
-            </div>
-            <h1 className="m-0 text-[32px] font-semibold tracking-[-0.035em] text-text-strong sm:text-[42px]">
-              Создавайте изображения для писем и презентаций
+            <h1 className="m-0 text-[24px] font-semibold tracking-[-0.035em] text-text-strong sm:text-[28px]">
+              Изображения
             </h1>
-            <p className="mb-0 mt-3 max-w-2xl text-[14px] leading-6 text-text-muted">
-              Опишите замысел, выберите арт-направление и формат. Готовый файл
-              сохраняется в общей медиатеке — его можно скачать, открыть в
-              конструкторе письма или сразу поставить на первый слайд новой
-              презентации.
-            </p>
           </div>
           <div className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2 text-[11px] text-text-muted">
             <ShieldCheck aria-hidden="true" className="size-6 text-success" />
@@ -320,9 +310,6 @@ export function ImageStudioView() {
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <h2 className="m-0 text-[17px] font-semibold">Новая работа</h2>
-                <p className="mb-0 mt-1 text-[12px] text-text-muted">
-                  Один запрос создаёт один долговечный файл.
-                </p>
               </div>
               <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground">
                 <WandSparkles aria-hidden="true" className="size-7" />
@@ -518,9 +505,6 @@ export function ImageStudioView() {
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
               <div>
                 <h2 className="m-0 text-[15px] font-semibold">Результат</h2>
-                <p className="mb-0 mt-0.5 text-[10px] text-text-muted">
-                  Файл хранится в Поток, а не по временной ссылке провайдера.
-                </p>
               </div>
               {selectedAsset ? (
                 <div className="flex flex-wrap gap-2">

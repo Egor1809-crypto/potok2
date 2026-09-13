@@ -217,15 +217,10 @@ export function CalendarView() {
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="Расписание"
         title="Календарь рассылок"
-        description="Планируйте рассылки и проверяйте результаты отправки за последние 24 часа."
         action={<Link href={`/campaigns/new?scheduledDate=${todayKey}&timeZone=${encodeURIComponent(timeZone)}`} className={buttonVariants()}><Plus className="size-6" />Запланировать</Link>}
       />
       {error ? <Alert tone="danger" title="Календарь недоступен">{error}</Alert> : null}
-      <Alert tone="info" title={timeZoneChoice === "auto" ? "Часовой пояс определён автоматически" : "Часовой пояс календаря"}>
-        Все даты календаря и время отправки показаны в выбранном часовом поясе: {describeTimeZone(timeZone)}. На сервере расписание хранится в UTC без сдвига.
-      </Alert>
 
       <div className="flex flex-wrap items-end gap-3" aria-label="Представление и фильтры календаря">
         <div className="min-w-0 sm:ms-auto sm:order-last"><label htmlFor="calendar-time-zone" className="mb-1 block text-xs text-text-muted">Часовой пояс</label><Select id="calendar-time-zone" value={timeZoneChoice} onChange={event => setTimeZoneChoice(event.target.value)} options={[{ value: "auto", label: "Автоматически — по устройству" }, ...russianTimeZones]} /></div>

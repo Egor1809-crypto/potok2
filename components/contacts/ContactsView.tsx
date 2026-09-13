@@ -546,14 +546,9 @@ export function ContactsView() {
     <div className="space-y-6">
       <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="section-eyebrow">База и доступность каналов</p>
           <h1 className="text-[28px] font-semibold tracking-[-.04em]">Контакты</h1>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <p className="text-sm text-[var(--text-muted)]">{loading && summary.total === 0 ? "Загружаем базу…" : `${summary.total.toLocaleString("ru-RU")} контактов · ${activeCount.toLocaleString("ru-RU")} активных`}</p>
-            <a href="https://tech-pravo.ru/" target="_blank" rel="noreferrer" aria-label="ТехнологИИ Права — открыть сайт" className="group inline-flex items-center gap-2 rounded-full border border-[#16E7EE]/20 bg-[#10141d] px-3 py-1.5 text-[11px] font-semibold tracking-[-.02em] shadow-[0_6px_16px_rgba(16,20,29,.12)] transition hover:-translate-y-px hover:border-[#F43CB8]/55 hover:shadow-[0_10px_20px_rgba(16,20,29,.18)]">
-              <span className="whitespace-nowrap"><span className="font-extrabold text-[#16E7EE]">Технолог</span><span className="font-extrabold text-[#F43CB8]">ИИ</span><span className="font-extrabold text-[#16E7EE]"> Права</span></span>
-              <span aria-hidden="true" className="text-[#8d9aa7] transition group-hover:translate-x-0.5 group-hover:text-[#16E7EE]">↗</span>
-            </a>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">

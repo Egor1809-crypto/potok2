@@ -184,9 +184,8 @@ export function AnalyticsView() {
     <div className="space-y-6">
       <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="section-eyebrow">Факты выполнения</p>
           <h1 className="text-[28px] font-semibold tracking-[-.04em]">Журнал отправки</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-muted)]">Итоги доставки, прочтений и переходов синхронизируются из UniSender. Автор определяется по участнику, который создал и запустил кампанию; ответственный за контакт на эту аналитику не влияет.</p>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-muted)]">Данные UniSender по авторам рассылок.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <label><span className="sr-only">Выбрать участника</span><Select className="input min-w-56" value={participantSelection} onChange={(event) => { setParticipantSelection(event.target.value); setSelection("all"); }}><option value="mine">Моя фактическая активность</option><option value="all">Вся команда</option>{snapshot.members.filter((member) => member.id !== snapshot.participant.id).map((member) => <option key={member.id} value={member.id}>{member.displayName}</option>)}</Select></label>

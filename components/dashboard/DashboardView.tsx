@@ -4,7 +4,6 @@ import Link from "next/link";
 import { MiniCalendar } from "./MiniCalendar";
 import {
   ArrowRight,
-  Blocks,
   Cable,
   Check,
   CircleAlert,
@@ -22,13 +21,10 @@ import {
   Megaphone,
   Plus,
   PanelsTopLeft,
-  Paintbrush,
   RefreshCw,
   Send,
-  SearchCheck,
   MousePointerClick,
   SendHorizontal,
-  Upload,
   UsersRound,
   UserSearch,
   Zap,
@@ -190,8 +186,6 @@ export function DashboardView() {
   }
 
   const nextAction = getNextAction(snapshot);
-  const participantName = snapshot.participant.displayName || "Участник";
-  const firstName = participantName.split(" ")[0];
   const connectedEmailProvider = snapshot.integrations.some(
     (integration) =>
       integration.enabled &&
@@ -224,9 +218,7 @@ export function DashboardView() {
     <div className="space-y-6">
       <section className="grid min-w-0 gap-5 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm sm:grid-cols-[minmax(0,1fr)_232px] sm:items-center sm:p-7">
         <div>
-          <p className="section-eyebrow">{snapshot.workspace.name}</p>
-          <h1 className="text-[28px] font-semibold tracking-[-.04em] sm:text-[32px]">{firstName ? `${firstName}, что создаём сегодня?` : "Что создаём сегодня?"}</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-muted)]">Письмо, презентация и изображения живут в одной студии. Найденные контакты проходят вашу проверку, а готовые материалы можно повторно использовать в проектах.</p>
+          <h1 className="text-[28px] font-semibold tracking-[-.04em] sm:text-[32px]">Главная</h1>
           <div className="mt-5 flex flex-wrap gap-2"><Link href="/templates" className="btn btn-secondary w-fit gap-2"><LayoutTemplate aria-hidden="true" className="size-6" />Выбрать шаблон</Link><Link href="/email-builder?new=1" className="btn btn-primary w-fit gap-2"><Plus aria-hidden="true" className="size-6" />Создать письмо</Link><Link href="/campaigns" className="btn btn-secondary w-fit gap-2"><SendHorizontal aria-hidden="true" className="size-6" />Рассылка писем</Link></div>
         </div>
         <div className="flex min-w-0 justify-center sm:justify-end"><MiniCalendar campaigns={snapshot.calendarSchedule ?? snapshot.campaigns} /></div>
@@ -235,9 +227,8 @@ export function DashboardView() {
       <section className="card min-w-0 overflow-hidden" aria-labelledby="unisender-lifetime-title">
         <div className="flex flex-col gap-3 border-b border-[var(--border)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div>
-            <p className="section-eyebrow">UniSender · за всё время</p>
             <h2 id="unisender-lifetime-title" className="mt-1 text-[17px] font-semibold">Общие результаты рассылок</h2>
-            <p className="mt-1 text-[11px] text-[var(--text-subtle)]">Данные провайдера по всем синхронизированным email-кампаниям.</p>
+            <p className="mt-1 text-[11px] text-[var(--text-subtle)]">UniSender, за всё время.</p>
           </div>
           <button type="button" onClick={() => void refreshProviderStats(true)} disabled={providerRefreshing} className="btn btn-secondary w-fit gap-2">
             <RefreshCw aria-hidden="true" className={`size-6 ${providerRefreshing ? "animate-spin" : ""}`} />
@@ -256,7 +247,7 @@ export function DashboardView() {
         </div>
         <div className="border-t border-[var(--border)] px-5 py-4 sm:px-6">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-            <div><h3 className="text-[13px] font-semibold">Кто реально отправлял</h3><p className="mt-1 text-[10px] text-[var(--text-subtle)]">Показатели относятся к автору кампании, а не к ответственному за контакт.</p></div>
+            <div><h3 className="text-[13px] font-semibold">По авторам рассылок</h3></div>
             <Link href="/analytics" className="text-[11px] font-semibold text-[var(--primary)]">Подробная аналитика →</Link>
           </div>
           <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
@@ -271,32 +262,16 @@ export function DashboardView() {
         </div>
       </section>
 
-      <section id="creative-studio" className="grid scroll-mt-24 gap-3 md:grid-cols-2 xl:grid-cols-4" aria-label="Творческие модули">
-        <StudioCard href="/email-builder?new=1" Icon={MailPlus} title="Письмо" description="Собрать из блоков, шаблона или вместе с ИИ." action="Создать письмо" featured />
-        <StudioCard href="/presentations?new=1" Icon={PanelsTopLeft} title="Презентация" description="Создать слайды с нуля, из письма или по задаче." action="Открыть презентации" />
-        <StudioCard href="/image-studio?new=1" Icon={ImagePlus} title="Изображение" description="Создать визуал и использовать его в письме или слайдах." action="Открыть студию" />
-        <StudioCard href="/contact-finder" Icon={UserSearch} title="Контакты" description="Найти публичные email и телефоны, проверить и импортировать." action="Начать поиск" />
-      </section>
-
-      <section className="card p-5 sm:p-6" aria-labelledby="workflow-title">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><p className="section-eyebrow">Единый рабочий процесс</p><h2 id="workflow-title" className="mt-1 text-[17px] font-semibold">От источника до готового материала</h2></div><p className="max-w-xl text-[11px] leading-5 text-[var(--text-muted)]">Каждый переход сохраняет результат в рабочем пространстве: ничего не нужно переносить вручную между модулями.</p></div>
-        <ol className="mt-5 grid gap-3 md:grid-cols-4">
-          <WorkflowStep index="01" Icon={SearchCheck} title="Найти" text="Укажите сайт или вставьте текст, затем проверьте найденные данные." />
-          <WorkflowStep index="02" Icon={Paintbrush} title="Создать визуал" text="Сохраните изображение в общей библиотеке материалов." />
-          <WorkflowStep index="03" Icon={Blocks} title="Собрать" text="Добавьте визуал в письмо или презентацию и отредактируйте." />
-          <WorkflowStep index="04" Icon={SendHorizontal} title="Использовать" text="Скачайте результат или передайте готовое письмо в рассылку." />
-        </ol>
-        <div className="mt-4 flex flex-wrap gap-2 border-t border-[var(--border)] pt-4">
-          <Link href="/templates?import=1" className="btn btn-secondary max-w-full gap-2 whitespace-normal text-left"><Upload aria-hidden="true" className="size-6" />Импортировать свой макет</Link>
-          <Link href="/templates" className="btn btn-ghost gap-2">Открыть шаблоны<ArrowRight aria-hidden="true" className="size-6" /></Link>
-        </div>
+      <section id="creative-studio" className="grid scroll-mt-24 gap-3 md:grid-cols-3" aria-label="Творческие модули">
+        <StudioCard href="/presentations?new=1" Icon={PanelsTopLeft} title="Презентация" />
+        <StudioCard href="/image-studio?new=1" Icon={ImagePlus} title="Изображение" />
+        <StudioCard href="/contact-finder" Icon={UserSearch} title="Поиск контактов" />
       </section>
 
       <section className={`rounded-2xl border p-5 sm:p-6 ${nextAction.tone}`} aria-labelledby="next-action-title">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
           <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-white/75 text-[var(--primary)] shadow-sm"><nextAction.Icon aria-hidden="true" className="size-5" /></span>
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[.1em] text-[var(--text-muted)]">Следующий шаг</p>
             <h2 id="next-action-title" className="mt-1 text-[17px] font-semibold">{nextAction.title}</h2>
             <p className="mt-1 text-[12px] leading-5 text-[var(--text-muted)]">{nextAction.description}</p>
           </div>
@@ -316,9 +291,9 @@ export function DashboardView() {
 
       <section className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(300px,.75fr)]">
         <div className="card min-w-0 overflow-hidden">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] px-5 py-4 sm:px-6">
-            <div><h2 className="text-[15px] font-semibold">Кампании</h2><p className="mt-1 text-[11px] text-[var(--text-subtle)]">Черновики, блокировки и запуски из базы</p></div>
-            <Link href="/campaigns" className="text-[12px] font-semibold text-[var(--primary)]">Все кампании</Link>
+          <div className="flex items-center justify-end border-b border-[var(--border)] px-5 py-4 sm:px-6">
+            <h2 className="sr-only">Последние рассылки</h2>
+            <Link href="/campaigns" className="text-[12px] font-semibold text-[var(--primary)]">Все рассылки →</Link>
           </div>
           {recentCampaigns.length ? (
             <div className="divide-y divide-[var(--border)]">
@@ -330,7 +305,7 @@ export function DashboardView() {
         </div>
 
         <div className="card p-5 sm:p-6">
-          <div className="flex items-center justify-between gap-3"><div><h2 className="text-[15px] font-semibold">Готовность к рассылке</h2><p className="mt-1 text-[11px] text-[var(--text-subtle)]">Проверяется перед каждым запуском</p></div><Check aria-hidden="true" className="size-7 text-[var(--success)]" /></div>
+          <div className="flex items-center justify-between gap-3"><div><h2 className="text-[15px] font-semibold">Готовность к рассылке</h2></div><Check aria-hidden="true" className="size-7 text-[var(--success)]" /></div>
           <ol className="mt-5 space-y-1">
             <ReadinessStep ready={snapshot.templates.length > 0} label="Есть шаблон письма" action="Создать" href="/email-builder?new=1" />
             <ReadinessStep ready={snapshot.stats.totalContacts > 0} label="Есть получатели" action="Добавить" href="/contacts" />
@@ -376,31 +351,16 @@ function ReadinessStep({ ready, label, action, href }: { ready: boolean; label: 
   );
 }
 
-function StudioCard({ href, Icon, title, description, action, featured = false }: {
+function StudioCard({ href, Icon, title }: {
   href: string;
   Icon: typeof MailPlus;
   title: string;
-  description: string;
-  action: string;
-  featured?: boolean;
 }) {
   return (
     <Link href={href} className="group rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 transition hover:-translate-y-0.5 hover:border-[var(--primary)]/35 hover:shadow-sm">
-      <span className={`grid size-12 place-items-center rounded-xl border border-border-strong text-text-strong transition duration-200 group-hover:-rotate-2 group-hover:scale-105 ${featured ? "bg-primary-subtle" : "bg-surface-subtle"}`}><Icon aria-hidden="true" strokeWidth={1.9} className="size-8" /></span>
+      <span className={`grid size-12 place-items-center rounded-xl border border-border-strong text-text-strong transition duration-200 group-hover:-rotate-2 group-hover:scale-105 bg-surface-subtle`}><Icon aria-hidden="true" strokeWidth={1.9} className="size-8" /></span>
       <h2 className="mt-4 text-[15px] font-semibold">{title}</h2>
-      <p className="mt-1.5 text-[11px] leading-5 text-[var(--text-muted)]">{description}</p>
-      <span className="mt-4 inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--primary)]">{action}<ArrowRight aria-hidden="true" className="size-5 transition group-hover:translate-x-0.5" /></span>
     </Link>
-  );
-}
-
-function WorkflowStep({ index, Icon, title, text }: { index: string; Icon: typeof SearchCheck; title: string; text: string }) {
-  return (
-    <li className="rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)] p-4">
-      <div className="flex items-center justify-between"><span className="text-[10px] font-semibold tracking-[.14em] text-[var(--primary)]">{index}</span><span className="grid size-8 place-items-center rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--primary)]"><Icon aria-hidden="true" strokeWidth={1.8} className="size-6" /></span></div>
-      <h3 className="mt-3 text-[13px] font-semibold">{title}</h3>
-      <p className="mt-1 text-[10px] leading-4 text-[var(--text-muted)]">{text}</p>
-    </li>
   );
 }
 

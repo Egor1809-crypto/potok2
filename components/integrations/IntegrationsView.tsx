@@ -405,7 +405,6 @@ export function IntegrationsView() {
   return (
     <div className="mx-auto max-w-5xl space-y-6 pb-10">
       <PageHeader
-        eyebrow="Настройка доставки"
         title="Каналы и интеграции"
         description="Подключите хотя бы один провайдер. Затем выберите его на третьем шаге создания кампании."
         action={

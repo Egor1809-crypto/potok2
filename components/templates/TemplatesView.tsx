@@ -4,7 +4,7 @@ import { confirmAction } from "@/components/ui/confirm-action";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { ArrowLeft, FileText, PenTool, RefreshCw, SearchX, Sparkles, Upload } from "@/components/ui/icons";
+import { ArrowLeft, PenTool, RefreshCw, SearchX, Sparkles, Upload } from "@/components/ui/icons";
 
 import { importLetter, uploadImportedResources, type ImportedLetter } from "@/lib/email-import/import-letter";
 import { importCodeLetter, type CodeImportInput } from "@/lib/email-import/code";
@@ -392,12 +392,10 @@ export function TemplatesView() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Серверная библиотека"
         title="Email-шаблоны"
         description={routeContext.campaignName
           ? `Выберите макет для кампании «${routeContext.campaignName}». Аудитория и маршруты останутся в черновике.`
-          : "Создавайте, редактируйте и повторно используйте макеты. HTML и текстовая версия собираются на сервере."}
-        meta={loadState === "ready" ? `Шаблонов: ${templates.length}` : "Данные с сервера"}
+          : undefined}
         action={
           <div className="flex flex-wrap items-center gap-2">
             {routeContext.backTo ? (
@@ -420,7 +418,6 @@ export function TemplatesView() {
         }
       />
 
-      <p className="text-sm text-text-muted">Импортируйте файл или вставьте код письма. Перед добавлением в шаблоны можно проверить результат.</p>
       <TemplateDirector open={directorOpen} onOpenChange={setDirectorOpen} templates={templates} initialTemplate={directorTemplate} onSaved={template => { setTemplates(current => [template, ...current.filter(item => item.id !== template.id)]); setNotice(`Шаблон «${template.name}» сохранён.`); }} />
       <EmailImportDialog open={importOpen} onOpenChange={setImportOpen} busy={importing} progress={importProgress} error={error} onFiles={files => void importTemplate(files)} onCode={input => void importCode(input)} />
       {importProgress ? <p role="status" className="text-sm text-primary">{importProgress}</p> : null}
@@ -438,7 +435,7 @@ export function TemplatesView() {
 
       {loadState === "loading" ? (
         <div className="card grid min-h-64 place-items-center p-8 text-center">
-          <div><Spinner className="mx-auto size-5" label="Загрузка шаблонов" /><p className="mt-3 text-[12px] text-text-muted">Загружаем библиотеку с сервера…</p></div>
+          <div><Spinner className="mx-auto size-5" label="Загрузка шаблонов" /><p className="mt-3 text-[12px] text-text-muted">Загружаем шаблоны…</p></div>
         </div>
       ) : loadState === "error" ? (
         <div className="card">
@@ -465,17 +462,6 @@ export function TemplatesView() {
               Мои шаблоны <span className="ml-1 opacity-70">{templates.filter((template) => !template.isStarter).length}</span>
             </button>
           </div>
-          {scope === "all" && collection === "studio" ? (
-            <div className="overflow-hidden rounded-[18px] border border-[#28231F] bg-[#211D1A] p-5 text-[#F8F2E8] shadow-[0_18px_46px_rgba(35,28,23,0.12)] sm:p-6">
-              <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(340px,.8fr)] lg:items-end">
-                <div>
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#C7FF65]">СТУДИЯ ДИЗАЙНА «ПОТОК» / 01</span>
-                  <h2 className="mb-0 mt-3 max-w-3xl text-balance text-[28px] font-semibold leading-[1.04] tracking-[-0.04em] sm:text-[38px]">Не шаблоны по палитрам, а разные арт-направления</h2>
-                </div>
-                <p className="m-0 max-w-xl text-[12px] leading-6 text-[#C9C0B7]">Больше 150 студийных макетов: Swiss Grid, Memphis, Bauhaus, cinema noir, botanical, neo‑Tokyo, postal, gallery, ceramic, festival и другие. Они различаются композицией, ритмом и задачей, а не только цветом.</p>
-              </div>
-            </div>
-          ) : null}
         <Tabs value={category} onValueChange={(value) => setCategory(value as CategoryFilter)} className="min-w-0">
           <TabsList className="-mb-px">
             {categories.map((item) => (
@@ -509,7 +495,6 @@ export function TemplatesView() {
 
             <div className="mt-4 flex items-center justify-between gap-3">
               <p className="m-0 text-[11px] text-text-muted">Найдено: <span className="font-semibold text-text-strong">{filteredTemplates.length}</span>{category !== "All" ? ` · ${templateCategoryLabels[category]}` : ""}</p>
-              <span className="hidden items-center gap-1.5 text-[10px] text-text-subtle sm:flex"><FileText aria-hidden="true" className="size-4" />Каждый макет хранится в рабочем пространстве</span>
             </div>
 
             {filteredTemplates.length ? (

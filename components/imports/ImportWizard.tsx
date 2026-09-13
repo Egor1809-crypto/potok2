@@ -348,7 +348,6 @@ export function ImportWizard() {
   return (
     <div className="mx-auto max-w-[1040px] space-y-5">
       <header>
-        <p className="section-eyebrow">Перенос данных</p>
         <h1 className="mt-2 text-[28px] font-medium tracking-[-.04em]">
           Импорт контактов
         </h1>

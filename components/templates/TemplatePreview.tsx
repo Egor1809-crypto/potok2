@@ -40,8 +40,6 @@ export function TemplateCard({
   onFavorite: () => void;
   busyAction?: "clone" | "delete" | "favorite";
 }) {
-  const isStudioPick = template.id.startsWith("template-v7-studio-") || template.id.startsWith("template-v8-creative-");
-  const isDesignerCollection = isStudioPick || template.id.startsWith("template-v3-");
   return (
     <article className="group relative min-w-0 overflow-hidden rounded-[14px] border border-border bg-surface shadow-[var(--shadow-xs)] transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-1 hover:border-border-strong hover:shadow-[var(--shadow-md)]">
       <button type="button" onClick={onFavorite} aria-pressed={template.isFavorite} aria-label={`${template.isFavorite ? "Убрать из избранного" : "Добавить в избранное"}: ${template.name}`} className={`absolute right-3 top-3 z-30 grid size-9 place-items-center rounded-full border shadow-sm backdrop-blur transition ${template.isFavorite ? "border-[#F43CB8]/40 bg-[#10141d] text-[#F43CB8]" : "border-white/70 bg-white/85 text-[#667085] hover:text-[#F43CB8]"}`}>
@@ -66,9 +64,7 @@ export function TemplateCard({
             </p>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1">
-            <Badge variant={isDesignerCollection || !template.isStarter ? "accent" : "neutral"}>
-              {isStudioPick ? "Выбор студии" : isDesignerCollection ? "Дизайнерский" : template.isStarter ? "Из библиотеки" : "Мой шаблон"}
-            </Badge>
+            {!template.isStarter && <Badge variant="accent">Мой шаблон</Badge>}
             <span className="text-[9px] text-text-subtle">{templateCategoryLabels[template.category]}</span>
           </div>
         </div>
@@ -150,7 +146,6 @@ export function TemplateThumbnail({ template }: { template: EmailTemplateRecord 
       {isStudioPick ? (
         <>
           <span aria-hidden="true" className="absolute inset-x-0 top-0 h-px opacity-35" style={{ backgroundColor: accentColor }} />
-          <span aria-hidden="true" className="absolute bottom-3 left-3 font-mono text-[7px] uppercase tracking-[0.16em] opacity-40">Art direction / 2026</span>
         </>
       ) : (
         <>
@@ -158,12 +153,6 @@ export function TemplateThumbnail({ template }: { template: EmailTemplateRecord 
           <span aria-hidden="true" className="absolute -bottom-14 -left-12 size-32 rounded-full bg-white/30" />
         </>
       )}
-      {template.id.startsWith("template-v3-") || isStudioPick ? (
-        <span className="absolute left-3 top-3 z-20 inline-flex items-center gap-1 rounded-full border border-white/60 bg-white/85 px-2 py-1 text-[8px] font-semibold uppercase tracking-[0.08em] text-[#312a3b] shadow-sm backdrop-blur">
-          <Sparkles aria-hidden="true" className="size-3.5" />
-          {isStudioPick ? "Studio pick" : "Дизайнерский"}
-        </span>
-      ) : null}
 
       <div
         className="relative h-[266px] w-[204px] overflow-hidden bg-white shadow-[0_18px_45px_rgba(30,25,38,0.18)] ring-1 ring-black/[0.04] transition-transform duration-300 group-hover:scale-[1.025] sm:h-[280px] sm:w-[216px]"

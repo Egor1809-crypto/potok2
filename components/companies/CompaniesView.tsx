@@ -53,7 +53,6 @@ export function CompaniesView() {
     <div className="space-y-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="section-eyebrow">Организации</p>
           <h1 className="mt-2 text-[28px] font-medium tracking-[-.04em]">
             Компании
           </h1>

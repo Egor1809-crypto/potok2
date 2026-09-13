@@ -193,9 +193,7 @@ export function CampaignsView({
   return (
     <div className="mx-auto max-w-6xl space-y-6 pb-10">
       <PageHeader
-        eyebrow="Полный цикл коммуникации"
-        title="Кампании"
-        description="Каждая кампания проходит понятный путь: черновик → проверка → готовность → отправка → результат."
+        title="Рассылка писем"
         action={
           <Link href="/campaigns/new" className={buttonVariants({ variant: "primary" })}>
             <MailPlus aria-hidden="true" className="size-6" />
@@ -228,8 +226,7 @@ export function CampaignsView({
         <div className="border-b border-border p-4 sm:p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h2 id="campaign-list-title" className="text-[16px] font-semibold text-text-strong">Рабочий список</h2>
-              <p className="mt-1 text-[12px] text-text-muted">Статус показывает, что уже сделано и какое действие нужно следующим.</p>
+              <h2 id="campaign-list-title" className="sr-only">Список рассылок</h2>
             </div>
             <SearchInput
               value={search}

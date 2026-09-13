@@ -58,7 +58,7 @@ export function TeamManagementView() {
   const filtered = data?.members.filter(m => `${m.displayName} ${m.login}`.toLocaleLowerCase("ru").includes(search.toLocaleLowerCase("ru"))) ?? [];
   return <div className="mx-auto max-w-6xl space-y-6">
     <header className="flex flex-wrap items-start justify-between gap-4">
-      <div><h1 className="text-3xl font-semibold tracking-tight">Команда и доступ</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-muted)]">Пригласите коллег и назначьте каждому базы и группы контактов для работы.</p></div>
+      <div><h1 className="text-3xl font-semibold tracking-tight">Команда и доступ</h1></div>
       {data?.canManage && <button className="btn btn-primary gap-2" onClick={() => openEdit()}><Plus className="size-6" aria-hidden />Пригласить коллегу</button>}
     </header>
     {error && !edit && <div role="alert" className="rounded-xl bg-[var(--danger-subtle)] p-4 text-sm text-[var(--danger)]">{error} <button className="underline" onClick={() => { setError(""); void load(); }}>Повторить</button></div>}

@@ -125,7 +125,6 @@ export function ContactProfileRoute() {
         <span className="mx-auto grid size-12 place-items-center rounded-xl bg-[var(--surface-subtle)] text-[var(--text-tertiary)]">
           <UserRoundX aria-hidden="true" size={28} />
         </span>
-        <p className="section-eyebrow mt-5">Контакт недоступен</p>
         <h1 className="mt-2 text-[24px] font-semibold tracking-[-.035em] text-[var(--text-primary)]">
           Контакт не найден
         </h1>
