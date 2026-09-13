@@ -1,13 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { calendarDayKey as dateKeyInTimezone, parseCalendarDate } from "@/lib/calendar/dates";
+import { calendarDayKey as dateKeyInTimezone, calendarMonthDays, parseCalendarDate } from "@/lib/calendar/dates";
 import { useCalendarTimeZone } from "@/lib/calendar-timezone";
 import { russianTimeZones } from "@/lib/russian-timezones";
 import { CalendarReport } from "./CalendarReport";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Filter, Plus, X } from "@/components/ui/icons";
+import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Filter, Plus } from "@/components/ui/icons";
 
 import { getCampaignChannelDefinition } from "@/components/campaigns/campaignChannels";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -19,13 +19,6 @@ const weekdays = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 
 function dateKey(value: Date) {
   return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
-}
-
-function startOfGrid(month: Date) {
-  const first = new Date(month.getFullYear(), month.getMonth(), 1);
-  const mondayIndex = (first.getDay() + 6) % 7;
-  first.setDate(first.getDate() - mondayIndex);
-  return first;
 }
 
 function formatMonth(month: Date) {
@@ -68,7 +61,8 @@ export function CalendarView() {
   const [snapshot, setSnapshot] = React.useState<WorkspaceSnapshot | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [month, setMonth] = React.useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
-  const [selectedDay, setSelectedDay] = React.useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = React.useState<string | null>(null);
+  const focusDayPanel = React.useRef(false);
   const dayButtons = React.useRef(new Map<string, HTMLButtonElement>());
   const dayPanel = React.useRef<HTMLElement>(null);
   const panelHeading = React.useRef<HTMLHeadingElement>(null);
@@ -77,15 +71,16 @@ export function CalendarView() {
   const [status, setStatus] = React.useState("");
   const { timeZone, choice: timeZoneChoice, setChoice: setTimeZoneChoice } = useCalendarTimeZone();
   const todayKey = dateKeyInTimezone(new Date().toISOString(), timeZone);
+  const selectedDay = selectedDate ?? todayKey;
   const previousToday = React.useRef(dateKey(new Date()));
   React.useEffect(() => {
     const oldMonth = previousToday.current.slice(0, 7);
     const frame = requestAnimationFrame(() => {
       previousToday.current = todayKey;
       setMonth(current => {
-      if (dateKey(current).slice(0, 7) !== oldMonth) return current;
-      const [year, monthNumber] = todayKey.split("-").map(Number);
-      return new Date(year, monthNumber - 1, 1);
+        if (dateKey(current).slice(0, 7) !== oldMonth) return current;
+        const [year, monthNumber] = todayKey.split("-").map(Number);
+        return new Date(year, monthNumber - 1, 1);
       });
     });
     return () => cancelAnimationFrame(frame);
@@ -129,7 +124,7 @@ export function CalendarView() {
     const [year, monthNumber] = targetDay.split("-").map(Number);
     const frame = requestAnimationFrame(() => {
       setMonth(new Date(year, monthNumber - 1, 1));
-      setSelectedDay(targetDay);
+      setSelectedDate(targetDay);
       setView("calendar");
     });
     return () => cancelAnimationFrame(frame);
@@ -142,35 +137,46 @@ export function CalendarView() {
     const [year, monthNumber] = key.split("-").map(Number);
     const frame = window.requestAnimationFrame(() => {
       setMonth(new Date(year, monthNumber - 1, 1));
-      setSelectedDay(key);
+      setSelectedDate(key);
     });
     return () => window.cancelAnimationFrame(frame);
   }, [targetCampaignId, targetScheduledAt, timeZone]);
 
   React.useEffect(() => {
-    if (!selectedDay) return;
-    panelHeading.current?.focus({ preventScroll: true });
-    if (window.matchMedia("(max-width: 1023px)").matches) {
-      panelHeading.current?.scrollIntoView({ block: "nearest" });
+    if (focusDayPanel.current) {
+      focusDayPanel.current = false;
+      panelHeading.current?.focus({ preventScroll: true });
+      if (window.matchMedia("(max-width: 1023px)").matches) {
+        panelHeading.current?.scrollIntoView({ block: "nearest" });
+      }
     }
     const panel = dayPanel.current;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       event.preventDefault();
       dayButtons.current.get(selectedDay)?.focus({ preventScroll: true });
-      setSelectedDay(null);
     };
     panel?.addEventListener("keydown", onKeyDown);
     return () => panel?.removeEventListener("keydown", onKeyDown);
-  }, [selectedDay]);
+  }, [selectedDay, view]);
 
-  function closeDay() {
-    if (selectedDay) dayButtons.current.get(selectedDay)?.focus({ preventScroll: true });
-    setSelectedDay(null);
+  function selectDay(key: string) {
+    if (key === selectedDay) {
+      panelHeading.current?.focus({ preventScroll: true });
+      if (window.matchMedia("(max-width: 1023px)").matches) panelHeading.current?.scrollIntoView({ block: "nearest" });
+    } else {
+      focusDayPanel.current = true;
+      setSelectedDate(key);
+    }
+  }
+
+  function showToday() {
+    const [year, monthNumber] = todayKey.split("-").map(Number);
+    setMonth(new Date(year, monthNumber - 1, 1));
+    setSelectedDate(null);
   }
 
   function changeMonth(delta: number) {
-    setSelectedDay(null);
     setMonth((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1));
   }
 
@@ -190,14 +196,7 @@ export function CalendarView() {
   const groups = React.useMemo(() => snapshot
     ? Array.from(new Set(snapshot.campaigns.map((campaign) => audienceLabel(campaign, snapshot)))).sort()
     : [], [snapshot]);
-  const days = React.useMemo(() => {
-    const first = startOfGrid(month);
-    return Array.from({ length: 42 }, (_, index) => {
-      const value = new Date(first);
-      value.setDate(first.getDate() + index);
-      return value;
-    });
-  }, [month]);
+  const days = React.useMemo(() => calendarMonthDays(new Date(Date.UTC(month.getFullYear(), month.getMonth(), 1, 12))), [month]);
   const campaignsByDay = React.useMemo(() => {
     const map = new Map<string, CampaignRecord[]>();
     for (const campaign of campaigns) {
@@ -209,10 +208,8 @@ export function CalendarView() {
     }
     return map;
   }, [campaigns, timeZone]);
-  const selectedItems = selectedDay ? campaignsByDay.get(selectedDay) ?? [] : [];
-  const selectedDateLabel = selectedDay
-    ? new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric" }).format(new Date(`${selectedDay}T12:00:00`))
-    : "";
+  const selectedItems = campaignsByDay.get(selectedDay) ?? [];
+  const selectedDateLabel = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric" }).format(new Date(`${selectedDay}T12:00:00`));
 
   return (
     <div className="space-y-5">
@@ -237,7 +234,7 @@ export function CalendarView() {
         </div>
       </section>
 
-      <div className={cn("grid min-w-0 grid-cols-1 items-start gap-5", selectedDay && "lg:grid-cols-[minmax(0,1fr)_320px]")}>
+      <div className="grid min-w-0 grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
         <section className="card min-w-0 overflow-hidden" aria-label="Месячный календарь">
           <header className="flex items-center justify-between gap-2 border-b border-border px-3 py-3 sm:px-5">
             <Button size="icon" variant="ghost" aria-label="Предыдущий месяц" onClick={() => changeMonth(-1)}><ChevronLeft aria-hidden="true" className="size-7" /></Button>
@@ -249,30 +246,30 @@ export function CalendarView() {
           </div>
           <div className="grid grid-cols-7">
             {days.map((day) => {
-              const key = dateKey(day);
+              const key = day.key;
               const items = campaignsByDay.get(key) ?? [];
-              const outside = day.getMonth() !== month.getMonth();
+              const outside = !day.currentMonth;
               const today = key === todayKey;
               const selected = selectedDay === key;
-              const dayLabel = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric" }).format(day);
+              const dayLabel = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric" }).format(new Date(`${key}T12:00:00`));
               return (
                 <button
                   key={key}
                   ref={(element) => { if (element) dayButtons.current.set(key, element); else dayButtons.current.delete(key); }}
                   type="button"
-                  onClick={() => setSelectedDay(key)}
+                  onClick={() => selectDay(key)}
                   aria-label={`${dayLabel}. Рассылок на этот день: ${items.length}`}
                   aria-pressed={selected}
-                  aria-controls={selectedDay ? "calendar-day-details" : undefined}
+                  aria-controls="calendar-day-details"
                   aria-current={today ? "date" : undefined}
                   className={cn(
-                    "flex min-h-24 min-w-0 flex-col items-start gap-2 border-b border-e border-border p-1.5 text-start hover:bg-primary/5 focus-visible:relative focus-visible:z-[1] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary sm:min-h-28 sm:p-3",
+                    "flex min-h-20 min-w-0 flex-col items-start gap-2 border-b border-e border-border p-1.5 text-start hover:bg-primary/5 focus-visible:relative focus-visible:z-[1] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary sm:min-h-24 sm:p-2.5",
                     outside && "bg-surface-subtle/60",
                     items.length > 0 && !outside && "bg-primary/[0.035]",
                     selected && "bg-primary/10 ring-2 ring-inset ring-primary",
                   )}
                 >
-                  <span className={cn("grid size-7 shrink-0 place-items-center rounded-full text-[13px] font-semibold", today ? "bg-primary text-white" : outside ? "text-text-subtle" : "text-text-strong")}>{day.getDate()}</span>
+                  <span className={cn("grid size-7 shrink-0 place-items-center rounded-full text-[13px] font-semibold", today ? "bg-primary text-white" : outside ? "text-text-subtle" : "text-text-strong")}>{day.day}</span>
                   {items.length > 0 ? (
                     <span aria-hidden="true" className="inline-flex max-w-full items-center justify-center gap-0.5 rounded-full bg-primary px-0.5 py-1 text-[10px] font-semibold leading-none text-white sm:gap-1.5 sm:px-2 sm:text-[14px]">
                       <span className="size-1 shrink-0 rounded-full bg-white sm:size-1.5" />
@@ -285,40 +282,38 @@ export function CalendarView() {
           </div>
         </section>
 
-        {selectedDay ? (
-          <aside ref={dayPanel} id="calendar-day-details" className="card min-w-0 p-4 sm:p-5" aria-labelledby="calendar-day-title">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h2 ref={panelHeading} id="calendar-day-title" tabIndex={-1} className="rounded text-[18px] font-semibold text-text-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">{selectedDateLabel}</h2>
-                <p className="mt-1 text-[12px] text-text-muted" role="status">Рассылок: {selectedItems.length}</p>
-              </div>
-              <Button size="icon" variant="ghost" aria-label="Закрыть сведения о дне" onClick={closeDay}><X aria-hidden="true" className="size-6" /></Button>
+        <aside ref={dayPanel} id="calendar-day-details" className="card min-w-0 p-4 sm:p-5 lg:sticky lg:top-5" aria-labelledby="calendar-day-title">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 ref={panelHeading} id="calendar-day-title" tabIndex={-1} className="rounded text-[18px] font-semibold text-text-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">{selectedDateLabel}</h2>
+              <p className="mt-1 text-[12px] text-text-muted" role="status">Рассылок: {selectedItems.length}</p>
             </div>
-            <p className="mt-3 text-[12px] text-text-muted">Время: {describeTimeZone(timeZone)}</p>
-            <div className="mt-5 space-y-4">
-              {selectedItems.map((campaign) => (
-                <article key={campaign.id} className={cn("min-w-0 rounded-xl border border-border p-4", campaign.id === targetCampaignId && "border-primary bg-primary/[0.035]")}>
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <time dateTime={campaign.scheduledAt!} className="inline-flex items-center gap-1.5 text-[15px] font-semibold tabular-nums text-primary"><Clock3 aria-hidden="true" className="size-6" />{formatTime(campaign.scheduledAt!, timeZone)}</time>
-                    <Badge variant={campaign.status === "blocked" ? "warning" : "neutral"}>{statusLabel[campaign.status]}</Badge>
-                  </div>
-                  <h3 className="mt-3 break-words text-[14px] font-semibold text-text-strong">{campaign.name}</h3>
-                  <dl className="mt-4 space-y-3 text-[13px]">
-                    <CalendarDetail label="Тема" value={campaign.subject || "Не указана"} />
-                    <CalendarDetail label="Аудитория" value={snapshot ? audienceLabel(campaign, snapshot) : ""} />
-                    <CalendarDetail label="Получателей" value={campaign.metrics.recipients.toLocaleString("ru-RU")} />
-                    <CalendarDetail label="Отправитель" value={[campaign.senderName, campaign.senderEmail].filter(Boolean).join(" · ") || "Не указан"} />
-                    <CalendarDetail label="Каналы" value={campaign.deliveryChannels.map((channel) => getCampaignChannelDefinition(channel).label).join(", ") || "Не выбраны"} />
-                  </dl>
-                  {campaign.statusReason ? <p className="mt-4 break-words rounded-lg bg-surface-subtle p-3 text-[12px] leading-5 text-text-muted">{campaign.statusReason}</p> : null}
-                  <Link href={`/campaigns/${campaign.id}`} aria-label={`Открыть рассылку «${campaign.name}»`} className={buttonVariants({ variant: "outline", size: "sm", className: "mt-4 w-full" })}>Открыть рассылку</Link>
-                </article>
-              ))}
-              {selectedItems.length === 0 ? <p className="rounded-xl bg-surface-subtle p-4 text-[14px] leading-6 text-text-muted">{query || group || status ? "На этот день нет рассылок по выбранным фильтрам." : "На этот день нет запланированных рассылок."}</p> : null}
-            </div>
-            <Link href={`/campaigns/new?scheduledDate=${selectedDay}&timeZone=${encodeURIComponent(timeZone)}`} className={buttonVariants({ className: "mt-5 w-full" })}><Plus aria-hidden="true" className="size-6" />Запланировать</Link>
-          </aside>
-        ) : null}
+            <Button size="sm" variant="outline" onClick={showToday}>Сегодня</Button>
+          </div>
+          <p className="mt-3 text-[12px] text-text-muted">Время: {describeTimeZone(timeZone)}</p>
+          <div className="mt-5 space-y-4">
+            {selectedItems.map((campaign) => (
+              <article key={campaign.id} className={cn("min-w-0 rounded-xl border border-border p-4", campaign.id === targetCampaignId && "border-primary bg-primary/[0.035]")}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <time dateTime={campaign.scheduledAt!} className="inline-flex items-center gap-1.5 text-[15px] font-semibold tabular-nums text-primary"><Clock3 aria-hidden="true" className="size-6" />{formatTime(campaign.scheduledAt!, timeZone)}</time>
+                  <Badge variant={campaign.status === "blocked" ? "warning" : "neutral"}>{statusLabel[campaign.status]}</Badge>
+                </div>
+                <h3 className="mt-3 break-words text-[14px] font-semibold text-text-strong">{campaign.name}</h3>
+                <dl className="mt-4 space-y-3 text-[13px]">
+                  <CalendarDetail label="Тема" value={campaign.subject || "Не указана"} />
+                  {campaign.audienceType === "segment" && snapshot ? <CalendarDetail label="Группа" value={audienceLabel(campaign, snapshot)} /> : null}
+                  <CalendarDetail label="Получателей" value={campaign.metrics.recipients.toLocaleString("ru-RU")} />
+                  <CalendarDetail label="Отправитель" value={[campaign.senderName, campaign.senderEmail].filter(Boolean).join(" · ") || "Не указан"} />
+                  <CalendarDetail label="Каналы" value={campaign.deliveryChannels.map((channel) => getCampaignChannelDefinition(channel).label).join(", ") || "Не выбраны"} />
+                </dl>
+                {campaign.statusReason ? <p className="mt-4 break-words rounded-lg bg-surface-subtle p-3 text-[12px] leading-5 text-text-muted">{campaign.statusReason}</p> : null}
+                <Link href={`/campaigns/${campaign.id}`} aria-label={`Открыть рассылку «${campaign.name}»`} className={buttonVariants({ variant: "outline", size: "sm", className: "mt-4 w-full" })}>Открыть рассылку</Link>
+              </article>
+            ))}
+            {selectedItems.length === 0 ? <p className="rounded-xl bg-surface-subtle p-4 text-[14px] leading-6 text-text-muted">{query || group || status ? "На этот день нет рассылок по выбранным фильтрам." : "На этот день нет запланированных рассылок."}</p> : null}
+          </div>
+          <Link href={`/campaigns/new?scheduledDate=${selectedDay}&timeZone=${encodeURIComponent(timeZone)}`} className={buttonVariants({ className: "mt-5 w-full" })}><Plus aria-hidden="true" className="size-6" />Запланировать</Link>
+        </aside>
       </div>
       <div className="flex flex-wrap gap-2">
         <Badge variant="success"><CalendarDays className="size-4" />Запланировано: {campaigns.filter((item) => item.status === "scheduled").length}</Badge>

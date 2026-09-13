@@ -1220,7 +1220,7 @@ function EmailBuilderWorkspace({
             />
           </div>
 
-          <div className={cn("grid min-h-0 flex-1 bg-surface-subtle/30", focusCanvas || !showLibrary && !showProperties ? "lg:grid-cols-[minmax(0,1fr)]" : showLibrary && showProperties ? "lg:grid-cols-[190px_minmax(0,1fr)_270px]" : showLibrary ? "lg:grid-cols-[190px_minmax(0,1fr)]" : "lg:grid-cols-[minmax(0,1fr)_270px]")}>
+          <div className={cn("grid min-h-0 flex-1 bg-surface-subtle/30", focusCanvas || !showLibrary && !showProperties ? "lg:grid-cols-[minmax(0,1fr)]" : showLibrary && showProperties ? "lg:grid-cols-[280px_minmax(0,1fr)_270px] xl:grid-cols-[304px_minmax(0,1fr)_280px]" : showLibrary ? "lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[304px_minmax(0,1fr)]" : "lg:grid-cols-[minmax(0,1fr)_270px]")}>
             <BlockLibrary
               onAdd={addBlock}
               document={document}

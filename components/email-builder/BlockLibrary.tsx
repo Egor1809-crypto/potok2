@@ -134,7 +134,7 @@ export function BlockLibrary({
           <span className="sr-only">{tab === "icons" ? "Найти значок" : "Найти блок"}</span>
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={tab === "icons" ? "Найти значок" : tab === "decor" ? "Найти узор" : "Найти блок"} className="min-w-0 flex-1 border-0 bg-transparent text-[11px] text-text-strong outline-none placeholder:text-text-subtle" />
         </label>
-        <div className="mt-3 grid grid-cols-2 gap-1 rounded-lg bg-surface-subtle p-1" role="tablist" aria-label="Тип элементов">
+        <div className="mt-3 grid gap-1 rounded-lg bg-surface-subtle p-1" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,128px),1fr))" }} role="tablist" aria-label="Тип элементов">
           <LibraryTab active={tab === "content"} onClick={() => setTab("content")} icon={AlignJustify}>Контент</LibraryTab>
           <LibraryTab active={tab === "layout"} onClick={() => setTab("layout")} icon={LayoutTemplate}>Структуры</LibraryTab>
           <LibraryTab active={tab === "decor"} onClick={() => setTab("decor")} icon={Sparkles}>Декор</LibraryTab>
@@ -268,5 +268,5 @@ export function BlockLibrary({
 }
 
 function LibraryTab({ active, onClick, icon: Icon, children }: { active: boolean; onClick: () => void; icon: LucideIcon; children: string }) {
-  return <button type="button" role="tab" aria-selected={active} onClick={onClick} className="flex h-7 items-center justify-center gap-1.5 rounded-md text-[10px] font-semibold text-text-muted outline-none aria-selected:bg-surface aria-selected:text-primary aria-selected:shadow-[var(--shadow-xs)] focus-visible:ring-2 focus-visible:ring-primary/30"><Icon aria-hidden="true" className="size-4" />{children}</button>;
+  return <button type="button" role="tab" aria-selected={active} onClick={onClick} className="email-library-tab flex min-h-9 min-w-0 items-center justify-start gap-2 rounded-md px-2 py-2 text-xs font-semibold text-text-muted outline-none aria-selected:bg-surface aria-selected:text-primary aria-selected:shadow-[var(--shadow-xs)] focus-visible:ring-2 focus-visible:ring-primary/30"><Icon aria-hidden="true" className="size-5 shrink-0" /><span className="min-w-0 leading-snug">{children}</span></button>;
 }

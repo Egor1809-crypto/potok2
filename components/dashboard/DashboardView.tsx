@@ -216,10 +216,10 @@ export function DashboardView() {
 
   return (
     <div className="space-y-6">
-      <section className="grid min-w-0 gap-5 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm sm:grid-cols-[minmax(0,1fr)_232px] sm:items-center sm:p-7">
-        <div>
+      <section className="grid min-w-0 gap-5 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm sm:grid-cols-[minmax(0,1fr)_232px] sm:items-start sm:p-7">
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-4">
           <h1 className="text-[28px] font-semibold tracking-[-.04em] sm:text-[32px]">Главная</h1>
-          <div className="mt-5 flex flex-wrap gap-2"><Link href="/templates" className="btn btn-secondary w-fit gap-2"><LayoutTemplate aria-hidden="true" className="size-6" />Выбрать шаблон</Link><Link href="/email-builder?new=1" className="btn btn-primary w-fit gap-2"><Plus aria-hidden="true" className="size-6" />Создать письмо</Link><Link href="/campaigns" className="btn btn-secondary w-fit gap-2"><SendHorizontal aria-hidden="true" className="size-6" />Рассылка писем</Link></div>
+          <div className="flex min-w-0 flex-wrap gap-2"><Link href="/templates" className="btn btn-secondary w-fit gap-2"><LayoutTemplate aria-hidden="true" className="size-6" />Выбрать шаблон</Link><Link href="/email-builder?new=1" className="btn btn-primary w-fit gap-2"><Plus aria-hidden="true" className="size-6" />Создать письмо</Link><Link href="/campaigns" className="btn btn-secondary w-fit gap-2"><SendHorizontal aria-hidden="true" className="size-6" />Рассылка писем</Link></div>
         </div>
         <div className="flex min-w-0 justify-center sm:justify-end"><MiniCalendar campaigns={snapshot.calendarSchedule ?? snapshot.campaigns} /></div>
       </section>
