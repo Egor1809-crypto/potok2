@@ -63,11 +63,11 @@ export function CommandMenu({ open, onOpenChange, returnFocusRef }: CommandMenuP
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="command-menu-title" className="relative flex max-h-[80dvh] w-full max-w-[560px] flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-[0_16px_48px_rgba(0,0,0,.16)]">
       <div className="flex items-center justify-between px-5 pb-2 pt-4">
         <h2 id="command-menu-title" className="text-sm font-medium text-text-strong">Перейти к разделу</h2>
-        <button type="button" aria-label="Закрыть поиск" title="Закрыть · Esc" onClick={() => onOpenChange(false)} className="-mr-2 grid size-10 place-items-center rounded-lg text-text-muted hover:bg-surface-subtle"><X aria-hidden="true" className="size-4" /></button>
+        <button type="button" aria-label="Закрыть поиск" title="Закрыть · Esc" onClick={() => onOpenChange(false)} className="-mr-2 grid size-10 place-items-center rounded-lg text-text-muted hover:bg-surface-subtle"><X aria-hidden="true" className="size-6" /></button>
       </div>
       <form onSubmit={event => { event.preventDefault(); openSelected(); }} className="px-4 pb-3">
         <div className="command-search-field flex min-h-11 items-center gap-3 rounded-lg border border-border bg-background px-3">
-          <Search aria-hidden="true" className="size-[18px] shrink-0 text-text-muted" />
+          <Search aria-hidden="true" className="size-7 shrink-0 text-text-muted" />
           <label htmlFor="mailflow-command-search" className="sr-only">Поиск разделов и действий</label>
           <input ref={inputRef} id="mailflow-command-search" role="combobox" aria-autocomplete="list" aria-expanded="true" aria-controls="navigation-search-results" aria-activedescendant={results.length ? `navigation-result-${selectedIndex}` : undefined} type="text" autoComplete="off" autoCapitalize="off" spellCheck={false} maxLength={160} value={query} onChange={event => { setQuery(event.target.value); setActiveIndex(0); }} onKeyDown={event => {
             if (event.nativeEvent.isComposing) return;
@@ -77,7 +77,7 @@ export function CommandMenu({ open, onOpenChange, returnFocusRef }: CommandMenuP
               event.preventDefault(); setActiveIndex(nextSearchIndex(selectedIndex, event.key, results.length));
             }
           }} placeholder="Например, календарь или импорт письма" className="command-search-input min-h-11 w-full min-w-0 border-0 bg-transparent p-0 text-base text-text-strong placeholder:text-text-subtle" />
-          {query ? <button type="button" aria-label="Очистить поиск" onClick={clear} className="grid size-8 shrink-0 place-items-center rounded text-text-muted hover:bg-surface-subtle"><X aria-hidden="true" className="size-3.5" /></button> : null}
+          {query ? <button type="button" aria-label="Очистить поиск" onClick={clear} className="grid size-8 shrink-0 place-items-center rounded text-text-muted hover:bg-surface-subtle"><X aria-hidden="true" className="size-5" /></button> : null}
         </div>
       </form>
       <div className="scrollbar-subtle min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-2">
@@ -88,10 +88,10 @@ export function CommandMenu({ open, onOpenChange, returnFocusRef }: CommandMenuP
             return <li key={route.href} role="presentation">
               {!hasQuery && route.kind === "action" && results[index - 1]?.kind !== "action" ? <p className="px-3 pb-2 pt-4 text-xs text-text-subtle">Действия</p> : null}
               <Link id={`navigation-result-${index}`} role="option" aria-selected={selectedIndex === index} tabIndex={-1} href={route.href} onClick={event => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey && event.button === 0) onOpenChange(false); }} onMouseMove={() => setActiveIndex(index)} className={cn("flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm text-text-strong", selectedIndex === index ? "bg-surface-subtle" : "hover:bg-surface-subtle")}>
-                <Icon aria-hidden="true" className="size-[18px] shrink-0 text-text-muted" strokeWidth={1.7} />
+                <Icon aria-hidden="true" className="size-7 shrink-0 text-text-muted" strokeWidth={1.7} />
                 <span className="min-w-0 flex-1">{route.label}</span>
                 {hasQuery ? <span className="hidden text-xs text-text-subtle sm:inline">{route.category}</span> : null}
-                <ArrowUpRight aria-hidden="true" className={cn("size-3.5 shrink-0 text-text-subtle", selectedIndex !== index && "opacity-0")} />
+                <ArrowUpRight aria-hidden="true" className={cn("size-5 shrink-0 text-text-subtle", selectedIndex !== index && "opacity-0")} />
               </Link>
             </li>;
           })}

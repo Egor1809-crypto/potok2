@@ -279,7 +279,7 @@ export function ImageStudioView() {
         <header className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
           <div className="max-w-3xl">
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary-subtle px-3 py-1.5 text-[11px] font-semibold text-primary">
-              <Sparkles aria-hidden="true" className="size-3.5" /> Визуальная
+              <Sparkles aria-hidden="true" className="size-5" /> Визуальная
               студия
             </div>
             <h1 className="m-0 text-[32px] font-semibold tracking-[-0.035em] text-text-strong sm:text-[42px]">
@@ -293,7 +293,7 @@ export function ImageStudioView() {
             </p>
           </div>
           <div className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2 text-[11px] text-text-muted">
-            <ShieldCheck aria-hidden="true" className="size-4 text-success" />
+            <ShieldCheck aria-hidden="true" className="size-6 text-success" />
             {status?.configured
               ? `NavyAI подключён · ${status.model}`
               : "Провайдер не подключён"}
@@ -325,7 +325,7 @@ export function ImageStudioView() {
                 </p>
               </div>
               <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground">
-                <WandSparkles aria-hidden="true" className="size-4.5" />
+                <WandSparkles aria-hidden="true" className="size-7" />
               </span>
             </div>
             <div className="grid gap-4">
@@ -498,7 +498,7 @@ export function ImageStudioView() {
                 disabled={!status?.configured || prompt.trim().length < 12}
                 size="lg"
                 className="w-full"
-                leadingIcon={<Sparkles aria-hidden="true" className="size-4" />}
+                leadingIcon={<Sparkles aria-hidden="true" className="size-6" />}
               >
                 Создать и сохранить
               </Button>
@@ -531,7 +531,7 @@ export function ImageStudioView() {
                       size: "sm",
                     })}
                   >
-                    <Download aria-hidden="true" className="size-3.5" />
+                    <Download aria-hidden="true" className="size-5" />
                     Скачать
                   </a>
                   <Link
@@ -544,7 +544,7 @@ export function ImageStudioView() {
                     {purpose === "email-background"
                       ? "Поставить фоном письма"
                       : "Добавить в письмо"}
-                    <ArrowRight aria-hidden="true" className="size-3.5" />
+                    <ArrowRight aria-hidden="true" className="size-5" />
                   </Link>
                   <Link
                     href={`/presentations?new=1&asset=${encodeURIComponent(selectedAsset.id)}`}
@@ -553,7 +553,7 @@ export function ImageStudioView() {
                       size: "sm",
                     })}
                   >
-                    <Presentation aria-hidden="true" className="size-3.5" />
+                    <Presentation aria-hidden="true" className="size-5" />
                     Использовать в презентации
                   </Link>
                 </div>
@@ -584,7 +584,7 @@ export function ImageStudioView() {
               ) : (
                 <div className="max-w-sm text-center">
                   <span className="mx-auto grid size-14 place-items-center rounded-2xl border border-border bg-white/80 text-primary shadow-sm">
-                    <ImageIcon aria-hidden="true" className="size-6" />
+                    <ImageIcon aria-hidden="true" className="size-8" />
                   </span>
                   <h3 className="mb-0 mt-4 text-[16px] font-semibold">
                     Здесь появится первая работа
@@ -607,7 +607,7 @@ export function ImageStudioView() {
           <div className="flex items-end justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
-                <Images aria-hidden="true" className="size-4 text-primary" />
+                <Images aria-hidden="true" className="size-6 text-primary" />
                 <h2
                   id="image-gallery-title"
                   className="m-0 text-[18px] font-semibold"
@@ -672,14 +672,14 @@ export function ImageStudioView() {
                           aria-label={`Скачать ${asset.filename}`}
                           className="grid size-7 place-items-center rounded-lg border border-border bg-surface hover:border-primary/30 hover:text-primary"
                         >
-                          <Download aria-hidden="true" className="size-3" />
+                          <Download aria-hidden="true" className="size-4" />
                         </a>
                         <Link
                           href={`/email-builder?new=1&asset=${encodeURIComponent(asset.id)}&assetName=${encodeURIComponent(asset.filename)}`}
                           aria-label={`Использовать ${asset.filename} в письме`}
                           className="grid size-7 place-items-center rounded-lg bg-primary text-primary-foreground"
                         >
-                          <ArrowRight aria-hidden="true" className="size-3" />
+                          <ArrowRight aria-hidden="true" className="size-4" />
                         </Link>
                       </div>
                     </div>
@@ -692,7 +692,7 @@ export function ImageStudioView() {
               <div>
                 <ImageIcon
                   aria-hidden="true"
-                  className="mx-auto size-5 text-text-subtle"
+                  className="mx-auto size-7 text-text-subtle"
                 />
                 <p className="mb-0 mt-2 text-[12px] font-medium">
                   Медиатека пока пуста

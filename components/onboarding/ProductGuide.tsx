@@ -108,7 +108,7 @@ export function ProductGuide() {
           className="fixed bottom-5 right-5 z-40 inline-flex size-11 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_12px_28px_rgba(101,88,232,0.32)] outline-none transition hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(101,88,232,0.4)] focus-visible:ring-4 focus-visible:ring-primary/25"
           aria-label="Открыть быстрый старт"
         >
-          <CircleHelp aria-hidden="true" className="size-5" />
+          <CircleHelp aria-hidden="true" className="size-7" />
         </button>
       ) : null}
 
@@ -118,14 +118,14 @@ export function ProductGuide() {
           <section className="pointer-events-auto absolute bottom-4 left-4 right-4 mx-auto max-w-[440px] rounded-2xl border border-border bg-surface p-5 shadow-[0_22px_65px_rgba(15,23,42,0.22)] sm:bottom-6 sm:left-auto sm:right-6">
             <div className="flex items-start gap-3">
               <span className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl bg-primary-subtle text-primary">
-                <Sparkles aria-hidden="true" className="size-4" />
+                <Sparkles aria-hidden="true" className="size-6" />
               </span>
               <div className="min-w-0 flex-1">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-primary">Быстрый старт · {stepIndex + 1}/{steps.length}</p>
                 <h2 className="mt-1 text-base font-semibold tracking-[-0.015em] text-text-strong">{currentStep.title}</h2>
               </div>
               <button type="button" onClick={close} className="grid size-8 place-items-center rounded-lg text-text-subtle transition hover:bg-surface-subtle hover:text-text-strong" aria-label="Закрыть обучение">
-                <X aria-hidden="true" className="size-4" />
+                <X aria-hidden="true" className="size-6" />
               </button>
             </div>
             <p className="mt-3 text-[13px] leading-5 text-text-muted">{currentStep.text}</p>

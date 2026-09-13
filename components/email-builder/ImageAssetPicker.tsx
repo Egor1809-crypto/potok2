@@ -103,7 +103,7 @@ export function ImageAssetPicker({ kind, value, onSelect, destinationLabel = "п
         className={`grid min-h-28 cursor-pointer place-items-center rounded-xl border-2 border-dashed px-4 py-4 text-center outline-none transition focus-visible:ring-2 focus-visible:ring-primary/30 ${dragActive ? "border-primary bg-primary-subtle/70" : "border-border-strong bg-surface-subtle hover:border-primary/50 hover:bg-primary-subtle/30"}`}
       >
         <span>
-          {uploading ? <LoaderCircle aria-hidden="true" className="mx-auto size-5 animate-spin text-primary" /> : <Upload aria-hidden="true" className="mx-auto size-5 text-primary" />}
+          {uploading ? <LoaderCircle aria-hidden="true" className="mx-auto size-7 animate-spin text-primary" /> : <Upload aria-hidden="true" className="mx-auto size-7 text-primary" />}
           <span className="mt-2 block text-[11px] font-semibold text-text-strong">
             {uploading ? "Загружаем…" : `Перетащите ${pickerLabel} сюда`}
           </span>
@@ -127,7 +127,7 @@ export function ImageAssetPicker({ kind, value, onSelect, destinationLabel = "п
           </div>
         </div>
       ) : (
-        <div className="flex items-center gap-2 rounded-lg border border-dashed border-border px-2.5 py-2 text-[10px] text-text-subtle"><ImagePlus aria-hidden="true" className="size-3.5" />{kind === "logo" ? "Логотипов пока нет" : "Фотографий пока нет"}</div>
+        <div className="flex items-center gap-2 rounded-lg border border-dashed border-border px-2.5 py-2 text-[10px] text-text-subtle"><ImagePlus aria-hidden="true" className="size-5" />{kind === "logo" ? "Логотипов пока нет" : "Фотографий пока нет"}</div>
       )}
     </div>
   );

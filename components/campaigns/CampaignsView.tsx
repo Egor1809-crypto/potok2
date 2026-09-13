@@ -198,7 +198,7 @@ export function CampaignsView({
         description="Каждая кампания проходит понятный путь: черновик → проверка → готовность → отправка → результат."
         action={
           <Link href="/campaigns/new" className={buttonVariants({ variant: "primary" })}>
-            <MailPlus aria-hidden="true" className="size-4" />
+            <MailPlus aria-hidden="true" className="size-6" />
             Новая кампания
           </Link>
         }
@@ -212,7 +212,7 @@ export function CampaignsView({
             onClick={() => void loadCampaigns()}
             className="mt-3 inline-flex items-center gap-2 text-[12px] font-semibold text-danger underline underline-offset-4"
           >
-            <RefreshCw aria-hidden="true" className="size-3.5" />
+            <RefreshCw aria-hidden="true" className="size-5" />
             Повторить загрузку
           </button>
         </Alert>
@@ -283,19 +283,19 @@ export function CampaignsView({
                   </div>
 
                   <div>
-                    <p className="flex items-center gap-2 text-[12px] font-medium text-text-strong"><UsersRound aria-hidden="true" className="size-4 text-text-subtle" />{campaign.audience}</p>
+                    <p className="flex items-center gap-2 text-[12px] font-medium text-text-strong"><UsersRound aria-hidden="true" className="size-6 text-text-subtle" />{campaign.audience}</p>
                     <p className="mt-1 text-[11px] text-text-muted">Получателей: {formatNumber(campaign.metrics.recipients)}</p>
                     <div className="mt-2 flex gap-1.5">
                       {campaign.deliveryChannels.map((channel) => {
                         const item = channelMeta[channel];
                         const Icon = item.icon;
-                        return <span key={channel} title={item.label} aria-label={item.label} className={`grid size-7 place-items-center rounded-lg ${item.className}`}><Icon aria-hidden="true" className="size-3.5" /></span>;
+                        return <span key={channel} title={item.label} aria-label={item.label} className={`grid size-7 place-items-center rounded-lg ${item.className}`}><Icon aria-hidden="true" className="size-5" /></span>;
                       })}
                     </div>
                   </div>
 
                   <div className={cn("rounded-xl border p-3", campaign.status === "blocked" ? "border-warning/25 bg-warning-subtle" : "border-border bg-surface-subtle/50")}>
-                    <p className="flex items-center gap-2 text-[12px] font-semibold text-text-strong"><StatusIcon aria-hidden="true" className="size-4" />Следующий шаг</p>
+                    <p className="flex items-center gap-2 text-[12px] font-semibold text-text-strong"><StatusIcon aria-hidden="true" className="size-6" />Следующий шаг</p>
                     <p className="mt-1 text-[11px] leading-4.5 text-text-muted">
                       {campaign.statusReason || blockedPlans[0]?.statusReason || meta.next}
                     </p>
@@ -306,16 +306,16 @@ export function CampaignsView({
                     {(campaign.status === "draft" || campaign.status === "blocked") ? (
                       <Link href={editHref} className={buttonVariants({ variant: "primary", size: "sm" })}>
                         {campaign.status === "blocked" ? "Исправить" : "Продолжить"}
-                        <ArrowRight aria-hidden="true" className="size-3.5" />
+                        <ArrowRight aria-hidden="true" className="size-5" />
                       </Link>
                     ) : (
                       <Link href={`/campaigns/${campaign.id}`} className={buttonVariants({ variant: "secondary", size: "sm" })}>
                         Открыть
-                        <ArrowRight aria-hidden="true" className="size-3.5" />
+                        <ArrowRight aria-hidden="true" className="size-5" />
                       </Link>
                     )}
                     <Link href={`/campaigns/new?duplicate=${encodeURIComponent(campaign.id)}`} aria-label={`Дублировать кампанию «${campaign.name}»`} className={buttonVariants({ variant: "ghost", size: "sm" })}>
-                      <Copy aria-hidden="true" className="size-3.5" />
+                      <Copy aria-hidden="true" className="size-5" />
                     </Link>
                   </div>
                 </article>
@@ -324,7 +324,7 @@ export function CampaignsView({
           </div>
         ) : (
           <EmptyState
-            icon={<Send className="size-5" />}
+            icon={<Send className="size-7" />}
             title="Кампании не найдены"
             description={search ? "Измените поисковый запрос." : "В этом статусе пока нет кампаний."}
             action={search ? { label: "Очистить поиск", onClick: () => setSearch("") } : { label: "Создать кампанию", onClick: () => window.location.assign("/campaigns/new") }}
@@ -355,7 +355,7 @@ function SummaryCard({
   }[tone];
   return (
     <article className="card flex items-start gap-3 p-4 sm:p-5">
-      <span className={`grid size-10 shrink-0 place-items-center rounded-xl ${classes}`}><Icon aria-hidden="true" className="size-4" /></span>
+      <span className={`grid size-10 shrink-0 place-items-center rounded-xl ${classes}`}><Icon aria-hidden="true" className="size-6" /></span>
       <div>
         <p className="text-[12px] font-medium text-text-muted">{label}</p>
         <p className="mt-0.5 text-[22px] font-semibold tracking-[-0.04em] text-text-strong">{value}</p>

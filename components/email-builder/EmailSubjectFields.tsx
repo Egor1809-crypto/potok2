@@ -21,7 +21,7 @@ export function EmailSubjectFields({ document, onUpdate, onOpenAi }: { document:
   return <div className="shrink-0 border-b border-border bg-surface px-3 py-2">
     <div className="flex flex-wrap items-center gap-2">
       <button type="button" aria-expanded={expanded} aria-controls="email-envelope-fields" onClick={() => setExpanded(value => !value)} className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-2 text-left hover:bg-surface-subtle focus-visible:outline-2 focus-visible:outline-primary">
-        <span className="shrink-0 text-sm text-text-muted">Тема</span><span className="truncate text-sm font-medium">{document.subject || "Укажите тему письма"}</span><ChevronDown aria-hidden className={`size-4 shrink-0 ${expanded ? "rotate-180" : ""}`} />
+        <span className="shrink-0 text-sm text-text-muted">Тема</span><span className="truncate text-sm font-medium">{document.subject || "Укажите тему письма"}</span><ChevronDown aria-hidden className={`size-6 shrink-0 ${expanded ? "rotate-180" : ""}`} />
       </button>
       <div className="flex flex-wrap items-center gap-2">
         <Button type="button" variant="secondary" size="sm" disabled={ai.busy || !document.blocks.length || Boolean(document.rawHtml)} onClick={() => void generate()}>{ai.busy ? "Подбираем темы…" : "Ещё варианты темы"}</Button>

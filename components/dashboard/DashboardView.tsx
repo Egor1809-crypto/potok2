@@ -180,10 +180,10 @@ export function DashboardView() {
   if (!snapshot) {
     return (
       <div className="mx-auto max-w-xl rounded-2xl border border-[var(--danger)]/20 bg-[var(--surface)] p-8 text-center shadow-sm">
-        <CircleAlert aria-hidden="true" className="mx-auto size-8 text-[var(--danger)]" />
+        <CircleAlert aria-hidden="true" className="mx-auto size-10 text-[var(--danger)]" />
         <h1 className="mt-4 text-xl font-semibold">Не удалось открыть рабочее пространство</h1>
         <p className="mt-2 text-sm text-[var(--text-muted)]">{error}</p>
-        <button type="button" onClick={() => void load()} className="btn btn-primary mt-5 gap-2"><RefreshCw aria-hidden="true" className="size-4" />Повторить</button>
+        <button type="button" onClick={() => void load()} className="btn btn-primary mt-5 gap-2"><RefreshCw aria-hidden="true" className="size-6" />Повторить</button>
       </div>
     );
   }
@@ -227,7 +227,7 @@ export function DashboardView() {
           <h1 className="text-[28px] font-semibold tracking-[-.04em] sm:text-[32px]">{firstName ? `${firstName}, что создаём сегодня?` : "Что создаём сегодня?"}</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-muted)]">Письмо, презентация и изображения живут в одной студии. Найденные контакты проходят вашу проверку, а готовые материалы можно повторно использовать в проектах.</p>
         </div>
-        <div className="flex flex-wrap gap-2"><Link href="/templates" className="btn btn-secondary w-fit gap-2"><LayoutTemplate aria-hidden="true" className="size-4" />Выбрать шаблон</Link><Link href="/email-builder?new=1" className="btn btn-primary w-fit gap-2"><Plus aria-hidden="true" className="size-4" />Создать письмо</Link><Link href="/campaigns" className="btn btn-secondary w-fit gap-2"><SendHorizontal aria-hidden="true" className="size-4" />Рассылка писем</Link></div>
+        <div className="flex flex-wrap gap-2"><Link href="/templates" className="btn btn-secondary w-fit gap-2"><LayoutTemplate aria-hidden="true" className="size-6" />Выбрать шаблон</Link><Link href="/email-builder?new=1" className="btn btn-primary w-fit gap-2"><Plus aria-hidden="true" className="size-6" />Создать письмо</Link><Link href="/campaigns" className="btn btn-secondary w-fit gap-2"><SendHorizontal aria-hidden="true" className="size-6" />Рассылка писем</Link></div>
       </section>
 
       <section className="card overflow-hidden" aria-labelledby="unisender-lifetime-title">
@@ -238,14 +238,14 @@ export function DashboardView() {
             <p className="mt-1 text-[11px] text-[var(--text-subtle)]">Данные провайдера по всем синхронизированным email-кампаниям.</p>
           </div>
           <button type="button" onClick={() => void refreshProviderStats(true)} disabled={providerRefreshing} className="btn btn-secondary w-fit gap-2">
-            <RefreshCw aria-hidden="true" className={`size-4 ${providerRefreshing ? "animate-spin" : ""}`} />
+            <RefreshCw aria-hidden="true" className={`size-6 ${providerRefreshing ? "animate-spin" : ""}`} />
             {providerRefreshing ? `Обновляем… ${providerRefreshProgress}%` : "Обновить все данные"}
           </button>
         </div>
         <div className="grid gap-px bg-[var(--border)] sm:grid-cols-2 xl:grid-cols-4">
           {providerMetrics.map(({ label, value, note, Icon, tone }) => (
             <article key={label} className="bg-[var(--surface)] p-5 sm:p-6">
-              <span className={`grid size-10 place-items-center rounded-xl ${tone}`}><Icon aria-hidden="true" className="size-5" /></span>
+              <span className={`grid size-10 place-items-center rounded-xl ${tone}`}><Icon aria-hidden="true" className="size-7" /></span>
               <p className="mt-5 text-[30px] font-semibold tracking-[-.045em]">{number.format(value)}</p>
               <p className="mt-1 text-[12px] font-semibold">{label}</p>
               <p className="mt-1 text-[10px] text-[var(--text-subtle)]">{note}</p>
@@ -285,8 +285,8 @@ export function DashboardView() {
           <WorkflowStep index="04" Icon={SendHorizontal} title="Использовать" text="Скачайте результат или передайте готовое письмо в рассылку." />
         </ol>
         <div className="mt-4 flex flex-wrap gap-2 border-t border-[var(--border)] pt-4">
-          <Link href="/templates?import=1" className="btn btn-secondary gap-2"><Upload aria-hidden="true" className="size-4" />Импортировать свой макет</Link>
-          <Link href="/templates" className="btn btn-ghost gap-2">Открыть шаблоны<ArrowRight aria-hidden="true" className="size-4" /></Link>
+          <Link href="/templates?import=1" className="btn btn-secondary gap-2"><Upload aria-hidden="true" className="size-6" />Импортировать свой макет</Link>
+          <Link href="/templates" className="btn btn-ghost gap-2">Открыть шаблоны<ArrowRight aria-hidden="true" className="size-6" /></Link>
         </div>
       </section>
 
@@ -298,14 +298,14 @@ export function DashboardView() {
             <h2 id="next-action-title" className="mt-1 text-[17px] font-semibold">{nextAction.title}</h2>
             <p className="mt-1 text-[12px] leading-5 text-[var(--text-muted)]">{nextAction.description}</p>
           </div>
-          <Link href={nextAction.href} className="btn btn-primary shrink-0 gap-2">{nextAction.action}<ArrowRight aria-hidden="true" className="size-4" /></Link>
+          <Link href={nextAction.href} className="btn btn-primary shrink-0 gap-2">{nextAction.action}<ArrowRight aria-hidden="true" className="size-6" /></Link>
         </div>
       </section>
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-label="Состояние рабочего пространства">
         {metrics.map(({ label, value, note, Icon, href, iconTone }) => (
           <Link key={label} href={href} className="card group p-4 transition hover:border-[var(--primary)]/30 hover:shadow-sm sm:p-5">
-            <div className="flex items-start justify-between gap-3"><p className="pt-1 text-[12px] font-semibold text-[var(--text-muted)]">{label}</p><span className={`grid size-9 place-items-center rounded-xl border ${iconTone} transition group-hover:scale-105`}><Icon aria-hidden="true" strokeWidth={1.8} className="size-[18px]" /></span></div>
+            <div className="flex items-start justify-between gap-3"><p className="pt-1 text-[12px] font-semibold text-[var(--text-muted)]">{label}</p><span className={`grid size-9 place-items-center rounded-xl border ${iconTone} transition group-hover:scale-105`}><Icon aria-hidden="true" strokeWidth={1.8} className="size-7" /></span></div>
             <p className="mt-4 text-[26px] font-semibold tracking-[-.04em]">{value}</p>
             <p className="mt-1 text-[11px] leading-4 text-[var(--text-subtle)]">{note}</p>
           </Link>
@@ -328,7 +328,7 @@ export function DashboardView() {
         </div>
 
         <div className="card p-5 sm:p-6">
-          <div className="flex items-center justify-between gap-3"><div><h2 className="text-[15px] font-semibold">Готовность к рассылке</h2><p className="mt-1 text-[11px] text-[var(--text-subtle)]">Проверяется перед каждым запуском</p></div><Check aria-hidden="true" className="size-5 text-[var(--success)]" /></div>
+          <div className="flex items-center justify-between gap-3"><div><h2 className="text-[15px] font-semibold">Готовность к рассылке</h2><p className="mt-1 text-[11px] text-[var(--text-subtle)]">Проверяется перед каждым запуском</p></div><Check aria-hidden="true" className="size-7 text-[var(--success)]" /></div>
           <ol className="mt-5 space-y-1">
             <ReadinessStep ready={snapshot.templates.length > 0} label="Есть шаблон письма" action="Создать" href="/email-builder?new=1" />
             <ReadinessStep ready={snapshot.stats.totalContacts > 0} label="Есть получатели" action="Добавить" href="/contacts" />
@@ -356,10 +356,10 @@ function getNextAction(snapshot: WorkspaceSnapshot) {
 function CampaignRow({ campaign, timeZone }: { campaign: CampaignRecord; timeZone: string }) {
   return (
     <Link href={`/campaigns/${campaign.id}`} className="flex items-center gap-3 px-5 py-4 transition hover:bg-[var(--surface-subtle)] sm:px-6">
-      <span className={`grid size-9 shrink-0 place-items-center rounded-xl ${campaign.status === "blocked" ? "bg-[var(--warning-subtle)] text-[var(--warning)]" : "bg-[var(--primary-subtle)] text-[var(--primary)]"}`}><Megaphone aria-hidden="true" className="size-4" /></span>
+      <span className={`grid size-9 shrink-0 place-items-center rounded-xl ${campaign.status === "blocked" ? "bg-[var(--warning-subtle)] text-[var(--warning)]" : "bg-[var(--primary-subtle)] text-[var(--primary)]"}`}><Megaphone aria-hidden="true" className="size-6" /></span>
       <span className="min-w-0 flex-1"><span className="block truncate text-[12px] font-semibold">{campaign.name}</span><span className="mt-1 block truncate text-[10px] text-[var(--text-subtle)]">{campaign.audienceLabel} · {formatDate(campaign.updatedAt, timeZone)}</span></span>
       <span className={`badge ${statusTone[campaign.status]}`}>{statusLabel[campaign.status]}</span>
-      <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-[var(--text-subtle)]" />
+      <ArrowRight aria-hidden="true" className="size-6 shrink-0 text-[var(--text-subtle)]" />
     </Link>
   );
 }
@@ -367,7 +367,7 @@ function CampaignRow({ campaign, timeZone }: { campaign: CampaignRecord; timeZon
 function ReadinessStep({ ready, label, action, href }: { ready: boolean; label: string; action: string; href: string }) {
   return (
     <li className="flex items-center gap-3 rounded-lg py-2.5">
-      <span className={`grid size-6 shrink-0 place-items-center rounded-full ${ready ? "bg-[var(--success-subtle)] text-[var(--success)]" : "bg-[var(--warning-subtle)] text-[var(--warning)]"}`}>{ready ? <Check aria-hidden="true" className="size-3.5" /> : <Clock3 aria-hidden="true" className="size-3.5" />}</span>
+      <span className={`grid size-6 shrink-0 place-items-center rounded-full ${ready ? "bg-[var(--success-subtle)] text-[var(--success)]" : "bg-[var(--warning-subtle)] text-[var(--warning)]"}`}>{ready ? <Check aria-hidden="true" className="size-5" /> : <Clock3 aria-hidden="true" className="size-5" />}</span>
       <span className="flex-1 text-[12px] font-medium">{label}</span>
       {!ready && <Link href={href} className="text-[11px] font-semibold text-[var(--primary)]">{action}</Link>}
     </li>
@@ -384,10 +384,10 @@ function StudioCard({ href, Icon, title, description, action, featured = false }
 }) {
   return (
     <Link href={href} className="group rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 transition hover:-translate-y-0.5 hover:border-[var(--primary)]/35 hover:shadow-sm">
-      <span className={`grid size-12 place-items-center rounded-xl border border-border-strong text-text-strong transition duration-200 group-hover:-rotate-2 group-hover:scale-105 ${featured ? "bg-primary-subtle" : "bg-surface-subtle"}`}><Icon aria-hidden="true" strokeWidth={1.9} className="size-6" /></span>
+      <span className={`grid size-12 place-items-center rounded-xl border border-border-strong text-text-strong transition duration-200 group-hover:-rotate-2 group-hover:scale-105 ${featured ? "bg-primary-subtle" : "bg-surface-subtle"}`}><Icon aria-hidden="true" strokeWidth={1.9} className="size-8" /></span>
       <h2 className="mt-4 text-[15px] font-semibold">{title}</h2>
       <p className="mt-1.5 text-[11px] leading-5 text-[var(--text-muted)]">{description}</p>
-      <span className="mt-4 inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--primary)]">{action}<ArrowRight aria-hidden="true" className="size-3.5 transition group-hover:translate-x-0.5" /></span>
+      <span className="mt-4 inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--primary)]">{action}<ArrowRight aria-hidden="true" className="size-5 transition group-hover:translate-x-0.5" /></span>
     </Link>
   );
 }
@@ -395,7 +395,7 @@ function StudioCard({ href, Icon, title, description, action, featured = false }
 function WorkflowStep({ index, Icon, title, text }: { index: string; Icon: typeof SearchCheck; title: string; text: string }) {
   return (
     <li className="rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)] p-4">
-      <div className="flex items-center justify-between"><span className="text-[10px] font-semibold tracking-[.14em] text-[var(--primary)]">{index}</span><span className="grid size-8 place-items-center rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--primary)]"><Icon aria-hidden="true" strokeWidth={1.8} className="size-4" /></span></div>
+      <div className="flex items-center justify-between"><span className="text-[10px] font-semibold tracking-[.14em] text-[var(--primary)]">{index}</span><span className="grid size-8 place-items-center rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--primary)]"><Icon aria-hidden="true" strokeWidth={1.8} className="size-6" /></span></div>
       <h3 className="mt-3 text-[13px] font-semibold">{title}</h3>
       <p className="mt-1 text-[10px] leading-4 text-[var(--text-muted)]">{text}</p>
     </li>
@@ -404,12 +404,12 @@ function WorkflowStep({ index, Icon, title, text }: { index: string; Icon: typeo
 
 function EmptyCampaigns() {
   return (
-    <div className="px-6 py-10 text-center"><Megaphone aria-hidden="true" className="mx-auto size-7 text-[var(--text-subtle)]" /><p className="mt-3 text-[13px] font-semibold">Кампаний пока нет</p><p className="mt-1 text-[11px] text-[var(--text-muted)]">Начните с аудитории, затем выберите сообщение и каналы.</p><Link href="/campaigns/new" className="btn btn-primary mt-4">Создать кампанию</Link></div>
+    <div className="px-6 py-10 text-center"><Megaphone aria-hidden="true" className="mx-auto size-9 text-[var(--text-subtle)]" /><p className="mt-3 text-[13px] font-semibold">Кампаний пока нет</p><p className="mt-1 text-[11px] text-[var(--text-muted)]">Начните с аудитории, затем выберите сообщение и каналы.</p><Link href="/campaigns/new" className="btn btn-primary mt-4">Создать кампанию</Link></div>
   );
 }
 
 function LoadingState() {
   return (
-    <div className="grid min-h-[420px] place-items-center"><div className="text-center"><LoaderCircle aria-hidden="true" className="mx-auto size-7 animate-spin text-[var(--primary)]" /><p className="mt-3 text-sm text-[var(--text-muted)]">Загружаем рабочее состояние…</p></div></div>
+    <div className="grid min-h-[420px] place-items-center"><div className="text-center"><LoaderCircle aria-hidden="true" className="mx-auto size-9 animate-spin text-[var(--primary)]" /><p className="mt-3 text-sm text-[var(--text-muted)]">Загружаем рабочее состояние…</p></div></div>
   );
 }

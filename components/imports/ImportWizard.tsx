@@ -707,7 +707,7 @@ export function ImportWizard() {
               {readyEmailCount > 0 && hasMappedEmailConsent && (
                 <div className="border-t border-[var(--border)] p-5 sm:px-6">
                   <div className="flex items-start gap-3 rounded-xl border border-[#bce8d2] bg-[#f2fbf6] p-4">
-                    <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-[#21855a]" />
+                    <CheckCircle2 size={24} className="mt-0.5 shrink-0 text-[#21855a]" />
                     <p className="text-[10px] leading-5 text-[var(--text-secondary)]">
                       Найден столбец «Согласие Email». Галочки вручную ставить не нужно: для каждой строки будет использовано её значение «да/нет» или «1/0».
                     </p>
@@ -749,7 +749,7 @@ export function ImportWizard() {
               {importRun.status === "importing" ? (
                 <Loader2 size={23} className="animate-spin" />
               ) : importRun.status === "success" ? (
-                <CheckCircle2 size={24} />
+                <CheckCircle2 size={32} />
               ) : (
                 <AlertTriangle size={23} />
               )}
@@ -840,7 +840,7 @@ export function ImportWizard() {
                     onClick={() => void startImport()}
                     className="btn btn-primary justify-center gap-1.5"
                   >
-                    <RotateCcw size={12} />
+                    <RotateCcw size={16} />
                     Повторить оставшиеся
                   </button>
                   {importRun.processed === 0 && (
@@ -863,7 +863,7 @@ export function ImportWizard() {
                   onClick={reset}
                   className="btn btn-secondary justify-center gap-1.5"
                 >
-                  <RotateCcw size={12} />
+                  <RotateCcw size={16} />
                   Другая таблица
                 </button>
                 <Link
@@ -880,7 +880,7 @@ export function ImportWizard() {
       )}
 
       <aside className="flex gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)] p-3 text-[9px] leading-4 text-[var(--text-tertiary)]">
-        <FileText size={14} className="mt-0.5 shrink-0" />
+        <FileText size={20} className="mt-0.5 shrink-0" />
         <p>
           Email-согласие записывается только после явного подтверждения
           перед импортом. Для Telegram и ВКонтакте сопоставьте идентификатор и столбец

@@ -22,7 +22,7 @@ export function CalendarReport({ report, timeZone, refresh, loading }: {
   return <section className="space-y-5" aria-labelledby="calendar-report-title">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div><h2 id="calendar-report-title" className="text-lg font-semibold text-text-strong">История за последние 24 часа</h2><p className="mt-1 text-sm text-text-muted">{format(report.from)} — {format(report.to)}</p></div>
-      <Button variant="outline" loading={loading} onClick={refresh}><RefreshCw className="size-4" aria-hidden="true"/>Обновить отчёт</Button>
+      <Button variant="outline" loading={loading} onClick={refresh}><RefreshCw className="size-6" aria-hidden="true"/>Обновить отчёт</Button>
     </div>
     <p className="text-sm leading-6 text-text-muted">Рассылки, срок которых наступил за этот период, а также запущенные, заблокированные и отменённые рассылки. Показатели отражают их текущее состояние и обновляются каждые 30 секунд. Передача провайдеру ещё не означает доставку получателю.</p>
     <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">

@@ -285,8 +285,8 @@ export const DropdownMenuItem = React.forwardRef<
       aria-disabled={disabled || undefined}
       tabIndex={-1}
       className={cn(
-        "flex min-h-8 w-full items-center gap-2 rounded-[7px] px-2.5 text-left text-[12px] font-medium text-text transition-colors hover:bg-surface-subtle hover:text-text-strong focus:bg-surface-subtle focus:text-text-strong focus:outline-none disabled:pointer-events-none disabled:opacity-45 [&_svg]:size-3.5 [&_svg]:shrink-0",
-        inset && "pl-8",
+        "flex min-h-9 w-full items-center gap-2 rounded-[7px] px-2.5 text-left text-[12px] font-medium text-text transition-colors hover:bg-surface-subtle hover:text-text-strong focus:bg-surface-subtle focus:text-text-strong focus:outline-none disabled:pointer-events-none disabled:opacity-45 [&_svg]:size-5 [&_svg]:shrink-0",
+        inset && "pl-10",
         destructive && "text-danger hover:bg-danger-subtle hover:text-danger focus:bg-danger-subtle focus:text-danger",
         className,
       )}
@@ -325,12 +325,12 @@ export const DropdownMenuCheckboxItem = React.forwardRef<
       role="menuitemcheckbox"
       aria-checked={checked}
       closeOnSelect={false}
-      className={cn("relative pl-8", className)}
+      className={cn("relative pl-10", className)}
       onSelect={() => onCheckedChange?.(!checked)}
       {...props}
     >
-      <span className="absolute left-2.5 grid size-4 place-items-center">
-        {checked && <Check aria-hidden="true" className="size-3.5 text-primary" />}
+      <span className="absolute left-2.5 grid size-5 place-items-center">
+        {checked && <Check aria-hidden="true" className="size-5 text-primary" />}
       </span>
       {children}
     </DropdownMenuItem>
@@ -374,5 +374,5 @@ export function DropdownMenuShortcut({
 }
 
 export function DropdownMenuSubIndicator() {
-  return <ChevronRight aria-hidden="true" className="ml-auto size-3.5 text-text-subtle" />;
+  return <ChevronRight aria-hidden="true" className="ml-auto size-5 text-text-subtle" />;
 }

@@ -85,7 +85,7 @@ export function ToastSurface({
           config.iconClass,
         )}
       >
-        <Icon aria-hidden="true" className="size-4" />
+        <Icon aria-hidden="true" className="size-6" />
       </span>
       <div className="min-w-0 flex-1 pt-0.5">
         <p className="m-0 text-[13px] leading-5 font-semibold text-text-strong">
@@ -113,7 +113,7 @@ export function ToastSurface({
           onClick={onDismiss}
           className="grid size-7 shrink-0 place-items-center rounded-[7px] text-text-subtle transition-colors hover:bg-surface-subtle hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
         >
-          <X aria-hidden="true" className="size-3.5" />
+          <X aria-hidden="true" className="size-5" />
         </button>
       )}
     </div>

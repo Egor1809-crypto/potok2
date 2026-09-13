@@ -51,7 +51,7 @@ export function Alert({
       {...props}
     >
       <span className="mt-0.5 shrink-0">
-        {icon ?? <Icon aria-hidden="true" className="size-4" />}
+        {icon ?? <Icon aria-hidden="true" className="size-6" />}
       </span>
       <div className="min-w-0 text-text">
         {title && (

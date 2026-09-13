@@ -106,7 +106,7 @@ export function CreativeDirectorPanel({
                   background: `radial-gradient(circle at center,#17181d 62%,transparent 64%),conic-gradient(#8b7cff ${report.score * 3.6}deg,#33353c 0deg)`,
                 }}
               >
-                <ScanSearch className="size-5 text-[#a99fff]" />
+                <ScanSearch className="size-7 text-[#a99fff]" />
               </span>
             </div>
             <p className="mb-0 mt-4 text-[12px] font-medium leading-5 text-white/82">
@@ -150,7 +150,7 @@ export function CreativeDirectorPanel({
                   {fixableIssues.length} правок без изменения фактов и ссылок
                 </span>
               </span>
-              <Sparkles aria-hidden="true" className="size-4 text-[#d8d3ff]" />
+              <Sparkles aria-hidden="true" className="size-6 text-[#d8d3ff]" />
             </button>
           ) : null}
 
@@ -171,7 +171,7 @@ export function CreativeDirectorPanel({
                 Убрать нейроклише и собрать строгий ритм
               </span>
             </span>
-            <WandSparkles aria-hidden="true" className="size-4 text-[#bdb6ff]" />
+            <WandSparkles aria-hidden="true" className="size-6 text-[#bdb6ff]" />
           </button>
           <p className="mb-0 mt-2 text-[9px] leading-4 text-white/38">
             Смысл и факты сохраняются. Меняются только клише, центровка длинного текста, типографика и визуальные токены.
@@ -213,7 +213,7 @@ export function CreativeDirectorPanel({
                 onClick={() => setTab(value)}
                 className="relative inline-flex h-9 items-center gap-2 rounded-lg px-3 text-[11px] font-semibold text-text-muted outline-none transition hover:bg-surface-subtle aria-pressed:bg-primary-subtle aria-pressed:text-primary focus-visible:ring-2 focus-visible:ring-primary/30 after:absolute after:inset-x-3 after:-bottom-[11px] after:h-0.5 after:scale-x-0 after:rounded-full after:bg-primary after:transition-transform aria-pressed:after:scale-x-100"
               >
-                <Icon aria-hidden="true" className="size-3.5" />
+                <Icon aria-hidden="true" className="size-5" />
                 {label}
                 {value === "audit" && report.issues.length ? (
                   <span className="rounded-full bg-current/10 px-1.5 py-0.5 text-[9px]">
@@ -342,7 +342,7 @@ export function CreativeDirectorPanel({
                               {step}
                             </span>
                             {index < recipe.sequence.length - 1 ? (
-                              <ArrowRight aria-hidden="true" className="size-3 text-text-subtle" />
+                              <ArrowRight aria-hidden="true" className="size-4 text-text-subtle" />
                             ) : null}
                           </span>
                         ))}
@@ -402,7 +402,7 @@ export function CreativeDirectorPanel({
         <>
           {lastApplied ? (
             <span className="mr-auto inline-flex items-center gap-1.5 text-[11px] font-medium text-success">
-              <Check aria-hidden="true" className="size-3.5" />
+              <Check aria-hidden="true" className="size-5" />
               {lastApplied}
             </span>
           ) : null}
@@ -432,7 +432,7 @@ function AuditTab({
       <div className="grid min-h-96 place-items-center text-center">
         <div className="max-w-sm">
           <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-success-subtle text-success">
-            <ShieldCheck aria-hidden="true" className="size-5" />
+            <ShieldCheck aria-hidden="true" className="size-7" />
           </span>
           <h3 className="mt-4 text-[17px] font-semibold text-text-strong">
             Сильная редакция
@@ -480,7 +480,7 @@ function AuditTab({
                     : "bg-primary-subtle text-primary",
               )}
             >
-              <CircleAlert aria-hidden="true" className="size-4" />
+              <CircleAlert aria-hidden="true" className="size-6" />
             </span>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
@@ -505,7 +505,7 @@ function AuditTab({
               </Button>
             ) : (
               <span className="hidden size-8 place-items-center rounded-lg border border-border bg-surface text-text-subtle sm:grid">
-                <ArrowRight aria-hidden="true" className="size-3.5" />
+                <ArrowRight aria-hidden="true" className="size-5" />
               </span>
             )}
           </article>

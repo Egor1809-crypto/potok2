@@ -210,7 +210,7 @@ export function SettingsView() {
               onClick={() => setSection(id)}
               className={`flex w-full items-start gap-3 rounded-xl px-3 py-3 text-left transition ${section === id ? "bg-[var(--primary-subtle)] text-[var(--primary)]" : "hover:bg-[var(--surface-subtle)]"}`}
             >
-              <Icon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+              <Icon aria-hidden="true" className="mt-0.5 size-6 shrink-0" />
               <span>
                 <span className="block text-[13px] font-semibold">{label}</span>
                 <span className={`mt-0.5 block text-[11px] leading-4 ${section === id ? "text-[var(--primary)]/70" : "text-[var(--text-subtle)]"}`}>{description}</span>
@@ -227,7 +227,7 @@ export function SettingsView() {
             </div>
             {section !== "data" && canManage && (
               <button type="button" onClick={() => void save()} disabled={state === "loading" || state === "saving"} className="btn btn-primary gap-2 self-start sm:self-auto">
-                {state === "saving" ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : state === "saved" ? <Check aria-hidden="true" className="size-4" /> : <Save aria-hidden="true" className="size-4" />}
+                {state === "saving" ? <LoaderCircle aria-hidden="true" className="size-6 animate-spin" /> : state === "saved" ? <Check aria-hidden="true" className="size-6" /> : <Save aria-hidden="true" className="size-6" />}
                 {state === "saving" ? "Сохраняем" : state === "saved" ? "Сохранено" : "Сохранить"}
               </button>
             )}
@@ -235,7 +235,7 @@ export function SettingsView() {
 
           {state === "error" && error && (
             <div role="alert" className="mx-5 mt-5 flex items-start gap-3 rounded-xl border border-[var(--danger)]/20 bg-[var(--danger-subtle)] px-4 py-3 text-[12px] text-[var(--danger)] sm:mx-6">
-              <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+              <CircleAlert aria-hidden="true" className="mt-0.5 size-6 shrink-0" />
               <span className="flex-1">{error}</span>
               <button type="button" onClick={() => void load()} className="font-semibold underline underline-offset-2">Повторить</button>
             </div>
@@ -321,7 +321,7 @@ function PasswordPanel() {
       <Field label="Текущий пароль" value={currentPassword} onChange={setCurrentPassword} type="password" />
       <Field label="Новый пароль" value={nextPassword} onChange={setNextPassword} type="password" />
     </div>
-    <div className="mt-3 flex flex-wrap items-center gap-3"><button type="button" disabled={state === "saving" || !currentPassword || !nextPassword} onClick={() => void save()} className="btn btn-primary gap-2"><KeyRound aria-hidden className="size-4" />{state === "saving" ? "Сохраняем…" : "Изменить пароль"}</button>{message && <p className={state === "error" ? "text-xs text-red-700" : "text-xs text-emerald-700"}>{message}</p>}</div>
+    <div className="mt-3 flex flex-wrap items-center gap-3"><button type="button" disabled={state === "saving" || !currentPassword || !nextPassword} onClick={() => void save()} className="btn btn-primary gap-2"><KeyRound aria-hidden className="size-6" />{state === "saving" ? "Сохраняем…" : "Изменить пароль"}</button>{message && <p className={state === "error" ? "text-xs text-red-700" : "text-xs text-emerald-700"}>{message}</p>}</div>
   </FormBlock>;
 }
 
@@ -329,7 +329,7 @@ function SendingSection({ form, update }: { form: WorkspaceForm; update: UpdateF
   return (
     <div className="space-y-7">
       <div className="flex items-start gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)]/70 p-4">
-        <Mail aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-[var(--primary)]" />
+        <Mail aria-hidden="true" className="mt-0.5 size-6 shrink-0 text-[var(--primary)]" />
         <div>
           <p className="text-[12px] font-semibold">Сначала подключите канал доставки</p>
           <p className="mt-1 text-[11px] leading-5 text-[var(--text-muted)]">Кампания не запустится, пока выбранный провайдер не настроен и аудитория не прошла проверку.</p>
@@ -357,11 +357,11 @@ function DataSection({ participantEmail, onExport }: { participantEmail: string;
         <span className="badge badge-success">Защищён</span>
       </SettingRow>
       <SettingRow Icon={Download} title="Экспорт данных" copy="Скачать снимок контактов, сегментов, email-шаблонов, кампаний и настроек в формате JSON.">
-        <button type="button" onClick={onExport} className="btn btn-secondary gap-2"><Download aria-hidden="true" className="size-4" />Скачать</button>
+        <button type="button" onClick={onExport} className="btn btn-secondary gap-2"><Download aria-hidden="true" className="size-6" />Скачать</button>
       </SettingRow>
       <div className="rounded-xl border border-[var(--border)] p-4">
         <div className="flex gap-3">
-          <Settings2 aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-[var(--text-muted)]" />
+          <Settings2 aria-hidden="true" className="mt-0.5 size-6 shrink-0 text-[var(--text-muted)]" />
           <div>
             <p className="text-[12px] font-semibold">Что хранится</p>
             <p className="mt-1 text-[11px] leading-5 text-[var(--text-muted)]">Рабочие данные сохраняются в базе проекта. Черновое состояние формы может временно храниться в браузере до сохранения.</p>
@@ -394,7 +394,7 @@ function FormBlock({ title, description, children }: { title: string; descriptio
 function SettingRow({ Icon, title, copy, children }: { Icon: typeof ShieldCheck; title: string; copy: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-4 rounded-xl border border-[var(--border)] p-4 sm:flex-row sm:items-center">
-      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-[var(--surface-subtle)] text-[var(--text-muted)]"><Icon aria-hidden="true" className="size-4" /></span>
+      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-[var(--surface-subtle)] text-[var(--text-muted)]"><Icon aria-hidden="true" className="size-6" /></span>
       <div className="min-w-0 flex-1">
         <p className="text-[12px] font-semibold">{title}</p>
         <p className="mt-1 text-[11px] leading-5 text-[var(--text-muted)]">{copy}</p>

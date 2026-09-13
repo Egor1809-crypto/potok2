@@ -83,7 +83,7 @@ export function Spinner({
     <LoaderCircle
       role="status"
       aria-label={label}
-      className={cn("size-4 animate-[mf-spin_700ms_linear_infinite] text-primary", className)}
+      className={cn("size-6 animate-[mf-spin_700ms_linear_infinite] text-primary", className)}
     />
   );
 }
@@ -160,7 +160,7 @@ export interface EmptyStateProps
 }
 
 export function EmptyState({
-  icon = <Inbox className="size-5" />,
+  icon = <Inbox className="size-7" />,
   title,
   description,
   action,

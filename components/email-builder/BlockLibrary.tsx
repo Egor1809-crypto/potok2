@@ -123,14 +123,14 @@ export function BlockLibrary({
     >
       <div className="border-b border-border/70 px-4 pb-3 pt-4">
         <div className="flex items-center gap-2">
-          <AlignJustify aria-hidden="true" className="size-4 text-primary" />
+          <AlignJustify aria-hidden="true" className="size-6 text-primary" />
           <h2 className="m-0 text-[13px] font-semibold text-text-strong">Добавить в письмо</h2>
         </div>
         <p className="mt-1 text-[11px] leading-4 text-text-muted">
           Выберите элемент — он появится после выделенного блока.
         </p>
         <label className="mt-3 flex h-9 items-center gap-2 rounded-lg border border-border bg-surface-subtle px-3 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10">
-          <Search aria-hidden="true" className="size-3.5 text-text-subtle" />
+          <Search aria-hidden="true" className="size-5 text-text-subtle" />
           <span className="sr-only">{tab === "icons" ? "Найти значок" : "Найти блок"}</span>
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={tab === "icons" ? "Найти значок" : tab === "decor" ? "Найти узор" : "Найти блок"} className="min-w-0 flex-1 border-0 bg-transparent text-[11px] text-text-strong outline-none placeholder:text-text-subtle" />
         </label>
@@ -237,7 +237,7 @@ export function BlockLibrary({
                 className="group min-w-0 rounded-[9px] border border-border bg-surface p-2.5 text-left outline-none transition hover:border-primary/40 hover:bg-primary-subtle/35 focus-visible:ring-2 focus-visible:ring-primary/30"
               >
                 <span className="grid size-8 place-items-center rounded-[9px] bg-surface-subtle text-text-muted transition-colors group-hover:bg-primary-subtle group-hover:text-primary">
-                  <Icon aria-hidden="true" className="size-4" strokeWidth={1.8} />
+                  <Icon aria-hidden="true" className="size-6" strokeWidth={1.8} />
                 </span>
                 <span className="mt-2 block truncate text-[11px] font-semibold text-text-strong">
                   {item.label}
@@ -255,7 +255,7 @@ export function BlockLibrary({
 
         <div className="mt-4 rounded-[11px] border border-primary/15 bg-primary-subtle/55 p-3">
           <div className="flex items-center gap-2 text-[11px] font-semibold text-primary">
-            <Link2 aria-hidden="true" className="size-3.5" />
+            <Link2 aria-hidden="true" className="size-5" />
             Персонализация настроена
           </div>
           <p className="mt-1.5 text-[10px] leading-4 text-text-muted">
@@ -268,5 +268,5 @@ export function BlockLibrary({
 }
 
 function LibraryTab({ active, onClick, icon: Icon, children }: { active: boolean; onClick: () => void; icon: LucideIcon; children: string }) {
-  return <button type="button" role="tab" aria-selected={active} onClick={onClick} className="flex h-7 items-center justify-center gap-1.5 rounded-md text-[10px] font-semibold text-text-muted outline-none aria-selected:bg-surface aria-selected:text-primary aria-selected:shadow-[var(--shadow-xs)] focus-visible:ring-2 focus-visible:ring-primary/30"><Icon aria-hidden="true" className="size-3" />{children}</button>;
+  return <button type="button" role="tab" aria-selected={active} onClick={onClick} className="flex h-7 items-center justify-center gap-1.5 rounded-md text-[10px] font-semibold text-text-muted outline-none aria-selected:bg-surface aria-selected:text-primary aria-selected:shadow-[var(--shadow-xs)] focus-visible:ring-2 focus-visible:ring-primary/30"><Icon aria-hidden="true" className="size-4" />{children}</button>;
 }

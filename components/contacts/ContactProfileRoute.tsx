@@ -97,14 +97,14 @@ export function ContactProfileRoute() {
   };
 
   if (state === "loading") {
-    return <div className="grid min-h-[420px] place-items-center"><LoaderCircle aria-hidden="true" className="size-6 animate-spin text-[var(--primary)]" /><span className="sr-only">Загрузка контакта</span></div>;
+    return <div className="grid min-h-[420px] place-items-center"><LoaderCircle aria-hidden="true" className="size-8 animate-spin text-[var(--primary)]" /><span className="sr-only">Загрузка контакта</span></div>;
   }
 
   if (state === "error") {
     return (
       <section className="card mx-auto max-w-xl px-6 py-12 text-center" role="alert">
         <span className="mx-auto grid size-12 place-items-center rounded-xl bg-[var(--danger-subtle)] text-[var(--danger)]">
-          <UserRoundX aria-hidden="true" size={22} />
+          <UserRoundX aria-hidden="true" size={28} />
         </span>
         <h1 className="mt-5 text-[24px] font-semibold tracking-[-.035em]">
           Не удалось открыть контакт
@@ -123,7 +123,7 @@ export function ContactProfileRoute() {
     return (
       <section className="card mx-auto max-w-xl px-6 py-12 text-center" role="status">
         <span className="mx-auto grid size-12 place-items-center rounded-xl bg-[var(--surface-subtle)] text-[var(--text-tertiary)]">
-          <UserRoundX aria-hidden="true" size={22} />
+          <UserRoundX aria-hidden="true" size={28} />
         </span>
         <p className="section-eyebrow mt-5">Контакт недоступен</p>
         <h1 className="mt-2 text-[24px] font-semibold tracking-[-.035em] text-[var(--text-primary)]">
@@ -133,7 +133,7 @@ export function ContactProfileRoute() {
           Возможно, профиль удалён или ссылка указана неверно.
         </p>
         <Link href="/contacts" className="btn btn-primary mx-auto mt-6 w-fit gap-2">
-          <ArrowLeft aria-hidden="true" size={14} />
+          <ArrowLeft aria-hidden="true" size={20} />
           Вернуться к контактам
         </Link>
       </section>

@@ -41,7 +41,7 @@ export function ProductPreview() {
                 <span className="text-[11px] font-semibold tracking-[.12em]">{BRAND_NAME}</span>
               </div>
               <div className="mb-3 flex w-full items-center justify-between rounded-lg border border-[#e5e5eb] bg-white px-2.5 py-2 text-left text-[10px] font-medium text-[#353744] shadow-sm">
-                Рабочее пространство <ChevronDown size={12} />
+                Рабочее пространство <ChevronDown size={16} />
               </div>
               <div className="space-y-0.5">
                 {[
@@ -70,7 +70,7 @@ export function ProductPreview() {
               <div className="flex h-14 items-center justify-between border-b border-[#ececf1] px-4 sm:px-6">
                 <span className="text-xs font-semibold text-[#262734]">Контакты</span>
                 <div className="flex items-center gap-2">
-                  <div className="hidden items-center gap-2 rounded-lg border border-[#e4e5eb] px-2.5 py-1.5 text-[9px] text-[#9698a5] sm:flex"><Search size={12} /> Поиск <kbd className="ml-5 rounded bg-[#f2f2f5] px-1 py-0.5">⌘ K</kbd></div>
+                  <div className="hidden items-center gap-2 rounded-lg border border-[#e4e5eb] px-2.5 py-1.5 text-[9px] text-[#9698a5] sm:flex"><Search size={16} /> Поиск <kbd className="ml-5 rounded bg-[#f2f2f5] px-1 py-0.5">⌘ K</kbd></div>
                   <span className="grid size-7 place-items-center rounded-full bg-[#20212d] text-[8px] font-semibold text-white">ЕС</span>
                 </div>
               </div>
@@ -85,7 +85,7 @@ export function ProductPreview() {
                   <span className="mb-2.5 text-[9px] text-[#9294a0]">4 вида</span>
                 </div>
                 <div className="mt-3 flex items-center gap-2">
-                  <div className="flex h-8 flex-1 items-center gap-2 rounded-lg border border-[#e4e5eb] px-2.5 text-[9px] text-[#9b9da9]"><Search size={12} /> Поиск контактов</div>
+                  <div className="flex h-8 flex-1 items-center gap-2 rounded-lg border border-[#e4e5eb] px-2.5 text-[9px] text-[#9b9da9]"><Search size={16} /> Поиск контактов</div>
                   <span className="flex h-8 items-center rounded-lg border border-[#d9dbe3] bg-[#f8f7ff] px-3 text-[9px] font-semibold text-[#5e57dc]">Фильтр <span className="ml-1 rounded bg-[#625cf6] px-1.5 py-0.5 text-white">3</span></span>
                   <span className="hidden h-8 items-center rounded-lg border border-[#e4e5eb] px-3 text-[9px] text-[#555765] sm:flex">Столбцы</span>
                 </div>
@@ -123,7 +123,7 @@ export function ProductPreview() {
       </div>
 
       <div className="absolute -left-5 bottom-12 hidden items-center gap-3 rounded-xl border border-[#dedfe7] bg-white p-3 pr-5 shadow-[0_18px_45px_rgba(32,33,50,.15)] xl:flex">
-        <span className="grid size-9 place-items-center rounded-lg bg-[#eaf8ef] text-[#3f8c5b]"><BarChart3 size={17} /></span>
+        <span className="grid size-9 place-items-center rounded-lg bg-[#eaf8ef] text-[#3f8c5b]"><BarChart3 size={24} /></span>
         <div><p className="text-[8px] text-[#9395a1]">Доставляемость</p><p className="text-sm font-semibold text-[#282a36]">98,2% <span className="ml-1 text-[8px] text-[#3f9b61]">+2,4%</span></p></div>
       </div>
     </div>

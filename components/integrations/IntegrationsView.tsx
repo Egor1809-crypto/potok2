@@ -411,7 +411,7 @@ export function IntegrationsView() {
         action={
           <Link href="/campaigns/new" className={buttonVariants({ variant: "primary" })}>
             Создать кампанию
-            <ArrowRight aria-hidden="true" className="size-4" />
+            <ArrowRight aria-hidden="true" className="size-6" />
           </Link>
         }
       />
@@ -425,13 +425,13 @@ export function IntegrationsView() {
             size="sm"
             className="mt-3"
             onClick={() => void loadIntegrations()}
-            leadingIcon={<RefreshCw aria-hidden="true" className="size-3.5" />}
+            leadingIcon={<RefreshCw aria-hidden="true" className="size-5" />}
           >
             Повторить подключение
           </Button>
         </Alert>
       ) : (
-        <Alert tone="info" title="Статус подтверждается провайдером" icon={<ShieldCheck aria-hidden="true" className="size-4" />}>
+        <Alert tone="info" title="Статус подтверждается провайдером" icon={<ShieldCheck aria-hidden="true" className="size-6" />}>
           Сохранение формы не означает подключение. Кнопка проверки выполняет безопасный
           запрос конкретного провайдера. Токены и пароли защищены на сервере.
         </Alert>
@@ -478,7 +478,7 @@ export function IntegrationsView() {
             return (
               <article key={channel.id} className="grid gap-4 px-5 py-5 sm:px-6 lg:grid-cols-[48px_minmax(190px,.8fr)_minmax(220px,1fr)_170px_170px] lg:items-center">
                 <span className="grid size-11 place-items-center rounded-xl bg-primary-subtle text-primary">
-                  <Icon aria-hidden="true" className="size-5" />
+                  <Icon aria-hidden="true" className="size-7" />
                 </span>
 
                 <div>
@@ -518,14 +518,14 @@ export function IntegrationsView() {
                   {status === "connected" && provider.deliveryMode !== "roadmap" ? (
                     <Link href={campaignHref} className={buttonVariants({ variant: "primary", size: "sm" })}>
                       В кампанию
-                      <ArrowRight aria-hidden="true" className="size-3.5" />
+                      <ArrowRight aria-hidden="true" className="size-5" />
                     </Link>
                   ) : (
                     <Button
                       variant="secondary"
                       size="sm"
                       onClick={() => openSetup(channel.id, provider.id)}
-                      leadingIcon={<Settings2 aria-hidden="true" className="size-3.5" />}
+                      leadingIcon={<Settings2 aria-hidden="true" className="size-5" />}
                     >
                       Настроить
                     </Button>
@@ -537,7 +537,7 @@ export function IntegrationsView() {
                       loading={busyAction === `check:${provider.id}`}
                       loadingText="Проверяем…"
                       onClick={() => void checkIntegration(provider.id)}
-                      leadingIcon={<RefreshCw aria-hidden="true" className="size-3.5" />}
+                      leadingIcon={<RefreshCw aria-hidden="true" className="size-5" />}
                     >
                       Проверить
                     </Button>
@@ -549,7 +549,7 @@ export function IntegrationsView() {
                       aria-label={`Отключить ${provider.name}`}
                       loading={busyAction === `disconnect:${provider.id}`}
                       onClick={() => void disconnect(provider.id)}
-                      leadingIcon={<Unplug aria-hidden="true" className="size-3.5" />}
+                      leadingIcon={<Unplug aria-hidden="true" className="size-5" />}
                     >
                       Отключить
                     </Button>
@@ -563,7 +563,7 @@ export function IntegrationsView() {
 
       <section className="grid gap-4" aria-label="Инструкции подключения мессенджеров">
         <article className="rounded-xl border border-[#bed8ff] bg-[#f4f8ff] p-5">
-          <div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-xl bg-[#0077ff] text-white"><MessagesSquare aria-hidden="true" className="size-5" /></span><div><h2 className="text-[14px] font-semibold text-text-strong">ВКонтакте от имени сообщества</h2><p className="mt-0.5 text-[11px] text-text-muted">Сообщения только разрешившим пользователям</p></div></div>
+          <div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-xl bg-[#0077ff] text-white"><MessagesSquare aria-hidden="true" className="size-7" /></span><div><h2 className="text-[14px] font-semibold text-text-strong">ВКонтакте от имени сообщества</h2><p className="mt-0.5 text-[11px] text-text-muted">Сообщения только разрешившим пользователям</p></div></div>
           <ol className="mt-4 space-y-2 text-[12px] leading-5 text-text-muted">
             <li><b>1.</b> Включите сообщения сообщества и разрешите пользователям писать ему.</li>
             <li><b>2.</b> Создайте серверный ключ с доступом к сообщениям и сохраните его как <code>VK_COMMUNITY_ACCESS_TOKEN</code>.</li>
@@ -578,7 +578,7 @@ export function IntegrationsView() {
         <div className="rounded-xl border border-[#bcd8ff] bg-[#f3f8ff] p-5">
           <div className="flex items-start gap-3">
             <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#1777ff] text-white">
-              <Mail aria-hidden="true" className="size-4" />
+              <Mail aria-hidden="true" className="size-6" />
             </span>
             <div>
               <h2 className="text-[14px] font-semibold text-text-strong">VK WorkSpace SMTP внутри Потока</h2>
@@ -594,7 +594,7 @@ export function IntegrationsView() {
           className={buttonVariants({ variant: "secondary" })}
         >
           Создать кампанию
-          <ArrowRight aria-hidden="true" className="size-4" />
+          <ArrowRight aria-hidden="true" className="size-6" />
         </Link>
       </section>
 
@@ -648,7 +648,7 @@ function SetupModal({
             onClick={onSave}
             loading={saving}
             loadingText="Проверяем…"
-            leadingIcon={<ShieldCheck aria-hidden="true" className="size-4" />}
+            leadingIcon={<ShieldCheck aria-hidden="true" className="size-6" />}
           >
             Сохранить и проверить
           </Button>
@@ -692,7 +692,7 @@ function SetupModal({
           <ul className="mt-2 space-y-2 text-[12px] leading-5 text-text-muted">
             {provider.credentials.slice(0, 3).map((credential) => (
               <li key={credential} className="flex gap-2">
-                <CircleDashed aria-hidden="true" className="mt-1 size-3.5 shrink-0" />
+                <CircleDashed aria-hidden="true" className="mt-1 size-5 shrink-0" />
                 {credential}
               </li>
             ))}

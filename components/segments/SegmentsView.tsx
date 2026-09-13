@@ -212,7 +212,7 @@ export function SegmentsView() {
               disabled={loading}
               className="btn btn-secondary w-fit gap-2 disabled:cursor-wait disabled:opacity-60"
             >
-              <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+              <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
               Пересчитать охват
             </button>
           )}
@@ -225,7 +225,7 @@ export function SegmentsView() {
             disabled={loading}
             className="btn btn-primary w-fit gap-2 disabled:cursor-wait disabled:opacity-60"
           >
-            <Plus size={14} />
+            <Plus size={20} />
             Новый сегмент
           </button>
         </div>
@@ -269,7 +269,7 @@ export function SegmentsView() {
           <label className="relative w-full sm:w-72">
             <span className="sr-only">Поиск сегментов</span>
             <Search
-              size={14}
+              size={20}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]"
             />
             <input
@@ -287,12 +287,12 @@ export function SegmentsView() {
             className="flex min-h-52 items-center justify-center gap-2 p-8 text-xs text-[var(--text-tertiary)]"
             role="status"
           >
-            <RefreshCw size={16} className="animate-spin" />
+            <RefreshCw size={24} className="animate-spin" />
             Загружаем сегменты…
           </div>
         ) : loadError ? (
           <div className="flex min-h-52 flex-col items-center justify-center p-8 text-center">
-            <AlertTriangle size={24} className="text-[#b65a4a]" />
+            <AlertTriangle size={32} className="text-[#b65a4a]" />
             <p className="mt-3 text-sm font-semibold">
               Сегменты не загрузились
             </p>
@@ -311,7 +311,7 @@ export function SegmentsView() {
         ) : visibleSegments.length === 0 ? (
           <div className="flex min-h-52 flex-col items-center justify-center p-8 text-center">
             <span className="grid size-11 place-items-center rounded-xl bg-primary-subtle text-primary">
-              <UsersRound size={19} />
+              <UsersRound size={28} />
             </span>
             <p className="mt-3 text-sm font-semibold">
               {segments.length === 0
@@ -346,7 +346,7 @@ export function SegmentsView() {
                       color: segment.color,
                     }}
                   >
-                    <UsersRound size={17} />
+                    <UsersRound size={24} />
                   </span>
                   <div className="min-w-0 flex-1">
                     <h3 className="truncate text-sm font-semibold">
@@ -411,7 +411,7 @@ export function SegmentsView() {
                     }}
                     className="btn btn-secondary justify-center gap-1.5"
                   >
-                    <PencilLine size={12} />
+                    <PencilLine size={16} />
                     Изменить
                   </button>
                   <Link
@@ -419,7 +419,7 @@ export function SegmentsView() {
                     className="btn btn-primary justify-center gap-1.5"
                   >
                     В кампанию
-                    <ArrowRight size={12} />
+                    <ArrowRight size={16} />
                   </Link>
                 </div>
               </article>

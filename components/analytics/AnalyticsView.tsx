@@ -163,11 +163,11 @@ export function AnalyticsView() {
   };
 
   if (loading && !snapshot) {
-    return <div className="grid min-h-[420px] place-items-center"><div className="text-center"><LoaderCircle aria-hidden="true" className="mx-auto size-7 animate-spin text-[var(--primary)]" /><p className="mt-3 text-sm text-[var(--text-muted)]">Загружаем журнал отправки…</p></div></div>;
+    return <div className="grid min-h-[420px] place-items-center"><div className="text-center"><LoaderCircle aria-hidden="true" className="mx-auto size-9 animate-spin text-[var(--primary)]" /><p className="mt-3 text-sm text-[var(--text-muted)]">Загружаем журнал отправки…</p></div></div>;
   }
 
   if (!snapshot) {
-    return <div className="card mx-auto max-w-lg p-8 text-center"><CircleAlert aria-hidden="true" className="mx-auto size-8 text-[var(--danger)]" /><h1 className="mt-4 text-xl font-semibold">Журнал недоступен</h1><p className="mt-2 text-sm text-[var(--text-muted)]">{error}</p><button type="button" onClick={() => void load()} className="btn btn-primary mt-5">Повторить</button></div>;
+    return <div className="card mx-auto max-w-lg p-8 text-center"><CircleAlert aria-hidden="true" className="mx-auto size-10 text-[var(--danger)]" /><h1 className="mt-4 text-xl font-semibold">Журнал недоступен</h1><p className="mt-2 text-sm text-[var(--text-muted)]">{error}</p><button type="button" onClick={() => void load()} className="btn btn-primary mt-5">Повторить</button></div>;
   }
 
   const kpis = [
@@ -191,14 +191,14 @@ export function AnalyticsView() {
         <div className="flex flex-wrap gap-2">
           <label><span className="sr-only">Выбрать участника</span><Select className="input min-w-56" value={participantSelection} onChange={(event) => { setParticipantSelection(event.target.value); setSelection("all"); }}><option value="mine">Моя фактическая активность</option><option value="all">Вся команда</option>{snapshot.members.filter((member) => member.id !== snapshot.participant.id).map((member) => <option key={member.id} value={member.id}>{member.displayName}</option>)}</Select></label>
           <label><span className="sr-only">Выбрать кампанию</span><Select className="input min-w-56" value={selection} onChange={(event) => setSelection(event.target.value)}><option value="all">Все кампании участника</option>{participantCampaigns.map((campaign) => <option key={campaign.id} value={campaign.id}>{campaign.name}</option>)}</Select></label>
-          <button type="button" onClick={exportCsv} disabled={!jobs.length} className="btn btn-secondary gap-2"><Download aria-hidden="true" className="size-4" />Скачать CSV</button>
+          <button type="button" onClick={exportCsv} disabled={!jobs.length} className="btn btn-secondary gap-2"><Download aria-hidden="true" className="size-6" />Скачать CSV</button>
         </div>
       </header>
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6" aria-label="Итоги выполнения">
         {kpis.map(({ label, value, note, Icon }) => (
           <article key={label} className="card p-4">
-            <span className="grid size-8 place-items-center rounded-lg bg-[var(--primary-subtle)] text-[var(--primary)]"><Icon aria-hidden="true" className="size-4" /></span>
+            <span className="grid size-8 place-items-center rounded-lg bg-[var(--primary-subtle)] text-[var(--primary)]"><Icon aria-hidden="true" className="size-6" /></span>
             <p className="mt-5 text-[22px] font-semibold tracking-[-.04em]">{number.format(value)}</p>
             <p className="mt-1 text-[11px] font-semibold">{label}</p>
             <p className="mt-1 text-[9px] leading-4 text-[var(--text-subtle)]">{note}</p>
@@ -208,7 +208,7 @@ export function AnalyticsView() {
 
       {!jobs.length ? (
         <section className="rounded-2xl border border-[#eadfbd] bg-[#fff9eb] p-5">
-          <div className="flex items-start gap-3"><BarChart3 aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-[var(--warning)]" /><div><h2 className="text-[13px] font-semibold">Заданий на отправку пока нет</h2><p className="mt-1 text-[11px] leading-5 text-[var(--text-muted)]">Сохраните кампанию, проверьте готовность и запустите её явно. Если провайдер не подключён, Поток остановит запуск и покажет причину.</p><Link href="/campaigns" className="mt-2 inline-flex text-[11px] font-semibold text-[var(--primary)]">Открыть кампании →</Link></div></div>
+          <div className="flex items-start gap-3"><BarChart3 aria-hidden="true" className="mt-0.5 size-7 shrink-0 text-[var(--warning)]" /><div><h2 className="text-[13px] font-semibold">Заданий на отправку пока нет</h2><p className="mt-1 text-[11px] leading-5 text-[var(--text-muted)]">Сохраните кампанию, проверьте готовность и запустите её явно. Если провайдер не подключён, Поток остановит запуск и покажет причину.</p><Link href="/campaigns" className="mt-2 inline-flex text-[11px] font-semibold text-[var(--primary)]">Открыть кампании →</Link></div></div>
         </section>
       ) : (
         <section className="card overflow-hidden">

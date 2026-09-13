@@ -45,7 +45,7 @@ export function Stepper({
                 !current && !complete && "border-border-strong text-text-subtle",
               )}
             >
-              {complete ? <Check aria-hidden="true" className="size-3.5" /> : index + 1}
+              {complete ? <Check aria-hidden="true" className="size-5" /> : index + 1}
             </span>
             <span
               className={cn(

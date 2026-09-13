@@ -509,8 +509,8 @@ a.card:hover {
 }
 
 .btn-icon {
-  width: 38px;
-  min-width: 38px;
+  width: 40px;
+  min-width: 40px;
   padding: 0;
 }
 
@@ -543,7 +543,7 @@ fieldset {
 /* Keep text clear of leading icons. The base `.input` padding is declared
    after Tailwind utilities, so icon-bearing fields need an explicit contract. */
 .input.input-with-leading-icon {
-  padding-left: 42px !important;
+  padding-left: 48px !important;
 }
 
 .input.input-with-trailing-action {

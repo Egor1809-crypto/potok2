@@ -75,7 +75,7 @@ export function AppSidebar({
     >
       <div className="flex h-[var(--topbar-height)] shrink-0 items-center justify-between border-b border-border/70 px-5">
         <BrandMark />
-        {!mobile && onCollapse ? <button data-sidebar-collapse type="button" onClick={onCollapse} aria-label="Свернуть левую панель" title="Свернуть левую панель" aria-expanded="true" aria-controls="platform-sidebar" className="grid size-10 shrink-0 place-items-center rounded-lg text-text-muted hover:bg-surface-subtle"><ChevronLeft aria-hidden="true" className="size-[18px]" /></button> : null}
+        {!mobile && onCollapse ? <button data-sidebar-collapse type="button" onClick={onCollapse} aria-label="Свернуть левую панель" title="Свернуть левую панель" aria-expanded="true" aria-controls="platform-sidebar" className="grid size-10 shrink-0 place-items-center rounded-lg text-text-muted hover:bg-surface-subtle"><ChevronLeft aria-hidden="true" className="size-7" /></button> : null}
         {mobile ? (
           <IconButton
             data-mobile-nav-close
@@ -84,7 +84,7 @@ export function AppSidebar({
             size="sm"
             onClick={onClose}
           >
-            <X aria-hidden="true" className="size-4" />
+            <X aria-hidden="true" className="size-6" />
           </IconButton>
         ) : null}
       </div>
@@ -142,13 +142,13 @@ export function AppSidebar({
                       <Icon
                         aria-hidden="true"
                         className={cn(
-                          "size-[18px] shrink-0",
+                          "size-7 shrink-0",
                           active ? "text-primary" : "text-text-subtle group-hover:text-text-muted",
                         )}
                         strokeWidth={1.8}
                       />
                       <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                      <ChevronRight aria-hidden="true" className={cn("size-3.5 shrink-0 text-text-subtle transition-transform", expanded && "rotate-90", active && "text-primary/70")} />
+                      <ChevronRight aria-hidden="true" className={cn("size-5 shrink-0 text-text-subtle transition-transform", expanded && "rotate-90", active && "text-primary/70")} />
                     </button> : <Link
                       href={item.href}
                       data-guide-id={item.href === "/templates" ? "templates" : item.href === "/contacts" ? "contacts" : item.href === "/campaigns" ? "campaigns" : undefined}
@@ -159,7 +159,7 @@ export function AppSidebar({
                         active ? "bg-primary-subtle text-primary" : "text-text-muted hover:bg-surface-subtle hover:text-text-strong",
                       )}
                     >
-                      <Icon aria-hidden="true" className={cn("size-[18px] shrink-0", active ? "text-primary" : "text-text-subtle group-hover:text-text-muted")} strokeWidth={1.8} />
+                      <Icon aria-hidden="true" className={cn("size-7 shrink-0", active ? "text-primary" : "text-text-subtle group-hover:text-text-muted")} strokeWidth={1.8} />
                       <span className="min-w-0 flex-1 truncate">{item.label}</span>
                     </Link>}
 
@@ -219,7 +219,7 @@ export function AppSidebar({
             className: "mb-3 w-full justify-center",
           })}
         >
-          <Plus aria-hidden="true" className="size-4" />
+          <Plus aria-hidden="true" className="size-6" />
           Создать проект
         </Link>
 
@@ -240,7 +240,7 @@ export function AppSidebar({
           </span>
           <ChevronRight
             aria-hidden="true"
-            className="size-3.5 text-text-subtle transition-transform group-hover:translate-x-0.5"
+            className="size-5 text-text-subtle transition-transform group-hover:translate-x-0.5"
           />
         </Link>
       </div>

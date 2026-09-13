@@ -62,7 +62,7 @@ export function CompaniesView() {
           </p>
         </div>
         <button className="btn btn-primary w-fit gap-2">
-          <Plus size={14} />
+          <Plus size={20} />
           Добавить компанию
         </button>
       </div>
@@ -71,7 +71,7 @@ export function CompaniesView() {
         {metrics.map(({ Icon, value, label }) => (
           <article key={label} className="card flex items-center gap-4 p-4">
             <span className="grid size-10 place-items-center rounded-xl bg-[#f0efff] text-[#625cf6]">
-              <Icon size={18} />
+              <Icon size={28} />
             </span>
             <div>
               <p className="text-[21px] font-semibold tracking-[-.035em]">
@@ -88,7 +88,7 @@ export function CompaniesView() {
           <label className="relative min-w-[220px] flex-1">
             <span className="sr-only">Поиск компаний</span>
             <Search
-              size={14}
+              size={20}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]"
             />
             <input
@@ -99,16 +99,16 @@ export function CompaniesView() {
             />
           </label>
           <button className="btn btn-secondary gap-2">
-            Отрасль <ChevronDown size={12} />
+            Отрасль <ChevronDown size={16} />
           </button>
           <button className="btn btn-secondary gap-2">
-            Регион <ChevronDown size={12} />
+            Регион <ChevronDown size={16} />
           </button>
           <button
             className="btn btn-ghost px-2"
             aria-label="Дополнительные фильтры компаний"
           >
-            <MoreHorizontal size={16} />
+            <MoreHorizontal size={24} />
           </button>
         </div>
 
@@ -230,7 +230,7 @@ function CompanyDrawer({
             className="grid size-8 place-items-center rounded-lg hover:bg-[var(--surface-subtle)]"
             aria-label="Закрыть профиль компании"
           >
-            <X size={17} />
+            <X size={24} />
           </button>
         </div>
 
@@ -328,7 +328,7 @@ function CompanyDrawer({
               ) : (
                 <div className="p-7 text-center">
                   <MapPin
-                    size={18}
+                    size={28}
                     className="mx-auto text-[var(--text-tertiary)]"
                   />
                   <p className="mt-2 text-[10px] text-[var(--text-tertiary)]">

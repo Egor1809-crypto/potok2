@@ -218,7 +218,7 @@ export function CalendarView() {
         eyebrow="Расписание"
         title="Календарь рассылок"
         description="Планируйте рассылки и проверяйте результаты отправки за последние 24 часа."
-        action={<Link href={`/campaigns/new?scheduledDate=${todayKey}&timeZone=${encodeURIComponent(timeZone)}`} className={buttonVariants()}><Plus className="size-4" />Запланировать</Link>}
+        action={<Link href={`/campaigns/new?scheduledDate=${todayKey}&timeZone=${encodeURIComponent(timeZone)}`} className={buttonVariants()}><Plus className="size-6" />Запланировать</Link>}
       />
       {error ? <Alert tone="danger" title="Календарь недоступен">{error}</Alert> : null}
       <Alert tone="info" title={timeZoneChoice === "auto" ? "Часовой пояс определён автоматически" : "Часовой пояс календаря"}>
@@ -233,7 +233,7 @@ export function CalendarView() {
       {view === "report" ? <CalendarReport report={snapshot?.calendarReport} timeZone={timeZone} loading={loading} refresh={() => void load()} /> : <>
       <section className="card p-4 sm:p-5" aria-label="Фильтры календаря">
         <div className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_240px_200px_auto]">
-          <div className="relative"><Filter className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-subtle" /><Input className="input-with-leading-icon" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Тема, название или группа" aria-label="Поиск по теме" /></div>
+          <div className="relative"><Filter className="pointer-events-none absolute left-3 top-1/2 size-6 -translate-y-1/2 text-text-subtle" /><Input className="input-with-leading-icon" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Тема, название или группа" aria-label="Поиск по теме" /></div>
           <Select value={group} onChange={(event) => setGroup(event.target.value)} aria-label="Группа получателей" options={[{ value: "", label: "Все группы" }, ...groups.map((value) => ({ value, label: value }))]} />
           <Select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="Статус рассылки" options={[{ value: "", label: "Все статусы" }, { value: "scheduled", label: "Запланированные" }, { value: "sending", label: "Отправляются" }, { value: "blocked", label: "Нужно исправить" }]} />
           <Button variant="ghost" onClick={() => { setQuery(""); setGroup(""); setStatus(""); }}>Сбросить</Button>
@@ -243,9 +243,9 @@ export function CalendarView() {
       <div className={cn("grid min-w-0 grid-cols-1 items-start gap-5", selectedDay && "lg:grid-cols-[minmax(0,1fr)_320px]")}>
         <section className="card min-w-0 overflow-hidden" aria-label="Месячный календарь">
           <header className="flex items-center justify-between gap-2 border-b border-border px-3 py-3 sm:px-5">
-            <Button size="icon" variant="ghost" aria-label="Предыдущий месяц" onClick={() => changeMonth(-1)}><ChevronLeft aria-hidden="true" className="size-5" /></Button>
+            <Button size="icon" variant="ghost" aria-label="Предыдущий месяц" onClick={() => changeMonth(-1)}><ChevronLeft aria-hidden="true" className="size-7" /></Button>
             <h2 className="text-center text-[18px] font-semibold text-text-strong">{formatMonth(month)}</h2>
-            <Button size="icon" variant="ghost" aria-label="Следующий месяц" onClick={() => changeMonth(1)}><ChevronRight aria-hidden="true" className="size-5" /></Button>
+            <Button size="icon" variant="ghost" aria-label="Следующий месяц" onClick={() => changeMonth(1)}><ChevronRight aria-hidden="true" className="size-7" /></Button>
           </header>
           <div className="grid grid-cols-7 border-b border-border bg-surface-subtle">
             {weekdays.map((day) => <div key={day} className="py-2 text-center text-[12px] font-semibold text-text-muted">{day}</div>)}
@@ -295,14 +295,14 @@ export function CalendarView() {
                 <h2 ref={panelHeading} id="calendar-day-title" tabIndex={-1} className="rounded text-[18px] font-semibold text-text-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">{selectedDateLabel}</h2>
                 <p className="mt-1 text-[12px] text-text-muted" role="status">Рассылок: {selectedItems.length}</p>
               </div>
-              <Button size="icon" variant="ghost" aria-label="Закрыть сведения о дне" onClick={closeDay}><X aria-hidden="true" className="size-4" /></Button>
+              <Button size="icon" variant="ghost" aria-label="Закрыть сведения о дне" onClick={closeDay}><X aria-hidden="true" className="size-6" /></Button>
             </div>
             <p className="mt-3 text-[12px] text-text-muted">Время: {describeTimeZone(timeZone)}</p>
             <div className="mt-5 space-y-4">
               {selectedItems.map((campaign) => (
                 <article key={campaign.id} className={cn("min-w-0 rounded-xl border border-border p-4", campaign.id === targetCampaignId && "border-primary bg-primary/[0.035]")}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <time dateTime={campaign.scheduledAt!} className="inline-flex items-center gap-1.5 text-[15px] font-semibold tabular-nums text-primary"><Clock3 aria-hidden="true" className="size-4" />{formatTime(campaign.scheduledAt!, timeZone)}</time>
+                    <time dateTime={campaign.scheduledAt!} className="inline-flex items-center gap-1.5 text-[15px] font-semibold tabular-nums text-primary"><Clock3 aria-hidden="true" className="size-6" />{formatTime(campaign.scheduledAt!, timeZone)}</time>
                     <Badge variant={campaign.status === "blocked" ? "warning" : "neutral"}>{statusLabel[campaign.status]}</Badge>
                   </div>
                   <h3 className="mt-3 break-words text-[14px] font-semibold text-text-strong">{campaign.name}</h3>
@@ -319,12 +319,12 @@ export function CalendarView() {
               ))}
               {selectedItems.length === 0 ? <p className="rounded-xl bg-surface-subtle p-4 text-[14px] leading-6 text-text-muted">{query || group || status ? "На этот день нет рассылок по выбранным фильтрам." : "На этот день нет запланированных рассылок."}</p> : null}
             </div>
-            <Link href={`/campaigns/new?scheduledDate=${selectedDay}&timeZone=${encodeURIComponent(timeZone)}`} className={buttonVariants({ className: "mt-5 w-full" })}><Plus aria-hidden="true" className="size-4" />Запланировать</Link>
+            <Link href={`/campaigns/new?scheduledDate=${selectedDay}&timeZone=${encodeURIComponent(timeZone)}`} className={buttonVariants({ className: "mt-5 w-full" })}><Plus aria-hidden="true" className="size-6" />Запланировать</Link>
           </aside>
         ) : null}
       </div>
       <div className="flex flex-wrap gap-2">
-        <Badge variant="success"><CalendarDays className="size-3" />Запланировано: {campaigns.filter((item) => item.status === "scheduled").length}</Badge>
+        <Badge variant="success"><CalendarDays className="size-4" />Запланировано: {campaigns.filter((item) => item.status === "scheduled").length}</Badge>
         {Object.entries(statusLabel).filter(([key]) => campaigns.some((item) => item.status === key)).map(([key, label]) => <Badge key={key}>{label}: {campaigns.filter((item) => item.status === key).length}</Badge>)}
       </div>
       </>}

@@ -45,7 +45,7 @@ export function TemplateCard({
   return (
     <article className="group relative min-w-0 overflow-hidden rounded-[14px] border border-border bg-surface shadow-[var(--shadow-xs)] transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-1 hover:border-border-strong hover:shadow-[var(--shadow-md)]">
       <button type="button" onClick={onFavorite} aria-pressed={template.isFavorite} aria-label={`${template.isFavorite ? "Убрать из избранного" : "Добавить в избранное"}: ${template.name}`} className={`absolute right-3 top-3 z-30 grid size-9 place-items-center rounded-full border shadow-sm backdrop-blur transition ${template.isFavorite ? "border-[#F43CB8]/40 bg-[#10141d] text-[#F43CB8]" : "border-white/70 bg-white/85 text-[#667085] hover:text-[#F43CB8]"}`}>
-        <Star aria-hidden="true" className={`size-4 ${template.isFavorite ? "fill-current" : ""}`} />
+        <Star aria-hidden="true" className={`size-6 ${template.isFavorite ? "fill-current" : ""}`} />
       </button>
       <Link
         href={editHref}
@@ -75,7 +75,7 @@ export function TemplateCard({
 
         <div className="mt-4 flex items-center justify-between gap-3 border-t border-border/70 pt-3.5">
           <span className="flex items-center gap-1.5 text-[10px] text-text-subtle">
-            <Blocks aria-hidden="true" className="size-3" />
+            <Blocks aria-hidden="true" className="size-4" />
             Блоков: {template.builderDocument.blocks.length.toLocaleString("ru-RU")}
           </span>
           <span className="text-[10px] text-text-subtle">
@@ -83,12 +83,12 @@ export function TemplateCard({
           </span>
         </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className="mt-3 grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,160px),1fr))" }}>
           <Link
             href={editHref}
             className={buttonVariants({ variant: "secondary", size: "sm", className: "min-w-0 px-2" })}
           >
-            <PencilLine aria-hidden="true" className="size-3.5" />
+            <PencilLine aria-hidden="true" className="size-5" />
             {editLabel}
           </Link>
           <Link
@@ -96,11 +96,11 @@ export function TemplateCard({
             className={buttonVariants({ variant: "primary", size: "sm", className: "min-w-0 px-2" })}
           >
             В кампанию
-            <ArrowRight aria-hidden="true" className="size-3.5" />
+            <ArrowRight aria-hidden="true" className="size-5" />
           </Link>
         </div>
 
-        {onDirector && <Button variant="secondary" size="sm" className="mt-2 w-full" onClick={onDirector}><Sparkles aria-hidden className="size-3.5" />Арт-директор</Button>}
+        {onDirector && <Button variant="secondary" size="sm" className="mt-2 w-full" onClick={onDirector}><Sparkles aria-hidden className="size-5" />Арт-директор</Button>}
         <div className="mt-2 flex justify-end gap-1">
           <Button
             variant="ghost"
@@ -112,7 +112,7 @@ export function TemplateCard({
             aria-label={`Дублировать шаблон «${template.name}»`}
             className="h-7 px-2 text-[10px]"
           >
-            <Copy aria-hidden="true" className="size-3" />
+            <Copy aria-hidden="true" className="size-4" />
             Дублировать
           </Button>
           {!template.isStarter ? <Button
@@ -125,7 +125,7 @@ export function TemplateCard({
             aria-label={`Удалить шаблон «${template.name}»`}
             className="h-7 px-2 text-[10px] text-danger hover:text-danger"
           >
-            <Trash2 aria-hidden="true" className="size-3" />
+            <Trash2 aria-hidden="true" className="size-4" />
             Удалить
           </Button> : null}
         </div>
@@ -160,7 +160,7 @@ export function TemplateThumbnail({ template }: { template: EmailTemplateRecord 
       )}
       {template.id.startsWith("template-v3-") || isStudioPick ? (
         <span className="absolute left-3 top-3 z-20 inline-flex items-center gap-1 rounded-full border border-white/60 bg-white/85 px-2 py-1 text-[8px] font-semibold uppercase tracking-[0.08em] text-[#312a3b] shadow-sm backdrop-blur">
-          <Sparkles aria-hidden="true" className="size-2.5" />
+          <Sparkles aria-hidden="true" className="size-3.5" />
           {isStudioPick ? "Studio pick" : "Дизайнерский"}
         </span>
       ) : null}
@@ -227,7 +227,7 @@ function TemplateMiniBlock({ block, accentColor }: { block: TemplateMiniBlockVal
     return <div className="line-clamp-3 text-[8px] leading-[1.55]" style={commonStyle}>{cleanMiniText(block.content)}</div>;
   }
   if (block.type === "image") {
-    return <div style={commonStyle}><div className="grid h-24 place-items-center rounded-lg bg-gradient-to-br from-black/[0.04] to-black/[0.12]"><ImageIcon aria-hidden="true" className="size-5 opacity-35" /></div></div>;
+    return <div style={commonStyle}><div className="grid h-24 place-items-center rounded-lg bg-gradient-to-br from-black/[0.04] to-black/[0.12]"><ImageIcon aria-hidden="true" className="size-7 opacity-35" /></div></div>;
   }
   if (block.type === "stats") {
     return <div className="grid grid-cols-2 gap-2" style={commonStyle}>{[0, 2].map((index) => <div key={index} className="rounded-md border border-black/[0.06] p-3 text-center"><strong className="block text-[16px]" style={{ color: block.accentColor ?? accentColor }}>{parts[index]}</strong><span className="text-[7px] opacity-65">{parts[index + 1]}</span></div>)}</div>;

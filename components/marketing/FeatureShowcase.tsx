@@ -37,7 +37,7 @@ export function FeatureShowcase() {
               {[
                 ["Должность", "равно", "Юрист"], ["Город", "равно", "Москва"], ["Статус", "равно", "Активен"],
               ].map((row, index) => (
-                <div key={row[0]} className="flex items-center gap-2"><span className="w-9 text-[8px] font-semibold text-[#625cf6]">{index === 0 ? "ГДЕ" : "И"}</span>{row.map((cell) => <span key={cell} className="flex flex-1 items-center justify-between rounded-lg border border-[#e2e3e9] bg-[#fafafb] px-3 py-2.5 text-left text-[10px] font-medium text-[#454754]">{cell}<ChevronDown size={12} className="text-[#9698a5]" /></span>)}</div>
+                <div key={row[0]} className="flex items-center gap-2"><span className="w-9 text-[8px] font-semibold text-[#625cf6]">{index === 0 ? "ГДЕ" : "И"}</span>{row.map((cell) => <span key={cell} className="flex flex-1 items-center justify-between rounded-lg border border-[#e2e3e9] bg-[#fafafb] px-3 py-2.5 text-left text-[10px] font-medium text-[#454754]">{cell}<ChevronDown size={16} className="text-[#9698a5]" /></span>)}</div>
               ))}
               <span className="ml-11 flex items-center gap-1.5 py-2 text-[10px] font-semibold text-[#5d57dc]"><Plus size={13} /> Добавить фильтр</span>
             </div>

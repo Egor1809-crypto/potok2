@@ -564,7 +564,7 @@ export function AiEmailAssistant({
 
       <header className="text-center">
         <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-primary text-white shadow-lg">
-          <Sparkles aria-hidden="true" className="size-5" />
+          <Sparkles aria-hidden="true" className="size-7" />
         </span>
         <h2 className="mt-4 text-[28px] font-semibold tracking-[-0.04em] text-text-strong">
           {stage === "prompt" ? "Что нужно создать?" : "Уточним детали"}
@@ -775,10 +775,10 @@ export function AiEmailAssistant({
             {busy ? (
               <LoaderCircle
                 aria-hidden="true"
-                className="size-4 animate-spin"
+                className="size-6 animate-spin"
               />
             ) : (
-              <Sparkles aria-hidden="true" className="size-4" />
+              <Sparkles aria-hidden="true" className="size-6" />
             )}
             {busy
               ? "Анализируем задачу…"
@@ -803,7 +803,7 @@ export function AiEmailAssistant({
             </span>
             {detectedUrl ? (
               <span className="ml-auto inline-flex items-center gap-1 text-success">
-                <Check className="size-3" />
+                <Check className="size-4" />
                 {useLinkedContext
                   ? "Ссылка учитывается"
                   : "Ссылка не учитывается"}
@@ -846,7 +846,7 @@ export function AiEmailAssistant({
                         onClick={() => setActiveQuestionIndex(index)}
                         className="grid size-7 place-items-center rounded-full border border-border bg-surface text-[9px] font-semibold text-text-muted outline-none transition hover:border-primary/40 hover:text-primary aria-[current=step]:border-primary aria-[current=step]:bg-primary aria-[current=step]:text-white"
                       >
-                        {complete ? <Check className="size-3" /> : index + 1}
+                        {complete ? <Check className="size-4" /> : index + 1}
                       </button>
                     );
                   })}
@@ -1086,10 +1086,10 @@ export function AiEmailAssistant({
                   {uploading ? (
                     <LoaderCircle
                       aria-hidden="true"
-                      className="size-5 animate-spin"
+                      className="size-7 animate-spin"
                     />
                   ) : (
-                    <Upload aria-hidden="true" className="size-5" />
+                    <Upload aria-hidden="true" className="size-7" />
                   )}
                 </span>
                 <strong className="mt-3 block text-[13px] text-text-strong">
@@ -1110,7 +1110,7 @@ export function AiEmailAssistant({
                   >
                     <ImagePlus
                       aria-hidden="true"
-                      className="size-3 text-primary"
+                      className="size-4 text-primary"
                     />
                     {asset.filename}
                     <span className="text-text-subtle">
@@ -1141,7 +1141,7 @@ export function AiEmailAssistant({
               variant="ghost"
               onClick={() => setStage("prompt")}
             >
-              <ArrowLeft aria-hidden="true" className="size-4" />
+              <ArrowLeft aria-hidden="true" className="size-6" />
               Изменить описание
             </Button>
             <Button
@@ -1162,10 +1162,10 @@ export function AiEmailAssistant({
               {busy ? (
                 <LoaderCircle
                   aria-hidden="true"
-                  className="size-4 animate-spin"
+                  className="size-6 animate-spin"
                 />
               ) : (
-                <WandSparkles aria-hidden="true" className="size-4" />
+                <WandSparkles aria-hidden="true" className="size-6" />
               )}
               {busy
                 ? "ИИ редактирует текст, строит дизайн и создаёт визуалы…"

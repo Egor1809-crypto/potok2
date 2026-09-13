@@ -1995,7 +1995,7 @@ export function PresentationStudio() {
           <Button
             variant="ghost"
             size="sm"
-            leadingIcon={<ArrowLeft className="size-4" />}
+            leadingIcon={<ArrowLeft className="size-6" />}
             onClick={() => navigateTo()}
           >
             Презентации
@@ -2021,7 +2021,7 @@ export function PresentationStudio() {
           <Button
             variant="outline"
             size="sm"
-            leadingIcon={<Sparkles className="size-3.5" />}
+            leadingIcon={<Sparkles className="size-5" />}
             onClick={() => void openAiCreator()}
           >
             Новая с ИИ
@@ -2029,7 +2029,7 @@ export function PresentationStudio() {
           <Button
             variant="outline"
             size="sm"
-            leadingIcon={<Copy className="size-3.5" />}
+            leadingIcon={<Copy className="size-5" />}
             onClick={() => void copyProjectLink()}
           >
             Ссылка
@@ -2037,7 +2037,7 @@ export function PresentationStudio() {
           <Button
             variant="outline"
             size="sm"
-            leadingIcon={<Download className="size-3.5" />}
+            leadingIcon={<Download className="size-5" />}
             onClick={() => void downloadPptx()}
             loading={busy === "save"}
           >
@@ -2046,14 +2046,14 @@ export function PresentationStudio() {
           <Button
             variant="outline"
             size="sm"
-            leadingIcon={<Mail className="size-3.5" />}
+            leadingIcon={<Mail className="size-5" />}
             onClick={() => void openEmailCampaign()}
           >
             В письмо
           </Button>
           <Button
             size="sm"
-            leadingIcon={<Save className="size-3.5" />}
+            leadingIcon={<Save className="size-5" />}
             onClick={() => void saveProject()}
             loading={busy === "save"}
             loadingText="Сохраняем"
@@ -2094,7 +2094,7 @@ export function PresentationStudio() {
                     setSelectedSlideId(slide.id);
                   }}
                 >
-                  <Plus className="size-4" />
+                  <Plus className="size-6" />
                 </Button>
               </div>
               <div className="flex max-h-48 gap-2 overflow-x-auto pb-1 lg:grid lg:max-h-none lg:min-h-0 lg:flex-1 lg:grid-cols-1 lg:overflow-x-hidden lg:overflow-y-auto lg:pr-1">
@@ -2141,9 +2141,9 @@ export function PresentationStudio() {
                     onClick={() => setSlidesPanelOpen((current) => !current)}
                   >
                     {slidesPanelOpen ? (
-                      <PanelLeftClose className="size-4" />
+                      <PanelLeftClose className="size-6" />
                     ) : (
-                      <PanelLeftOpen className="size-4" />
+                      <PanelLeftOpen className="size-6" />
                     )}
                   </Button>
                   <span className="shrink-0 rounded-md bg-primary-subtle px-2 py-1 text-[9px] font-semibold text-primary">
@@ -2166,7 +2166,7 @@ export function PresentationStudio() {
                     title="Выше"
                     onClick={() => moveSlide(-1)}
                   >
-                    <ArrowUp className="size-3.5" />
+                    <ArrowUp className="size-5" />
                   </Button>
                   <Button
                     variant="ghost"
@@ -2176,7 +2176,7 @@ export function PresentationStudio() {
                     title="Ниже"
                     onClick={() => moveSlide(1)}
                   >
-                    <ArrowDown className="size-3.5" />
+                    <ArrowDown className="size-5" />
                   </Button>
                   <Button
                     variant="ghost"
@@ -2186,7 +2186,7 @@ export function PresentationStudio() {
                     title="Дублировать"
                     onClick={duplicateSlide}
                   >
-                    <Copy className="size-3.5" />
+                    <Copy className="size-5" />
                   </Button>
                   <Button
                     variant="ghost"
@@ -2197,14 +2197,14 @@ export function PresentationStudio() {
                     disabled={project.slides.length <= 1}
                     onClick={removeSlide}
                   >
-                    <Trash2 className="size-3.5" />
+                    <Trash2 className="size-5" />
                   </Button>
                   </div>
                   <Button
                     variant="outline"
                     size="sm"
                     className="h-8 px-2.5 xl:hidden"
-                    leadingIcon={<Palette className="size-3.5" />}
+                    leadingIcon={<Palette className="size-5" />}
                     onClick={() => setQuickSlideOpen(true)}
                   >
                     Инструменты
@@ -2605,7 +2605,7 @@ export function PresentationStudio() {
           <div className="grid gap-5">
             <section className="grid gap-3 rounded-xl border border-border bg-surface-subtle/45 p-4">
               <div className="flex items-center gap-2">
-                <Type className="size-4 text-primary" aria-hidden="true" />
+                <Type className="size-6 text-primary" aria-hidden="true" />
                 <strong className="text-[13px]">Надписи</strong>
               </div>
               <FormField label="Заголовок-вывод" htmlFor="quick-slide-title">
@@ -2656,7 +2656,7 @@ export function PresentationStudio() {
                 className="flex items-center gap-3 rounded-xl border border-border bg-surface p-4 text-left transition hover:border-primary/40 hover:bg-primary-subtle/20"
               >
                 <span className="grid size-9 place-items-center rounded-lg bg-primary-subtle text-primary">
-                  <ImageIcon className="size-4" aria-hidden="true" />
+                  <ImageIcon className="size-6" aria-hidden="true" />
                 </span>
                 <span>
                   <strong className="block text-[12px]">
@@ -2669,7 +2669,7 @@ export function PresentationStudio() {
               </button>
               <div className="rounded-xl border border-border bg-surface p-4">
                 <div className="mb-3 flex items-center gap-2">
-                  <Palette className="size-4 text-primary" aria-hidden="true" />
+                  <Palette className="size-6 text-primary" aria-hidden="true" />
                   <strong className="text-[12px]">Фон и узор</strong>
                 </div>
                 <ThemeStrip
@@ -2768,20 +2768,20 @@ export function PresentationStudio() {
           <>
             <Button
               variant="outline"
-              leadingIcon={<Mail className="size-4" />}
+              leadingIcon={<Mail className="size-6" />}
               onClick={() => void openEmailImport()}
             >
               Из письма
             </Button>
             <Button
               variant="outline"
-              leadingIcon={<Sparkles className="size-4" />}
+              leadingIcon={<Sparkles className="size-6" />}
               onClick={() => setAiOpen(true)}
             >
               Создать с ИИ
             </Button>
             <Button
-              leadingIcon={<FilePlus2 className="size-4" />}
+              leadingIcon={<FilePlus2 className="size-6" />}
               onClick={createBlank}
               loading={busy === "blank"}
             >
@@ -2814,7 +2814,7 @@ export function PresentationStudio() {
             className="flex gap-3 rounded-lg bg-surface-subtle/55 p-3"
           >
             <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary-subtle text-primary">
-              <Icon className="size-4" />
+              <Icon className="size-6" />
             </span>
             <div>
               <p className="m-0 text-[12px] font-semibold text-text-strong">
@@ -2935,7 +2935,7 @@ export function PresentationStudio() {
                       aria-label={`${favoriteProjectIds.includes(item.id) ? "Убрать из избранного" : "Добавить в избранное"}: ${item.name}`}
                     >
                       <Star
-                        className="size-3.5"
+                        className="size-5"
                         fill={
                           favoriteProjectIds.includes(item.id)
                             ? "currentColor"
@@ -2950,7 +2950,7 @@ export function PresentationStudio() {
                       className="rounded-md p-1.5 text-text-subtle hover:bg-danger-subtle hover:text-danger"
                       aria-label={`Удалить ${item.name}`}
                     >
-                      <Trash2 className="size-3.5" />
+                      <Trash2 className="size-5" />
                     </button>
                   </div>
                 </div>
@@ -2959,7 +2959,7 @@ export function PresentationStudio() {
           </div>
         ) : (
           <div className="rounded-xl border border-dashed border-border-strong bg-surface px-6 py-10 text-center">
-            <LayoutTemplate className="mx-auto size-7 text-primary" />
+            <LayoutTemplate className="mx-auto size-9 text-primary" />
             <h3 className="mb-0 mt-3 text-[14px] font-semibold">
               {query
                 ? "Ничего не найдено"
@@ -3054,7 +3054,7 @@ export function PresentationStudio() {
                     aria-label={`${favoriteTemplateIds.includes(template.id) ? "Убрать из избранного" : "Добавить в избранное"}: ${template.name}`}
                   >
                     <Star
-                      className="size-3.5"
+                      className="size-5"
                       fill={
                         favoriteTemplateIds.includes(template.id)
                           ? "currentColor"
@@ -3113,7 +3113,7 @@ export function PresentationStudio() {
               }
               loading={busy === "ai" || busy === "ai-save"}
               loadingText="Проектируем сюжет и слайды"
-              leadingIcon={<Sparkles className="size-4" />}
+              leadingIcon={<Sparkles className="size-6" />}
             >
               Создать презентацию
             </Button>
@@ -3428,7 +3428,7 @@ export function PresentationStudio() {
               onClick={() => void createFromEmail()}
               loading={busy === "email-create"}
               disabled={!selectedEmailId}
-              leadingIcon={<Mail className="size-4" />}
+              leadingIcon={<Mail className="size-6" />}
             >
               Создать из письма
             </Button>
@@ -3455,7 +3455,7 @@ export function PresentationStudio() {
                   className="flex items-start gap-3 rounded-lg border border-border bg-surface p-3 text-left transition hover:border-primary/40 aria-pressed:border-primary aria-pressed:bg-primary-subtle/30"
                 >
                   <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg bg-surface-subtle text-text-muted">
-                    <Mail className="size-4" />
+                    <Mail className="size-6" />
                   </span>
                   <span className="min-w-0 flex-1">
                     <strong className="block truncate text-[12px]">
@@ -3466,7 +3466,7 @@ export function PresentationStudio() {
                     </span>
                   </span>
                   {selectedEmailId === template.id ? (
-                    <Check className="mt-1 size-4 shrink-0 text-primary" />
+                    <Check className="mt-1 size-6 shrink-0 text-primary" />
                   ) : null}
                 </button>
               ))}

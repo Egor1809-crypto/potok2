@@ -1018,7 +1018,7 @@ function EmailBuilderWorkspace({
         onSave={save}
         onContinue={continueFromEditor}
         continueHref={continueHref}
-        tools={<>{creationMode === "manual" && <Button type="button" variant="secondary" size="sm" aria-pressed={focusCanvas} aria-label={focusCanvas ? "Вернуть панели редактора" : "Только письмо"} onClick={() => { setFocusCanvas(value => !value); setMobilePanel("canvas"); }}>{focusCanvas ? <Minimize2 aria-hidden className="size-4" /> : <Maximize2 aria-hidden className="size-4" />}<span className="hidden xl:inline">{focusCanvas ? "Вернуть панели" : "Только письмо"}</span></Button>}<EmailExportMenu document={document} name={campaignName} /></>}
+        tools={<>{creationMode === "manual" && <Button type="button" variant="secondary" size="sm" aria-pressed={focusCanvas} aria-label={focusCanvas ? "Вернуть панели редактора" : "Только письмо"} onClick={() => { setFocusCanvas(value => !value); setMobilePanel("canvas"); }}>{focusCanvas ? <Minimize2 aria-hidden className="size-6" /> : <Maximize2 aria-hidden className="size-6" />}<span className="hidden xl:inline">{focusCanvas ? "Вернуть панели" : "Только письмо"}</span></Button>}<EmailExportMenu document={document} name={campaignName} /></>}
       />
       {creationMode === "manual" && !focusCanvas ? <EmailSubjectFields document={document} onUpdate={updateDocument} onOpenAi={() => { if (document.rawHtml) { setHtmlDirectorOpen(true); return; } setRightPanelMode("ai"); setShowProperties(true); setMobilePanel("properties"); }} /> : null}
 
@@ -1032,7 +1032,7 @@ function EmailBuilderWorkspace({
           href="/templates"
           className="inline-flex h-9 items-center gap-2 rounded-xl px-4 text-[11px] font-semibold text-text-muted outline-none transition hover:bg-surface-subtle hover:text-text-strong focus-visible:ring-2 focus-visible:ring-primary/30"
         >
-          <Library aria-hidden="true" className="size-4" />
+          <Library aria-hidden="true" className="size-6" />
           Выбрать шаблон
         </Link>
         <button
@@ -1042,7 +1042,7 @@ function EmailBuilderWorkspace({
           onClick={() => setCreationMode("manual")}
           className="inline-flex h-9 items-center gap-2 rounded-xl px-4 text-[11px] font-semibold text-text-muted outline-none transition hover:bg-surface-subtle aria-selected:bg-primary aria-selected:text-white aria-selected:shadow-[var(--shadow-sm)] focus-visible:ring-2 focus-visible:ring-primary/30"
         >
-          <PenTool aria-hidden="true" className="size-4" />
+          <PenTool aria-hidden="true" className="size-6" />
           Собрать вручную
         </button>
         <button
@@ -1052,10 +1052,10 @@ function EmailBuilderWorkspace({
           onClick={() => setCreationMode("ai")}
           className="inline-flex h-9 items-center gap-2 rounded-xl px-4 text-[11px] font-semibold text-text-muted outline-none transition hover:bg-surface-subtle aria-selected:bg-primary aria-selected:text-white aria-selected:shadow-[var(--shadow-sm)] focus-visible:ring-2 focus-visible:ring-primary/30"
         >
-          <Sparkles aria-hidden="true" className="size-4" />
+          <Sparkles aria-hidden="true" className="size-6" />
           Создать с ИИ
         </button>
-        {creationMode === "manual" && !document.rawHtml ? <div className="ml-auto flex items-center gap-1"><Button type="button" variant="ghost" size="sm" aria-pressed={showLibrary} onClick={() => setShowLibrary(value => !value)} className="hidden lg:inline-flex"><Blocks aria-hidden className="size-4" />Блоки</Button><Button type="button" variant="ghost" size="sm" aria-pressed={showProperties} onClick={() => setShowProperties(value => !value)} className="hidden lg:inline-flex"><SlidersHorizontal aria-hidden className="size-4" />Свойства</Button>{mode === "template" ? <Button type="button" size="sm" variant="ghost" onClick={() => setTemplateSettingsOpen(true)}>О шаблоне</Button> : null}</div> : null}
+        {creationMode === "manual" && !document.rawHtml ? <div className="ml-auto flex items-center gap-1"><Button type="button" variant="ghost" size="sm" aria-pressed={showLibrary} onClick={() => setShowLibrary(value => !value)} className="hidden lg:inline-flex"><Blocks aria-hidden className="size-6" />Блоки</Button><Button type="button" variant="ghost" size="sm" aria-pressed={showProperties} onClick={() => setShowProperties(value => !value)} className="hidden lg:inline-flex"><SlidersHorizontal aria-hidden className="size-6" />Свойства</Button>{mode === "template" ? <Button type="button" size="sm" variant="ghost" onClick={() => setTemplateSettingsOpen(true)}>О шаблоне</Button> : null}</div> : null}
       </div>
 
       {creationMode === "start" ? (
@@ -1065,7 +1065,7 @@ function EmailBuilderWorkspace({
         >
           <div className="mx-auto max-w-5xl text-center">
             <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-primary text-white shadow-[var(--shadow-md)]">
-              <WandSparkles aria-hidden="true" className="size-5" />
+              <WandSparkles aria-hidden="true" className="size-7" />
             </span>
             <h2
               id="builder-start-title"
@@ -1083,7 +1083,7 @@ function EmailBuilderWorkspace({
                 className="rounded-2xl border border-border bg-surface p-5 transition hover:border-primary/40 hover:shadow-[var(--shadow-sm)]"
               >
                 <span className="grid size-10 place-items-center rounded-xl bg-primary-subtle text-primary">
-                  <Library aria-hidden="true" className="size-5" />
+                  <Library aria-hidden="true" className="size-7" />
                 </span>
                 <strong className="mt-4 block text-[14px] text-text-strong">
                   Выбрать шаблон
@@ -1098,7 +1098,7 @@ function EmailBuilderWorkspace({
                 className="rounded-2xl border border-border bg-surface p-5 text-left transition hover:border-primary/40 hover:shadow-[var(--shadow-sm)]"
               >
                 <span className="grid size-10 place-items-center rounded-xl bg-primary-subtle text-primary">
-                  <PenTool aria-hidden="true" className="size-5" />
+                  <PenTool aria-hidden="true" className="size-7" />
                 </span>
                 <strong className="mt-4 block text-[14px] text-text-strong">
                   Пустой холст
@@ -1113,7 +1113,7 @@ function EmailBuilderWorkspace({
                 className="rounded-2xl border border-primary/25 bg-primary-subtle/55 p-5 text-left transition hover:border-primary/50 hover:shadow-[var(--shadow-sm)]"
               >
                 <span className="grid size-10 place-items-center rounded-xl bg-primary text-white">
-                  <Sparkles aria-hidden="true" className="size-5" />
+                  <Sparkles aria-hidden="true" className="size-7" />
                 </span>
                 <strong className="mt-4 block text-[14px] text-text-strong">
                   Создать с ИИ
@@ -1203,7 +1203,7 @@ function EmailBuilderWorkspace({
                   onClick={() => setMobilePanel(panel)}
                   className="flex h-7 items-center gap-1.5 rounded-[7px] px-2 text-[10px] font-medium capitalize text-text-muted outline-none transition aria-pressed:bg-surface aria-pressed:text-primary aria-pressed:shadow-[var(--shadow-xs)] focus-visible:ring-2 focus-visible:ring-primary/30 sm:px-2.5"
                 >
-                  <Icon aria-hidden="true" className="size-3" />
+                  <Icon aria-hidden="true" className="size-4" />
                   <span className="hidden min-[420px]:inline">
                     {panel === "blocks"
                       ? "Блоки"

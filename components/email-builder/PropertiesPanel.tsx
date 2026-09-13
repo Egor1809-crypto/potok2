@@ -130,7 +130,7 @@ export function PropertiesPanel({
       <div className="flex items-center justify-between gap-3 border-b border-border/70 px-4 py-3.5">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <SlidersHorizontal aria-hidden="true" className="size-4 text-primary" />
+            <SlidersHorizontal aria-hidden="true" className="size-6 text-primary" />
             <h2 className="m-0 text-[13px] font-semibold text-text-strong">Свойства</h2>
           </div>
           <div className="mt-1.5 flex items-center gap-1.5">
@@ -142,7 +142,7 @@ export function PropertiesPanel({
         </div>
         <div className="flex items-center gap-0.5">
           <IconButton label="Дублировать выбранный блок" variant="ghost" size="sm" onClick={onDuplicate}>
-            <Copy aria-hidden="true" className="size-3.5" />
+            <Copy aria-hidden="true" className="size-5" />
           </IconButton>
           <IconButton
             label="Удалить выбранный блок"
@@ -151,7 +151,7 @@ export function PropertiesPanel({
             className="hover:!bg-danger-subtle hover:!text-danger"
             onClick={onDelete}
           >
-            <Trash2 aria-hidden="true" className="size-3.5" />
+            <Trash2 aria-hidden="true" className="size-5" />
           </IconButton>
         </div>
       </div>
@@ -168,7 +168,7 @@ export function PropertiesPanel({
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm" className="h-7 px-2 text-[10px]">
-                      <Braces aria-hidden="true" className="size-3.5" />
+                      <Braces aria-hidden="true" className="size-5" />
                       Персонализировать
                     </Button>
                   </DropdownMenuTrigger>
@@ -207,7 +207,7 @@ export function PropertiesPanel({
             {block.type === "button" || block.type === "product" || block.type === "video" || block.type === "document" || block.type === "compliance" ? (
               <FormField label="Куда ведёт нажатие" htmlFor="builder-button-link" hint={block.href?.startsWith("https://") ? "Ссылка готова. Нажмите кнопку на холсте, чтобы проверить переход." : "Вставьте полный адрес. Если протокол не указан, добавим https:// автоматически."}>
                 <div className="relative">
-                  <Link2 aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-text-subtle" />
+                  <Link2 aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-text-subtle" />
                   <Input
                     id="builder-button-link"
                     type="url"
@@ -215,10 +215,10 @@ export function PropertiesPanel({
                     onChange={(event) => onUpdateBlock({ href: event.target.value })}
                     onBlur={(event) => onUpdateBlock({ href: normalizedActionUrl(event.target.value) })}
                     placeholder="https://example.ru/страница"
-                    className="pl-8 text-[11px]"
+                    className="input-with-leading-icon text-[11px]"
                   />
                 </div>
-                {block.href ? <a href={normalizedActionUrl(block.href)} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold text-primary hover:underline"><Link2 aria-hidden="true" className="size-3" />Проверить ссылку в новой вкладке</a> : null}
+                {block.href ? <a href={normalizedActionUrl(block.href)} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold text-primary hover:underline"><Link2 aria-hidden="true" className="size-4" />Проверить ссылку в новой вкладке</a> : null}
               </FormField>
             ) : null}
             {block.type === "image" || block.type === "logo" ? (
@@ -231,7 +231,7 @@ export function PropertiesPanel({
             {block.type === "image" || block.type === "logo" ? (
               <FormField label="Ссылка при нажатии" htmlFor="builder-image-action" hint="Получатель откроет эту страницу, если нажмёт на фотографию или логотип.">
                 <div className="relative">
-                  <Link2 aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-text-subtle" />
+                  <Link2 aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-text-subtle" />
                   <Input
                     id="builder-image-action"
                     type="url"
@@ -239,7 +239,7 @@ export function PropertiesPanel({
                     placeholder="https://company.ru/страница"
                     onChange={(event) => onUpdateBlock({ linkHref: event.target.value })}
                     onBlur={(event) => onUpdateBlock({ linkHref: normalizedActionUrl(event.target.value) })}
-                    className="pl-8 text-[11px]"
+                    className="input-with-leading-icon text-[11px]"
                   />
                 </div>
               </FormField>
@@ -251,7 +251,7 @@ export function PropertiesPanel({
                 hint="Можно использовать уже размещённое изображение."
               >
                 <div className="relative">
-                  <Link2 aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-text-subtle" />
+                  <Link2 aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-text-subtle" />
                   <Input
                     id="builder-image-link"
                     type="url"
@@ -259,7 +259,7 @@ export function PropertiesPanel({
                     value={block.href ?? ""}
                     placeholder="https://example.ru/image.jpg"
                     onChange={(event) => onUpdateBlock({ href: event.target.value })}
-                    className="pl-8 text-[11px]"
+                    className="input-with-leading-icon text-[11px]"
                   />
                 </div>
               </FormField>
@@ -326,7 +326,7 @@ export function PropertiesPanel({
                       onClick={() => onUpdateBlock({ alignment })}
                       className="grid h-8 place-items-center rounded-[7px] text-text-muted outline-none transition hover:text-text-strong focus-visible:ring-2 focus-visible:ring-primary/30 aria-pressed:bg-surface aria-pressed:text-primary aria-pressed:shadow-[var(--shadow-xs)]"
                     >
-                      <Icon aria-hidden="true" className="size-4" />
+                      <Icon aria-hidden="true" className="size-6" />
                     </button>
                   ))}
                 </div>
@@ -454,7 +454,7 @@ export function PropertiesPanel({
             <ColorField label="Внешний фон" value={document.workspaceBackground} onChange={(workspaceBackground) => onUpdateDocument({ workspaceBackground })} />
             <FormField label="Ширина письма" htmlFor="builder-content-width">
               <div className="flex items-center gap-2">
-                <Maximize2 aria-hidden="true" className="size-4 text-text-subtle" />
+                <Maximize2 aria-hidden="true" className="size-6 text-text-subtle" />
                 <Select id="builder-content-width" value={String(document.contentWidth)} onChange={(event) => onUpdateDocument({ contentWidth: Number(event.target.value) })} options={[{value:"480",label:"Узкое · 480"},{value:"560",label:"Компактное · 560"},{value:"640",label:"Стандарт · 640"},{value:"720",label:"Широкое · 720"}]} />
               </div>
             </FormField>
@@ -480,7 +480,7 @@ function PropertySection({
     <section className="border-b border-border/70 px-4 py-4">
       <div className="mb-3 flex items-center justify-between gap-2">
         <h3 className="m-0 flex items-center gap-2 text-[11px] font-semibold text-text-strong">
-          <Icon aria-hidden="true" className="size-3.5 text-text-subtle" />
+          <Icon aria-hidden="true" className="size-5 text-text-subtle" />
           {title}
         </h3>
         {action}

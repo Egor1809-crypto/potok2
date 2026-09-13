@@ -135,7 +135,7 @@ export function EmailCanvas({
               <div className="grid min-h-[420px] place-items-center px-8 py-14 text-center">
                 <div className="max-w-[320px]">
                   <span className="mx-auto grid size-12 place-items-center rounded-2xl border border-dashed border-primary/40 bg-primary-subtle text-primary">
-                    <Plus aria-hidden="true" className="size-5" />
+                    <Plus aria-hidden="true" className="size-7" />
                   </span>
                   <strong className="mt-4 block text-[16px] text-text-strong">
                     Пустой холст
@@ -149,7 +149,7 @@ export function EmailCanvas({
                     onClick={() => onOpenBlocks()}
                     className="mt-4 inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-4 text-[11px] font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
                   >
-                    <Plus aria-hidden="true" className="size-3.5" />
+                    <Plus aria-hidden="true" className="size-5" />
                     Добавить первый блок
                   </button>
                 </div>
@@ -199,7 +199,7 @@ export function EmailCanvas({
                 onClick={() => onOpenBlocks()}
                 className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-dashed border-border-strong px-3 text-[10px] font-medium text-text-muted outline-none transition hover:border-primary/40 hover:bg-primary-subtle/40 hover:text-primary focus-visible:ring-2 focus-visible:ring-primary/30"
               >
-                <Plus aria-hidden="true" className="size-3.5" />
+                <Plus aria-hidden="true" className="size-5" />
                 Добавить блок контента
               </button>
             </div> : null}
@@ -329,7 +329,7 @@ function CanvasBlock({
             }}
             onDragEnd={onDragEnd}
           >
-            <GripVertical aria-hidden="true" className="size-3.5" />
+            <GripVertical aria-hidden="true" className="size-5" />
           </IconButton>
           <IconButton
             label="Переместить блок вверх"
@@ -338,7 +338,7 @@ function CanvasBlock({
             disabled={first}
             onClick={() => onMove(-1)}
           >
-            <ArrowUp aria-hidden="true" className="size-3.5" />
+            <ArrowUp aria-hidden="true" className="size-5" />
           </IconButton>
           <IconButton
             label="Переместить блок вниз"
@@ -347,7 +347,7 @@ function CanvasBlock({
             disabled={last}
             onClick={() => onMove(1)}
           >
-            <ArrowDown aria-hidden="true" className="size-3.5" />
+            <ArrowDown aria-hidden="true" className="size-5" />
           </IconButton>
           <IconButton
             label="Дублировать блок"
@@ -355,7 +355,7 @@ function CanvasBlock({
             variant="ghost"
             onClick={onDuplicate}
           >
-            <Copy aria-hidden="true" className="size-3.5" />
+            <Copy aria-hidden="true" className="size-5" />
           </IconButton>
           <IconButton
             label="Удалить блок"
@@ -364,7 +364,7 @@ function CanvasBlock({
             className="hover:!bg-danger-subtle hover:!text-danger"
             onClick={onDelete}
           >
-            <Trash2 aria-hidden="true" className="size-3.5" />
+            <Trash2 aria-hidden="true" className="size-5" />
           </IconButton>
         </div>
       ) : null}
@@ -407,7 +407,7 @@ function CanvasBlock({
           selected ? "flex" : "hidden group-hover/add:flex",
         )}
       >
-        <Plus aria-hidden="true" className="size-3" />
+        <Plus aria-hidden="true" className="size-4" />
         Добавить ниже
       </button>
     </div>
@@ -685,9 +685,9 @@ function BlockContent({
               style={{ fontSize: block.fontSize, color: accentColor }}
             >
               {index === 0 ? (
-                <Linkedin aria-hidden="true" className="size-3" />
+                <Linkedin aria-hidden="true" className="size-4" />
               ) : (
-                <Globe2 aria-hidden="true" className="size-3" />
+                <Globe2 aria-hidden="true" className="size-4" />
               )}
               {item}
             </a>

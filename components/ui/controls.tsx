@@ -25,13 +25,13 @@ export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
     }, [indeterminate]);
 
     const input = (
-      <span className="relative inline-grid size-4 shrink-0 place-items-center">
+      <span className="relative inline-grid size-5 shrink-0 place-items-center">
         <input
           ref={localRef}
           id={inputId}
           type="checkbox"
           className={cn(
-            "peer size-4 appearance-none rounded-[5px] border border-border-strong bg-surface shadow-[var(--shadow-xs)] transition-colors checked:border-primary checked:bg-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25 disabled:cursor-not-allowed disabled:opacity-50",
+            "peer size-5 appearance-none rounded-[5px] border border-border-strong bg-surface shadow-[var(--shadow-xs)] transition-colors checked:border-primary checked:bg-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25 disabled:cursor-not-allowed disabled:opacity-50",
             className,
           )}
           {...props}
@@ -39,13 +39,13 @@ export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
         {indeterminate ? (
           <Minus
             aria-hidden="true"
-            className="pointer-events-none absolute size-3 text-white opacity-0 peer-checked:opacity-100 peer-indeterminate:opacity-100"
+            className="pointer-events-none absolute size-4 text-white opacity-0 peer-checked:opacity-100 peer-indeterminate:opacity-100"
             strokeWidth={3}
           />
         ) : (
           <Check
             aria-hidden="true"
-            className="pointer-events-none absolute size-3 text-white opacity-0 peer-checked:opacity-100"
+            className="pointer-events-none absolute size-4 text-white opacity-0 peer-checked:opacity-100"
             strokeWidth={3}
           />
         )}

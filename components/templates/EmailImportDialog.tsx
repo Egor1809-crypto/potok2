@@ -21,7 +21,7 @@ export function EmailImportDialog({ open, onOpenChange, busy, progress, error, o
     <div className="min-w-0 space-y-4">
       {error ? <Alert tone="danger">{error}</Alert> : null}
       <Tabs value={tab} onValueChange={value => { if (!busy) setTab(value); }}>
-        <TabsList aria-label="Способ импорта письма"><TabsTrigger value="file" disabled={busy}><Upload className="mr-2 size-4" aria-hidden="true" />Из файла</TabsTrigger><TabsTrigger value="code" disabled={busy}><Code2 className="mr-2 size-4" aria-hidden="true" />Вставить код</TabsTrigger></TabsList>
+        <TabsList aria-label="Способ импорта письма"><TabsTrigger value="file" disabled={busy}><Upload className="mr-2 size-6" aria-hidden="true" />Из файла</TabsTrigger><TabsTrigger value="code" disabled={busy}><Code2 className="mr-2 size-6" aria-hidden="true" />Вставить код</TabsTrigger></TabsList>
         <TabsContent value="file" className="space-y-4 pt-4">
           <p className="text-sm leading-6 text-text-muted">HTML, PDF, Word DOCX, изображения, TXT и JSON Поток. Вместе с HTML можно выбрать его изображения и CSS.</p>
           <input ref={fileInput} type="file" multiple accept={importAccept} hidden disabled={busy} onChange={event => { const files = Array.from(event.target.files ?? []); event.target.value = ""; if (files.length) onFiles(files); }} />

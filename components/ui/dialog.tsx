@@ -181,7 +181,7 @@ export function Modal({
             onClick={close}
             className="-mt-1 -mr-1 shrink-0"
           >
-            <X aria-hidden="true" className="size-4" />
+            <X aria-hidden="true" className="size-6" />
           </IconButton>
         </div>
         <div className={cn("scrollbar-subtle min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-5 sm:p-6", contentClassName)}>
@@ -286,7 +286,7 @@ export function Drawer({
             onClick={close}
             className="-mt-1 -mr-1 shrink-0"
           >
-            <X aria-hidden="true" className="size-4" />
+            <X aria-hidden="true" className="size-6" />
           </IconButton>
         </div>
         <div className={cn("scrollbar-subtle min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-5 sm:p-6", contentClassName)}>

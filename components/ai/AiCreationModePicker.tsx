@@ -47,7 +47,7 @@ export function AiCreationModePicker({
     >
       <div className="flex items-center gap-2 px-2.5 pb-2 pt-1.5">
         <span className="grid size-7 place-items-center rounded-lg bg-primary text-white shadow-[var(--shadow-xs)]">
-          <Sparkles aria-hidden="true" className="size-3.5" />
+          <Sparkles aria-hidden="true" className="size-5" />
         </span>
         <div>
           <strong className="block text-[11px] text-text-strong">
@@ -88,7 +88,7 @@ export function AiCreationModePicker({
                     : "bg-surface-subtle text-text-muted group-hover:bg-primary-subtle group-hover:text-primary",
                 )}
               >
-                <Icon aria-hidden="true" className="size-4" />
+                <Icon aria-hidden="true" className="size-6" />
               </span>
               <span className="mt-3 block text-[8px] font-semibold uppercase tracking-[.13em] text-primary">
                 {option.eyebrow}
@@ -104,7 +104,7 @@ export function AiCreationModePicker({
               </span>
               {selected ? (
                 <span className="absolute right-3 top-3 grid size-6 place-items-center rounded-full bg-primary text-white shadow-[var(--shadow-xs)]">
-                  <Check aria-hidden="true" className="size-3.5" />
+                  <Check aria-hidden="true" className="size-5" />
                 </span>
               ) : null}
             </button>

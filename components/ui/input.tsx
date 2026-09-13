@@ -47,7 +47,7 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
       <div className={cn("relative", wrapperClassName)}>
         <Search
           aria-hidden="true"
-          className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-text-subtle"
+          className="pointer-events-none absolute top-1/2 left-3 size-6 -translate-y-1/2 text-text-subtle"
           strokeWidth={1.8}
         />
         <Input
@@ -69,7 +69,7 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
             aria-label="Очистить поиск"
             className="absolute top-1/2 right-2 grid size-6 -translate-y-1/2 place-items-center rounded-md text-text-subtle transition-colors hover:bg-surface-subtle hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
           >
-            <X aria-hidden="true" className="size-3.5" />
+            <X aria-hidden="true" className="size-5" />
           </button>
         )}
       </div>

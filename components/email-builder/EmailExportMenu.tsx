@@ -429,7 +429,7 @@ export function EmailExportMenu({ document, name }: { document: BuilderDocument;
   return <>
     <div className="relative">
       <Button type="button" variant="secondary" size="sm" disabled={busy} onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-haspopup="dialog" aria-label="Скачать письмо">
-        <Download aria-hidden="true" className="size-3.5" /><span className="hidden xl:inline">{busy ? "Готовим…" : "Скачать"}</span>
+        <Download aria-hidden="true" className="size-5" /><span className="hidden xl:inline">{busy ? "Готовим…" : "Скачать"}</span>
       </Button>
     </div>
 
@@ -439,7 +439,7 @@ export function EmailExportMenu({ document, name }: { document: BuilderDocument;
         <div className="min-w-0 space-y-3"><p className="text-sm font-semibold">Выберите формат</p>
           <label className="flex items-center justify-between gap-3 text-sm">Количество копий<input type="number" min="1" max="20" value={copies} onChange={event => setCopies(Math.max(1, Math.min(20, Number(event.target.value) || 1)))} className="input w-20" /></label>
           {options.map(([format, Icon, label, hint]) => <button key={format} type="button" onClick={() => void run(format)} className="flex min-h-14 w-full items-center gap-3 rounded-xl border border-border px-3 py-3 text-left hover:border-primary hover:bg-primary-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
-            <Icon aria-hidden className="size-5 shrink-0 text-primary" /><span><span className="block text-sm font-semibold">{label}</span><span className="mt-1 block text-xs text-text-muted">{hint}</span></span>
+            <Icon aria-hidden className="size-7 shrink-0 text-primary" /><span><span className="block text-sm font-semibold">{label}</span><span className="mt-1 block text-xs text-text-muted">{hint}</span></span>
           </button>)}
           <p className="text-xs leading-5 text-text-muted">Скачивается текущая версия письма с вашими правками. Текстовый формат сохраняет только текст.</p>
         </div>
@@ -450,14 +450,14 @@ export function EmailExportMenu({ document, name }: { document: BuilderDocument;
       <div className="fixed inset-0 z-[1000] grid place-items-center bg-[#211924]/45 p-4 backdrop-blur-[2px]" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setDialog(null); }}>
         <div ref={dialogRef} tabIndex={-1} role="alertdialog" aria-modal="true" aria-labelledby="export-dialog-title" aria-describedby="export-dialog-description" className="w-full max-w-md rounded-2xl border border-border bg-surface p-5 shadow-[var(--shadow-floating)] outline-none sm:p-6">
           <div className="flex items-start gap-3">
-            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-warning-subtle text-warning"><AlertCircle aria-hidden="true" className="size-5" /></span>
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-warning-subtle text-warning"><AlertCircle aria-hidden="true" className="size-7" /></span>
             <div className="min-w-0 flex-1"><h2 id="export-dialog-title" className="m-0 text-[16px] font-semibold text-text-strong">{dialog.title}</h2><p id="export-dialog-description" className="mb-0 mt-2 text-[12px] leading-5 text-text-muted">{dialog.message}</p></div>
-            <button type="button" onClick={() => setDialog(null)} className="grid size-8 shrink-0 place-items-center rounded-lg text-text-muted hover:bg-surface-subtle" aria-label="Закрыть"><X aria-hidden="true" className="size-4" /></button>
+            <button type="button" onClick={() => setDialog(null)} className="grid size-8 shrink-0 place-items-center rounded-lg text-text-muted hover:bg-surface-subtle" aria-label="Закрыть"><X aria-hidden="true" className="size-6" /></button>
           </div>
           <div className="mt-5 flex justify-end gap-2">
             <Button type="button" variant="secondary" size="sm" onClick={() => setDialog(null)}>Закрыть</Button>
-            {dialog.download ? <a href={dialog.download.url} download={dialog.download.filename} className="btn btn-primary btn-sm"><Download aria-hidden="true" className="size-4" />Скачать PDF</a> : null}
-            {dialog.retryPdf ? <Button type="button" variant="primary" size="sm" onClick={() => void run("pdf")}><Printer aria-hidden="true" className="size-4" />Разрешить и повторить</Button> : null}
+            {dialog.download ? <a href={dialog.download.url} download={dialog.download.filename} className="btn btn-primary btn-sm"><Download aria-hidden="true" className="size-6" />Скачать PDF</a> : null}
+            {dialog.retryPdf ? <Button type="button" variant="primary" size="sm" onClick={() => void run("pdf")}><Printer aria-hidden="true" className="size-6" />Разрешить и повторить</Button> : null}
           </div>
         </div>
       </div>,

@@ -101,7 +101,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(function 
           const match = enabled.find(index => entries[index].label.toLocaleLowerCase("ru").startsWith(text));
           if (!open) show(); if (match !== undefined) setActive(match);
         }
-      }}><span className="min-w-0 truncate">{entries[selectedIndex]?.label ?? placeholder ?? "Выберите…"}</span><ChevronDown aria-hidden className={cn("size-4 shrink-0 text-text-muted", open && "rotate-180")} /></button>
+      }}><span className="min-w-0 truncate">{entries[selectedIndex]?.label ?? placeholder ?? "Выберите…"}</span><ChevronDown aria-hidden className={cn("size-6 shrink-0 text-text-muted", open && "rotate-180")} /></button>
     <select {...props} ref={native} value={value} defaultValue={defaultValue} disabled={disabled} aria-hidden="true" tabIndex={-1} className="sr-only pointer-events-none" onFocus={() => trigger.current?.focus()}
       onInvalid={event => { event.preventDefault(); setInvalid(true); trigger.current?.focus(); props.onInvalid?.(event); }}
       onChange={event => { setUncontrolled(event.currentTarget.value); setInvalid(false); onChange?.(event); }}>
@@ -110,7 +110,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(function 
     {open && position && createPortal(<div ref={list} id={listId} role="listbox" tabIndex={-1} aria-label={props["aria-label"] ?? "Варианты"} className="fixed z-[1500] overflow-x-hidden overflow-y-auto overscroll-contain rounded-xl border border-border bg-surface-raised p-1 shadow-[var(--shadow-lg)]" style={position} onMouseDown={event => event.preventDefault()}>
       {entries.map((entry, index) => <div key={`${entry.value}:${index}`} id={`${uid}-${index}`} data-option-index={index} role="option" tabIndex={-1} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); choose(index); } }} aria-selected={entry.value === selected} aria-disabled={entry.disabled || undefined}
         className={cn("flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm [overflow-wrap:anywhere]", index === active ? "bg-primary-subtle text-primary" : "text-text-strong", entry.disabled && "cursor-not-allowed opacity-40")}
-        onMouseMove={() => { if (!entry.disabled) setActive(index); }} onClick={() => choose(index)}><span className="min-w-0 flex-1">{entry.label}</span>{entry.value === selected && <Check aria-hidden className="size-4 shrink-0 text-primary" />}</div>)}
+        onMouseMove={() => { if (!entry.disabled) setActive(index); }} onClick={() => choose(index)}><span className="min-w-0 flex-1">{entry.label}</span>{entry.value === selected && <Check aria-hidden className="size-6 shrink-0 text-primary" />}</div>)}
     </div>, document.body)}
   </div>;
 });

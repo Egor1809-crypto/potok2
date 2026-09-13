@@ -1158,7 +1158,7 @@ function CampaignWizardState({
       <div className="mx-auto flex min-h-[560px] max-w-2xl items-center py-10">
         <section className="card w-full p-7 text-center sm:p-10">
           <span className="mx-auto grid size-14 place-items-center rounded-full bg-success-subtle text-success">
-            <CheckCircle2 aria-hidden="true" className="size-7" />
+            <CheckCircle2 aria-hidden="true" className="size-9" />
           </span>
           <Badge variant="success" className="mt-5">{finishedCampaign.dispatched ? "Передано провайдеру" : "Готовность подтверждена"}</Badge>
           <h1 className="mt-4 text-[26px] font-semibold tracking-[-0.035em] text-text-strong">
@@ -1180,7 +1180,7 @@ function CampaignWizardState({
             ) : null}
             <Link href={`/campaigns/${finishedCampaign.id}`} className={buttonVariants({ variant: "primary" })}>
               Открыть кампанию
-              <ArrowRight aria-hidden="true" className="size-4" />
+              <ArrowRight aria-hidden="true" className="size-6" />
             </Link>
           </div>
         </section>
@@ -1219,7 +1219,7 @@ function CampaignWizardState({
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <Link href="/campaigns" className="inline-flex items-center gap-1.5 text-[13px] font-medium text-text-muted hover:text-text-strong">
-            <ArrowLeft aria-hidden="true" className="size-4" />
+            <ArrowLeft aria-hidden="true" className="size-6" />
             Кампании
           </Link>
           <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -1237,7 +1237,7 @@ function CampaignWizardState({
           onClick={() => void mutateCampaign("save")}
           loading={busyAction === "save"}
           loadingText="Сохраняем…"
-          leadingIcon={<Save aria-hidden="true" className="size-4" />}
+          leadingIcon={<Save aria-hidden="true" className="size-6" />}
         >
           Сохранить черновик
         </Button>
@@ -1252,7 +1252,7 @@ function CampaignWizardState({
             size="sm"
             className="mt-3"
             onClick={() => void loadWorkspace()}
-            leadingIcon={<RefreshCw aria-hidden="true" className="size-3.5" />}
+            leadingIcon={<RefreshCw aria-hidden="true" className="size-5" />}
           >
             Повторить подключение
           </Button>
@@ -1421,12 +1421,12 @@ function CampaignWizardState({
             {currentStep === 0 ? (
               <Link href="/campaigns" className={buttonVariants({ variant: "ghost" })}>Отмена</Link>
             ) : (
-              <Button variant="ghost" onClick={() => { setCurrentStep((step) => step - 1); setError(null); }} leadingIcon={<ArrowLeft className="size-4" />}>
+              <Button variant="ghost" onClick={() => { setCurrentStep((step) => step - 1); setError(null); }} leadingIcon={<ArrowLeft className="size-6" />}>
                 Назад
               </Button>
             )}
             {currentStep < 3 ? (
-              <Button onClick={goNext} trailingIcon={<ArrowRight className="size-4" />}>
+              <Button onClick={goNext} trailingIcon={<ArrowRight className="size-6" />}>
                 Далее: {steps[currentStep + 1].label}
               </Button>
             ) : (
@@ -1434,7 +1434,7 @@ function CampaignWizardState({
                 onClick={() => void mutateCampaign("launch")}
                 loading={busyAction === "launch"}
                 loadingText="Проверяем…"
-                leadingIcon={<Send className="size-4" />}
+                leadingIcon={<Send className="size-6" />}
               >
                 {evaluation?.blockers.length
                   ? "Проверить повторно"
@@ -1657,7 +1657,7 @@ function AudienceStep({
               )}
             >
               <span className={cn("grid size-10 shrink-0 place-items-center rounded-xl", selected ? "bg-primary text-white" : "bg-surface-subtle text-text-muted")}>
-                <Icon aria-hidden="true" className="size-4.5" />
+                <Icon aria-hidden="true" className="size-7" />
               </span>
               <span>
                 <span className="block text-[14px] font-semibold text-text-strong">{option.title}</span>
@@ -1684,7 +1684,7 @@ function AudienceStep({
                 )}
               >
                 <span className={cn("grid size-6 place-items-center rounded-full border", selected ? "border-primary bg-primary text-white" : "border-border-strong")}>
-                  {selected ? <Check aria-hidden="true" className="size-3.5" /> : null}
+                  {selected ? <Check aria-hidden="true" className="size-5" /> : null}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-[13px] font-semibold text-text-strong">{segment.name}</span>
@@ -1790,7 +1790,7 @@ function AudienceStep({
           ) : null}
           <div className="mt-3 grid gap-2 rounded-xl border border-border bg-surface-subtle/45 p-3">
             <div className="relative">
-              <Search aria-hidden="true" className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-text-subtle" />
+              <Search aria-hidden="true" className="pointer-events-none absolute start-3 top-1/2 size-6 -translate-y-1/2 text-text-subtle" />
               <Input aria-label="Поиск контактов" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск по имени, email, компании или должности" className="input-with-leading-icon" />
             </div>
             <div className="grid min-w-0 gap-2 sm:grid-cols-2">
@@ -1985,7 +1985,7 @@ function MessageStep({
         {!telegramOnly && (
         <section className="rounded-xl border border-border p-5" aria-labelledby="email-message-title">
           <div className="flex items-center gap-3">
-            <span className="grid size-9 place-items-center rounded-xl bg-primary-subtle text-primary"><Mail aria-hidden="true" className="size-4" /></span>
+            <span className="grid size-9 place-items-center rounded-xl bg-primary-subtle text-primary"><Mail aria-hidden="true" className="size-6" /></span>
             <div>
               <h3 id="email-message-title" className="text-[15px] font-semibold text-text-strong">Email</h3>
               <p className="mt-0.5 text-[11px] text-text-muted">Тема, прехедер и основной текст</p>
@@ -2007,7 +2007,7 @@ function MessageStep({
               </p>
             ) : null}
             <Link href={editorHref} className={buttonVariants({ variant: "secondary", size: "sm" })}>
-              <PencilLine aria-hidden="true" className="size-3.5" />
+              <PencilLine aria-hidden="true" className="size-5" />
               Открыть визуальный редактор
             </Link>
           </div>
@@ -2016,7 +2016,7 @@ function MessageStep({
         )}
         <section className="rounded-xl border border-border p-5" aria-labelledby="messenger-message-title">
           <div className="flex items-center gap-3">
-            <span className="grid size-9 place-items-center rounded-xl bg-info-subtle text-info"><MessageCircle aria-hidden="true" className="size-4" /></span>
+            <span className="grid size-9 place-items-center rounded-xl bg-info-subtle text-info"><MessageCircle aria-hidden="true" className="size-6" /></span>
             <div>
               <h3 id="messenger-message-title" className="text-[15px] font-semibold text-text-strong">{telegramOnly ? "Сообщение в Telegram" : "Telegram и ВКонтакте"}</h3>
               <p className="mt-0.5 text-[11px] text-text-muted">{telegramOnly ? "Текст получит каждый выбранный подписчик" : "Один короткий вариант для выбранных мессенджеров"}</p>
@@ -2098,7 +2098,7 @@ function ChannelsStep({
                   onClick={() => onToggleChannel(channel.id)}
                   className="flex min-w-0 flex-1 items-center gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
                 >
-                  <span className={cn("grid size-10 shrink-0 place-items-center rounded-xl", selected ? "bg-primary text-white" : "bg-surface-subtle text-text-muted")}><Icon aria-hidden="true" className="size-4" /></span>
+                  <span className={cn("grid size-10 shrink-0 place-items-center rounded-xl", selected ? "bg-primary text-white" : "bg-surface-subtle text-text-muted")}><Icon aria-hidden="true" className="size-6" /></span>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2">
                       <span className="text-[14px] font-semibold text-text-strong">{channel.label}</span>
@@ -2126,7 +2126,7 @@ function ChannelsStep({
                       href={`/integrations?channel=${channel.id}&provider=${providerId}`}
                       className={buttonVariants({ variant: connection === "connected" ? "ghost" : "secondary", size: "sm" })}
                     >
-                      <Settings2 aria-hidden="true" className="size-3.5" />
+                      <Settings2 aria-hidden="true" className="size-5" />
                       {connection === "connected" ? "Открыть" : "Настроить"}
                     </Link>
                   </div>
@@ -2162,7 +2162,7 @@ function ChannelsStep({
       ) : null}
 
       <div className="mt-6 flex items-start gap-3 rounded-xl border border-border bg-surface-subtle p-4">
-        <ShieldCheck aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-primary" />
+        <ShieldCheck aria-hidden="true" className="mt-0.5 size-7 shrink-0 text-primary" />
         <div className="flex items-start gap-3">
           <div>
             <p className="text-[13px] font-semibold text-text-strong">Согласия проверяет сервер</p>
@@ -2281,7 +2281,7 @@ function ReviewStep({
                     aria-label={`Удалить волну ${index + 1}`}
                     onClick={() => onScheduledTimesChange(scheduledTimes.filter((_, itemIndex) => itemIndex !== index))}
                   >
-                    <Trash2 aria-hidden="true" className="size-4" />
+                    <Trash2 aria-hidden="true" className="size-6" />
                   </Button>
                 ) : null}
               </div>
@@ -2295,7 +2295,7 @@ function ReviewStep({
                 size="sm"
                 variant="secondary"
                 disabled={scheduledTimes.length >= 20}
-                leadingIcon={<Plus aria-hidden="true" className="size-4" />}
+                leadingIcon={<Plus aria-hidden="true" className="size-6" />}
                 onClick={() => onScheduledTimesChange([...scheduledTimes, nextWaveTime(scheduledTimes)])}
               >
                 Добавить время
@@ -2317,7 +2317,7 @@ function ReviewStep({
 
       <section className={cn("mt-6 rounded-xl border p-5", blockers.length ? "border-warning/30 bg-warning-subtle" : "border-success/25 bg-success-subtle")} aria-labelledby="blockers-title">
         <div className="flex items-center gap-3">
-          {blockers.length ? <CircleAlert aria-hidden="true" className="size-5 text-warning" /> : <CheckCircle2 aria-hidden="true" className="size-5 text-success" />}
+          {blockers.length ? <CircleAlert aria-hidden="true" className="size-7 text-warning" /> : <CheckCircle2 aria-hidden="true" className="size-7 text-success" />}
           <div>
             <h3 id="blockers-title" className="text-[14px] font-semibold text-text-strong">{blockers.length ? `Причин, мешающих запуску: ${blockers.length}` : "Предварительная проверка пройдена"}</h3>
             <p className="mt-1 text-[12px] text-text-muted">{evaluation ? "Результат серверной проверки" : "Предварительная проверка формы"}</p>
@@ -2325,7 +2325,7 @@ function ReviewStep({
         </div>
         {blockers.length ? (
           <ul className="mt-4 space-y-2 text-[12px] leading-5 text-text">
-            {blockers.map((blocker) => <li key={blocker} className="flex gap-2"><CircleDashed aria-hidden="true" className="mt-1 size-3.5 shrink-0" />{blocker}</li>)}
+            {blockers.map((blocker) => <li key={blocker} className="flex gap-2"><CircleDashed aria-hidden="true" className="mt-1 size-5 shrink-0" />{blocker}</li>)}
           </ul>
         ) : (
           <p className="mt-3 text-[12px] leading-5 text-text">Нажмите «Проверить и отправить»: сервер рассчитает финальный охват и после успешной проверки передаст письма провайдеру.</p>
@@ -2368,10 +2368,10 @@ function CampaignSummary({
         <Badge variant={blockers.length === 0 ? "success" : "warning"} dot>{blockers.length === 0 ? "Готово" : `Нужно исправить: ${blockers.length}`}</Badge>
       </div>
       <dl className="mt-5 space-y-4">
-        <SummaryRow icon={<Send aria-hidden="true" className="size-4" />} label="Рассылка" value={campaignName || "Не названа"} />
-        <SummaryRow icon={<UsersRound aria-hidden="true" className="size-4" />} label="Аудитория" value={`${audienceLabel} · ${formatNumber(recipientCount)}`} />
+        <SummaryRow icon={<Send aria-hidden="true" className="size-6" />} label="Рассылка" value={campaignName || "Не названа"} />
+        <SummaryRow icon={<UsersRound aria-hidden="true" className="size-6" />} label="Аудитория" value={`${audienceLabel} · ${formatNumber(recipientCount)}`} />
         <SummaryRow
-          icon={<ShieldCheck aria-hidden="true" className="size-4" />}
+          icon={<ShieldCheck aria-hidden="true" className="size-6" />}
           label="Маршруты"
           value={currentStep < 2
             ? "Настроите на шаге 3"

@@ -129,8 +129,8 @@ export function ContactDrawer({
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--border)] bg-white/95 px-5 py-3 backdrop-blur-xl">
           <p className="text-[12px] font-semibold">Карточка контакта</p>
           <div className="flex items-center gap-1">
-            {!embedded && <Link href={`/contacts/${contact.id}`} className="grid size-9 place-items-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface-subtle)]" aria-label="Открыть отдельную страницу"><ExternalLink aria-hidden="true" className="size-4" /></Link>}
-            {onClose && <button data-autofocus={!embedded ? "true" : undefined} type="button" onClick={onClose} className="grid size-9 place-items-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface-subtle)]" aria-label="Закрыть карточку"><X aria-hidden="true" className="size-5" /></button>}
+            {!embedded && <Link href={`/contacts/${contact.id}`} className="grid size-9 place-items-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface-subtle)]" aria-label="Открыть отдельную страницу"><ExternalLink aria-hidden="true" className="size-6" /></Link>}
+            {onClose && <button data-autofocus={!embedded ? "true" : undefined} type="button" onClick={onClose} className="grid size-9 place-items-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface-subtle)]" aria-label="Закрыть карточку"><X aria-hidden="true" className="size-7" /></button>}
           </div>
         </div>
 
@@ -144,9 +144,9 @@ export function ContactDrawer({
           </div>
 
           <div className="mt-6 flex flex-wrap gap-2">
-            {contact.email && <a href={`mailto:${contact.email}`} className="btn btn-primary gap-2"><Mail aria-hidden="true" className="size-4" />Написать письмо</a>}
-            <Link href={`/campaigns/new?contact=${contact.id}`} className="btn btn-secondary gap-2"><Send aria-hidden="true" className="size-4" />В кампанию</Link>
-            {stored && onEdit && <button type="button" onClick={() => onEdit(contact)} className="btn btn-secondary gap-2"><Pencil aria-hidden="true" className="size-4" />Изменить</button>}
+            {contact.email && <a href={`mailto:${contact.email}`} className="btn btn-primary gap-2"><Mail aria-hidden="true" className="size-6" />Написать письмо</a>}
+            <Link href={`/campaigns/new?contact=${contact.id}`} className="btn btn-secondary gap-2"><Send aria-hidden="true" className="size-6" />В кампанию</Link>
+            {stored && onEdit && <button type="button" onClick={() => onEdit(contact)} className="btn btn-secondary gap-2"><Pencil aria-hidden="true" className="size-6" />Изменить</button>}
           </div>
 
           <section className="mt-8">
@@ -184,7 +184,7 @@ export function ContactDrawer({
             <div className="mt-3 grid gap-2 sm:grid-cols-3">
               {channels.map(({ id, label, address, ready, reason, Icon }) => (
                 <div key={id} className="rounded-xl border border-[var(--border)] p-3">
-                  <div className="flex items-center justify-between gap-2"><span className={`grid size-8 place-items-center rounded-lg ${ready ? "bg-[var(--success-subtle)] text-[var(--success)]" : "bg-[var(--surface-subtle)] text-[var(--text-subtle)]"}`}><Icon aria-hidden="true" className="size-4" /></span>{ready && <Check aria-hidden="true" className="size-4 text-[var(--success)]" />}</div>
+                  <div className="flex items-center justify-between gap-2"><span className={`grid size-8 place-items-center rounded-lg ${ready ? "bg-[var(--success-subtle)] text-[var(--success)]" : "bg-[var(--surface-subtle)] text-[var(--text-subtle)]"}`}><Icon aria-hidden="true" className="size-6" /></span>{ready && <Check aria-hidden="true" className="size-6 text-[var(--success)]" />}</div>
                   <p className="mt-3 text-[11px] font-semibold">{label}</p>
                   <p className="mt-1 truncate text-[9px] text-[var(--text-subtle)]" title={address}>{address}</p>
                   <p className={`mt-2 text-[9px] font-semibold ${ready ? "text-[var(--success)]" : "text-[var(--warning)]"}`}>{reason}</p>
@@ -196,7 +196,7 @@ export function ContactDrawer({
           {stored ? <ContactCommunicationPanel key={contact.id} contactId={contact.id} /> : null}
 
           <section className="mt-8 rounded-xl bg-[var(--surface-subtle)] p-4">
-            <div className="flex gap-3"><ShieldCheck aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-[var(--text-muted)]" /><div><h2 className="text-[11px] font-semibold">Состояние данных</h2><p className="mt-1 text-[10px] leading-5 text-[var(--text-muted)]">Контакт обновлён {dateFormatter.format(new Date(updatedAt))}. Перед запуском кампания повторно проверит статус и согласия.</p></div></div>
+            <div className="flex gap-3"><ShieldCheck aria-hidden="true" className="mt-0.5 size-6 shrink-0 text-[var(--text-muted)]" /><div><h2 className="text-[11px] font-semibold">Состояние данных</h2><p className="mt-1 text-[10px] leading-5 text-[var(--text-muted)]">Контакт обновлён {dateFormatter.format(new Date(updatedAt))}. Перед запуском кампания повторно проверит статус и согласия.</p></div></div>
           </section>
         </div>
       </section>
@@ -205,5 +205,5 @@ export function ContactDrawer({
 }
 
 function Detail({ Icon, label, value }: { Icon: typeof Mail; label: string; value: string }) {
-  return <div className="grid grid-cols-[28px_100px_minmax(0,1fr)] items-center border-b border-[var(--border)] px-4 py-3 last:border-0"><Icon aria-hidden="true" className="size-4 text-[var(--text-subtle)]" /><span className="text-[10px] text-[var(--text-subtle)]">{label}</span><span className="truncate text-[11px] font-medium">{value}</span></div>;
+  return <div className="grid grid-cols-[28px_100px_minmax(0,1fr)] items-center border-b border-[var(--border)] px-4 py-3 last:border-0"><Icon aria-hidden="true" className="size-6 text-[var(--text-subtle)]" /><span className="text-[10px] text-[var(--text-subtle)]">{label}</span><span className="truncate text-[11px] font-medium">{value}</span></div>;
 }

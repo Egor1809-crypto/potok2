@@ -270,7 +270,7 @@ export function ContactFinderView() {
         description="Глубокий парсер находит деловые email и телефоны в страницах, sitemap, структурированных данных и защищённых от спама записях. Поток показывает источник каждого результата и ничего не сохраняет без вашего выбора."
         action={
           <Link href="/contacts" className={buttonVariants({ variant: "outline" })}>
-            <UsersRound aria-hidden="true" className="size-4" />
+            <UsersRound aria-hidden="true" className="size-6" />
             Открыть контакты
           </Link>
         }
@@ -286,7 +286,7 @@ export function ContactFinderView() {
           return (
             <Card key={String(title)} className="flex items-start gap-3 p-4">
               <span className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-primary-subtle text-primary">
-                <StepIcon aria-hidden="true" className="size-4" />
+                <StepIcon aria-hidden="true" className="size-6" />
               </span>
               <div>
                 <p className="m-0 text-[13px] font-semibold text-text-strong">{String(title)}</p>
@@ -320,7 +320,7 @@ export function ContactFinderView() {
                   }
                 }}
               >
-                <Globe2 aria-hidden="true" className="size-3.5" /> Сайт
+                <Globe2 aria-hidden="true" className="size-5" /> Сайт
               </button>
               <button
                 id="contact-finder-tab-text"
@@ -341,7 +341,7 @@ export function ContactFinderView() {
                   }
                 }}
               >
-                <FileText aria-hidden="true" className="size-3.5" /> Текст
+                <FileText aria-hidden="true" className="size-5" /> Текст
               </button>
             </div>
           </div>
@@ -429,7 +429,7 @@ export function ContactFinderView() {
               loading={loading}
               loadingText="Проверяем источник…"
               disabled={!canAnalyze}
-              leadingIcon={<Search aria-hidden="true" className="size-4" />}
+              leadingIcon={<Search aria-hidden="true" className="size-6" />}
               onClick={() => void analyze()}
             >
               Найти публичные контакты
@@ -439,7 +439,7 @@ export function ContactFinderView() {
 
         <Card className="h-fit p-5 sm:p-6">
           <div className="flex items-center gap-2 text-text-strong">
-            <ShieldCheck aria-hidden="true" className="size-4 text-success" />
+            <ShieldCheck aria-hidden="true" className="size-6 text-success" />
             <h2 className="m-0 text-[14px] font-semibold">Без скрытого сбора</h2>
           </div>
           <ul className="mt-4 mb-0 space-y-3 pl-0 text-[12px] leading-5 text-text-muted">
@@ -452,7 +452,7 @@ export function ContactFinderView() {
               "Согласие на email-рассылку не назначается автоматически.",
             ].map((item) => (
               <li key={item} className="flex gap-2">
-                <CheckCircle2 aria-hidden="true" className="mt-0.5 size-3.5 shrink-0 text-success" />
+                <CheckCircle2 aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-success" />
                 <span>{item}</span>
               </li>
             ))}
@@ -499,7 +499,7 @@ export function ContactFinderView() {
             <Card className="grid min-h-52 place-items-center p-8 text-center">
               <div className="max-w-md">
                 <span className="mx-auto grid size-11 place-items-center rounded-full bg-surface-subtle text-text-muted">
-                  <Search aria-hidden="true" className="size-5" />
+                  <Search aria-hidden="true" className="size-7" />
                 </span>
                 <h3 className="mt-4 mb-0 text-[16px] font-semibold text-text-strong">Публичные контакты не найдены</h3>
                 <p className="mt-2 mb-0 text-[13px] leading-5 text-text-muted">
@@ -528,7 +528,7 @@ export function ContactFinderView() {
                     <div className="min-w-0">
                       <div className="flex min-w-0 items-center gap-2">
                         <span className="grid size-8 shrink-0 place-items-center rounded-[9px] bg-primary-subtle text-primary">
-                          <EndpointIcon aria-hidden="true" className="size-4" />
+                          <EndpointIcon aria-hidden="true" className="size-6" />
                         </span>
                         <div className="min-w-0">
                           <p className="m-0 truncate text-[13px] font-semibold text-text-strong">{candidate.value}</p>
@@ -559,7 +559,7 @@ export function ContactFinderView() {
                             rel="noreferrer"
                             className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
                           >
-                            Источник <ExternalLink aria-hidden="true" className="size-3" />
+                            Источник <ExternalLink aria-hidden="true" className="size-4" />
                           </a>
                         ) : null}
                       </div>
@@ -596,7 +596,7 @@ export function ContactFinderView() {
               <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between sm:p-6">
                 <div className="max-w-2xl">
                   <div className="flex items-center gap-2">
-                    <Sparkles aria-hidden="true" className="size-4 text-primary" />
+                    <Sparkles aria-hidden="true" className="size-6 text-primary" />
                     <h3 className="m-0 text-[15px] font-semibold text-text-strong">
                       Добавить выбранные: {selectedCandidates.length}
                     </h3>
@@ -616,7 +616,7 @@ export function ContactFinderView() {
                   loading={importState.status === "importing"}
                   loadingText="Добавляем…"
                   disabled={!importConfirmed || importState.status === "success"}
-                  trailingIcon={<ArrowRight aria-hidden="true" className="size-4" />}
+                  trailingIcon={<ArrowRight aria-hidden="true" className="size-6" />}
                   onClick={() => void importSelected()}
                 >
                   Добавить выбранные в контакты
@@ -625,7 +625,7 @@ export function ContactFinderView() {
               {importState.status === "success" ? (
                 <div className="flex flex-wrap items-center justify-between gap-3 border-t border-success/15 bg-success-subtle px-5 py-3 text-[12px] sm:px-6">
                   <span className="inline-flex items-center gap-2 text-success" role="status" aria-live="polite">
-                    <CheckCircle2 aria-hidden="true" className="size-4" /> {importState.message}
+                    <CheckCircle2 aria-hidden="true" className="size-6" /> {importState.message}
                   </span>
                   <Link href="/contacts" className="font-semibold text-primary hover:underline">Перейти к контактам</Link>
                 </div>
@@ -637,7 +637,7 @@ export function ContactFinderView() {
             </Card>
           ) : (
             result.candidates.length > 0 && (
-              <Alert tone="info" icon={<Info aria-hidden="true" className="size-4" />} title="Выберите нужные записи">
+              <Alert tone="info" icon={<Info aria-hidden="true" className="size-6" />} title="Выберите нужные записи">
                 Ничего не импортируется автоматически. Отметьте контакты, которые хотите сохранить.
               </Alert>
             )

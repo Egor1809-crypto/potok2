@@ -402,18 +402,18 @@ export function TemplatesView() {
           <div className="flex flex-wrap items-center gap-2">
             {routeContext.backTo ? (
               <Link href={routeContext.backTo} className={buttonVariants({ variant: "secondary", size: "md" })}>
-                <ArrowLeft aria-hidden="true" className="size-4" />
+                <ArrowLeft aria-hidden="true" className="size-6" />
                 Вернуться к кампании
               </Link>
             ) : null}
             <>
-              <Button variant="secondary" onClick={() => { setDirectorTemplate(null); setDirectorOpen(true); }}><Sparkles aria-hidden className="size-4" />Арт-директор</Button>
+              <Button variant="secondary" onClick={() => { setDirectorTemplate(null); setDirectorOpen(true); }}><Sparkles aria-hidden className="size-6" />Арт-директор</Button>
               <button type="button" disabled={importing} onClick={() => { setError(null); setImportOpen(true); }} className={buttonVariants({ variant: "secondary", size: "md" })}>
-                <Upload aria-hidden="true" className="size-4" />{importing ? "Импортируем…" : "Импортировать письмо"}
+                <Upload aria-hidden="true" className="size-6" />{importing ? "Импортируем…" : "Импортировать письмо"}
               </button>
             </>
             <Link href={newTemplateHref} className={buttonVariants({ variant: "primary", size: "md" })}>
-              <PenTool aria-hidden="true" className="size-4" />
+              <PenTool aria-hidden="true" className="size-6" />
               {routeContext.returnTo ? "Начать с нуля" : "Открыть конструктор"}
             </Link>
           </div>
@@ -443,7 +443,7 @@ export function TemplatesView() {
       ) : loadState === "error" ? (
         <div className="card">
           <EmptyState
-            icon={<RefreshCw aria-hidden="true" className="size-5" />}
+            icon={<RefreshCw aria-hidden="true" className="size-7" />}
             title="Библиотека не загружена"
             description="Без ответа сервера нельзя безопасно редактировать или удалять шаблоны."
             action={{ label: "Повторить", onClick: () => void loadTemplates() }}
@@ -456,7 +456,7 @@ export function TemplatesView() {
               ★ Избранное <span className="ml-1 opacity-70">{templates.filter((template) => template.isFavorite).length}</span>
             </button>
             <button type="button" aria-pressed={scope === "all" && collection === "studio"} onClick={() => { setScope("all"); setCollection("studio"); }} className="rounded-lg px-4 py-2 text-[12px] font-semibold text-text-muted outline-none transition hover:text-text-strong aria-pressed:bg-primary aria-pressed:text-white focus-visible:ring-2 focus-visible:ring-primary/30">
-              <Sparkles aria-hidden="true" className="mr-1.5 inline size-3.5" />Подборка студии <span className="ml-1 opacity-70">{templates.filter(isStudioTemplate).length}</span>
+              <Sparkles aria-hidden="true" className="mr-1.5 inline size-5" />Подборка студии <span className="ml-1 opacity-70">{templates.filter(isStudioTemplate).length}</span>
             </button>
             <button type="button" aria-pressed={scope === "all" && collection === "all"} onClick={() => { setScope("all"); setCollection("all"); }} className="rounded-lg px-4 py-2 text-[12px] font-semibold text-text-muted outline-none transition hover:text-text-strong aria-pressed:bg-primary aria-pressed:text-white focus-visible:ring-2 focus-visible:ring-primary/30">
               Вся библиотека <span className="ml-1 opacity-70">{templates.length}</span>
@@ -509,7 +509,7 @@ export function TemplatesView() {
 
             <div className="mt-4 flex items-center justify-between gap-3">
               <p className="m-0 text-[11px] text-text-muted">Найдено: <span className="font-semibold text-text-strong">{filteredTemplates.length}</span>{category !== "All" ? ` · ${templateCategoryLabels[category]}` : ""}</p>
-              <span className="hidden items-center gap-1.5 text-[10px] text-text-subtle sm:flex"><FileText aria-hidden="true" className="size-3" />Каждый макет хранится в рабочем пространстве</span>
+              <span className="hidden items-center gap-1.5 text-[10px] text-text-subtle sm:flex"><FileText aria-hidden="true" className="size-4" />Каждый макет хранится в рабочем пространстве</span>
             </div>
 
             {filteredTemplates.length ? (
@@ -538,7 +538,7 @@ export function TemplatesView() {
             ) : (
               <div className="mt-4 rounded-[14px] border border-border bg-surface">
                 <EmptyState
-                  icon={<SearchX aria-hidden="true" className="size-5" />}
+                  icon={<SearchX aria-hidden="true" className="size-7" />}
                   title={scope === "mine" && !scopedTemplates.length ? "У вас пока нет своих шаблонов" : templates.length ? "Подходящих шаблонов нет" : "Библиотека пуста"}
                   description={scope === "mine" && !scopedTemplates.length ? "Создайте макет с нуля или откройте стартовый шаблон и сохраните свой вариант." : templates.length ? "Измените запрос или категорию." : "Создайте первый шаблон в визуальном редакторе."}
                   action={templates.length ? { label: scope === "mine" && !scopedTemplates.length ? "Показать библиотеку" : "Сбросить фильтры", onClick: () => { setQuery(""); setCategory("All"); setStyle("all"); setPalette("all"); setDensity("all"); if (scope === "mine" && !scopedTemplates.length) setScope("all"); } } : undefined}

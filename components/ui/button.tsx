@@ -81,7 +81,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         {loading ? (
           <LoaderCircle
             aria-hidden="true"
-            className="size-4 animate-[mf-spin_700ms_linear_infinite]"
+            className="size-6 animate-[mf-spin_700ms_linear_infinite]"
           />
         ) : (
           leadingIcon
@@ -104,7 +104,7 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
       <Button
         ref={ref}
         size="icon"
-        className={cn(size === "sm" && "!size-8 !min-h-8 !min-w-8", className)}
+        className={cn(size === "sm" && "!size-9 !min-h-9 !min-w-9", className)}
         aria-label={label}
         title={props.title ?? label}
         {...props}

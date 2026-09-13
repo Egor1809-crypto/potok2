@@ -49,7 +49,7 @@ export function Topbar({
           aria-haspopup="dialog"
           className="flex min-h-10 items-center gap-2 rounded-lg px-2 text-left text-sm text-text-muted hover:bg-surface-subtle sm:w-56"
         >
-          <Search aria-hidden="true" className="size-3.5" />
+          <Search aria-hidden="true" className="size-5" />
           <span className="min-w-0 flex-1 truncate">Поиск</span>
           <kbd className="hidden font-sans text-xs text-text-subtle sm:inline">⌘ / Ctrl K</kbd>
         </button>
@@ -68,7 +68,7 @@ export function Topbar({
               className: "px-2.5 sm:px-3",
             })}
           >
-            <Plus aria-hidden="true" className="size-4" />
+            <Plus aria-hidden="true" className="size-6" />
             <span className="hidden sm:inline">Создать</span>
           </Link>
         )}
@@ -78,7 +78,7 @@ export function Topbar({
           aria-label="Открыть календарь рассылок"
           className="hidden h-9 items-center gap-2 rounded-lg border border-primary/25 bg-primary/5 px-3 text-[12px] font-semibold text-primary shadow-[0_1px_2px_rgba(101,88,232,0.1)] transition hover:-translate-y-px hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-primary/30 md:inline-flex"
         >
-          <CalendarDays aria-hidden="true" className="size-4" />
+          <CalendarDays aria-hidden="true" className="size-6" />
           Календарь
         </Link>
 
@@ -98,7 +98,7 @@ export function Topbar({
             });
           }}
         >
-          <LogOut aria-hidden className="size-[17px]" />
+          <LogOut aria-hidden className="size-6" />
         </IconButton></span>
       </div>
     </header>

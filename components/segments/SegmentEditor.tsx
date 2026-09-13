@@ -269,7 +269,7 @@ export function SegmentEditor({
             className="grid size-9 place-items-center rounded-lg hover:bg-[var(--surface-subtle)] disabled:opacity-50"
             aria-label="Закрыть редактор сегмента"
           >
-            <X size={17} />
+            <X size={24} />
           </button>
         </div>
 

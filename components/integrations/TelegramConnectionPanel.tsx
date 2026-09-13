@@ -51,7 +51,7 @@ export function TelegramConnectionPanel({ open, onOpenChange, onChange, updatedA
     <section id="telegram-connection" className="card scroll-mt-24 overflow-hidden" aria-labelledby="telegram-connection-title">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-5 sm:px-6">
         <div className="flex items-center gap-3">
-          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-surface-subtle text-text-strong"><MessageCircleMore aria-hidden="true" className="size-5" /></span>
+          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-surface-subtle text-text-strong"><MessageCircleMore aria-hidden="true" className="size-7" /></span>
           <div><h2 id="telegram-connection-title" className="text-[17px] font-semibold text-text-strong">Рассылки в Telegram</h2><p className="mt-1 text-[13px] text-text-muted">Бот, подписчики и отправка из Потока</p></div>
         </div>
         <Badge variant={info?.connected ? "success" : "neutral"} dot>{info?.connected ? "Подключён" : info ? "Не подключён" : "Загружаем…"}</Badge>
@@ -60,19 +60,19 @@ export function TelegramConnectionPanel({ open, onOpenChange, onChange, updatedA
         {!open && problem}
         {info?.connected ? <>
           <div className="flex flex-wrap items-start justify-between gap-4">
-            <div><p className="font-semibold text-text-strong">{info.displayName}</p><a className="mt-1 inline-flex items-center gap-1 text-[13px] text-primary underline underline-offset-4" href={`https://t.me/${info.username}`} target="_blank" rel="noreferrer">@{info.username}<ExternalLink aria-hidden="true" className="size-3" /></a></div>
+            <div><p className="font-semibold text-text-strong">{info.displayName}</p><a className="mt-1 inline-flex items-center gap-1 text-[13px] text-primary underline underline-offset-4" href={`https://t.me/${info.username}`} target="_blank" rel="noreferrer">@{info.username}<ExternalLink aria-hidden="true" className="size-4" /></a></div>
             <div className="text-right"><p className="text-2xl font-semibold tabular-nums text-text-strong">{info.subscribers.toLocaleString("ru-RU")}</p><p className="text-[12px] text-text-muted">доступно для рассылки</p></div>
           </div>
           <div className="rounded-xl border border-border bg-surface-subtle p-4">
             <FormField label="Ссылка для подписки" htmlFor="telegram-subscribe-url" hint="Отправьте её аудитории или разместите на сайте. Человек откроет бота и подтвердит подписку — контакт появится в Потоке автоматически.">
-              <div className="flex flex-col gap-2 sm:flex-row"><Input id="telegram-subscribe-url" readOnly value={info.subscribeUrl} onFocus={event => event.currentTarget.select()} className="min-w-0 flex-1" /><Button variant="outline" onClick={() => void copyLink()} leadingIcon={<Copy aria-hidden="true" className="size-4" />}>{copied ? "Скопировано" : "Скопировать"}</Button></div>
+              <div className="flex flex-col gap-2 sm:flex-row"><Input id="telegram-subscribe-url" readOnly value={info.subscribeUrl} onFocus={event => event.currentTarget.select()} className="min-w-0 flex-1" /><Button variant="outline" onClick={() => void copyLink()} leadingIcon={<Copy aria-hidden="true" className="size-6" />}>{copied ? "Скопировано" : "Скопировать"}</Button></div>
             </FormField>
           </div>
           {info.subscribers === 0 && <p className="text-[13px] leading-5 text-text-muted">Пока подписчиков нет. Откройте ссылку и подпишитесь сами, чтобы проверить подключение. Счётчик обновляется автоматически.</p>}
           <div className="flex flex-wrap gap-2">
-            {info.subscribers > 0 ? <Link href="/campaigns/new?channel=telegram&provider_telegram=telegram-bot-api&audience=telegram" className={buttonVariants({ variant: "primary" })}>Создать рассылку<ArrowRight aria-hidden="true" className="size-4" /></Link> : <a href={info.subscribeUrl} target="_blank" rel="noreferrer" className={buttonVariants({ variant: "primary" })}>Открыть бота<ExternalLink aria-hidden="true" className="size-4" /></a>}
-            <Button variant="outline" disabled={Boolean(busy)} loading={busy === "check"} onClick={() => void act("check")} leadingIcon={<RefreshCw aria-hidden="true" className="size-4" />}>Проверить</Button>
-            <Button variant="ghost" disabled={Boolean(busy)} onClick={() => setConfirmDisconnect(true)} leadingIcon={<Unplug aria-hidden="true" className="size-4" />}>Отключить</Button>
+            {info.subscribers > 0 ? <Link href="/campaigns/new?channel=telegram&provider_telegram=telegram-bot-api&audience=telegram" className={buttonVariants({ variant: "primary" })}>Создать рассылку<ArrowRight aria-hidden="true" className="size-6" /></Link> : <a href={info.subscribeUrl} target="_blank" rel="noreferrer" className={buttonVariants({ variant: "primary" })}>Открыть бота<ExternalLink aria-hidden="true" className="size-6" /></a>}
+            <Button variant="outline" disabled={Boolean(busy)} loading={busy === "check"} onClick={() => void act("check")} leadingIcon={<RefreshCw aria-hidden="true" className="size-6" />}>Проверить</Button>
+            <Button variant="ghost" disabled={Boolean(busy)} onClick={() => setConfirmDisconnect(true)} leadingIcon={<Unplug aria-hidden="true" className="size-6" />}>Отключить</Button>
           </div>
           <p className="text-[12px] leading-5 text-text-muted">{info.message} Команда /stop отменяет подписку. Telegram-сообщения поддерживают текст, персонализацию и PDF.</p>
         </> : <>
@@ -92,7 +92,7 @@ export function TelegramConnectionPanel({ open, onOpenChange, onChange, updatedA
           <FormField label="Токен бота" htmlFor="telegram-bot-token" hint="Не пароль от вашего Telegram. Получить токен можно у @BotFather командой /newbot или /token.">
             <Input id="telegram-bot-token" type="password" value={token} onChange={event => setToken(event.target.value)} autoComplete="off" spellCheck={false} autoCapitalize="none" placeholder="Вставьте токен из BotFather" required maxLength={130} disabled={Boolean(busy)} />
           </FormField>
-          <p className="flex items-start gap-2 text-[12px] leading-5 text-text-muted"><ShieldCheck aria-hidden="true" className="mt-0.5 size-4 shrink-0" />Токен хранится зашифрованным на сервере и не показывается после подключения. Используйте отдельного бота, который не подключён к другому сервису.</p>
+          <p className="flex items-start gap-2 text-[12px] leading-5 text-text-muted"><ShieldCheck aria-hidden="true" className="mt-0.5 size-6 shrink-0" />Токен хранится зашифрованным на сервере и не показывается после подключения. Используйте отдельного бота, который не подключён к другому сервису.</p>
           <div className="flex justify-end gap-2"><Button variant="ghost" type="button" disabled={Boolean(busy)} onClick={closeSetup}>Отмена</Button><Button type="submit" disabled={!token.trim() || Boolean(busy)} loading={busy === "connect"} loadingText="Подключаем…">Подключить бота</Button></div>
         </form>
       </Modal>

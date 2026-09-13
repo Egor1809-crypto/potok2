@@ -236,7 +236,7 @@ export function CampaignDetailView({
   return (
     <div className="mx-auto max-w-6xl space-y-6 pb-10">
       <Link href="/campaigns" className="inline-flex items-center gap-1.5 text-[13px] font-medium text-text-muted hover:text-text-strong">
-        <ArrowLeft aria-hidden="true" className="size-4" />
+        <ArrowLeft aria-hidden="true" className="size-6" />
         Все кампании
       </Link>
 
@@ -248,7 +248,7 @@ export function CampaignDetailView({
         action={
           <>
             <Link href={`/campaigns/new?duplicate=${encodeURIComponent(item.id)}`} className={buttonVariants({ variant: "secondary" })}>
-              <Copy aria-hidden="true" className="size-4" />
+              <Copy aria-hidden="true" className="size-6" />
               Создать копию
             </Link>
             {canDelete ? (
@@ -257,7 +257,7 @@ export function CampaignDetailView({
                 onClick={onDelete}
                 loading={deleting}
                 loadingText="Удаляем…"
-                leadingIcon={<Trash2 aria-hidden="true" className="size-4" />}
+                leadingIcon={<Trash2 aria-hidden="true" className="size-6" />}
               >
                 Удалить
               </Button>
@@ -267,19 +267,19 @@ export function CampaignDetailView({
                 onClick={onDispatch}
                 loading={dispatching}
                 loadingText="Запускаем…"
-                leadingIcon={<SendHorizontal aria-hidden="true" className="size-4" />}
+                leadingIcon={<SendHorizontal aria-hidden="true" className="size-6" />}
               >
                 Начать отправку
               </Button>
             ) : null}
             {editable ? (
               <Link href={`/campaigns/new?campaign=${encodeURIComponent(item.id)}&step=${item.status === "blocked" ? "review" : "audience"}`} className={buttonVariants({ variant: "primary" })}>
-                <FileEdit aria-hidden="true" className="size-4" />
+                <FileEdit aria-hidden="true" className="size-6" />
                 {item.status === "blocked" ? "Устранить причины" : "Редактировать"}
               </Link>
             ) : (
               <Link href={`/analytics?campaign=${encodeURIComponent(item.id)}`} className={buttonVariants({ variant: "primary" })}>
-                <BarChart3 aria-hidden="true" className="size-4" />
+                <BarChart3 aria-hidden="true" className="size-6" />
                 Открыть аналитику
               </Link>
             )}
@@ -307,14 +307,14 @@ export function CampaignDetailView({
       {blockers.length ? (
         <section className="rounded-xl border border-warning/30 bg-warning-subtle p-5" aria-labelledby="campaign-blockers-title">
           <div className="flex items-center gap-3">
-            <AlertTriangle aria-hidden="true" className="size-5 text-warning" />
+            <AlertTriangle aria-hidden="true" className="size-7 text-warning" />
             <div>
               <h2 id="campaign-blockers-title" className="text-[15px] font-semibold text-text-strong">Что мешает готовности</h2>
               <p className="mt-1 text-[12px] text-text-muted">Исправьте каждый пункт и повторите серверную проверку.</p>
             </div>
           </div>
           <ul className="mt-4 grid gap-2 text-[12px] leading-5 text-text sm:grid-cols-2">
-            {blockers.map((blocker) => <li key={blocker} className="flex gap-2 rounded-lg bg-surface/70 p-3"><CircleDashed aria-hidden="true" className="mt-1 size-3.5 shrink-0 text-warning" />{blocker}</li>)}
+            {blockers.map((blocker) => <li key={blocker} className="flex gap-2 rounded-lg bg-surface/70 p-3"><CircleDashed aria-hidden="true" className="mt-1 size-5 shrink-0 text-warning" />{blocker}</li>)}
           </ul>
         </section>
       ) : null}
@@ -353,7 +353,7 @@ function Lifecycle({ status, currentIndex }: { status: CampaignStatus; currentIn
           return (
             <li key={label} aria-current={current ? "step" : undefined} className={cn("flex items-center gap-2 rounded-xl border px-3 py-3 sm:flex-col sm:items-start", current ? "border-primary/40 bg-primary-subtle" : complete ? "border-success/25 bg-success-subtle" : "border-border bg-surface-subtle/40")}>
               <span className={cn("grid size-6 place-items-center rounded-full text-[10px] font-semibold", current ? "bg-primary text-white" : complete ? "bg-success text-white" : "bg-surface text-text-subtle")}>
-                {complete ? <Check aria-hidden="true" className="size-3.5" /> : index + 1}
+                {complete ? <Check aria-hidden="true" className="size-5" /> : index + 1}
               </span>
               <span className="text-[12px] font-semibold text-text-strong">{label}</span>
             </li>
@@ -424,7 +424,7 @@ function DispatchPanel({
               onClick={onDispatch}
               loading={dispatching}
               loadingText="Запускаем…"
-              leadingIcon={<SendHorizontal aria-hidden="true" className="size-4" />}
+              leadingIcon={<SendHorizontal aria-hidden="true" className="size-6" />}
             >
               Начать отправку
             </Button>
@@ -488,7 +488,7 @@ function Metrics({
           const Icon = metric.icon;
           return (
             <article key={metric.label} className="card p-4">
-              <div className="flex items-center justify-between gap-3"><span className="text-[11px] font-medium text-text-muted">{metric.label}</span><Icon aria-hidden="true" className="size-4 text-text-subtle" /></div>
+              <div className="flex items-center justify-between gap-3"><span className="text-[11px] font-medium text-text-muted">{metric.label}</span><Icon aria-hidden="true" className="size-6 text-text-subtle" /></div>
               <p className="mt-2 text-[21px] font-semibold tracking-[-0.04em] text-text-strong">{metric.value}</p>
               <p className="mt-1 text-[10px] text-text-subtle">{metric.meta}</p>
             </article>
@@ -514,7 +514,7 @@ function Content({ campaign }: { campaign: DetailCampaign }) {
       <div className={cn("grid gap-4 p-5 sm:p-6", hasEmail && messengerChannels.length ? "lg:grid-cols-2" : "grid-cols-1")}>
         {hasEmail ? (
           <article className="rounded-xl border border-border p-5">
-            <div className="flex items-center gap-3"><span className="grid size-9 place-items-center rounded-xl bg-primary-subtle text-primary"><Mail aria-hidden="true" className="size-4" /></span><div><h3 className="text-[14px] font-semibold text-text-strong">Email</h3><p className="mt-0.5 text-[11px] text-text-muted">{campaign.subject || "Без темы"}</p></div></div>
+            <div className="flex items-center gap-3"><span className="grid size-9 place-items-center rounded-xl bg-primary-subtle text-primary"><Mail aria-hidden="true" className="size-6" /></span><div><h3 className="text-[14px] font-semibold text-text-strong">Email</h3><p className="mt-0.5 text-[11px] text-text-muted">{campaign.subject || "Без темы"}</p></div></div>
             {campaign.previewText ? <p className="mt-4 text-[11px] text-text-muted"><strong>Прехедер:</strong> {campaign.previewText}</p> : null}
             <p className="mt-4 whitespace-pre-wrap text-[13px] leading-6 text-text">{campaign.emailBodyText || "Текст письма не добавлен."}</p>
             <div className="mt-5 border-t border-border pt-4 text-[11px] text-text-muted"><strong className="font-semibold text-text-strong">От:</strong> {campaign.senderName} · {campaign.senderEmail}</div>
@@ -522,7 +522,7 @@ function Content({ campaign }: { campaign: DetailCampaign }) {
         ) : null}
         {messengerChannels.length ? (
           <article className="rounded-xl border border-border p-5">
-            <div className="flex items-center gap-3"><span className="grid size-9 place-items-center rounded-xl bg-info-subtle text-info"><MessageCircle aria-hidden="true" className="size-4" /></span><div><h3 className="text-[14px] font-semibold text-text-strong">Мессенджеры</h3><p className="mt-0.5 text-[11px] text-text-muted">{messengerChannels.map((channel) => deliveryChannelById[channel].shortLabel).join(" · ")}</p></div></div>
+            <div className="flex items-center gap-3"><span className="grid size-9 place-items-center rounded-xl bg-info-subtle text-info"><MessageCircle aria-hidden="true" className="size-6" /></span><div><h3 className="text-[14px] font-semibold text-text-strong">Мессенджеры</h3><p className="mt-0.5 text-[11px] text-text-muted">{messengerChannels.map((channel) => deliveryChannelById[channel].shortLabel).join(" · ")}</p></div></div>
             <div className="mt-5 flex justify-end"><p className="max-w-[92%] whitespace-pre-wrap rounded-[16px_16px_4px_16px] bg-primary px-4 py-3 text-[13px] leading-6 text-white">{campaign.messengerMessage || "Текст сообщения не добавлен."}</p></div>
           </article>
         ) : null}
@@ -545,7 +545,7 @@ function DeliveryRoutes({ campaign, plans }: { campaign: DetailCampaign; plans: 
           const Icon = channel === "email" ? Mail : channel === "telegram" ? SendHorizontal : MessageCircle;
           return (
             <article key={channel} className="grid gap-3 px-5 py-4 sm:grid-cols-[40px_minmax(0,1fr)_140px_140px] sm:items-center sm:px-6">
-              <span className="grid size-9 place-items-center rounded-xl bg-primary-subtle text-primary"><Icon aria-hidden="true" className="size-4" /></span>
+              <span className="grid size-9 place-items-center rounded-xl bg-primary-subtle text-primary"><Icon aria-hidden="true" className="size-6" /></span>
               <div><h3 className="text-[13px] font-semibold text-text-strong">{deliveryChannelById[channel].shortLabel}</h3><p className="mt-1 text-[11px] text-text-muted">{provider?.name ?? "Провайдер будет выбран при настройке"}</p>{plan?.statusReason ? <p className="mt-1 text-[11px] leading-4 text-warning">{plan.statusReason}</p> : null}</div>
               <div><p className="text-[10px] uppercase tracking-[0.08em] text-text-subtle">Охват</p><p className="mt-1 text-[13px] font-semibold text-text-strong">{plan ? `${formatNumber(plan.eligibleCount)} доступно` : "Не рассчитан"}</p></div>
               <Badge variant={plan?.status === "ready" ? "success" : plan?.status === "blocked" ? "warning" : "neutral"} dot className="w-fit sm:justify-self-end">{plan?.status === "ready" ? "Готов" : plan?.status === "blocked" ? "Заблокирован" : "Черновик"}</Badge>
@@ -578,8 +578,8 @@ function Audience({ campaign }: { campaign: DetailCampaign }) {
   return (
     <section className="card p-5" aria-labelledby="campaign-audience-title">
       <div className="flex items-start gap-3">
-        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary-subtle text-primary"><UsersRound aria-hidden="true" className="size-4" /></span>
-        <div><h2 id="campaign-audience-title" className="text-[14px] font-semibold text-text-strong">{campaign.audience}</h2><p className="mt-1 text-[12px] text-text-muted">Получателей: {formatNumber(campaign.metrics.recipients)}</p><Link href="/segments" className="mt-3 inline-flex items-center gap-1 text-[12px] font-semibold text-primary hover:text-primary-hover">Открыть аудитории <ArrowRight aria-hidden="true" className="size-3.5" /></Link></div>
+        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary-subtle text-primary"><UsersRound aria-hidden="true" className="size-6" /></span>
+        <div><h2 id="campaign-audience-title" className="text-[14px] font-semibold text-text-strong">{campaign.audience}</h2><p className="mt-1 text-[12px] text-text-muted">Получателей: {formatNumber(campaign.metrics.recipients)}</p><Link href="/segments" className="mt-3 inline-flex items-center gap-1 text-[12px] font-semibold text-primary hover:text-primary-hover">Открыть аудитории <ArrowRight aria-hidden="true" className="size-5" /></Link></div>
       </div>
     </section>
   );
@@ -592,7 +592,7 @@ function EventHistory({ events, timeZone }: { events: CampaignEventRecord[]; tim
       <h2 id="campaign-history-title" className="text-[15px] font-semibold text-text-strong">История действий</h2>
       {recent.length ? (
         <ol className="mt-4 space-y-4">
-          {recent.map((event) => <li key={event.id} className="flex gap-3"><span className="mt-1 grid size-6 shrink-0 place-items-center rounded-full bg-surface-subtle text-text-muted"><Clock3 aria-hidden="true" className="size-3" /></span><div><p className="text-[12px] leading-5 text-text-strong">{event.message}</p><time className="mt-0.5 block text-[10px] text-text-subtle">{formatDateTime(event.occurredAt, timeZone)}</time></div></li>)}
+          {recent.map((event) => <li key={event.id} className="flex gap-3"><span className="mt-1 grid size-6 shrink-0 place-items-center rounded-full bg-surface-subtle text-text-muted"><Clock3 aria-hidden="true" className="size-4" /></span><div><p className="text-[12px] leading-5 text-text-strong">{event.message}</p><time className="mt-0.5 block text-[10px] text-text-subtle">{formatDateTime(event.occurredAt, timeZone)}</time></div></li>)}
         </ol>
       ) : <p className="mt-3 text-[12px] leading-5 text-text-muted">События появятся после сохранения и проверки кампании.</p>}
       <p className="mt-4 border-t border-border pt-3 text-[10px] leading-4 text-text-subtle">
@@ -605,7 +605,7 @@ function EventHistory({ events, timeZone }: { events: CampaignEventRecord[]; tim
 function CampaignLoading() {
   return (
     <div className="mx-auto max-w-6xl py-16 text-center">
-      <RefreshCw aria-hidden="true" className="mx-auto size-6 animate-spin text-primary" />
+      <RefreshCw aria-hidden="true" className="mx-auto size-8 animate-spin text-primary" />
       <p className="mt-3 text-[13px] text-text-muted">Загружаем кампанию…</p>
     </div>
   );
@@ -615,12 +615,12 @@ function CampaignLoadError({ onReload }: { onReload?: () => void }) {
   return (
     <div className="mx-auto max-w-3xl py-10">
       <section className="card p-8 text-center sm:p-12">
-        <span className="mx-auto grid size-12 place-items-center rounded-xl bg-danger-subtle text-danger"><AlertTriangle aria-hidden="true" className="size-5" /></span>
+        <span className="mx-auto grid size-12 place-items-center rounded-xl bg-danger-subtle text-danger"><AlertTriangle aria-hidden="true" className="size-7" /></span>
         <h1 className="mt-5 text-[22px] font-semibold text-text-strong">Не удалось загрузить кампанию</h1>
         <p className="mx-auto mt-2 max-w-md text-[13px] leading-5 text-text-muted">Сервер рабочего пространства не ответил. Поток не подменяет кампанию локальной копией.</p>
         <div className="mt-6 flex flex-col justify-center gap-2 sm:flex-row">
           <Link href="/campaigns" className={buttonVariants({ variant: "secondary" })}>Все кампании</Link>
-          {onReload ? <Button onClick={onReload} leadingIcon={<RefreshCw className="size-4" />}>Повторить загрузку</Button> : null}
+          {onReload ? <Button onClick={onReload} leadingIcon={<RefreshCw className="size-6" />}>Повторить загрузку</Button> : null}
         </div>
       </section>
     </div>
@@ -631,12 +631,12 @@ function CampaignNotFound({ campaignId, onReload }: { campaignId?: string; onRel
   return (
     <div className="mx-auto max-w-3xl py-10">
       <section className="card p-8 text-center sm:p-12">
-        <span className="mx-auto grid size-12 place-items-center rounded-xl bg-surface-subtle text-text-muted"><SearchX aria-hidden="true" className="size-5" /></span>
+        <span className="mx-auto grid size-12 place-items-center rounded-xl bg-surface-subtle text-text-muted"><SearchX aria-hidden="true" className="size-7" /></span>
         <h1 className="mt-5 text-[22px] font-semibold text-text-strong">Кампания не найдена</h1>
         <p className="mx-auto mt-2 max-w-md text-[13px] leading-5 text-text-muted">{campaignId ? `Кампания «${campaignId}» отсутствует в рабочем пространстве.` : "В ссылке не указан идентификатор кампании."}</p>
         <div className="mt-6 flex flex-col justify-center gap-2 sm:flex-row">
           <Link href="/campaigns" className={buttonVariants({ variant: "primary" })}>Все кампании</Link>
-          {onReload ? <Button variant="secondary" onClick={onReload} leadingIcon={<RefreshCw className="size-4" />}>Повторить загрузку</Button> : null}
+          {onReload ? <Button variant="secondary" onClick={onReload} leadingIcon={<RefreshCw className="size-6" />}>Повторить загрузку</Button> : null}
         </div>
       </section>
     </div>

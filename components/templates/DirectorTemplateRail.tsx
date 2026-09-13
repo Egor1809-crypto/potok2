@@ -56,7 +56,7 @@ export function DirectorTemplateRail({ templates, selectedId, disabled, onSelect
           onSelect(templates[next].id); buttons.current.get(templates[next].id)?.focus({ preventScroll: true });
         }}>
         <DirectorThumbnail template={template} />
-        {template.id === selectedId && <span aria-hidden="true" className="absolute end-1.5 top-1.5 grid size-5 place-items-center rounded-full bg-primary text-white shadow-sm"><Check className="size-3" /></span>}
+        {template.id === selectedId && <span aria-hidden="true" className="absolute end-1.5 top-1.5 grid size-5 place-items-center rounded-full bg-primary text-white shadow-sm"><Check className="size-4" /></span>}
       </button></li>)}
     </ul>
   </nav>;
