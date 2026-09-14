@@ -502,6 +502,7 @@ export type PresentationElement = {
   kind: "text" | "image" | "shape";
   x: number; y: number; width: number; height: number;
   rotation?: number;
+  locked?: boolean;
   text?: string;
   fontSize?: number;
   fontFamily?: string;

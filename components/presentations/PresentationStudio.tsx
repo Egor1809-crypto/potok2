@@ -1,8 +1,9 @@
 "use client";
 
 import { PresentationImport } from "./PresentationImport";
+import { PresentationElementsEditor } from "./PresentationElementsEditor";
 import { PresentationDirector } from "./PresentationDirector";
-import { ImportedSlidePreview, ImportedSlideEditor } from "./ImportedSlide";
+import { ImportedSlidePreview } from "./ImportedSlide";
 import { useEditorDraft } from "@/lib/use-editor-draft";
 
 import { confirmAction } from "@/components/ui/confirm-action";
@@ -2639,9 +2640,9 @@ export function PresentationStudio() {
             </aside>
           </div>
         </div>
-        {quickSlideOpen && selectedSlide.canvas && <Modal open onOpenChange={setQuickSlideOpen} title="Элементы слайда" size="full" panelClassName="!max-w-[min(1600px,calc(100vw-32px))]"><ImportedSlideEditor key={selectedSlide.id} slide={selectedSlide} onChange={updateSlide} /></Modal>}
+        {quickSlideOpen && project.slides.some(s => s.canvas) && <PresentationElementsEditor project={project} selectedId={selectedSlide.id} onSelect={setSelectedSlideId} onChange={slides => updateProject({ slides })} onClose={() => setQuickSlideOpen(false)} onSave={() => void saveProject()} saving={busy === "save"} dirty={dirty} error={error} renderSlide={(p, s) => <SlidePreview project={p} slide={s} />} />}
         <Modal
-          open={quickSlideOpen && !selectedSlide.canvas}
+          open={quickSlideOpen && !project.slides.some(s => s.canvas)}
           onOpenChange={setQuickSlideOpen}
           title="Быстро изменить слайд"
           description="Текст, изображение и фон меняются здесь и сразу видны на холсте."

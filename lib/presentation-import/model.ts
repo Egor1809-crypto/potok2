@@ -18,7 +18,7 @@ export function parsePresentationCanvas(value: unknown): PresentationCanvas {
     if (e.text !== undefined) result.text = str(e.text, 12000);
     if (e.fontSize !== undefined) result.fontSize = num(e.fontSize, 1, 1000);
     if (e.fontFamily !== undefined) result.fontFamily = str(e.fontFamily, 100).replace(/["'<>;{}]/g, "");
-    for (const key of ["bold", "italic"] as const) if (e[key] !== undefined) { if (typeof e[key] !== "boolean") fail(); result[key] = e[key] as boolean; }
+    for (const key of ["bold", "italic", "locked"] as const) if (e[key] !== undefined) { if (typeof e[key] !== "boolean") fail(); result[key] = e[key] as boolean; }
     for (const key of ["color", "fill"] as const) if (e[key] !== undefined) { const color = str(e[key], 11); if (!/^#[\da-f]{6}$/i.test(color) && color !== "transparent") fail(); result[key] = color; }
     if (e.align !== undefined) { if (!["left", "center", "right"].includes(String(e.align))) fail(); result.align = e.align as PresentationElement["align"]; }
     if (e.shape !== undefined) { if (!["rect", "roundRect", "ellipse"].includes(String(e.shape))) fail(); result.shape = e.shape as PresentationElement["shape"]; }

@@ -15,6 +15,7 @@ export function applySlideDirection(slide: PresentationSlide, direction: SlideDi
       else throw new Error("Недопустимая правка слайда.");
     } else {
       const element = result.canvas?.elements.find(e => e.id === patch.target);
+      if (element?.locked) throw new Error("Элемент заблокирован. Сначала снимите блокировку.");
       if (!element) throw new Error("Элемент для правки не найден.");
       if (patch.field === "text" && element.kind === "text") element.text = patch.value;
       else if (["x", "y", "width", "height", "fontSize"].includes(patch.field)) { const n = Number(patch.value); if (!patch.value.trim() || !Number.isFinite(n) || n < (["x", "y"].includes(patch.field) ? -10000 : 1) || n > 10000) throw new Error("Некорректный размер элемента."); Object.assign(element, { [patch.field]: n }); }

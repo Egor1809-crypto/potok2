@@ -22,3 +22,9 @@ test('director only changes named fields and never mutates original', () => {
 test('director rejects unknown IDs, image replacement and changes to hidden PDF text', () => {
   for (const patch of [{ target: 'missing', field: 'text', value: 'x' }, { target: 'b', field: 'imageUrl', value: '/api/assets/other' }, { target: 'slide', field: 'body', value: 'Rebuilt' }, { target: 'a', field: 'width', value: '-10' }]) assert.throws(() => applySlideDirection(slide, { summary: '', findings: [], patches: [patch] }));
 });
+
+test('locked elements survive serialization and cannot be changed by the director', () => {
+  const locked = { ...canvas, elements: canvas.elements.map(e => ({ ...e, locked: true })) };
+  assert.equal(parsePresentationCanvas(locked).elements[0].locked, true);
+  assert.throws(() => applySlideDirection({ ...slide, canvas: locked }, { summary: '', findings: [], patches: [{ target: 'a', field: 'x', value: '100' }] }), /заблокирован/);
+});
