@@ -59,6 +59,7 @@ export function PhotoLibrary({ assets, selectedId, onSelect, loading, error }: {
           {!loading && !query && <Link href="/image-studio?view=create" className={buttonVariants({ variant: "secondary" })}>Создать первое изображение</Link>}
         </div>}
         {selected && <footer className={styles.actions}>
+          <Link href={`/art-director?type=photos&id=${encodeURIComponent(selected.id)}`} className={buttonVariants({ variant: "secondary" })}>Арт-директор</Link>
           <Link href={`/email-builder?new=1&asset=${encodeURIComponent(selected.id)}&assetName=${encodeURIComponent(selected.filename)}`} className={buttonVariants({ variant: "primary" })}><Mail aria-hidden className="size-5" />В письмо</Link>
           <Link href={`/email-builder?new=1&asset=${encodeURIComponent(selected.id)}&assetName=${encodeURIComponent(selected.filename)}&assetMode=background`} className={buttonVariants({ variant: "secondary" })}>Фон письма</Link>
           <Link href={`/presentations?new=1&asset=${encodeURIComponent(selected.id)}`} className={buttonVariants({ variant: "secondary" })}><Presentation aria-hidden className="size-5" />В презентацию</Link>
@@ -73,6 +74,8 @@ function PhotoCanvas({ asset }: { asset: EmailAssetRecord }) {
   const [dimensions, setDimensions] = useState("");
   const [failed, setFailed] = useState(false);
   return <>
+    {/* Scrollable 100% preview needs a keyboard focus target. */}
+    {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
     <div className={styles.canvas} data-actual-size={actualSize} tabIndex={actualSize ? 0 : undefined} role="region" aria-label={`Просмотр: ${asset.filename}`}>
       {failed ? <p role="alert">Изображение не загрузилось. Выберите другой файл или обновите страницу.</p> : <img src={asset.url} alt={asset.filename} onLoad={event => setDimensions(`${event.currentTarget.naturalWidth} × ${event.currentTarget.naturalHeight}`)} onError={() => setFailed(true)} />}
     </div>

@@ -2,7 +2,6 @@
 
 import { PresentationImport } from "./PresentationImport";
 import { PresentationElementsEditor } from "./PresentationElementsEditor";
-import { PresentationDirector } from "./PresentationDirector";
 import { ImportedSlidePreview } from "./ImportedSlide";
 import { useEditorDraft } from "@/lib/use-editor-draft";
 
@@ -631,7 +630,7 @@ function SlideTextInput(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea {...props} ref={ref} />;
 }
 
-function SlidePreview({
+export function SlidePreview({
   project: baseProject,
   slide,
   compact = false,
@@ -1418,7 +1417,6 @@ export function PresentationStudio() {
   const [previewTemplate, setPreviewTemplate] = useState<(typeof presentationTemplates)[number] | null>(null);
   const [previewSlide, setPreviewSlide] = useState(0);
   const [importOpen, setImportOpen] = useState(false);
-  const [directorOpen, setDirectorOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
   const [slideImageOpen, setSlideImageOpen] = useState(false);
@@ -2060,7 +2058,6 @@ export function PresentationStudio() {
 
   const workshopDialogs = <>
     {importOpen && <PresentationImport onClose={() => setImportOpen(false)} onCreate={input => createProject(input, "import")} />}
-    {directorOpen && <PresentationDirector projects={presentations} initial={project || undefined} onClose={() => setDirectorOpen(false)} renderSlide={(p, slide) => <SlidePreview project={p} slide={slide} />} onSaved={p => { setPresentations(items => items.map(item => item.id === p.id ? p : item)); if (project?.id === p.id) { setProject(p); setDirty(false); } }} />}
   </>;
 
   if (projectId && project && selectedSlide) {
@@ -2102,7 +2099,7 @@ export function PresentationStudio() {
           >
             Новая с ИИ
           </Button>
-          <Button size="sm" variant="outline" onClick={async () => { if (dirty && !(await saveProject())) return; setDirectorOpen(true); }}>Арт-директор</Button>
+          <Button size="sm" variant="outline" onClick={async () => { if (dirty && !(await saveProject())) return; router.push(`/art-director?type=presentations&id=${encodeURIComponent(project!.id)}`); }}>Арт-директор</Button>
           <Button
             variant="outline"
             size="sm"
@@ -2838,7 +2835,7 @@ export function PresentationStudio() {
         action={
           <>
             <Button variant="outline" onClick={() => setImportOpen(true)}>Импорт</Button>
-            <Button variant="outline" onClick={() => setDirectorOpen(true)}>Арт-директор</Button>
+            <Button variant="outline" onClick={() => router.push("/art-director?type=presentations")}>Арт-директор</Button>
             <Button
               variant="outline"
               leadingIcon={<Mail className="size-6" />}
@@ -2864,7 +2861,8 @@ export function PresentationStudio() {
         }
       />
       {error ? <Alert tone="danger">{error}</Alert> : null}
-      <div className="min-h-[50px] w-full shrink-0 overflow-x-auto pb-1">
+      <div className={libraryStyles.collectionRow}>
+      <div className={libraryStyles.collectionScroll}>
         <nav
           className={libraryStyles.collections}
           aria-label="Разделы библиотеки презентаций"
@@ -2901,24 +2899,11 @@ export function PresentationStudio() {
           ))}
         </nav>
       </div>
+      {libraryView !== "templates" && <SearchInput value={query} onChange={event => setQuery(event.target.value)} onClear={() => setQuery("")} placeholder="Найти презентацию" aria-label="Найти презентацию" wrapperClassName={libraryStyles.collectionSearch} />}
+      </div>
       {libraryView !== "templates" ? (
       <section>
-        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h2 className={libraryView === "favorites" ? "m-0 text-[18px] font-semibold" : "sr-only"}>
-              {libraryView === "favorites"
-                ? "Избранные презентации"
-                : "Ваши презентации"}
-            </h2>
-          </div>
-          <SearchInput
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            onClear={() => setQuery("")}
-            placeholder="Найти презентацию"
-            wrapperClassName="w-full sm:w-72"
-          />
-        </div>
+        <h2 className={libraryView === "favorites" ? "mb-4 text-[18px] font-semibold" : "sr-only"}>{libraryView === "favorites" ? "Избранные презентации" : "Ваши презентации"}</h2>
         {visibleProjects.length ? (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {visibleProjects.map((item) => (

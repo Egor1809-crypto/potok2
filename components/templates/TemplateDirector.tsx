@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Button, Modal } from "@/components/ui";
+import { Button } from "@/components/ui";
 import { CreativeDirectorPanel } from "@/components/email-builder/CreativeDirectorPanel";
 import { documentFromApiTemplate, type BuilderDocument } from "@/components/email-builder/builder-types";
 import type { EmailTemplateRecord } from "@/types/api";
@@ -9,9 +9,11 @@ import { LetterPreview } from "./LetterPreview";
 import { ImportedLetterDirector } from "./ImportedLetterDirector";
 import { DirectorTemplateRail } from "./DirectorTemplateRail";
 
+import { DirectorFrame } from "@/components/art-director/DirectorFrame";
+
 type WorkingTemplate = { template: EmailTemplateRecord; document: BuilderDocument; dirty: boolean };
-export function TemplateDirector({ open, onOpenChange, templates, initialTemplate, onSaved }: {
-  open: boolean; onOpenChange: (open: boolean) => void; templates: EmailTemplateRecord[];
+export function TemplateDirector({ open, onOpenChange, templates, initialTemplate, onSaved, embedded = false }: {
+  embedded?: boolean; open: boolean; onOpenChange: (open: boolean) => void; templates: EmailTemplateRecord[];
   initialTemplate: EmailTemplateRecord | null; onSaved: (template: EmailTemplateRecord) => void;
 }) {
   const [working, setWorking] = useState<WorkingTemplate | null>(null);
@@ -65,7 +67,7 @@ export function TemplateDirector({ open, onOpenChange, templates, initialTemplat
     } catch (error) { setError(error instanceof Error ? error.message : "Не удалось сохранить изменения."); }
     finally { setBusy(false); }
   }
-  return <Modal open={open} onOpenChange={value => { if (!busy) onOpenChange(value); }} title="Арт-директор шаблонов" hideHeader size="full" panelClassName="!max-w-[1600px] h-[calc(100dvh-32px)]" contentClassName="!p-0 !overflow-hidden flex" closeOnEscape={!busy} closeOnBackdrop={!busy}
+  return <DirectorFrame embedded={embedded} open={open} onOpenChange={value => { if (!busy) onOpenChange(value); }} title="Арт-директор шаблонов" hideHeader size="full" panelClassName="!max-w-[1600px] h-[calc(100dvh-32px)]" contentClassName="!p-0 !overflow-hidden flex" closeOnEscape={!busy} closeOnBackdrop={!busy}
     footer={<><span role="status" className="mr-auto min-w-0 text-sm text-text-muted">{notice || (working?.dirty ? "Есть изменения. Они останутся здесь до закрытия страницы." : "")}</span>{working && !working.dirty && !busy && <Link href={`/email-builder?template=${encodeURIComponent(working.template.id)}`} className="text-sm font-medium text-primary underline">Редактировать вручную</Link>}<Button variant="secondary" disabled={busy} onClick={() => onOpenChange(false)}>В библиотеку</Button><Button disabled={busy || !working?.dirty} loading={busy} onClick={() => void save()}>{working?.document.rawHtml ? "Сохранить отдельную копию" : working?.template.isStarter ? "Сохранить в мои шаблоны" : "Сохранить изменения"}</Button></>}>
     <div className="grid min-h-0 min-w-0 flex-1 grid-cols-[76px_minmax(0,1fr)] sm:grid-cols-[148px_minmax(0,1fr)] xl:grid-cols-[188px_minmax(0,1fr)]">
       <DirectorTemplateRail templates={templates} selectedId={working?.template.id} disabled={busy} onSelect={select} />
@@ -77,5 +79,5 @@ export function TemplateDirector({ open, onOpenChange, templates, initialTemplat
         </div>
       </section>
     </div>
-  </Modal>;
+  </DirectorFrame>;
 }

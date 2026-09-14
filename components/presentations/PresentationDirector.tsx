@@ -1,4 +1,5 @@
 "use client";
+import { createPortal } from "react-dom";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { PresentationProjectRecord, PresentationSlide } from "@/types/api";
 import type { SlideDirection } from "@/lib/presentation-import/direction";
@@ -12,13 +13,14 @@ import {
   Alert,
   Button,
   FormField,
-  Modal,
   Select,
   Textarea,
 } from "@/components/ui";
 import { confirmAction } from "@/components/ui/confirm-action";
 import { PresentationElementsEditor } from "./PresentationElementsEditor";
 import styles from "./PresentationWorkshop.module.css";
+
+import { DirectorFrame } from "@/components/art-director/DirectorFrame";
 
 type Progress = {
   completed: number;
@@ -40,11 +42,13 @@ const pauseFrame = () =>
   );
 export function PresentationDirector({
   projects,
+  embedded = false,
   initial,
   onClose,
   onSaved,
   renderSlide,
 }: {
+  embedded?: boolean;
   projects: PresentationProjectRecord[];
   initial?: PresentationProjectRecord;
   onClose: () => void;
@@ -329,7 +333,8 @@ export function PresentationDirector({
           ? "Проверка приостановлена"
           : `Проверка слайда ${progress?.current || 1} из ${progress?.total || 0}`;
   return (
-    <Modal
+    <DirectorFrame
+      embedded={embedded}
       open
       title="Арт-директор презентаций"
       size="full"
@@ -636,7 +641,7 @@ export function PresentationDirector({
                 </aside>
               </div>
             )}
-            {captureSlide && (
+            {captureSlide && typeof document !== "undefined" && createPortal(
               <div
                 ref={captureView}
                 className={styles.capture}
@@ -644,7 +649,7 @@ export function PresentationDirector({
                 inert
               >
                 {renderSlide(draft, captureSlide)}
-              </div>
+              </div>, document.body
             )}
             {edit && slide && (
               <PresentationElementsEditor
@@ -665,6 +670,6 @@ export function PresentationDirector({
           </>
         )}
       </div>
-    </Modal>
+    </DirectorFrame>
   );
 }

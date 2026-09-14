@@ -192,6 +192,7 @@ export function ImageStudioView() {
       title="Студия изображений"
       contentWidth="full"
       viewportLocked
+      desktopSidebarCollapsible
       contentClassName="!py-4"
     >
       <div className={studioStyles.workspace}>
@@ -201,12 +202,12 @@ export function ImageStudioView() {
               Конструктор изображений
             </h1>
           </div>
-          <div className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2 text-[11px] text-text-muted">
+          <div className="flex flex-wrap items-center gap-3"><Link href="/art-director?type=photos" className={buttonVariants({ variant: "secondary" })}><Sparkles aria-hidden className="size-6" />Арт-директор</Link><div className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2 text-[11px] text-text-muted">
             <ShieldCheck aria-hidden="true" className={cn("size-6", status?.configured ? "text-success" : "text-text-muted")} />
             {status?.configured
               ? "Готов к созданию"
               : "Провайдер не подключён"}
-          </div>
+          </div></div>
         </header>
 
         {!loading && status && !status.configured ? (

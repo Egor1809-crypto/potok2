@@ -9,9 +9,8 @@ import { ArrowLeft, CalendarDays, CheckCircle2, Mail, MessageCircle, PenTool, Re
 import { importLetter, uploadImportedResources, type ImportedLetter } from "@/lib/email-import/import-letter";
 import { importCodeLetter, type CodeImportInput } from "@/lib/email-import/code";
 import { LetterPreview } from "./LetterPreview";
-import { TemplateDirector } from "./TemplateDirector";
+import { useRouter } from "next/navigation";
 import { EmailImportDialog } from "./EmailImportDialog";
-import type { TemplateCategory } from "@/types";
 import type {
   ApiError,
   EmailTemplateDeleteResponse,
@@ -153,6 +152,7 @@ function mutationError(
 }
 
 export function TemplatesView() {
+  const router = useRouter();
   const browserSearch = useSyncExternalStore(subscribeToLocation, getBrowserSearch, getServerSearch);
   const routeContext = useMemo(() => {
     const params = new URLSearchParams(browserSearch);
@@ -180,8 +180,6 @@ export function TemplatesView() {
   const [palette, setPalette] = useState<PaletteFilter>("all");
   const [busy, setBusy] = useState<{ id: string; action: "clone" | "delete" | "favorite" } | null>(null);
   const [previewTemplate, setPreviewTemplate] = useState<EmailTemplateRecord | null>(null);
-  const [directorOpen, setDirectorOpen] = useState(false);
-  const [directorTemplate, setDirectorTemplate] = useState<EmailTemplateRecord | null>(null);
   const [importing, setImporting] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [importPreview, setImportPreview] = useState<ImportedLetter | null>(null);
@@ -226,9 +224,9 @@ export function TemplatesView() {
 
   useEffect(() => {
     if (new URLSearchParams(browserSearch).get("director") !== "1") return;
-    const frame = window.requestAnimationFrame(() => setDirectorOpen(true));
+    const frame = window.requestAnimationFrame(() => router.replace("/art-director?type=emails"));
     return () => window.cancelAnimationFrame(frame);
-  }, [browserSearch]);
+  }, [browserSearch, router]);
 
   const filteredTemplates = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase("ru-RU");
@@ -415,7 +413,7 @@ export function TemplatesView() {
               </Link>
             ) : null}
             <>
-              <Button variant="secondary" onClick={() => { setDirectorTemplate(null); setDirectorOpen(true); }}><Sparkles aria-hidden className="size-6" />Арт-директор</Button>
+              <Button variant="secondary" onClick={() => { router.push("/art-director?type=emails"); }}><Sparkles aria-hidden className="size-6" />Арт-директор</Button>
               <button type="button" disabled={importing} onClick={() => { setError(null); setImportOpen(true); }} className={buttonVariants({ variant: "secondary", size: "md" })}>
                 <Upload aria-hidden="true" className="size-6" />{importing ? "Импортируем…" : "Импортировать письмо"}
               </button>
@@ -432,7 +430,6 @@ export function TemplatesView() {
         {previewTemplate && <LetterPreview html={previewTemplate.emailBodyHtml} title={`Письмо: ${previewTemplate.name}`} className="h-[65vh] min-h-64" />}
       </Modal>
 
-      <TemplateDirector open={directorOpen} onOpenChange={setDirectorOpen} templates={templates} initialTemplate={directorTemplate} onSaved={template => { setTemplates(current => [template, ...current.filter(item => item.id !== template.id)]); setNotice(`Шаблон «${template.name}» сохранён.`); }} />
       <EmailImportDialog open={importOpen} onOpenChange={setImportOpen} busy={importing} progress={importProgress} error={error} onFiles={files => void importTemplate(files)} onCode={input => void importCode(input)} />
       {importProgress ? <p role="status" className="text-sm text-primary">{importProgress}</p> : null}
       <Modal open={Boolean(importPreview)} onOpenChange={open => { if (!open && !importing) setImportPreview(null); }} title="Проверьте импортированное письмо" size="xl" closeOnEscape={!importing} closeOnBackdrop={!importing} footer={<div className="flex flex-wrap gap-3"><Button variant="outline" disabled={importing} onClick={() => { setImportPreview(null); setImportOpen(true); }}>Назад к импорту</Button><Button loading={importing} disabled={importing || !importPreview?.name.trim()} onClick={() => void saveImportedTemplate()}>Добавить в шаблоны</Button></div>}>
@@ -522,7 +519,7 @@ export function TemplatesView() {
                     onPreview={() => setPreviewTemplate(template)}
                     editLabel={routeContext.returnTo ? "Настроить" : "Редактировать"}
                     applyHref={addTemplateToReturnPath(returnPath, template.id)}
-                    onDirector={() => { setDirectorTemplate(template); setDirectorOpen(true); }}
+                    onDirector={() => { router.push(`/art-director?type=emails&id=${encodeURIComponent(template.id)}`); }}
                     onClone={() => void cloneTemplate(template)}
                     onDelete={() => void deleteTemplate(template)}
                     onFavorite={() => void toggleFavorite(template)}

@@ -56,3 +56,8 @@
 @media (prefers-reduced-motion: reduce) { .card, .stack, .stack::before, .stack::after, .favorite, .collection, .previewHint, .slideSamples button { transition: none; } .card:hover, .coverButton:hover .stack, .favorite:active, .collection:active { transform: none; } .coverButton:hover .stack::before, .coverButton:hover .stack::after { transform: none; } }
 .page { display: grid; grid-template-columns: minmax(0,1fr); align-content: start; gap: 24px; min-inline-size: 0; padding-block: 4px 20px; }
 .page > * { min-inline-size: 0; }
+
+.collectionRow {display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px;min-inline-size:0}
+.collectionScroll {min-inline-size:0;max-inline-size:100%;overflow-x:auto;padding-block:2px;scrollbar-width:thin}
+.collectionSearch {flex:1 1 260px;max-inline-size:360px;min-inline-size:0}
+@media(max-width:700px){.collectionSearch {max-inline-size:none;width:100%}}
