@@ -854,6 +854,7 @@ export type WorkspaceHistoryWindow = {
 };
 
 export type WorkspaceSnapshot = {
+  creativeCounts?: { presentations: number; images: number };
   calendarSchedule?: Pick<CampaignRecord, "status" | "scheduledAt">[];
   calendarReport?: import("@/lib/calendar/report").CalendarReport;
   workspace: WorkspaceRecord;

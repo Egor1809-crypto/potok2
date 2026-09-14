@@ -208,10 +208,6 @@ async function reserveGeneration(request: Request, input: ImageStudioGenerateReq
     const concurrent = await existingIdempotentResult(request, key, requestHash);
     if (concurrent) return { key, requestHash, replayed: concurrent };
   }
-  void getD1().prepare("DELETE FROM ai_idempotency WHERE updated_at < ?")
-    .bind(new Date(now.getTime() - 48 * 60 * 60 * 1_000).toISOString())
-    .run()
-    .catch(() => undefined);
   return { key, requestHash, replayed: null };
 }
 

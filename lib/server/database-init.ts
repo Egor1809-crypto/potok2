@@ -10,8 +10,6 @@ import {
 import { integrationProviders } from "@/config/integrations";
 import { BRAND_NAME } from "@/config/brand";
 import { ApiRequestError } from "./api-utils";
-import { starterEmailTemplateValues } from "./starter-template-library";
-import { conferenceProductionTemplateValues } from "@/data/conference-production-templates.generated";
 import { requireTeamSession, toTeamParticipant, type TeamSession } from "./team-auth";
 
 export const WORKSPACE_ID = "workspace-main";
@@ -558,6 +556,11 @@ async function createSchema() {
 }
 
 async function seedDatabase(request: Request) {
+  // Large seed libraries are only loaded when a migration actually needs them.
+  const [{ starterEmailTemplateValues }, { conferenceProductionTemplateValues }] = await Promise.all([
+    import("./starter-template-library"),
+    import("@/data/conference-production-templates.generated"),
+  ]);
   const db = getDb();
   const identity = identityFromRequest(request);
   const now = new Date().toISOString();
@@ -1749,25 +1752,21 @@ async function applyTeamDirectoryCorrections() {
 
 async function initializeSystemDatabase(): Promise<void> {
   const d1 = getD1();
-  // This tiny table is safe to create before the full schema and lets a
-  // warm or newly-created Worker skip the expensive initialization path.
-  await d1
-    .prepare(
-      `CREATE TABLE IF NOT EXISTS system_state (
-        key TEXT PRIMARY KEY NOT NULL,
-        value TEXT NOT NULL,
-        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-      )`,
-    )
-    .run();
-  const marker = await d1
-    .prepare("SELECT value FROM system_state WHERE key = ?")
-    .bind("runtime-schema-version")
-    .first<{ value: string }>();
-  if (marker?.value === RUNTIME_SCHEMA_VERSION) {
-    await applyTeamDirectoryCorrections();
-    return;
+  let marker: { value: string } | null;
+  try {
+    marker = await d1.prepare("SELECT value FROM system_state WHERE key = ?")
+      .bind("runtime-schema-version").first<{ value: string }>();
+  } catch (error) {
+    // Bootstrap compatibility for an empty local database. Production schema is
+    // owned by migrations; do not issue DDL or rewrite accounts on every cold start.
+    if (!(error instanceof Error) || !/no such table: (?:main\.)?system_state/i.test(error.message)) throw error;
+    await d1.prepare(`CREATE TABLE IF NOT EXISTS system_state (
+      key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`).run();
+    marker = null;
   }
+  if (marker?.value === RUNTIME_SCHEMA_VERSION) return;
   await createSchema();
   await seedDatabase(new Request("http://potok.internal/system"));
   await applyTeamDirectoryCorrections();

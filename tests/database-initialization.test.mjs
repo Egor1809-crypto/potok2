@@ -59,3 +59,10 @@ test('a late failure of an older request cannot invalidate another request’s s
   const readyCounts = db.counts(); older.reject(new Error('request canceled')); await firstFailure;
   await db.ensure(); assert.deepEqual(db.counts(), readyCounts);
 });
+
+
+test('a migrated database cold start performs one read and no DDL, seed imports or account writes', async () => {
+  const db = await loadDatabaseInitializer(() => Promise.resolve({ value: version }));
+  await db.ensure();
+  assert.deepEqual(db.counts(), { reads: 1, writes: 0 });
+});

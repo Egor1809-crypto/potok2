@@ -1,0 +1,95 @@
+{
+  "scope": "Local temporary release copies for Potok; not production storage",
+  "preserved": [
+    "potok-deck-workspace-release-eb27l2hf",
+    "potok-presentation-import-release-66yjlj71"
+  ],
+  "removed": [
+    {
+      "directory": "potok-login-release-q8lvqcs_",
+      "bytes": 120117159,
+      "files": 2293
+    },
+    {
+      "directory": "potok-larger-icons-release-bewiq94f",
+      "bytes": 120174686,
+      "files": 2284
+    },
+    {
+      "directory": "potok-copy-cleanup-release-h4z7vwc4",
+      "bytes": 120136548,
+      "files": 2291
+    },
+    {
+      "directory": "potok-import-director-release-qe9ph5c7",
+      "bytes": 112053231,
+      "files": 1674
+    },
+    {
+      "directory": "potok-ui-release-iauugwxe",
+      "bytes": 111959089,
+      "files": 1667
+    },
+    {
+      "directory": "potok-calendar-type-release-psztak6q",
+      "bytes": 120109306,
+      "files": 2292
+    },
+    {
+      "directory": "potok-runeicons-release-9oqvgi5q",
+      "bytes": 119337954,
+      "files": 2375
+    },
+    {
+      "directory": "potok-calendar-emphasis-release-4qgfhvdc",
+      "bytes": 120122112,
+      "files": 2293
+    },
+    {
+      "directory": "potok-panel-top-release-vy4nmvnm",
+      "bytes": 120122410,
+      "files": 2293
+    },
+    {
+      "directory": "potok-status-library-release-hhrerx_f",
+      "bytes": 120117844,
+      "files": 2298
+    },
+    {
+      "directory": "potok-dashboard-stats-release-99fkz24_",
+      "bytes": 120121065,
+      "files": 2293
+    },
+    {
+      "directory": "potok-header-calendar-release-ni0ezwaq",
+      "bytes": 120193774,
+      "files": 2291
+    },
+    {
+      "directory": "potok-brand-scale-release-bgjot00s",
+      "bytes": 120174950,
+      "files": 2284
+    },
+    {
+      "directory": "potok-director-layout-release-94rkdd4n",
+      "bytes": 112067201,
+      "files": 1675
+    },
+    {
+      "directory": "potok-editable-email-release-pqik8f08",
+      "bytes": 112695556,
+      "files": 1719
+    },
+    {
+      "directory": "potok-director-pixel-release-fxvxg0oj",
+      "bytes": 120175102,
+      "files": 2284
+    },
+    {
+      "directory": "potok-creative-libraries-release-_mf7w03v",
+      "bytes": 120194488,
+      "files": 2305
+    }
+  ],
+  "totalBytes": 2009872475
+}

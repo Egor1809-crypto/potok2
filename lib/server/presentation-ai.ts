@@ -962,11 +962,6 @@ async function reservePresentationGeneration(
     );
   }
 
-  void getD1()
-    .prepare("DELETE FROM ai_idempotency WHERE updated_at < ?")
-    .bind(new Date(now.getTime() - 48 * 60 * 60 * 1_000).toISOString())
-    .run()
-    .catch(() => undefined);
   return { key, replayed: null };
 }
 

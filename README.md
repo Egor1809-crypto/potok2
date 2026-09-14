@@ -1,48 +1,48 @@
 # Поток
 
-Поток is a demo-ready SaaS MVP for managing B2B contacts, building personalized email campaigns, and measuring outreach in one workspace.
+Рабочая платформа команды: контакты и права доступа, рассылки через UniSender, шаблоны писем, изображения и презентации.
 
-## Product areas
+## Размещение и данные
 
-- Responsive marketing site, login, and registration
-- Dashboard with campaign and audience performance
-- Contact database with search, saved views, filters, selection, and profiles
-- Companies, dynamic segments, and a four-step import demo
-- Campaign list, campaign detail, and audience-to-send wizard
-- Interactive email builder with blocks, personalization, undo/redo, previews, and test sends
-- Template library, analytics funnel, and workspace settings
+Проект опубликован через Sites в Cloudflare Workers. `DB` — Cloudflare D1, `MEDIA` — R2. Это управляемый сервис, а не VPS: конфигурация ОС, физические диски и соседние проекты здесь не администрируются.
 
-The main demo flow starts in Contacts: apply the Lawyer + Moscow + Active filter, create a campaign for the matching audience, choose a template, edit the email, and continue through review to the simulated send result.
+- `app/`, `components/` — страницы и интерфейс.
+- `lib/server/`, `worker/` — API, интеграции, планировщик и обслуживание.
+- `db/schema.ts`, `drizzle/` — схема и последовательные миграции D1. Применённые миграции не переписывать.
+- `data/` — в том числе начальные шаблоны, необходимые для первичного заполнения базы; это не целиком тестовые данные.
+- `public/`, `vendor/` — используемые ресурсы и лицензии.
+- `.openai/hosting.json` — идентификатор проекта и логические привязки хранилищ. Секреты задаются в настройках Sites, не в Git.
 
-## Local development
+Авторизация, хранение и отправка работают с реальными данными. Проверки не должны отправлять письма или менять контакты без соответствующей задачи.
 
-Requires Node.js 22.13 or newer.
+## Версии и восстановление
+
+Исходники сохраняются в Git. Опубликованная версия Sites привязана к полному SHA и архиву сборки. Сохранение версии и публикация — разные операции. Для отката выбирают ранее успешно опубликованную версию.
+
+Архив версии содержит код, статические ресурсы и миграции; он не является резервной копией живой базы D1 или файлов R2. Откат кода не откатывает пользовательские данные. Возможности восстановления D1 и сохранности R2 проверяются отдельно у хостинга.
+
+## Обслуживание
+
+Планировщик проверяет уже запланированные рассылки каждую минуту. Успешное чтение `/api/workspace` служит дополнительным запуском фоновых задач. Не вызывайте отправку рассылок для проверки работоспособности сервера.
+
+`lib/maintenance/ephemera.ts` очищает только технические записи рабочего пространства проекта: сессии, истёкшие более семи дней назад, а также записи идемпотентности ИИ и счётчики лимитов без обновления более семи дней. По 500 записей каждого вида за проход, с блокировкой в D1 от параллельного запуска. При остатке следующий проход разрешён через пять минут; обычно — через сутки. Последний результат доступен в `system_state` по ключу `maintenance:workspace-main:ephemera:v1:last-report`. Изменения схемы не требуются.
+
+Контакты, шаблоны, презентации, медиа, приглашения, история рассылок и аудит этой очисткой не удаляются. Файлы R2 могут использоваться в уже отправленных письмах: отсутствие ссылки в текущем редакторе не доказывает, что файл можно удалить.
+
+Главная страница обновляет данные каждые три минуты в открытой вкладке. Один цикл сверяет с UniSender до трёх обрабатываемых и до трёх давно проверенных завершённых кампаний. Общие показатели считаются по всей доступной сохранённой истории. Обновление старой истории происходит постепенно; API полной сверки сохранён.
+
+## Разработка и проверки
+
+Node.js >=22.13; проверки обслуживания с `node:sqlite` выполнялись на Node.js 24.14.1.
 
 ```bash
-npm install
+npm ci
 npm run dev
-```
-
-Open the local URL printed by the development server.
-
-## Validation
-
-```bash
 npx tsc --noEmit
-npm run lint
-npm test
+node --experimental-strip-types --test tests/project-maintenance.test.mjs
+node --experimental-vm-modules --test tests/database-initialization.test.mjs
 ```
 
-`npm test` builds the Cloudflare-compatible application and verifies that every key route renders successfully.
+Локальная `.wrangler/` содержит собственную базу и медиа, поэтому её нельзя считать просто кэшем и удалять вместе со сборками. `outputs/`, `output/` и `tmp/` могут содержать пользовательские документы.
 
-## Structure
-
-- `app/` — application routes and metadata
-- `components/ui/` — shared design-system primitives
-- `components/layout/` — responsive product shell and navigation
-- `components/*` — product feature modules
-- `config/brand.ts` — replaceable product identity and demo workspace defaults
-- `data/` — realistic mock contacts, companies, campaigns, segments, templates, and analytics
-- `types/` — shared domain models
-
-This MVP intentionally simulates authentication, sending, importing, and persistence. Production SMTP, identity, billing, and backend services can be connected behind the existing product surfaces.
+Инвентаризация версий и выполненная очистка временных сборок: `docs/operations/`.

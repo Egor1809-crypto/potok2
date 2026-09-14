@@ -735,7 +735,7 @@ export async function getWorkspaceBootstrap(request: Request) {
       .where(and(eq(campaigns.workspaceId, WORKSPACE_ID), campaignAccessSql(actor.participant)))
       .orderBy(desc(campaigns.updatedAt))
       .limit(250);
-    const [campaignRecords, segmentRows, integrationRows, planRows, jobRows, eventRows, statsRows, campaignStatsRows, templateCountRows, memberRows, calendarSchedule] = await Promise.all([
+    const [campaignRecords, segmentRows, integrationRows, planRows, jobRows, eventRows, statsRows, campaignStatsRows, templateCountRows, memberRows, calendarSchedule, creativeCounts] = await Promise.all([
       campaignSummaryRecords(actor.participant, { limit: 250 }),
       db.select().from(segments).where(eq(segments.workspaceId, WORKSPACE_ID)).orderBy(desc(segments.updatedAt)),
       db.select().from(integrations).where(eq(integrations.workspaceId, WORKSPACE_ID)).orderBy(integrations.providerId),
@@ -755,13 +755,17 @@ export async function getWorkspaceBootstrap(request: Request) {
       scope === "dashboard" ? db.select({ status: campaigns.status, scheduledAt: campaigns.scheduledAt }).from(campaigns)
         .where(and(eq(campaigns.workspaceId, WORKSPACE_ID), campaignAccessSql(actor.participant),
           inArray(campaigns.status, ["scheduled", "sending"]), isNotNull(campaigns.scheduledAt))) : Promise.resolve([]),
+      scope === "dashboard" ? getD1().prepare(`SELECT
+        (SELECT count(*) FROM presentation_projects WHERE workspace_id = ?) AS presentations,
+        (SELECT count(*) FROM email_assets WHERE workspace_id = ? AND kind = 'photo') AS images
+      `).bind(WORKSPACE_ID, WORKSPACE_ID).first<{ presentations: number; images: number }>() : Promise.resolve(null),
     ]);
     const integrationRecords = integrationRows.filter((row) => PROVIDERS.includes(row.providerId)).map(toIntegrationRecord);
     return {
       ...base,
       members: memberRows.map(toParticipant),
       campaigns: campaignRecords,
-      ...(scope === "dashboard" ? { calendarSchedule } : {}),
+      ...(scope === "dashboard" ? { calendarSchedule, creativeCounts: { presentations: Number(creativeCounts?.presentations || 0), images: Number(creativeCounts?.images || 0) } } : {}),
       deliveryPlans: planRows.map(toDeliveryPlan),
       deliveryJobs: jobRows.map(toDeliveryJob),
       events: eventRows.map(toCampaignEvent),

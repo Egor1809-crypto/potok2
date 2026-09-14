@@ -1,4 +1,4 @@
-/** Cloudflare Worker entry point for the vinext-starter template. */
+/** Поток: Cloudflare Worker, planned campaigns and scoped storage maintenance. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
 
@@ -30,6 +30,15 @@ function runDueCampaignsInBackground(ctx: ExecutionContext) {
   );
 }
 
+let nextMaintenanceCheck = 0;
+function maintainProjectInBackground(ctx: ExecutionContext) {
+  if (Date.now() < nextMaintenanceCheck) return;
+  nextMaintenanceCheck = Date.now() + 5 * 60_000;
+  ctx.waitUntil(import("../lib/server/project-maintenance")
+    .then(({ maintainProjectStorage }) => maintainProjectStorage())
+    .catch(error => { nextMaintenanceCheck = 0; console.error("Project maintenance failed.", error); }));
+}
+
 // Image security config. SVG sources with .svg extension auto-skip the
 // optimization endpoint on the client side (served directly, no proxy).
 // To route SVGs through the optimizer (with security headers), set
@@ -58,12 +67,14 @@ const worker = {
     // normal traffic as an idempotent safety net for already-approved plans.
     if (request.method === "GET" && url.pathname === "/api/workspace" && response.ok) {
       runDueCampaignsInBackground(ctx);
+      maintainProjectInBackground(ctx);
     }
 
     return response;
   },
   async scheduled(_controller: ScheduledController, _env: Env, ctx: ExecutionContext) {
     runDueCampaignsInBackground(ctx);
+    maintainProjectInBackground(ctx);
   },
 };
 

@@ -34,8 +34,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   CampaignRecord,
   CampaignStatus,
-  ImageStudioStatusResponse,
-  PresentationsListResponse,
   UniSenderLifetimeStatsResponse,
   WorkspaceSnapshot,
 } from "@/types/api";
@@ -106,35 +104,21 @@ export function DashboardView() {
     setProviderRefreshing(true);
     setProviderRefreshProgress(0);
     try {
-      let cursor = 0;
-      let failed = 0;
-      while (!signal.aborted) {
-        const response = await fetch("/api/analytics/unisender-summary", {
-          method: "POST",
-          headers: { Accept: "application/json", "Content-Type": "application/json" },
-          body: JSON.stringify({ mode: "full", cursor }),
-          signal: AbortSignal.any([signal, AbortSignal.timeout(90_000)]),
-        });
-        if (!response.ok) throw new Error("Не удалось обновить статистику рассылок. Повторим автоматически.");
-        const payload = await response.json() as UniSenderLifetimeStatsResponse;
-        if (signal.aborted) return;
-        failed += payload.sync.failed;
-        setSnapshot((current) => current ? {
-          ...current,
-          stats: {
-            ...current.stats,
-            unisenderLifetime: payload.stats,
-            unisenderByParticipant: payload.byParticipant,
-          },
-        } : current);
-        setProviderRefreshProgress(payload.sync.total > 0
-          ? Math.min(100, Math.round(((payload.sync.nextCursor ?? payload.sync.total) / payload.sync.total) * 100))
-          : 100);
-        if (payload.sync.complete || payload.sync.nextCursor === null) break;
-        if (payload.sync.nextCursor <= cursor) throw new Error("Обновление статистики остановилось. Повторим автоматически.");
-        cursor = payload.sync.nextCursor;
-      }
-      if (failed > 0) throw new Error("Часть статистики пока не обновилась. Повторим автоматически.");
+      const response = await fetch("/api/analytics/unisender-summary", {
+        method: "POST",
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "quick" }),
+        signal: AbortSignal.any([signal, AbortSignal.timeout(90_000)]),
+      });
+      if (!response.ok) throw new Error("Не удалось обновить статистику рассылок. Повторим автоматически.");
+      const payload = await response.json() as UniSenderLifetimeStatsResponse;
+      if (signal.aborted) return;
+      setSnapshot(current => current ? {
+        ...current,
+        stats: { ...current.stats, unisenderLifetime: payload.stats, unisenderByParticipant: payload.byParticipant },
+      } : current);
+      setProviderRefreshProgress(100);
+      if (payload.sync.failed > 0) throw new Error("Часть статистики пока не обновилась. Повторим автоматически.");
     } finally {
       if (!signal.aborted) setProviderRefreshing(false);
     }
@@ -146,7 +130,7 @@ export function DashboardView() {
     activeRefresh.current = controller;
     lastRefreshStarted.current = Date.now();
     const { signal } = controller;
-    // Bound a stalled request without interrupting a full paginated sync.
+    // Refresh a bounded provider batch; the server still returns all saved lifetime totals.
     const fetchDashboard = (url: string) => fetch(url, { cache: "no-store", signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]) });
     setLoading(true);
     setError("");
@@ -159,24 +143,8 @@ export function DashboardView() {
       // Keep the complete provider totals until reconciliation returns them;
       // the workspace response may contain only a recent campaign window.
       setSnapshot(current => current ? { ...next, stats: { ...next.stats, unisenderLifetime: current.stats.unisenderLifetime, unisenderByParticipant: current.stats.unisenderByParticipant } } : next);
-      await Promise.all([
-        refreshProviderStats(signal),
-        Promise.allSettled([
-          fetchDashboard("/api/presentations").then(async result => {
-            if (!result.ok) throw new Error("Презентации недоступны");
-            return result.json() as Promise<PresentationsListResponse>;
-          }),
-          fetchDashboard("/api/image-studio").then(async result => {
-            if (!result.ok) throw new Error("Медиатека недоступна");
-            return result.json() as Promise<ImageStudioStatusResponse>;
-          }),
-        ]).then(([presentationsResult, imagesResult]) => {
-          if (!signal.aborted) setCreativeCounts(current => ({
-            presentations: presentationsResult.status === "fulfilled" ? presentationsResult.value.presentations.length : current.presentations,
-            images: imagesResult.status === "fulfilled" ? imagesResult.value.assets.length : current.images,
-          }));
-        }),
-      ]);
+      setCreativeCounts(next.creativeCounts ?? { presentations: 0, images: 0 });
+      await refreshProviderStats(signal);
     } catch (reason) {
       if (!signal.aborted) setError(reason instanceof Error && reason.name !== "TimeoutError" && reason.name !== "TypeError"
         ? reason.message
