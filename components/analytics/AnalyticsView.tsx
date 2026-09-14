@@ -2,12 +2,15 @@
 
 import { Select } from "@/components/ui/select";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
+import ui from "@/components/shared/workflow.module.css";
+import styles from "./analytics.module.css";
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   BarChart3,
   CircleAlert,
+  Clock3,
   Download,
   Eye,
   LoaderCircle,
@@ -173,7 +176,7 @@ export function AnalyticsView() {
   };
 
   if (loading && !snapshot) {
-    return <div className="grid min-h-[420px] place-items-center"><div className="text-center"><LoaderCircle aria-hidden="true" className="mx-auto size-9 animate-spin text-[var(--primary)]" /><p className="mt-3 text-sm text-[var(--text-muted)]">Загружаем журнал отправки…</p></div></div>;
+    return <div className={`${ui.page} min-h-[420px] place-items-center`}><div className="text-center" role="status"><LoaderCircle aria-hidden="true" className="mx-auto size-9 animate-spin text-[var(--primary)]" /><p className="mt-3 text-sm text-[var(--text-muted)]">Загружаем журнал отправки…</p></div></div>;
   }
 
   if (!snapshot) {
@@ -181,36 +184,36 @@ export function AnalyticsView() {
   }
 
   const kpis = [
-    { label: "Отправлено", value: providerTotals.sent, note: `${number.format(selectedCampaigns.length)} email-кампаний`, Icon: Send },
-    { label: "Доставлено", value: providerTotals.delivered, note: "подтверждено UniSender", Icon: MailCheck },
-    { label: "Прочитано", value: providerTotals.opened, note: "уникальные открытия", Icon: Eye },
-    { label: "Все переходы", value: providerTotals.clicked, note: "включая повторные клики", Icon: MousePointerClick },
-    { label: "Не доставлено", value: providerTotals.bounced, note: "по данным провайдера", Icon: ShieldAlert },
-    { label: "Принято в заданиях", value: jobTotals.accepted, note: `последние ${number.format(snapshot.historyWindow.deliveryJobsLimit)} заданий`, Icon: BarChart3 },
+    { label: "Отправлено", value: providerTotals.sent, note: `${number.format(selectedCampaigns.length)} email-кампаний`, Icon: Send, tone: "primary" },
+    { label: "Доставлено", value: providerTotals.delivered, note: "подтверждено UniSender", Icon: MailCheck, tone: "success" },
+    { label: "Прочитано", value: providerTotals.opened, note: "уникальные открытия", Icon: Eye, tone: "info" },
+    { label: "Все переходы", value: providerTotals.clicked, note: "включая повторные клики", Icon: MousePointerClick, tone: "primary" },
+    { label: "Не доставлено", value: providerTotals.bounced, note: "по данным провайдера", Icon: ShieldAlert, tone: "danger" },
+    { label: "Принято в заданиях", value: jobTotals.accepted, note: `последние ${number.format(snapshot.historyWindow.deliveryJobsLimit)} заданий`, Icon: BarChart3, tone: "success" },
   ];
   const historyLimit = snapshot.historyWindow.deliveryJobsLimit;
 
   return (
-    <div className="space-y-6">
-      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div className={`${ui.page} ${styles.page}`}>
+      <header className="flex flex-col gap-4">
         <div>
           <h1 className="text-[28px] font-semibold tracking-[-.04em]">Журнал отправки</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-muted)]">Данные UniSender по авторам рассылок.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className={`${ui.toolbar} ${styles.controls}`}>
           <label><span className="sr-only">Выбрать участника</span><Select className="input min-w-56" value={participantSelection} onChange={(event) => { setParticipantSelection(event.target.value); setSelection("all"); }}><option value="mine">Моя фактическая активность</option><option value="all">Вся команда</option>{snapshot.members.filter((member) => member.id !== snapshot.participant.id).map((member) => <option key={member.id} value={member.id}>{member.displayName}</option>)}</Select></label>
           <label><span className="sr-only">Выбрать кампанию</span><Select className="input min-w-56" value={selection} onChange={(event) => setSelection(event.target.value)}><option value="all">Все кампании участника</option>{participantCampaigns.map((campaign) => <option key={campaign.id} value={campaign.id}>{campaign.name}</option>)}</Select></label>
           <button type="button" onClick={exportCsv} disabled={!jobs.length} className="btn btn-secondary gap-2"><Download aria-hidden="true" className="size-6" />Скачать CSV</button>
         </div>
       </header>
 
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6" aria-label="Итоги выполнения">
-        {kpis.map(({ label, value, note, Icon }) => (
-          <article key={label} className="card p-4">
-            <span className="grid size-8 place-items-center rounded-lg bg-[var(--primary-subtle)] text-[var(--primary)]"><Icon aria-hidden="true" className="size-6" /></span>
-            <p className="mt-5 text-[22px] font-semibold tracking-[-.04em]">{number.format(value)}</p>
-            <p className="mt-1 text-[11px] font-semibold">{label}</p>
-            <p className="mt-1 text-[9px] leading-4 text-[var(--text-subtle)]">{note}</p>
+      <section className={styles.metrics} aria-label="Итоги выполнения">
+        {kpis.map(({ label, value, note, Icon, tone }) => (
+          <article key={label} className={ui.metric} data-tone={tone}>
+            <span className={ui.metricIcon}><Icon aria-hidden="true" className="size-6" /></span>
+            <p className={`${ui.value} ${styles.value}`}>{number.format(value)}</p>
+            <p className={styles.metricLabel}>{label}</p>
+            <p className={styles.metricNote}>{note}</p>
           </article>
         ))}
       </section>
@@ -220,23 +223,24 @@ export function AnalyticsView() {
           <div className="flex items-start gap-3"><BarChart3 aria-hidden="true" className="mt-0.5 size-7 shrink-0 text-[var(--warning)]" /><div><h2 className="text-[13px] font-semibold">Заданий на отправку пока нет</h2><p className="mt-1 text-[11px] leading-5 text-[var(--text-muted)]">Сохраните кампанию, проверьте готовность и запустите её явно. Если провайдер не подключён, Поток остановит запуск и покажет причину.</p><Link href="/campaigns" className="mt-2 inline-flex text-[11px] font-semibold text-[var(--primary)]">Открыть кампании →</Link></div></div>
         </section>
       ) : (
-        <section className="card overflow-hidden">
-          <div className="border-b border-[var(--border)] px-5 py-4 sm:px-6">
+        <section className={styles.history} aria-label="Задания по кампаниям">
+          <div className={styles.historyHeader}>
             <h2 className="text-[15px] font-semibold">Задания по кампаниям</h2>
             <p className="mt-1 text-[11px] text-[var(--text-subtle)]">Одно задание фиксирует конкретную версию сообщения, аудитории и каналов. CSV содержит это же окно из последних {number.format(historyLimit)} заданий рабочего пространства.</p>
           </div>
-          <div className="overflow-x-auto">
-            <table className="data-table min-w-[820px]">
+          {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- Keyboard users need to scroll the wide table. */}
+          <div className={styles.tableScroll} tabIndex={0} role="region" aria-label="История отправок">
+            <table className={`data-table ${styles.table}`}>
               <thead><tr><th>Кампания</th><th>Отправитель</th><th>Результат</th><th>Принято</th><th>Вручную</th><th>Проблемы</th><th>Время</th></tr></thead>
               <tbody>{jobs.map((job) => (
-                <tr key={job.id}>
-                  <td><Link href={`/campaigns/${job.campaignId}`} className="text-[12px] font-semibold hover:text-[var(--primary)]">{campaignName(campaigns, job.campaignId)}</Link></td>
-                  <td>{participantName(snapshot, campaigns.find((campaign) => campaign.id === job.campaignId)?.participantId ?? "")}</td>
-                  <td><Badge variant={jobStatusTone[job.status]} dot>{jobStatusLabel[job.status]}</Badge><p className="mt-1 max-w-xs text-[9px] leading-4 text-[var(--text-subtle)]">{job.statusMessage}</p></td>
-                  <td>{number.format(job.acceptedCount)}</td>
-                  <td>{number.format(job.manualCount)}</td>
-                  <td>{number.format(job.rejectedCount + job.ambiguousCount)}</td>
-                  <td>{formatDate(job.createdAt, snapshot.workspace.timezone)}</td>
+                <tr key={job.id} data-tone={jobStatusTone[job.status]}>
+                  <td><Link href={`/campaigns/${job.campaignId}`} className={styles.campaignName}>{campaignName(campaigns, job.campaignId)}</Link></td>
+                  <td data-label="Отправитель">{participantName(snapshot, campaigns.find((campaign) => campaign.id === job.campaignId)?.participantId ?? "")}</td>
+                  <td><Badge variant={jobStatusTone[job.status]} dot>{jobStatusLabel[job.status]}</Badge><p className={styles.statusMessage}>{job.statusMessage}</p></td>
+                  <td data-label="Принято"><span className={styles.accepted} data-active={job.acceptedCount > 0}>{number.format(job.acceptedCount)}</span></td>
+                  <td data-label="Вручную">{number.format(job.manualCount)}</td>
+                  <td data-label="Проблемы"><span className={styles.problems} data-active={job.rejectedCount + job.ambiguousCount > 0}>{number.format(job.rejectedCount + job.ambiguousCount)}</span></td>
+                  <td><time className={styles.time} dateTime={job.createdAt}><Clock3 size={18} aria-hidden="true"/>{formatDate(job.createdAt, snapshot.workspace.timezone)}</time></td>
                 </tr>
               ))}</tbody>
             </table>

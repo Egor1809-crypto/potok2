@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import ui from "@/components/shared/workflow.module.css";
+import styles from "./campaigns.module.css";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -191,7 +193,7 @@ export function CampaignsView({
   const active = counts.ready + counts.scheduled + counts.sending;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 pb-10">
+    <div className={cn(ui.page, styles.page)}>
       <PageHeader
         title="Рассылка писем"
         action={
@@ -222,11 +224,12 @@ export function CampaignsView({
         <SummaryCard icon={BarChart3} label="Принято провайдерами" value={formatNumber(acceptedRecipients)} text="Уникальные получатели; это ещё не подтверждение доставки" tone="success" />
       </section>
 
-      <section className="card overflow-hidden" aria-labelledby="campaign-list-title">
-        <div className="border-b border-border p-4 sm:p-5">
+      <section className={styles.library} aria-labelledby="campaign-list-title">
+        <div className={cn(ui.toolbar, styles.toolbar)}>
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h2 id="campaign-list-title" className="sr-only">Список рассылок</h2>
+              <p className={styles.resultCount} role="status">{apiMode === "loading" ? "Загружаем рассылки…" : `Найдено: ${formatNumber(filtered.length)}`}</p>
             </div>
             <SearchInput
               value={search}
@@ -237,49 +240,42 @@ export function CampaignsView({
               wrapperClassName="w-full lg:w-72"
             />
           </div>
-          <div className="mt-4 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Статус кампании">
+          <div className={ui.filters} role="group" aria-label="Статус кампании">
             {tabs.map((tab) => (
               <button
                 key={tab.value}
                 type="button"
-                role="tab"
-                aria-selected={activeTab === tab.value}
+                aria-pressed={activeTab === tab.value}
                 onClick={() => setActiveTab(tab.value)}
-                className={cn(
-                  "inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-[12px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
-                  activeTab === tab.value
-                    ? "border-primary/30 bg-primary-subtle text-primary"
-                    : "border-border bg-surface text-text-muted hover:border-border-strong",
-                )}
               >
                 {tab.label}
-                <span className="rounded-full bg-surface px-1.5 py-0.5 text-[10px]">{counts[tab.value]}</span>
+                <span>{counts[tab.value]}</span>
               </button>
             ))}
           </div>
         </div>
 
-        {filtered.length ? (
-          <div className="divide-y divide-border">
+        {apiMode === "loading" ? <div className={styles.loading} role="status"><RefreshCw aria-hidden="true" className="size-7 animate-spin text-primary" />Загружаем рассылки…</div> : filtered.length ? (
+          <div className={styles.list}>
             {filtered.map((campaign) => {
               const meta = statusMeta[campaign.status];
               const StatusIcon = meta.icon;
               const blockedPlans = deliveryPlans.filter((plan) => plan.campaignId === campaign.id && plan.status === "blocked");
               const editHref = `/campaigns/new?campaign=${encodeURIComponent(campaign.id)}&step=${campaign.status === "blocked" ? "review" : "audience"}`;
               return (
-                <article key={campaign.id} className="grid gap-4 p-5 transition-colors hover:bg-surface-subtle/35 lg:grid-cols-[minmax(0,1.3fr)_minmax(170px,.6fr)_minmax(190px,.75fr)_auto] lg:items-center lg:px-6">
+                <article key={campaign.id} className={cn(ui.record, styles.campaign)} data-tone={meta.tone}>
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant={meta.tone} dot>{meta.label}</Badge>
                       <span className="text-[11px] text-text-subtle">Создана {formatDate(campaign.createdAt, timeZone)}</span>
                     </div>
-                    <Link href={`/campaigns/${campaign.id}`} className="mt-2 block truncate text-[15px] font-semibold text-text-strong hover:text-primary">
+                    <Link href={`/campaigns/${campaign.id}`} className={styles.name}>
                       {campaign.name}
                     </Link>
                     <p className="mt-1 line-clamp-1 text-[12px] text-text-muted">{campaign.subject || campaign.messengerMessage || "Сообщение ещё не подготовлено"}</p>
                   </div>
 
-                  <div>
+                  <div className={styles.audience}>
                     <p className="flex items-center gap-2 text-[12px] font-medium text-text-strong"><UsersRound aria-hidden="true" className="size-6 text-text-subtle" />{campaign.audience}</p>
                     <p className="mt-1 text-[11px] text-text-muted">Получателей: {formatNumber(campaign.metrics.recipients)}</p>
                     <div className="mt-2 flex gap-1.5">
@@ -291,7 +287,7 @@ export function CampaignsView({
                     </div>
                   </div>
 
-                  <div className={cn("rounded-xl border p-3", campaign.status === "blocked" ? "border-warning/25 bg-warning-subtle" : "border-border bg-surface-subtle/50")}>
+                  <div className={styles.nextStep}>
                     <p className="flex items-center gap-2 text-[12px] font-semibold text-text-strong"><StatusIcon aria-hidden="true" className="size-6" />Следующий шаг</p>
                     <p className="mt-1 text-[11px] leading-4.5 text-text-muted">
                       {campaign.statusReason || blockedPlans[0]?.statusReason || meta.next}
@@ -299,7 +295,7 @@ export function CampaignsView({
                     {blockedPlans.length > 1 ? <p className="mt-1 text-[10px] font-medium text-warning">Заблокировано каналов: {blockedPlans.length}</p> : null}
                   </div>
 
-                  <div className="flex flex-wrap gap-2 lg:justify-end">
+                  <div className={styles.actions}>
                     {(campaign.status === "draft" || campaign.status === "blocked") ? (
                       <Link href={editHref} className={buttonVariants({ variant: "primary", size: "sm" })}>
                         {campaign.status === "blocked" ? "Исправить" : "Продолжить"}
@@ -351,11 +347,11 @@ function SummaryCard({
     success: "bg-success-subtle text-success",
   }[tone];
   return (
-    <article className="card flex items-start gap-3 p-4 sm:p-5">
-      <span className={`grid size-10 shrink-0 place-items-center rounded-xl ${classes}`}><Icon aria-hidden="true" className="size-6" /></span>
+    <article className={cn(ui.metric, styles.summary)} data-tone={tone}>
+      <span className={cn(ui.metricIcon, classes)}><Icon aria-hidden="true" className="size-6" /></span>
       <div>
         <p className="text-[12px] font-medium text-text-muted">{label}</p>
-        <p className="mt-0.5 text-[22px] font-semibold tracking-[-0.04em] text-text-strong">{value}</p>
+        <p className={ui.value}>{value}</p>
         <p className="mt-1 text-[11px] leading-4.5 text-text-subtle">{text}</p>
       </div>
     </article>

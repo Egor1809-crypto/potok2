@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import ui from "@/components/shared/workflow.module.css";
+import styles from "./calendar.module.css";
 import { calendarDayKey as dateKeyInTimezone, calendarMonthDays, parseCalendarDate } from "@/lib/calendar/dates";
 import { useCalendarTimeZone } from "@/lib/calendar-timezone";
 import { russianTimeZones } from "@/lib/russian-timezones";
@@ -217,21 +219,23 @@ export function CalendarView() {
   const selectedDateLabel = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric" }).format(new Date(`${selectedDay}T12:00:00`));
 
   return (
-    <div className="space-y-5">
+    <div className={cn(ui.page, styles.page)}>
       <PageHeader
         title="Календарь рассылок"
         action={<Link href={`/campaigns/new?scheduledDate=${todayKey}&timeZone=${encodeURIComponent(timeZone)}`} className={buttonVariants()}><Plus className="size-6" />Запланировать</Link>}
       />
       {error ? <Alert tone="danger" title="Календарь недоступен">{error}</Alert> : null}
 
-      <div className="flex flex-wrap items-end gap-3" aria-label="Представление и фильтры календаря">
+      <div className={styles.viewbar} aria-label="Представление и фильтры календаря">
         <div className="min-w-0 sm:ms-auto sm:order-last"><label htmlFor="calendar-time-zone" className="mb-1 block text-xs text-text-muted">Часовой пояс</label><Select id="calendar-time-zone" value={timeZoneChoice} onChange={event => setTimeZoneChoice(event.target.value)} options={[{ value: "auto", label: "Автоматически — по устройству" }, ...russianTimeZones]} /></div>
-        <Button variant={view === "calendar" ? "primary" : "outline"} aria-pressed={view === "calendar"} onClick={() => setView("calendar")}>Календарь</Button>
-        <Button variant={view === "report" ? "primary" : "outline"} aria-pressed={view === "report"} onClick={() => setView("report")}>Отчёт за 24 часа{snapshot?.calendarReport ? ` · ${snapshot.calendarReport.rows.length}` : ""}</Button>
+        <div className={cn(ui.filters, styles.viewTabs)} role="group" aria-label="Представление календаря">
+          <button type="button" aria-pressed={view === "calendar"} onClick={() => setView("calendar")}><CalendarDays size={22} aria-hidden="true"/>Календарь</button>
+          <button type="button" aria-pressed={view === "report"} onClick={() => setView("report")}><Clock3 size={22} aria-hidden="true"/>Отчёт за 24 часа{snapshot?.calendarReport ? <span>{snapshot.calendarReport.rows.length}</span> : null}</button>
+        </div>
       </div>
       {view === "report" ? <CalendarReport report={snapshot?.calendarReport} timeZone={timeZone} loading={loading} refresh={() => void load()} /> : <>
-      <section className="card p-4 sm:p-5" aria-label="Фильтры календаря">
-        <div className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_240px_200px_auto]">
+      <section className={cn(ui.toolbar, styles.filterbar)} aria-label="Фильтры календаря">
+        <div>
           <div className="relative"><Filter className="pointer-events-none absolute left-3 top-1/2 size-6 -translate-y-1/2 text-text-subtle" /><Input className="input-with-leading-icon" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Тема, название или группа" aria-label="Поиск по теме" /></div>
           <Select value={group} onChange={(event) => setGroup(event.target.value)} aria-label="Группа получателей" options={[{ value: "", label: "Все группы" }, ...groups.map((value) => ({ value, label: value }))]} />
           <Select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="Статус рассылки" options={[{ value: "", label: "Все статусы" }, { value: "scheduled", label: "Запланированные" }, { value: "sending", label: "Отправляются" }, { value: "blocked", label: "Нужно исправить" }]} />
@@ -239,17 +243,17 @@ export function CalendarView() {
         </div>
       </section>
 
-      <div className="grid min-w-0 grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
-        <section className="card min-w-0 overflow-hidden" aria-label="Месячный календарь">
-          <header className="flex items-center justify-between gap-2 border-b border-border px-3 py-3 sm:px-5">
+      <div className={styles.calendarLayout}>
+        <section className={styles.monthCard} aria-label="Месячный календарь">
+          <header className={styles.monthHeader}>
             <Button size="icon" variant="ghost" aria-label="Предыдущий месяц" onClick={() => changeMonth(-1)}><ChevronLeft aria-hidden="true" className="size-7" /></Button>
             <h2 className="text-center text-[18px] font-semibold text-text-strong">{formatMonth(month)}</h2>
             <Button size="icon" variant="ghost" aria-label="Следующий месяц" onClick={() => changeMonth(1)}><ChevronRight aria-hidden="true" className="size-7" /></Button>
           </header>
-          <div className="grid grid-cols-7 border-b border-border bg-surface-subtle">
+          <div className={styles.weekdays}>
             {weekdays.map((day) => <div key={day} className="py-2 text-center text-[12px] font-semibold text-text-muted">{day}</div>)}
           </div>
-          <div className="grid grid-cols-7">
+          <div className={styles.days}>
             {days.map((day) => {
               const key = day.key;
               const items = campaignsByDay.get(key) ?? [];
@@ -267,17 +271,14 @@ export function CalendarView() {
                   aria-pressed={selected}
                   aria-controls="calendar-day-details"
                   aria-current={today ? "date" : undefined}
-                  className={cn(
-                    "flex min-h-20 min-w-0 flex-col items-start gap-2 border-b border-e border-border p-1.5 text-start hover:bg-primary/5 focus-visible:relative focus-visible:z-[1] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary sm:min-h-24 sm:p-2.5",
-                    outside && "bg-surface-subtle/60",
-                    items.length > 0 && !outside && "bg-primary/[0.035]",
-                    selected && "bg-primary/10 ring-2 ring-inset ring-primary",
-                  )}
+                  data-outside={outside}
+                  data-has-events={items.length > 0}
+                  className={styles.day}
                 >
-                  <span className={cn("grid size-7 shrink-0 place-items-center rounded-full text-[13px] font-semibold", today ? "bg-primary text-white" : outside ? "text-text-subtle" : "text-text-strong")}>{day.day}</span>
+                  <span className={styles.date}>{day.day}</span>
                   {items.length > 0 ? (
-                    <span aria-hidden="true" className="inline-flex max-w-full items-center justify-center gap-0.5 rounded-full bg-primary px-0.5 py-1 text-[10px] font-semibold leading-none text-white sm:gap-1.5 sm:px-2 sm:text-[14px]">
-                      <span className="size-1 shrink-0 rounded-full bg-white sm:size-1.5" />
+                    <span aria-hidden="true" className={styles.eventCount}>
+                      <span />
                       {items.length}
                     </span>
                   ) : null}
@@ -287,8 +288,8 @@ export function CalendarView() {
           </div>
         </section>
 
-        <aside ref={dayPanel} id="calendar-day-details" className="card min-w-0 p-4 sm:p-5 lg:sticky lg:top-5" aria-labelledby="calendar-day-title">
-          <div className="flex items-start justify-between gap-3">
+        <aside ref={dayPanel} id="calendar-day-details" className={styles.dayPanel} aria-labelledby="calendar-day-title">
+          <div className={styles.panelHeader}>
             <div className="min-w-0">
               <h2 ref={panelHeading} id="calendar-day-title" tabIndex={-1} className="rounded text-[18px] font-semibold text-text-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">{selectedDateLabel}</h2>
               <p className="mt-1 text-[12px] text-text-muted" role="status">Рассылок: {selectedItems.length}</p>
@@ -296,9 +297,9 @@ export function CalendarView() {
             <Button size="sm" variant="outline" onClick={showToday}>Сегодня</Button>
           </div>
           <p className="mt-3 text-[12px] text-text-muted">Время: {describeTimeZone(timeZone)}</p>
-          <div className="mt-5 space-y-4">
+          <div className={styles.agenda}>
             {selectedItems.map((campaign) => (
-              <article key={campaign.id} className={cn("min-w-0 rounded-xl border border-border p-4", campaign.id === targetCampaignId && "border-primary bg-primary/[0.035]")}>
+              <article key={campaign.id} className={cn(ui.record, styles.event)} data-tone={statusTone[campaign.status]} data-target={campaign.id === targetCampaignId}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <time dateTime={campaign.scheduledAt!} className="inline-flex items-center gap-1.5 text-[15px] font-semibold tabular-nums text-primary"><Clock3 aria-hidden="true" className="size-6" />{formatTime(campaign.scheduledAt!, timeZone)}</time>
                   <Badge variant={statusTone[campaign.status]} dot>{statusLabel[campaign.status]}</Badge>
@@ -315,7 +316,7 @@ export function CalendarView() {
                 <Link href={`/campaigns/${campaign.id}`} aria-label={`Открыть рассылку «${campaign.name}»`} className={buttonVariants({ variant: "outline", size: "sm", className: "mt-4 w-full" })}>Открыть рассылку</Link>
               </article>
             ))}
-            {selectedItems.length === 0 ? <p className="rounded-xl bg-surface-subtle p-4 text-[14px] leading-6 text-text-muted">{query || group || status ? "На этот день нет рассылок по выбранным фильтрам." : "На этот день нет запланированных рассылок."}</p> : null}
+            {selectedItems.length === 0 ? <div className={styles.emptyDay}><CalendarDays size={32} aria-hidden="true"/><p>{query || group || status ? "На этот день нет рассылок по выбранным фильтрам." : "На этот день нет запланированных рассылок."}</p></div> : null}
           </div>
           <Link href={`/campaigns/new?scheduledDate=${selectedDay}&timeZone=${encodeURIComponent(timeZone)}`} className={buttonVariants({ className: "mt-5 w-full" })}><Plus aria-hidden="true" className="size-6" />Запланировать</Link>
         </aside>

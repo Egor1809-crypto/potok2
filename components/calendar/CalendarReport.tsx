@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import ui from "@/components/shared/workflow.module.css";
+import styles from "./calendar.module.css";
 import Link from "next/link";
 import { RefreshCw } from "@/components/ui/icons";
 import { Badge, Button, Input, buttonVariants } from "@/components/ui";
@@ -25,12 +27,12 @@ export function CalendarReport({ report, timeZone, refresh, loading }: {
       <Button variant="outline" loading={loading} onClick={refresh}><RefreshCw className="size-6" aria-hidden="true"/>Обновить отчёт</Button>
     </div>
     <p className="text-sm leading-6 text-text-muted">Рассылки, срок которых наступил за этот период, а также запущенные, заблокированные и отменённые рассылки. Показатели отражают их текущее состояние и обновляются каждые 30 секунд. Передача провайдеру ещё не означает доставку получателю.</p>
-    <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
-      {(Object.entries(reportLabels) as [ReportState, string][]).map(([state, label]) => <button key={state} type="button" aria-pressed={filter === state} onClick={() => { setFilter(filter === state ? "" : state); setLimit(20); }} className={`card flex flex-col items-start gap-2 p-4 text-start focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary ${filter === state ? "ring-2 ring-primary" : "hover:bg-surface-subtle"}`}><span className="text-2xl font-semibold tabular-nums text-text-strong">{report.counts[state]}</span><span className="text-sm text-text-muted">{label}</span></button>)}
+    <div className={styles.reportFilters}>
+      {(Object.entries(reportLabels) as [ReportState, string][]).map(([state, label]) => <button key={state} type="button" aria-pressed={filter === state} data-tone={variant(state)} onClick={() => { setFilter(filter === state ? "" : state); setLimit(20); }} className={`${ui.metric} ${styles.reportFilter}`}><span className={ui.value}>{report.counts[state]}</span><span className="text-sm text-text-muted">{label}</span></button>)}
     </div>
     <div className="flex flex-wrap items-center gap-3"><Input className="min-w-0 flex-1 sm:max-w-md" aria-label="Поиск в отчёте" placeholder="Название, тема, отправитель или причина" value={query} onChange={e => { setQuery(e.target.value); setLimit(20); }}/><Button variant="ghost" onClick={() => { setFilter(""); setQuery(""); setLimit(20); }}>Показать все</Button><span className="text-sm text-text-muted" role="status">Рассылок: {rows.length} из {report.rows.length}</span></div>
     {!rows.length ? <div className="card p-5 text-sm text-text-muted">{report.rows.length ? "Нет рассылок по выбранным условиям. Сбросьте фильтр или измените запрос." : "За последние 24 часа отправок, остановок и рассылок с наступившим сроком не было."}</div> : null}
-    <div className="space-y-3">{rows.slice(0, limit).map(row => <article key={row.id} className="card min-w-0 p-4 sm:p-5">
+    <div className="space-y-3">{rows.slice(0, limit).map(row => <article key={row.id} className={ui.record} data-tone={variant(row.state)}>
       <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0 flex-1"><time dateTime={row.activityAt} className="text-xs tabular-nums text-text-muted">{format(row.activityAt)}</time><h3 className="mt-1 break-words font-semibold text-text-strong">{row.name}</h3><p className="mt-1 break-words text-sm text-text-muted">{row.subject || "Тема не указана"}</p></div><Badge variant={variant(row.state)}>{row.label}</Badge></div>
       <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">{[["Получателей", row.recipients], ["Передано провайдеру", row.sent], ["Доставлено", row.delivered], ["Ошибки", row.errors]].map(([label, value]) => <div key={label}><dt className="text-xs text-text-muted">{label}</dt><dd className="mt-1 font-semibold tabular-nums">{value}</dd></div>)}</dl>
       <p className="mt-4 break-words rounded-lg bg-surface-subtle p-3 text-sm leading-6 text-text-muted">{row.reason}</p>
