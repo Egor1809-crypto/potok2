@@ -112,7 +112,7 @@ const statusMeta: Record<CampaignStatus, {
   },
   sending: {
     label: "Отправляется",
-    badge: "accent",
+    badge: "warning",
     title: "Провайдеры обрабатывают получателей",
     description: "Задания передаются выбранным провайдерам.",
   },

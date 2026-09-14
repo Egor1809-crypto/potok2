@@ -51,7 +51,7 @@ const statusConfig: Record<StatusTone, { label: string; variant: BadgeVariant }>
   active: { label: "Активна", variant: "success" },
   draft: { label: "Черновик", variant: "neutral" },
   scheduled: { label: "Запланирована", variant: "info" },
-  sending: { label: "Отправляется", variant: "accent" },
+  sending: { label: "Отправляется", variant: "warning" },
   error: { label: "Требуется действие", variant: "danger" },
 };
 

@@ -1,39 +1,23 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import {
-  ArrowRight,
-  Blocks,
-  Copy,
-  Image as ImageIcon,
-  PencilLine,
-  Sparkles,
-  Star,
-  Trash2,
-} from "@/components/ui/icons";
-
+import { ArrowRight, Copy, Eye, PencilLine, Sparkles, Star, Trash2 } from "@/components/ui/icons";
 import type { EmailTemplateRecord } from "@/types/api";
-import { BRAND_NAME } from "@/config/brand";
 import { Badge, Button, buttonVariants } from "@/components/ui";
-import { cn } from "@/components/ui/utils";
-import { emailFrameCss } from "@/components/email-builder/frame-presets";
+import { LetterPreview } from "./LetterPreview";
 import { templateCategoryLabels } from "./templateLabels";
+import styles from "./Templates.module.css";
 
 export function TemplateCard({
-  template,
-  editHref,
-  editLabel = "Редактировать",
-  applyHref,
-  onDirector,
-  onClone,
-  onDelete,
-  onFavorite,
-  busyAction,
+  template, editHref, editLabel = "Редактировать", applyHref,
+  onPreview, onDirector, onClone, onDelete, onFavorite, busyAction,
 }: {
   template: EmailTemplateRecord;
   editHref: string;
   editLabel?: string;
   applyHref: string;
+  onPreview: () => void;
   onDirector?: () => void;
   onClone: () => void;
   onDelete: () => void;
@@ -41,218 +25,69 @@ export function TemplateCard({
   busyAction?: "clone" | "delete" | "favorite";
 }) {
   return (
-    <article className="group relative min-w-0 overflow-hidden rounded-[14px] border border-border bg-surface shadow-[var(--shadow-xs)] transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-1 hover:border-border-strong hover:shadow-[var(--shadow-md)]">
-      <button type="button" onClick={onFavorite} aria-pressed={template.isFavorite} aria-label={`${template.isFavorite ? "Убрать из избранного" : "Добавить в избранное"}: ${template.name}`} className={`absolute right-3 top-3 z-30 grid size-9 place-items-center rounded-full border shadow-sm backdrop-blur transition ${template.isFavorite ? "border-[#F43CB8]/40 bg-[#10141d] text-[#F43CB8]" : "border-white/70 bg-white/85 text-[#667085] hover:text-[#F43CB8]"}`}>
-        <Star aria-hidden="true" className={`size-6 ${template.isFavorite ? "fill-current" : ""}`} />
-      </button>
-      <Link
-        href={editHref}
-        aria-label={`${editLabel} шаблон «${template.name}»`}
-        className="block outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40"
-      >
-        <TemplateThumbnail template={template} />
-      </Link>
-
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="m-0 truncate text-[14px] font-semibold tracking-[-0.015em] text-text-strong">
-              {template.name}
-            </h2>
-            <p className="mt-1 line-clamp-2 min-h-9 text-[11px] leading-[18px] text-text-muted">
-              {template.description || "Без описания"}
-            </p>
-          </div>
-          <div className="flex shrink-0 flex-col items-end gap-1">
-            {!template.isStarter && <Badge variant="accent">Мой шаблон</Badge>}
-            <span className="text-[9px] text-text-subtle">{templateCategoryLabels[template.category]}</span>
-          </div>
+    <article className={styles.card} aria-label={template.name}>
+      <div className={styles.preview}>
+        <button type="button" onClick={onFavorite} disabled={Boolean(busyAction)} aria-busy={busyAction === "favorite" || undefined} aria-pressed={template.isFavorite} aria-label={`${template.isFavorite ? "Убрать из избранного" : "Добавить в избранное"}: ${template.name}`} title={template.isFavorite ? "Убрать из избранного" : "Добавить в избранное"} className={styles.favorite}>
+          <Star aria-hidden="true" className={`size-6 ${template.isFavorite ? "fill-current" : ""}`} />
+        </button>
+        <Link href={editHref} aria-label={`${editLabel} шаблон «${template.name}»`} className={styles.previewLink}>
+          <TemplateThumbnail template={template} />
+        </Link>
+        <button type="button" onClick={onPreview} aria-label={`Посмотреть письмо «${template.name}»`} className={styles.previewAction}>
+          <Eye aria-hidden="true" className="size-5" />Посмотреть письмо
+        </button>
+      </div>
+      <div className={styles.cardBody}>
+        <div className={styles.cardMeta}>
+          <span>{templateCategoryLabels[template.category]}</span>
+          {!template.isStarter && <Badge variant="accent">Мой шаблон</Badge>}
         </div>
-
-        <div className="mt-4 flex items-center justify-between gap-3 border-t border-border/70 pt-3.5">
-          <span className="flex items-center gap-1.5 text-[10px] text-text-subtle">
-            <Blocks aria-hidden="true" className="size-4" />
-            Блоков: {template.builderDocument.blocks.length.toLocaleString("ru-RU")}
-          </span>
-          <span className="text-[10px] text-text-subtle">
-            {new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(template.updatedAt))}
-          </span>
-        </div>
-
-        <div className="mt-3 grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,160px),1fr))" }}>
-          <Link
-            href={editHref}
-            className={buttonVariants({ variant: "secondary", size: "sm", className: "min-w-0 px-2" })}
-          >
-            <PencilLine aria-hidden="true" className="size-5" />
-            {editLabel}
+        <h2 className={styles.cardTitle} title={template.name}>{template.name}</h2>
+        <p className={styles.description}>{template.description || template.subject}</p>
+        <div className={styles.cardActions}>
+          <Link href={editHref} className={buttonVariants({ variant: "secondary", size: "sm" })}>
+            <PencilLine aria-hidden="true" className="size-5" />{editLabel}
           </Link>
-          <Link
-            href={applyHref}
-            className={buttonVariants({ variant: "primary", size: "sm", className: "min-w-0 px-2" })}
-          >
-            В кампанию
-            <ArrowRight aria-hidden="true" className="size-5" />
+          <Link href={applyHref} className={buttonVariants({ variant: "outline", size: "sm", className: styles.apply })}>
+            В кампанию<ArrowRight aria-hidden="true" className="size-5" />
           </Link>
         </div>
-
-        {onDirector && <Button variant="secondary" size="sm" className="mt-2 w-full" onClick={onDirector}><Sparkles aria-hidden className="size-5" />Арт-директор</Button>}
-        <div className="mt-2 flex justify-end gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onClone}
-            loading={busyAction === "clone"}
-            loadingText="Копируем…"
-            disabled={Boolean(busyAction)}
-            aria-label={`Дублировать шаблон «${template.name}»`}
-            className="h-7 px-2 text-[10px]"
-          >
-            <Copy aria-hidden="true" className="size-4" />
-            Дублировать
-          </Button>
-          {!template.isStarter ? <Button
-            variant="ghost"
-            size="sm"
-            onClick={onDelete}
-            loading={busyAction === "delete"}
-            loadingText="Удаляем…"
-            disabled={Boolean(busyAction)}
-            aria-label={`Удалить шаблон «${template.name}»`}
-            className="h-7 px-2 text-[10px] text-danger hover:text-danger"
-          >
-            <Trash2 aria-hidden="true" className="size-4" />
-            Удалить
-          </Button> : null}
+        <div className={styles.cardFooter}>
+          {onDirector && <Button variant="ghost" size="sm" onClick={onDirector} className={styles.director}><Sparkles aria-hidden className="size-5" />Арт-директор</Button>}
+          <div className={styles.utilities}>
+            <Button variant="ghost" size="icon" onClick={onClone} loading={busyAction === "clone"} disabled={Boolean(busyAction)} aria-label={`Дублировать шаблон «${template.name}»`} title="Дублировать шаблон">
+              <Copy aria-hidden="true" className="size-5" />
+            </Button>
+            {!template.isStarter && <Button variant="ghost" size="icon" onClick={onDelete} loading={busyAction === "delete"} disabled={Boolean(busyAction)} aria-label={`Удалить шаблон «${template.name}»`} title="Удалить шаблон" className={styles.delete}>
+              <Trash2 aria-hidden="true" className="size-5" />
+            </Button>}
+          </div>
         </div>
       </div>
     </article>
   );
 }
 
+/** Use the saved letter instead of approximating its blocks. Frames are only
+ * mounted near the viewport so large libraries stay responsive. */
 export function TemplateThumbnail({ template }: { template: EmailTemplateRecord }) {
-  const blocks = template.builderDocument.blocks;
-  const accentColor = template.builderDocument.accentColor;
-  const frameStyle = template.builderDocument.frameStyle ?? "none";
-  const frameColor = template.builderDocument.frameColor ?? accentColor;
-  const frameRadius = template.builderDocument.frameRadius ?? 0;
-  const isStudioPick = template.id.startsWith("template-v7-studio-") || template.id.startsWith("template-v8-creative-");
-
-  return (
-    <div
-      className="relative grid h-[300px] place-items-center overflow-hidden p-4 sm:h-[320px]"
-      style={{ backgroundColor: template.builderDocument.workspaceBackground }}
-    >
-      {isStudioPick ? (
-        <>
-          <span aria-hidden="true" className="absolute inset-x-0 top-0 h-px opacity-35" style={{ backgroundColor: accentColor }} />
-        </>
-      ) : (
-        <>
-          <span aria-hidden="true" className="absolute -right-12 -top-14 size-40 rounded-full opacity-[0.09]" style={{ backgroundColor: accentColor }} />
-          <span aria-hidden="true" className="absolute -bottom-14 -left-12 size-32 rounded-full bg-white/30" />
-        </>
-      )}
-
-      <div
-        className="relative h-[266px] w-[204px] overflow-hidden bg-white shadow-[0_18px_45px_rgba(30,25,38,0.18)] ring-1 ring-black/[0.04] transition-transform duration-300 group-hover:scale-[1.025] sm:h-[280px] sm:w-[216px]"
-        style={{
-          backgroundColor: template.builderDocument.bodyBackground,
-          ...emailFrameCss(frameStyle, frameColor, Math.min(frameRadius, 14)),
-        }}
-      >
-        {template.builderDocument.rawHtml ? (
-          <iframe
-            title={`Предпросмотр шаблона «${template.name}»`}
-            srcDoc={template.emailBodyHtml}
-            sandbox=""
-            tabIndex={-1}
-            aria-hidden="true"
-            className="pointer-events-none absolute left-1/2 top-0 h-[470px] w-[640px] origin-top -translate-x-1/2 scale-[0.42] border-0 sm:scale-[0.45]"
-          />
-        ) : (
-          <div className="absolute left-1/2 top-0 w-[340px] origin-top -translate-x-1/2 scale-[0.6] sm:scale-[0.64]">
-            {blocks.slice(0, 9).map((block) => (
-              <TemplateMiniBlock key={block.id} block={block} accentColor={accentColor} />
-            ))}
-          </div>
-        )}
-      </div>
+  const container = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+  const [width, setWidth] = useState(0);
+  const pageWidth = Math.max(640, template.builderDocument.contentWidth || 640);
+  useEffect(() => {
+    const element = container.current;
+    if (!element) return;
+    const resize = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
+    const intersection = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting), { rootMargin: "240px 0px" });
+    resize.observe(element); intersection.observe(element);
+    return () => { resize.disconnect(); intersection.disconnect(); };
+  }, []);
+  return <div className={styles.thumbnail} style={{ backgroundColor: template.builderDocument.workspaceBackground }}>
+    <div ref={container} className={styles.paper} aria-hidden="true" inert>
+      {visible && width > 0 ? <div className={styles.letterFrame} style={{ width: pageWidth, transform: `scale(${width / pageWidth})` }}>
+        <LetterPreview html={template.emailBodyHtml} title={`Миниатюра: ${template.name}`} className="h-[1600px]" />
+      </div> : <div className={styles.thumbnailPlaceholder} />}
     </div>
-  );
-}
-
-type TemplateMiniBlockValue = EmailTemplateRecord["builderDocument"]["blocks"][number];
-
-function cleanMiniText(value: string) {
-  return value.replace(/{{([^}]+)}}/g, "$1").trim();
-}
-
-function TemplateMiniBlock({ block, accentColor }: { block: TemplateMiniBlockValue; accentColor: string }) {
-  const alignment = block.alignment ?? "left";
-  const background = block.backgroundColor === "transparent" ? "transparent" : block.backgroundColor;
-  const commonStyle = {
-    backgroundColor: background,
-    color: block.textColor,
-    textAlign: alignment,
-    padding: `${Math.max(7, (block.paddingTop ?? 16) * 0.62)}px ${Math.max(18, (block.paddingRight ?? 24) * 0.72)}px ${Math.max(7, (block.paddingBottom ?? 16) * 0.62)}px ${Math.max(18, (block.paddingLeft ?? 24) * 0.72)}px`,
-    fontFamily: block.fontFamily,
-  } as const;
-  const parts = cleanMiniText(block.content).split("|");
-
-  if (block.type === "pattern") {
-    return <div aria-hidden="true" className="whitespace-pre-line text-center text-[12px] font-semibold leading-4" style={{ ...commonStyle, letterSpacing: Math.min(block.letterSpacing ?? 0, 4) }}>{block.content}</div>;
-  }
-  if (block.type === "logo") {
-    return <div className="truncate text-[8px] font-bold uppercase tracking-[0.16em]" style={commonStyle}>{cleanMiniText(block.content) || BRAND_NAME}</div>;
-  }
-  if (block.type === "hero" || block.type === "banner") {
-    return <div style={commonStyle}><div className="text-[22px] font-bold leading-[1.05] tracking-[-0.035em]">{parts[0]}</div>{parts[1] ? <div className="mt-3 text-[8px] leading-[1.5] opacity-75">{parts[1]}</div> : null}</div>;
-  }
-  if (block.type === "heading") {
-    return <div className="text-[22px] font-bold leading-[1.05] tracking-[-0.04em]" style={commonStyle}>{cleanMiniText(block.content)}</div>;
-  }
-  if (block.type === "text") {
-    return <div className="line-clamp-3 text-[8px] leading-[1.55]" style={commonStyle}>{cleanMiniText(block.content)}</div>;
-  }
-  if (block.type === "image") {
-    return <div style={commonStyle}><div className="grid h-24 place-items-center rounded-lg bg-gradient-to-br from-black/[0.04] to-black/[0.12]"><ImageIcon aria-hidden="true" className="size-7 opacity-35" /></div></div>;
-  }
-  if (block.type === "stats") {
-    return <div className="grid grid-cols-2 gap-2" style={commonStyle}>{[0, 2].map((index) => <div key={index} className="rounded-md border border-black/[0.06] p-3 text-center"><strong className="block text-[16px]" style={{ color: block.accentColor ?? accentColor }}>{parts[index]}</strong><span className="text-[7px] opacity-65">{parts[index + 1]}</span></div>)}</div>;
-  }
-  if (block.type === "columns") {
-    return <div className="grid grid-cols-2 gap-2" style={commonStyle}>{parts.slice(0, 2).map((part, index) => <div key={index} className="whitespace-pre-line rounded-md border border-black/10 p-3 text-[8px] leading-[1.45]">{part}</div>)}</div>;
-  }
-  if (block.type === "quote") {
-    return <div style={commonStyle}><div className="border-l-[3px] pl-3 text-[9px] italic leading-[1.45]" style={{ borderColor: accentColor }}>{parts[0]}<span className="mt-2 block text-[7px] not-italic opacity-65">{parts[1]}</span></div></div>;
-  }
-  if (block.type === "checklist" || block.type === "timeline" || block.type === "faq") {
-    return <div className="space-y-1.5 text-[8px] leading-[1.35]" style={commonStyle}>{parts.slice(0, block.type === "checklist" ? 3 : 4).map((part, index) => <div key={index} className="flex gap-2"><span className="font-bold" style={{ color: accentColor }}>{block.type === "checklist" ? "✓" : `${Math.floor(index / 2) + 1}`}</span><span className={cn(index % 2 === 0 && block.type !== "checklist" && "font-semibold")}>{part}</span></div>)}</div>;
-  }
-  if (block.type === "coupon") {
-    return <div style={commonStyle}><div className="rounded-lg border-2 border-dashed p-3 text-center" style={{ borderColor: accentColor }}><span className="text-[7px] uppercase tracking-wider">{parts[0]}</span><strong className="my-1 block text-[18px] tracking-widest" style={{ color: accentColor }}>{parts[1]}</strong><span className="text-[7px] opacity-65">{parts[2]}</span></div></div>;
-  }
-  if (block.type === "video") {
-    return <div style={commonStyle}><div className="grid h-24 place-items-center rounded-lg bg-black/80 text-white"><span className="grid size-8 place-items-center rounded-full bg-white/20 text-[12px]">▶</span><span className="text-[8px] font-semibold">{parts[0]}</span></div></div>;
-  }
-  if (block.type === "notice" || block.type === "document" || block.type === "compliance") {
-    return <div style={commonStyle}><div className="rounded-lg border border-black/10 p-3"><span className="text-[7px] font-bold uppercase tracking-wider" style={{ color: accentColor }}>{parts[0]}</span><strong className="mt-1 block text-[10px]">{parts[1]}</strong><span className="mt-1 block text-[7px] opacity-60">{parts[2]}</span></div></div>;
-  }
-  if (block.type === "comparison") {
-    return <div className="grid grid-cols-2 gap-2" style={commonStyle}>{[0, 2].map((index) => <div key={index} className="rounded-md border border-black/10 p-3"><strong className="text-[8px]" style={{ color: accentColor }}>{parts[index]}</strong><p className="mb-0 mt-1 text-[7px] opacity-70">{parts[index + 1]}</p></div>)}</div>;
-  }
-  if (block.type === "product") {
-    return <div style={commonStyle}><div className="rounded-lg border border-black/10 p-3"><strong className="text-[10px]">{parts[0]}</strong><p className="my-1 text-[7px] opacity-65">{parts[1]}</p><strong className="text-[9px]">{parts[2]}</strong></div></div>;
-  }
-  if (block.type === "button") {
-    return <div style={commonStyle}><span className="inline-flex rounded-md px-4 py-2 text-[8px] font-bold" style={{ backgroundColor: block.buttonStyle === "outline" ? "transparent" : accentColor, border: block.buttonStyle === "outline" ? `2px solid ${accentColor}` : undefined, color: block.buttonStyle === "solid" ? block.textColor : accentColor }}>{block.label || block.content}</span></div>;
-  }
-  if (block.type === "divider") {
-    return <div style={commonStyle}><div className="border-t" style={{ borderColor: block.textColor }} /></div>;
-  }
-  if (block.type === "footer" || block.type === "signature") {
-    return <div className="line-clamp-2 text-[7px] leading-[1.45] opacity-65" style={commonStyle}>{cleanMiniText(block.content).replaceAll("|", " · ")}</div>;
-  }
-  return null;
+  </div>;
 }

@@ -4,7 +4,7 @@ import { confirmAction } from "@/components/ui/confirm-action";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { ArrowLeft, PenTool, RefreshCw, SearchX, Sparkles, Upload } from "@/components/ui/icons";
+import { ArrowLeft, PenTool, RefreshCw, SearchX, Sparkles, Star, Upload } from "@/components/ui/icons";
 
 import { importLetter, uploadImportedResources, type ImportedLetter } from "@/lib/email-import/import-letter";
 import { importCodeLetter, type CodeImportInput } from "@/lib/email-import/code";
@@ -37,6 +37,7 @@ import {
 } from "@/components/ui";
 import { TemplateCard } from "./TemplatePreview";
 import { templateCategoryLabels } from "./templateLabels";
+import styles from "./Templates.module.css";
 
 const categories = [
   "All",
@@ -175,6 +176,7 @@ export function TemplatesView() {
   const [density, setDensity] = useState<DensityFilter>("all");
   const [palette, setPalette] = useState<PaletteFilter>("all");
   const [busy, setBusy] = useState<{ id: string; action: "clone" | "delete" | "favorite" } | null>(null);
+  const [previewTemplate, setPreviewTemplate] = useState<EmailTemplateRecord | null>(null);
   const [directorOpen, setDirectorOpen] = useState(false);
   const [directorTemplate, setDirectorTemplate] = useState<EmailTemplateRecord | null>(null);
   const [importing, setImporting] = useState(false);
@@ -385,6 +387,11 @@ export function TemplatesView() {
   };
 
   const returnPath = routeContext.returnTo ?? "/campaigns/new?step=message";
+  const editTemplateHref = (template: EmailTemplateRecord) => routeContext.returnTo
+    ? campaignBuilderHref({ campaignName: routeContext.campaignName, returnTo: returnPath, templateId: template.id })
+    : `/email-builder?template=${encodeURIComponent(template.id)}`;
+  const hasFilters = Boolean(query || category !== "All" || style !== "all" || palette !== "all" || density !== "all");
+  const resetFilters = () => { setQuery(""); setCategory("All"); setStyle("all"); setPalette("all"); setDensity("all"); };
   const newTemplateHref = routeContext.returnTo
     ? campaignBuilderHref({ campaignName: routeContext.campaignName, returnTo: returnPath })
     : "/email-builder?new=1";
@@ -392,7 +399,7 @@ export function TemplatesView() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Email-шаблоны"
+        title="Шаблоны писем"
         description={routeContext.campaignName
           ? `Выберите макет для кампании «${routeContext.campaignName}». Аудитория и маршруты останутся в черновике.`
           : undefined}
@@ -417,6 +424,10 @@ export function TemplatesView() {
           </div>
         }
       />
+
+      <Modal open={Boolean(previewTemplate)} onOpenChange={open => { if (!open) setPreviewTemplate(null); }} title={previewTemplate?.name ?? "Просмотр письма"} description={previewTemplate?.subject} size="xl" footer={previewTemplate ? <div className="flex flex-wrap gap-2"><Link href={editTemplateHref(previewTemplate)} className={buttonVariants({ variant: "primary" })}>Редактировать письмо</Link><Link href={addTemplateToReturnPath(returnPath, previewTemplate.id)} className={buttonVariants({ variant: "secondary" })}>В кампанию</Link></div> : undefined}>
+        {previewTemplate && <LetterPreview html={previewTemplate.emailBodyHtml} title={`Письмо: ${previewTemplate.name}`} className="h-[65vh] min-h-64" />}
+      </Modal>
 
       <TemplateDirector open={directorOpen} onOpenChange={setDirectorOpen} templates={templates} initialTemplate={directorTemplate} onSaved={template => { setTemplates(current => [template, ...current.filter(item => item.id !== template.id)]); setNotice(`Шаблон «${template.name}» сохранён.`); }} />
       <EmailImportDialog open={importOpen} onOpenChange={setImportOpen} busy={importing} progress={importProgress} error={error} onFiles={files => void importTemplate(files)} onCode={input => void importCode(input)} />
@@ -448,18 +459,18 @@ export function TemplatesView() {
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="inline-flex flex-wrap rounded-xl border border-border bg-surface p-1" role="group" aria-label="Раздел шаблонов">
-            <button type="button" aria-pressed={collection === "favorites"} onClick={showFavorites} className="rounded-lg px-4 py-2 text-[12px] font-semibold text-text-muted outline-none transition hover:text-text-strong aria-pressed:bg-primary aria-pressed:text-white focus-visible:ring-2 focus-visible:ring-primary/30">
-              ★ Избранное <span className="ml-1 opacity-70">{templates.filter((template) => template.isFavorite).length}</span>
+          <div className={styles.collections} role="group" aria-label="Раздел шаблонов">
+            <button type="button" aria-pressed={collection === "favorites"} onClick={showFavorites} className={styles.collection}>
+              <Star aria-hidden="true" className="size-5" />Избранное <span>{templates.filter((template) => template.isFavorite).length}</span>
             </button>
-            <button type="button" aria-pressed={scope === "all" && collection === "studio"} onClick={() => { setScope("all"); setCollection("studio"); }} className="rounded-lg px-4 py-2 text-[12px] font-semibold text-text-muted outline-none transition hover:text-text-strong aria-pressed:bg-primary aria-pressed:text-white focus-visible:ring-2 focus-visible:ring-primary/30">
-              <Sparkles aria-hidden="true" className="mr-1.5 inline size-5" />Подборка студии <span className="ml-1 opacity-70">{templates.filter(isStudioTemplate).length}</span>
+            <button type="button" aria-pressed={scope === "all" && collection === "studio"} onClick={() => { setScope("all"); setCollection("studio"); }} className={styles.collection}>
+              <Sparkles aria-hidden="true" className="size-5" />Подборка студии <span>{templates.filter(isStudioTemplate).length}</span>
             </button>
-            <button type="button" aria-pressed={scope === "all" && collection === "all"} onClick={() => { setScope("all"); setCollection("all"); }} className="rounded-lg px-4 py-2 text-[12px] font-semibold text-text-muted outline-none transition hover:text-text-strong aria-pressed:bg-primary aria-pressed:text-white focus-visible:ring-2 focus-visible:ring-primary/30">
-              Вся библиотека <span className="ml-1 opacity-70">{templates.length}</span>
+            <button type="button" aria-pressed={scope === "all" && collection === "all"} onClick={() => { setScope("all"); setCollection("all"); }} className={styles.collection}>
+              Вся библиотека <span>{templates.length}</span>
             </button>
-            <button type="button" aria-pressed={scope === "mine"} onClick={() => { setScope("mine"); setCollection("all"); }} className="rounded-lg px-4 py-2 text-[12px] font-semibold text-text-muted outline-none transition hover:text-text-strong aria-pressed:bg-primary aria-pressed:text-white focus-visible:ring-2 focus-visible:ring-primary/30">
-              Мои шаблоны <span className="ml-1 opacity-70">{templates.filter((template) => !template.isStarter).length}</span>
+            <button type="button" aria-pressed={scope === "mine"} onClick={() => { setScope("mine"); setCollection("all"); }} className={styles.collection}>
+              Мои шаблоны <span>{templates.filter((template) => !template.isStarter).length}</span>
             </button>
           </div>
         <Tabs value={category} onValueChange={(value) => setCategory(value as CategoryFilter)} className="min-w-0">
@@ -475,11 +486,11 @@ export function TemplatesView() {
           </TabsList>
 
           <TabsContent value={category} className="pt-5">
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(260px,1fr)_170px_170px_190px_200px]">
-              <SearchInput value={query} onChange={(event) => setQuery(event.target.value)} onClear={() => setQuery("")} placeholder="Поиск по задаче, теме или названию…" aria-label="Поиск шаблонов" wrapperClassName="w-full" />
-              <Select value={style} onChange={(event) => setStyle(event.target.value as StyleFilter)} aria-label="Стиль шаблона" options={[{value:"all",label:"Любой стиль"},{value:"minimal",label:"Минималистичный"},{value:"editorial",label:"Редакционный"},{value:"bold",label:"Контрастный"}]} className="h-8 min-h-8 text-[11px]" />
-              <Select value={palette} onChange={(event) => setPalette(event.target.value as PaletteFilter)} aria-label="Цветовая система" options={[{value:"all",label:"Любая палитра"},{value:"light",label:"Светлая"},{value:"dark",label:"Тёмная"},{value:"warm",label:"Тёплая"},{value:"cool",label:"Холодная"},{value:"neutral",label:"Нейтральная"}]} className="h-8 min-h-8 text-[11px]" />
-              <Select value={density} onChange={(event) => setDensity(event.target.value as DensityFilter)} aria-label="Насыщенность шаблона" options={[{value:"all",label:"Любая насыщенность"},{value:"compact",label:"Короткий · до 6 блоков"},{value:"balanced",label:"Средний · 7–8 блоков"},{value:"rich",label:"Подробный · 9+ блоков"}]} className="h-8 min-h-8 text-[11px]" />
+            <div className={styles.filters}>
+              <SearchInput value={query} onChange={(event) => setQuery(event.target.value)} onClear={() => setQuery("")} placeholder="Поиск по задаче, теме или названию…" aria-label="Поиск шаблонов" wrapperClassName={styles.filterSearch} />
+              <Select value={style} onChange={(event) => setStyle(event.target.value as StyleFilter)} aria-label="Стиль шаблона" options={[{value:"all",label:"Любой стиль"},{value:"minimal",label:"Минималистичный"},{value:"editorial",label:"Редакционный"},{value:"bold",label:"Контрастный"}]} className={`${styles.filterControl} ${style !== "all" ? styles.filterActive : ""}`} />
+              <Select value={palette} onChange={(event) => setPalette(event.target.value as PaletteFilter)} aria-label="Цветовая система" options={[{value:"all",label:"Любая палитра"},{value:"light",label:"Светлая"},{value:"dark",label:"Тёмная"},{value:"warm",label:"Тёплая"},{value:"cool",label:"Холодная"},{value:"neutral",label:"Нейтральная"}]} className={`${styles.filterControl} ${palette !== "all" ? styles.filterActive : ""}`} />
+              <Select value={density} onChange={(event) => setDensity(event.target.value as DensityFilter)} aria-label="Насыщенность шаблона" options={[{value:"all",label:"Любая насыщенность"},{value:"compact",label:"Короткий · до 6 блоков"},{value:"balanced",label:"Средний · 7–8 блоков"},{value:"rich",label:"Подробный · 9+ блоков"}]} className={`${styles.filterControl} ${density !== "all" ? styles.filterActive : ""}`} />
               <Select
                 value={sort}
                 onChange={(event) => setSort(event.target.value as SortMode)}
@@ -489,12 +500,13 @@ export function TemplatesView() {
                   { value: "name", label: "По названию" },
                   { value: "blocks", label: "По числу блоков" },
                 ]}
-                className="h-8 min-h-8 text-[11px]"
+                className={styles.filterControl}
               />
             </div>
 
-            <div className="mt-4 flex items-center justify-between gap-3">
-              <p className="m-0 text-[11px] text-text-muted">Найдено: <span className="font-semibold text-text-strong">{filteredTemplates.length}</span>{category !== "All" ? ` · ${templateCategoryLabels[category]}` : ""}</p>
+            <div className={styles.results}>
+              <p role="status" className="m-0 text-[11px] text-text-muted">Найдено: <span className="font-semibold text-text-strong">{filteredTemplates.length}</span>{category !== "All" ? ` · ${templateCategoryLabels[category]}` : ""}</p>
+              {hasFilters && filteredTemplates.length > 0 && <Button variant="ghost" size="sm" onClick={resetFilters}>Сбросить фильтры</Button>}
             </div>
 
             {filteredTemplates.length ? (
@@ -503,13 +515,8 @@ export function TemplatesView() {
                   <TemplateCard
                     key={template.id}
                     template={template}
-                    editHref={routeContext.returnTo
-                      ? campaignBuilderHref({
-                          campaignName: routeContext.campaignName,
-                          returnTo: returnPath,
-                          templateId: template.id,
-                        })
-                      : `/email-builder?template=${encodeURIComponent(template.id)}`}
+                    editHref={editTemplateHref(template)}
+                    onPreview={() => setPreviewTemplate(template)}
                     editLabel={routeContext.returnTo ? "Настроить" : "Редактировать"}
                     applyHref={addTemplateToReturnPath(returnPath, template.id)}
                     onDirector={() => { setDirectorTemplate(template); setDirectorOpen(true); }}

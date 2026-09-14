@@ -1,6 +1,7 @@
 "use client";
 
 import { Select } from "@/components/ui/select";
+import { Badge, type BadgeVariant } from "@/components/ui/badge";
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -32,6 +33,15 @@ const jobStatusLabel: Record<DeliveryJobRecord["status"], string> = {
   partial: "Выполнено частично",
   manual_required: "Нужен ручной экспорт",
   failed: "Ошибка",
+};
+
+const jobStatusTone: Record<DeliveryJobRecord["status"], BadgeVariant> = {
+  queued: "info",
+  processing: "warning",
+  completed: "success",
+  partial: "warning",
+  manual_required: "warning",
+  failed: "danger",
 };
 
 function formatDate(value: string, timeZone: string) {
@@ -222,7 +232,7 @@ export function AnalyticsView() {
                 <tr key={job.id}>
                   <td><Link href={`/campaigns/${job.campaignId}`} className="text-[12px] font-semibold hover:text-[var(--primary)]">{campaignName(campaigns, job.campaignId)}</Link></td>
                   <td>{participantName(snapshot, campaigns.find((campaign) => campaign.id === job.campaignId)?.participantId ?? "")}</td>
-                  <td><span className="badge badge-neutral">{jobStatusLabel[job.status]}</span><p className="mt-1 max-w-xs text-[9px] leading-4 text-[var(--text-subtle)]">{job.statusMessage}</p></td>
+                  <td><Badge variant={jobStatusTone[job.status]} dot>{jobStatusLabel[job.status]}</Badge><p className="mt-1 max-w-xs text-[9px] leading-4 text-[var(--text-subtle)]">{job.statusMessage}</p></td>
                   <td>{number.format(job.acceptedCount)}</td>
                   <td>{number.format(job.manualCount)}</td>
                   <td>{number.format(job.rejectedCount + job.ambiguousCount)}</td>

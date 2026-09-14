@@ -80,7 +80,7 @@ const statusMeta: Record<CampaignStatus, {
   blocked: { label: "Требует настройки", tone: "warning", next: "Устраните причины и повторите проверку", icon: AlertTriangle },
   ready: { label: "Готова", tone: "success", next: "Проверки пройдены; внешняя отправка не выполнялась", icon: CheckCircle2 },
   scheduled: { label: "План по времени", tone: "info", next: "Расписание сохранено; отправка не запускалась", icon: CalendarClock },
-  sending: { label: "Отправляется", tone: "accent", next: "Провайдеры обрабатывают получателей", icon: Send },
+  sending: { label: "Отправляется", tone: "warning", next: "Провайдеры обрабатывают получателей", icon: Send },
   completed: { label: "Обработка завершена", tone: "success", next: "Смотрите фактически принятые провайдером сообщения", icon: CheckCircle2 },
   cancelled: { label: "Отменена", tone: "neutral", next: "Создайте копию, чтобы повторить", icon: Clock3 },
 };

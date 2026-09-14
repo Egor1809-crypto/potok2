@@ -73,7 +73,7 @@ const statusTone: Record<CampaignStatus, string> = {
   ready: "badge-success",
   blocked: "badge-warning",
   scheduled: "badge-info",
-  sending: "badge-info",
+  sending: "badge-warning",
   completed: "badge-success",
   cancelled: "badge-neutral",
 };

@@ -51,6 +51,11 @@ const statusLabel: Record<CampaignRecord["status"], string> = {
   cancelled: "Отменена",
 };
 
+const statusTone = {
+  draft: "neutral", ready: "success", blocked: "warning", scheduled: "info",
+  sending: "warning", completed: "success", cancelled: "neutral",
+} as const;
+
 export function CalendarView() {
   const params = useSearchParams();
   const targetCampaignId = params.get("campaign");
@@ -296,7 +301,7 @@ export function CalendarView() {
               <article key={campaign.id} className={cn("min-w-0 rounded-xl border border-border p-4", campaign.id === targetCampaignId && "border-primary bg-primary/[0.035]")}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <time dateTime={campaign.scheduledAt!} className="inline-flex items-center gap-1.5 text-[15px] font-semibold tabular-nums text-primary"><Clock3 aria-hidden="true" className="size-6" />{formatTime(campaign.scheduledAt!, timeZone)}</time>
-                  <Badge variant={campaign.status === "blocked" ? "warning" : "neutral"}>{statusLabel[campaign.status]}</Badge>
+                  <Badge variant={statusTone[campaign.status]} dot>{statusLabel[campaign.status]}</Badge>
                 </div>
                 <h3 className="mt-3 break-words text-[14px] font-semibold text-text-strong">{campaign.name}</h3>
                 <dl className="mt-4 space-y-3 text-[13px]">
@@ -316,8 +321,8 @@ export function CalendarView() {
         </aside>
       </div>
       <div className="flex flex-wrap gap-2">
-        <Badge variant="success"><CalendarDays className="size-4" />Запланировано: {campaigns.filter((item) => item.status === "scheduled").length}</Badge>
-        {Object.entries(statusLabel).filter(([key]) => campaigns.some((item) => item.status === key)).map(([key, label]) => <Badge key={key}>{label}: {campaigns.filter((item) => item.status === key).length}</Badge>)}
+        <Badge variant="info"><CalendarDays className="size-4" />Запланировано: {campaigns.filter((item) => item.status === "scheduled").length}</Badge>
+        {Object.entries(statusLabel).filter(([key]) => key !== "scheduled" && campaigns.some((item) => item.status === key)).map(([key, label]) => <Badge key={key} variant={statusTone[key as CampaignRecord["status"]]}>{label}: {campaigns.filter((item) => item.status === key).length}</Badge>)}
       </div>
       </>}
     </div>
