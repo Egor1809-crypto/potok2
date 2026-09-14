@@ -3,6 +3,8 @@
 import { Select } from "@/components/ui/select";
 
 import Link from "next/link";
+import styles from "./settings.module.css";
+import workflow from "@/components/shared/workflow.module.css";
 import {
   Check,
   CircleAlert,
@@ -192,24 +194,23 @@ export function SettingsView() {
   const current = useMemo(() => sections.find((item) => item.id === section) ?? sections[0], [section]);
 
   return (
-    <div className="space-y-6">
+    <div className={`${workflow.page} ${styles.page} mx-auto w-full max-w-6xl`}>
       <header className="max-w-3xl">
         <h1 className="text-[28px] font-semibold tracking-[-.035em] text-[var(--text-strong)]">Аккаунт и настройки</h1>
-        <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
-          Роли и доступ к контактам — в разделе «Команда».
-        </p>
       </header>
 
-      <div className="grid gap-5 lg:grid-cols-[248px_minmax(0,760px)]">
-        <nav className="card h-fit p-2" aria-label="Разделы настроек">
+      <div className={styles.layout}>
+        <nav className={styles.nav} aria-label="Разделы настроек">
           {sections.map(({ id, label, Icon }) => (
             <button
               key={id}
               type="button"
               onClick={() => setSection(id)}
-              className={`flex w-full items-start gap-3 rounded-xl px-3 py-3 text-left transition ${section === id ? "bg-[var(--primary-subtle)] text-[var(--primary)]" : "hover:bg-[var(--surface-subtle)]"}`}
+              className={styles.navItem}
+              aria-pressed={section === id}
+              aria-controls="settings-content"
             >
-              <Icon aria-hidden="true" className="mt-0.5 size-6 shrink-0" />
+              <span className={styles.navIcon}><Icon aria-hidden="true" className="size-7" /></span>
               <span>
                 <span className="block text-[13px] font-semibold">{label}</span>
               </span>
@@ -217,12 +218,12 @@ export function SettingsView() {
           ))}
         </nav>
 
-        <section className="card overflow-hidden">
-          <div className="flex flex-col gap-3 border-b border-[var(--border)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-            <div>
-              <h2 className="text-[16px] font-semibold">{current.label}</h2>
+        <section className={styles.panel} id="settings-content" aria-labelledby="settings-section-title" aria-busy={state === "loading"}>
+          <div className={styles.panelHeader}>
+            <div className={styles.panelTitle}><span className={workflow.metricIcon}><current.Icon className="size-7" aria-hidden /></span><div>
+              <h2 id="settings-section-title" className="text-[16px] font-semibold">{current.label}</h2>
               <p className="mt-1 text-[12px] text-[var(--text-muted)]">{current.description}</p>
-            </div>
+            </div></div>
             {section !== "data" && canManage && (
               <button type="button" onClick={() => void save()} disabled={state === "loading" || state === "saving"} className="btn btn-primary gap-2 self-start sm:self-auto">
                 {state === "saving" ? <LoaderCircle aria-hidden="true" className="size-6 animate-spin" /> : state === "saved" ? <Check aria-hidden="true" className="size-6" /> : <Save aria-hidden="true" className="size-6" />}
@@ -231,6 +232,8 @@ export function SettingsView() {
             )}
           </div>
 
+          {state === "loading" && <p role="status" className={styles.loading}><LoaderCircle aria-hidden className="size-6 animate-spin" />Загружаем настройки…</p>}
+          {state === "saved" && <p role="status" className="sr-only">Настройки сохранены.</p>}
           {state === "error" && error && (
             <div role="alert" className="mx-5 mt-5 flex items-start gap-3 rounded-xl border border-[var(--danger)]/20 bg-[var(--danger-subtle)] px-4 py-3 text-[12px] text-[var(--danger)] sm:mx-6">
               <CircleAlert aria-hidden="true" className="mt-0.5 size-6 shrink-0" />
@@ -255,8 +258,8 @@ type UpdateForm = <Key extends keyof WorkspaceForm>(key: Key, value: WorkspaceFo
 function AccountSection({ form, participant, canManage, update }: { form: WorkspaceForm; participant: { name: string; email: string }; members: TeamMember[]; canManage: boolean; update: UpdateForm }) {
   return (
     <div className="space-y-7">
-      <div className="rounded-2xl border border-[var(--primary)]/15 bg-[var(--primary-subtle)]/55 p-4 sm:p-5">
-        <div className="flex items-center gap-3">
+      <div className={styles.profile}>
+        <div className={styles.profileRow}>
           <span className="grid size-11 shrink-0 place-items-center rounded-full bg-[var(--primary)] text-[13px] font-semibold text-white">{participant.name.split(" ").map((part) => part[0]).join("").slice(0, 2)}</span>
           <div className="min-w-0 flex-1">
             <p className="truncate text-[14px] font-semibold">{participant.name}</p>
@@ -267,7 +270,7 @@ function AccountSection({ form, participant, canManage, update }: { form: Worksp
         <p className="mt-4 text-[12px] leading-5 text-[var(--text-muted)]">Доступ к контактам зависит от назначений администратора.</p>
       </div>
 
-      <div className="rounded-xl border border-[var(--border)] p-4"><p className="mb-3 text-sm">Приглашения, роли и доступ к отдельным базам и группам.</p><Link className="btn btn-secondary" href="/team">Открыть команду</Link></div>
+      <div className={styles.teamLink}><p className="text-sm">Приглашения, роли и доступ к отдельным базам и группам.</p><Link className="btn btn-secondary" href="/team">Открыть команду</Link></div>
 
       <PasswordPanel />
 
@@ -319,14 +322,14 @@ function PasswordPanel() {
       <Field label="Текущий пароль" value={currentPassword} onChange={setCurrentPassword} type="password" />
       <Field label="Новый пароль" value={nextPassword} onChange={setNextPassword} type="password" />
     </div>
-    <div className="mt-3 flex flex-wrap items-center gap-3"><button type="button" disabled={state === "saving" || !currentPassword || !nextPassword} onClick={() => void save()} className="btn btn-primary gap-2"><KeyRound aria-hidden className="size-6" />{state === "saving" ? "Сохраняем…" : "Изменить пароль"}</button>{message && <p className={state === "error" ? "text-xs text-red-700" : "text-xs text-emerald-700"}>{message}</p>}</div>
+    <div className="mt-3 flex flex-wrap items-center gap-3"><button type="button" disabled={state === "saving" || !currentPassword || !nextPassword} onClick={() => void save()} className="btn btn-primary gap-2"><KeyRound aria-hidden className="size-6" />{state === "saving" ? "Сохраняем…" : "Изменить пароль"}</button>{message && <p role={state === "error" ? "alert" : "status"} className={state === "error" ? "text-xs text-[var(--danger)]" : "text-xs text-[var(--success)]"}>{message}</p>}</div>
   </FormBlock>;
 }
 
 function SendingSection({ form, update }: { form: WorkspaceForm; update: UpdateForm }) {
   return (
     <div className="space-y-7">
-      <div className="flex items-start gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)]/70 p-4">
+      <div className={`${styles.callout} flex items-start gap-3`}>
         <Mail aria-hidden="true" className="mt-0.5 size-6 shrink-0 text-[var(--primary)]" />
         <div>
           <p className="text-[12px] font-semibold">Сначала подключите канал доставки</p>
@@ -357,7 +360,7 @@ function DataSection({ participantEmail, onExport }: { participantEmail: string;
       <SettingRow Icon={Download} title="Экспорт данных" copy="Скачать снимок контактов, сегментов, email-шаблонов, кампаний и настроек в формате JSON.">
         <button type="button" onClick={onExport} className="btn btn-secondary gap-2"><Download aria-hidden="true" className="size-6" />Скачать</button>
       </SettingRow>
-      <div className="rounded-xl border border-[var(--border)] p-4">
+      <div className={styles.callout}>
         <div className="flex gap-3">
           <Settings2 aria-hidden="true" className="mt-0.5 size-6 shrink-0 text-[var(--text-muted)]" />
           <div>
@@ -381,8 +384,8 @@ function Field({ label, value, onChange, placeholder, type = "text" }: { label: 
 
 function FormBlock({ title, description, children }: { title: string; description: string; children: ReactNode }) {
   return (
-    <section>
-      <h3 className="text-[13px] font-semibold">{title}</h3>
+    <section className={styles.formBlock}>
+      <h3 className="text-[14px] font-semibold">{title}</h3>
       <p className="mt-1 text-[11px] leading-5 text-[var(--text-muted)]">{description}</p>
       <div className="mt-4 space-y-4">{children}</div>
     </section>
@@ -391,8 +394,8 @@ function FormBlock({ title, description, children }: { title: string; descriptio
 
 function SettingRow({ Icon, title, copy, children }: { Icon: typeof ShieldCheck; title: string; copy: string; children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-4 rounded-xl border border-[var(--border)] p-4 sm:flex-row sm:items-center">
-      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-[var(--surface-subtle)] text-[var(--text-muted)]"><Icon aria-hidden="true" className="size-6" /></span>
+    <div className={styles.settingRow}>
+      <span className={workflow.metricIcon}><Icon aria-hidden="true" className="size-6" /></span>
       <div className="min-w-0 flex-1">
         <p className="text-[12px] font-semibold">{title}</p>
         <p className="mt-1 text-[11px] leading-5 text-[var(--text-muted)]">{copy}</p>
