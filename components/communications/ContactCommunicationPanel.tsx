@@ -4,10 +4,14 @@ import * as React from "react";
 import { Alert, Badge, Button, Input, Select, Textarea } from "@/components/ui";
 import type { ContactCommunicationData } from "@/lib/communications/types";
 import { communicationApi } from "./api";
+import { Avatar } from "@/components/ui/avatar";
+import { Gauge, ShieldCheck } from "@/components/ui/icons";
+import styles from "./communications.module.css";
 const date = (value: string) => new Date(value).toLocaleString("ru-RU");
 const states: Record<string, string> = { confirmed: "Подтверждено", missing: "Нет основания", review: "Требует проверки", revoked: "Отозвано", expired: "Срок истёк" };
-export function ContactCommunicationPanel({ contactId }: {
+export function ContactCommunicationPanel({ contactId, variant = "default" }: {
     contactId: string;
+    variant?: "default" | "workspace";
 }) {
     const [data, setData] = React.useState<ContactCommunicationData | null>(null);
     const [error, setError] = React.useState("");
@@ -35,21 +39,27 @@ export function ContactCommunicationPanel({ contactId }: {
     } }
     async function grant(event: React.FormEvent<HTMLFormElement>) { event.preventDefault(); const form = event.currentTarget; const f = new FormData(form); await mutate({ action: "grant", channel: f.get("channel"), purpose: f.get("purpose"), operator: f.get("operator"), source: f.get("source"), version: f.get("version"), statement: f.get("statement"), obtainedAt: new Date(String(f.get("obtainedAt"))).toISOString(), expiresAt: f.get("expiresAt") ? new Date(String(f.get("expiresAt"))).toISOString() : null }); }
     const row = data?.check.rows[0];
-    return <section className="mt-6 space-y-5" aria-label="Нагрузка и паспорт данных">
+    const pressureTone = (row?.percentage ?? 0) >= 100 ? "danger" : (row?.percentage ?? 0) >= 75 ? "warning" : "success";
+    return <section className={variant === "workspace" ? styles.contactWorkspace : `mt-6 ${styles.contactEmbedded}`} aria-label="Нагрузка и паспорт данных">
+    {variant === "workspace" && data ? <header className={styles.identityHeader}>
+      <Avatar name={data.contact.fullName} size="lg" aria-hidden="true"/>
+      <div><h2>{data.contact.fullName}</h2><p>{[data.contact.email || data.contact.phone, data.contact.companyName && data.contact.companyName !== data.contact.fullName ? data.contact.companyName : ""].filter(Boolean).join(" · ")}</p></div>
+    </header> : null}
+    <div className={variant === "workspace" ? styles.detailScroll : styles.contactContent} role={variant === "workspace" ? "region" : undefined} aria-label={variant === "workspace" ? "Данные выбранного контакта" : undefined} tabIndex={variant === "workspace" ? 0 : undefined}>
     {error ? <Alert tone="danger" title="Не удалось выполнить действие">{error}<Button variant="ghost" onClick={() => void load()}>Повторить</Button></Alert> : null}
-    <p role="status" className="text-sm text-text-muted">{notice}</p>
+    <p role="status" className={styles.notice}>{notice}</p>
     {!data ? <p className="text-sm text-text-muted">Загружаем историю и основания…</p> : <>
-      <section className="rounded-xl border border-border p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-base font-semibold">Нагрузка контакта</h2><Badge variant={row && row.percentage >= 100 ? "warning" : "neutral"}>{row?.percentage ?? 0}% лимита</Badge></div>
-        <progress className="mt-3 h-2 w-full accent-[var(--primary)]" value={Math.min(100, row?.percentage ?? 0)} max={100} aria-label="Использование лимита сообщений"/>
+      <section className={styles.insightCard}>
+        <div className="flex flex-wrap items-center justify-between gap-2"><h3 className={styles.sectionTitle}><span className={styles.sectionIcon}><Gauge size={22} aria-hidden="true"/></span>Нагрузка контакта</h3><Badge variant={pressureTone} dot>{row?.percentage ?? 0}% лимита</Badge></div>
+        <progress className={styles.pressureBar} data-tone={pressureTone} value={Math.min(100, row?.percentage ?? 0)} max={100} aria-label="Использование лимита сообщений"/>
         <p className="mt-2 text-sm">{row?.sent ?? 0} из {data.policy.contact_limit} сообщений за {data.policy.window_days} дней</p>
         <p className="mt-2 text-xs leading-5 text-text-muted">Учтены отправки через Поток. Личные письма из неподключённых ящиков не учитываются. Процент показывает использование установленного лимита.</p>
         {data.contact.companyName ? <p className="mt-3 text-sm">{data.contact.companyName}: {data.companyHistory.total} сообщений, {data.companyHistory.recipients} адресатов за этот период.</p> : null}
         <details className="mt-4"><summary className="cursor-pointer text-sm font-medium">История касаний ({data.history.length})</summary><ul className="mt-3 space-y-3">{data.history.map(h => <li key={h.id} className="text-sm"><span className="font-medium">{h.author || "Команда"}</span> · {h.channel}<br />{h.campaign_name}<br /><span className="text-xs text-text-muted">{date(h.occurred_at)}</span></li>)}</ul>{!data.history.length ? <p className="mt-2 text-sm text-text-muted">Отправок пока нет.</p> : null}</details>
       </section>
       {data.holds.length ? <Alert tone="warning" title="Автоматические письма приостановлены">{data.holds.map(h => <p key={h.id}>{h.reason}</p>)}<Button className="mt-3" variant="outline" disabled={busy} onClick={() => void mutate({ action: "resume" })}>Возобновить после проверки ответа</Button><p className="mt-2 text-xs">Возобновление не отменяет отписку.</p></Alert> : null}
-      <section className="rounded-xl border border-border p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-base font-semibold">Паспорт данных</h2><Badge variant={row && !row.blocked ? "success" : "warning"}>{row?.consent === "confirmed" && row.blocked ? "Требует проверки" : states[row?.consent ?? "missing"]}</Badge></div>
+      <section className={styles.insightCard}>
+        <div className="flex flex-wrap items-center justify-between gap-2"><h3 className={styles.sectionTitle}><span className={styles.sectionIcon}><ShieldCheck size={22} aria-hidden="true"/></span>Паспорт данных</h3><Badge variant={row && !row.blocked ? "success" : "warning"}>{row?.consent === "confirmed" && row.blocked ? "Требует проверки" : states[row?.consent ?? "missing"]}</Badge></div>
         <p className="mt-2 text-xs leading-5 text-text-muted">Статус рекламного Email. Отдельно фиксируются основание обработки данных и основание рекламного обращения. Старые отметки согласия требуют проверки подтверждений. IP при ручном внесении не считается IP получателя.</p>
         {row?.reasons.length ? <ul className="mt-3 space-y-1 text-sm">{row.reasons.map(reason => <li key={reason}>{reason}</li>)}</ul> : null}
         <a className="btn btn-secondary mt-4" href={`/api/communications?contact=${encodeURIComponent(contactId)}&export=1`}>Скачать подтверждения согласия</a>
@@ -70,5 +80,6 @@ export function ContactCommunicationPanel({ contactId }: {
         </details>
       </section>
     </>}
+    </div>
   </section>;
 }
