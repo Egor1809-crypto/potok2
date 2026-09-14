@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import styles from "./contact-finder.module.css";
 import {
   ArrowRight,
   CheckCircle2,
@@ -263,7 +264,7 @@ export function ContactFinderView() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className={styles.page}>
       <PageHeader
         title="Поиск публичных контактов"
         description="Найдите email и телефоны на сайте, проверьте результаты и добавьте нужные контакты."
@@ -275,31 +276,33 @@ export function ContactFinderView() {
         }
       />
 
-      <div className="grid gap-3 md:grid-cols-3">
+      <ol className={styles.steps} aria-label="Этапы поиска">
         {[
           [Globe2, "1. Укажите источник", "HTTPS-страница или вставленный текст"],
           [ShieldCheck, "2. Проверьте находки", "Источник, контекст и тип контакта"],
           [UsersRound, "3. Выберите для импорта", "Только отмеченные записи попадут в базу"],
-        ].map(([Icon, title, description]) => {
+        ].map(([Icon, title, description], index) => {
           const StepIcon = Icon as typeof Globe2;
+          const currentStep = result ? (selected.size ? 2 : 1) : 0;
+          const complete = index < currentStep || importState.status === "success";
           return (
-            <Card key={String(title)} className="flex items-start gap-3 p-4">
-              <span className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-primary-subtle text-primary">
-                <StepIcon aria-hidden="true" className="size-6" />
+            <li key={String(title)} className={styles.step} data-complete={complete} aria-current={index === currentStep ? "step" : undefined}>
+              <span className={styles.stepIcon}>
+                {complete ? <CheckCircle2 aria-hidden="true" className="size-6" /> : <StepIcon aria-hidden="true" className="size-6" />}
               </span>
               <div>
                 <p className="m-0 text-[13px] font-semibold text-text-strong">{String(title)}</p>
                 <p className="mt-1 mb-0 text-[12px] leading-4 text-text-muted">{String(description)}</p>
               </div>
-            </Card>
+            </li>
           );
         })}
-      </div>
+      </ol>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <Card className="overflow-hidden">
-          <div className="border-b border-border p-5 sm:p-6">
-            <div className="inline-flex rounded-[10px] bg-surface-subtle p-1" role="tablist" aria-label="Источник поиска">
+      <div className={styles.sourceLayout}>
+        <Card className={styles.sourceCard}>
+          <div className={styles.sourceHeader}>
+            <div className={styles.tabs} role="tablist" aria-label="Источник поиска">
               <button
                 id="contact-finder-tab-url"
                 type="button"
@@ -436,7 +439,7 @@ export function ContactFinderView() {
           </div>
         </Card>
 
-        <Card className="h-fit p-5 sm:p-6">
+        <Card className={styles.guide}>
           <div className="flex items-center gap-2 text-text-strong">
             <ShieldCheck aria-hidden="true" className="size-6 text-success" />
             <h2 className="m-0 text-[14px] font-semibold">Без скрытого сбора</h2>
@@ -514,10 +517,8 @@ export function ContactFinderView() {
                 return (
                   <Card
                     key={candidate.id}
-                    className={cn(
-                      "grid gap-4 p-4 transition-[border-color,box-shadow] md:grid-cols-[auto_minmax(220px,0.8fr)_minmax(260px,1.2fr)] md:items-start",
-                      checked && "border-primary/35 shadow-[0_0_0_1px_rgba(101,88,232,0.12)]",
-                    )}
+                    className={styles.resultCard}
+                    data-selected={checked}
                   >
                     <Checkbox
                       aria-label={`Выбрать ${candidate.value}`}
@@ -526,11 +527,11 @@ export function ContactFinderView() {
                     />
                     <div className="min-w-0">
                       <div className="flex min-w-0 items-center gap-2">
-                        <span className="grid size-8 shrink-0 place-items-center rounded-[9px] bg-primary-subtle text-primary">
+                        <span className={styles.endpointIcon}>
                           <EndpointIcon aria-hidden="true" className="size-6" />
                         </span>
                         <div className="min-w-0">
-                          <p className="m-0 truncate text-[13px] font-semibold text-text-strong">{candidate.value}</p>
+                          <p className={styles.endpoint}>{candidate.value}</p>
                           <p className="mt-0.5 mb-0 text-[11px] text-text-muted">
                             {candidate.type === "email" ? "Email" : "Телефон"} · {candidate.confidence === "high" ? "прямая ссылка" : "найден в тексте"}
                           </p>
@@ -548,7 +549,7 @@ export function ContactFinderView() {
                         />
                       </FormField>
                     </div>
-                    <div className="min-w-0 rounded-[9px] bg-surface-subtle p-3">
+                    <div className={styles.context}>
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className="text-[11px] font-semibold text-text-strong">{candidate.sourceLabel}</span>
                         {candidate.sourceUrl ? (
@@ -573,7 +574,7 @@ export function ContactFinderView() {
           )}
 
           {result.pages.length > 0 ? (
-            <details className="rounded-[11px] border border-border bg-surface px-4 py-3">
+            <details className={styles.report}>
               <summary className="cursor-pointer text-[12px] font-semibold text-text-strong">
                 Отчёт по страницам ({result.pages.length})
               </summary>
@@ -591,7 +592,7 @@ export function ContactFinderView() {
           ) : null}
 
           {selectedCandidates.length > 0 ? (
-            <Card className="overflow-hidden border-primary/20">
+            <Card className={styles.importCard}>
               <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between sm:p-6">
                 <div className="max-w-2xl">
                   <div className="flex items-center gap-2">

@@ -24,7 +24,8 @@ import {
   UsersRound,
 } from "@/components/ui/icons";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import styles from "./segments.module.css";
 
 const numberFormatter = new Intl.NumberFormat("ru-RU");
 const fieldLabels: Record<SegmentRuleField, string> = {
@@ -192,7 +193,7 @@ export function SegmentsView() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className={styles.page}>
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="mt-2 text-[28px] font-medium tracking-[-.04em]">
@@ -238,19 +239,20 @@ export function SegmentsView() {
         )}
       </div>
 
-      <section className="card overflow-hidden" aria-labelledby="segments-list-title">
-        <div className="flex flex-col gap-3 border-b border-[var(--border)] p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+      <section className={styles.library} aria-labelledby="segments-list-title">
+        <div className={styles.toolbar}>
           <div>
             <h2 id="segments-list-title" className="sr-only">
               Сохранённые сегменты
             </h2>
-            <p className="mt-1 text-[10px] text-[var(--text-tertiary)]">
+            <p className={styles.total} role="status">
+              <UsersRound size={24} aria-hidden="true" />
               {loading
                 ? "Загружаем…"
-                : `${numberFormatter.format(segments.length)} в рабочем пространстве`}
+                : search.trim() ? `Найдено: ${numberFormatter.format(visibleSegments.length)} из ${numberFormatter.format(segments.length)}` : `${numberFormatter.format(segments.length)} ${russianPlural(segments.length, "сегмент", "сегмента", "сегментов")}`}
             </p>
           </div>
-          <label className="relative w-full sm:w-72">
+          <label className={styles.search}>
             <span className="sr-only">Поиск сегментов</span>
             <Search
               size={20}
@@ -319,21 +321,17 @@ export function SegmentsView() {
             )}
           </div>
         ) : (
-          <div className="grid gap-px bg-[var(--border)] md:grid-cols-2 xl:grid-cols-3">
+          <div className={styles.grid}>
             {visibleSegments.map((segment) => (
-              <article key={segment.id} className="flex flex-col bg-white p-5">
+              <article key={segment.id} className={styles.segment} style={{ "--segment-accent": segment.color } as CSSProperties}>
                 <div className="flex items-start gap-3">
                   <span
-                    className="grid size-10 shrink-0 place-items-center rounded-xl"
-                    style={{
-                      backgroundColor: `${segment.color}14`,
-                      color: segment.color,
-                    }}
+                    className={styles.segmentIcon}
                   >
-                    <UsersRound size={24} />
+                    <UsersRound size={28} aria-hidden="true" />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <h3 className="truncate text-sm font-semibold">
+                    <h3 className={styles.segmentName}>
                       {segment.name}
                     </h3>
                     <p className="mt-1 line-clamp-2 min-h-8 text-[10px] leading-4 text-[var(--text-tertiary)]">
@@ -342,9 +340,9 @@ export function SegmentsView() {
                   </div>
                 </div>
 
-                <div className="mt-4 flex items-baseline justify-between gap-3 border-y border-[var(--border)] py-3">
+                <div className={styles.metrics}>
                   <div>
-                    <p className="text-xl font-semibold tracking-[-.035em]">
+                    <p className={styles.contactCount}>
                       {numberFormatter.format(segment.contactCount)}
                     </p>
                     <p className="text-[9px] text-[var(--text-tertiary)]">
@@ -369,11 +367,11 @@ export function SegmentsView() {
                   </p>
                 </div>
 
-                <ul className="mt-3 flex-1 space-y-1.5" aria-label="Правила">
+                <ul className={styles.rules} aria-label="Правила">
                   {segment.rules.slice(0, 3).map((rule, index) => (
                     <li
                       key={rule.id}
-                      className="truncate rounded-md bg-[var(--surface-subtle)] px-2.5 py-1.5 text-[9px] text-[var(--text-secondary)]"
+                      className={styles.rule}
                       title={ruleSummary(rule, index)}
                     >
                       {ruleSummary(rule, index)}
@@ -386,7 +384,7 @@ export function SegmentsView() {
                   )}
                 </ul>
 
-                <div className="mt-4 grid grid-cols-2 gap-2">
+                <div className={styles.actions}>
                   <button
                     type="button"
                     onClick={() => {

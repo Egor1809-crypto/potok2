@@ -49,7 +49,7 @@ export function ContactCommunicationPanel({ contactId, variant = "default" }: {
     {error ? <Alert tone="danger" title="Не удалось выполнить действие">{error}<Button variant="ghost" onClick={() => void load()}>Повторить</Button></Alert> : null}
     <p role="status" className={styles.notice}>{notice}</p>
     {!data ? <p className="text-sm text-text-muted">Загружаем историю и основания…</p> : <>
-      <section className={styles.insightCard}>
+      <section className={styles.insightCard} data-tone={pressureTone}>
         <div className="flex flex-wrap items-center justify-between gap-2"><h3 className={styles.sectionTitle}><span className={styles.sectionIcon}><Gauge size={22} aria-hidden="true"/></span>Нагрузка контакта</h3><Badge variant={pressureTone} dot>{row?.percentage ?? 0}% лимита</Badge></div>
         <progress className={styles.pressureBar} data-tone={pressureTone} value={Math.min(100, row?.percentage ?? 0)} max={100} aria-label="Использование лимита сообщений"/>
         <p className="mt-2 text-sm">{row?.sent ?? 0} из {data.policy.contact_limit} сообщений за {data.policy.window_days} дней</p>
@@ -58,7 +58,7 @@ export function ContactCommunicationPanel({ contactId, variant = "default" }: {
         <details className="mt-4"><summary className="cursor-pointer text-sm font-medium">История касаний ({data.history.length})</summary><ul className="mt-3 space-y-3">{data.history.map(h => <li key={h.id} className="text-sm"><span className="font-medium">{h.author || "Команда"}</span> · {h.channel}<br />{h.campaign_name}<br /><span className="text-xs text-text-muted">{date(h.occurred_at)}</span></li>)}</ul>{!data.history.length ? <p className="mt-2 text-sm text-text-muted">Отправок пока нет.</p> : null}</details>
       </section>
       {data.holds.length ? <Alert tone="warning" title="Автоматические письма приостановлены">{data.holds.map(h => <p key={h.id}>{h.reason}</p>)}<Button className="mt-3" variant="outline" disabled={busy} onClick={() => void mutate({ action: "resume" })}>Возобновить после проверки ответа</Button><p className="mt-2 text-xs">Возобновление не отменяет отписку.</p></Alert> : null}
-      <section className={styles.insightCard}>
+      <section className={styles.insightCard} data-tone={row && !row.blocked ? "success" : "warning"}>
         <div className="flex flex-wrap items-center justify-between gap-2"><h3 className={styles.sectionTitle}><span className={styles.sectionIcon}><ShieldCheck size={22} aria-hidden="true"/></span>Паспорт данных</h3><Badge variant={row && !row.blocked ? "success" : "warning"}>{row?.consent === "confirmed" && row.blocked ? "Требует проверки" : states[row?.consent ?? "missing"]}</Badge></div>
         <p className="mt-2 text-xs leading-5 text-text-muted">Статус рекламного Email. Отдельно фиксируются основание обработки данных и основание рекламного обращения. Старые отметки согласия требуют проверки подтверждений. IP при ручном внесении не считается IP получателя.</p>
         {row?.reasons.length ? <ul className="mt-3 space-y-1 text-sm">{row.reasons.map(reason => <li key={reason}>{reason}</li>)}</ul> : null}

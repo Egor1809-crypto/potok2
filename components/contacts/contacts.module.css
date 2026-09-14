@@ -35,7 +35,8 @@
 .bulkActions > span:first-child { flex-basis: 100%; font-size: 14px; }
 .bulkActions > div { max-inline-size: 100%; flex-wrap: wrap; }
 .bulkActions input { min-inline-size: 0; }
-.tableScroll { overflow: auto; max-block-size: max(340px,calc(100dvh - 440px)); overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: color-mix(in srgb,var(--primary) 30%,var(--border)) transparent; }
+/* Keep absolute screen-reader labels inside the table scroll boundary. */
+.tableScroll { position: relative; overflow: auto; max-block-size: max(340px,calc(100dvh - 440px)); overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: color-mix(in srgb,var(--primary) 30%,var(--border)) transparent; }
 .table { min-inline-size: 1120px; }
 .table th { position: sticky; inset-block-start: 0; z-index: 2; background: var(--surface-subtle); font-size: 12px; box-shadow: 0 1px var(--border); }
 .table :is(th,td) { padding: 14px 12px; }

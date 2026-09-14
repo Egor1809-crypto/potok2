@@ -16,6 +16,7 @@
   max-inline-size: 100%;
   margin-block-start: 18px;
   padding: 5px;
+  border: 1px solid color-mix(in srgb, var(--primary) 16%, var(--border));
   border-radius: 18px;
   background: color-mix(in srgb, var(--primary-subtle) 40%, var(--surface-subtle));
   box-shadow: inset 0 1px 2px rgb(0 0 0 / 3%);
@@ -74,7 +75,7 @@
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--primary) 35%, var(--border)) transparent;
 }
-.contactScroll { flex: 1; padding: 10px; }
+.contactScroll { position: relative; flex: 1; padding: 10px; }
 .contactList { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .contactButton {
   display: grid;
@@ -90,10 +91,11 @@
 }
 .contactButton[aria-pressed="true"] {
   border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
-  background: var(--primary-subtle);
+  background: linear-gradient(100deg, var(--primary-subtle), color-mix(in srgb, var(--primary-subtle) 40%, var(--surface)));
   box-shadow: inset 3px 0 var(--primary), 0 2px 6px color-mix(in srgb, var(--primary) 8%, transparent);
 }
-.contactAvatar { border-radius: 12px; box-shadow: none; }
+.contactAvatar { border-radius: 12px; box-shadow: 0 2px 5px rgb(0 0 0 / 4%); }
+.contactButton[aria-pressed="true"] .contactAvatar { outline: 2px solid color-mix(in srgb,var(--primary) 25%,transparent); outline-offset: 2px; }
 .contactText { min-inline-size: 0; overflow-wrap: anywhere; }
 .contactName { display: block; font-size: 14px; font-weight: 600; line-height: 1.4; }
 .contactMeta { display: block; margin-block-start: 3px; color: var(--text-muted); font-size: 12px; line-height: 1.4; }
@@ -110,7 +112,7 @@
 .backButton { display: none; }
 
 .contactWorkspace { display: flex; flex-direction: column; flex: 1; min-block-size: 0; min-inline-size: 0; }
-.identityHeader { display: flex; align-items: center; gap: 14px; flex: none; padding: 20px 24px; border-block-end: 1px solid var(--border); background: linear-gradient(110deg, color-mix(in srgb, var(--primary-subtle) 40%, var(--surface)), var(--surface) 75%); }
+.identityHeader { display: flex; align-items: center; gap: 14px; flex: none; padding: 20px 24px; border-block-end: 1px solid color-mix(in srgb,var(--primary) 18%,var(--border)); background: linear-gradient(110deg, var(--primary-subtle), var(--surface) 85%); box-shadow: inset 0 3px color-mix(in srgb,var(--primary) 60%,var(--border)); }
 .identityHeader > div { min-inline-size: 0; overflow-wrap: anywhere; }
 .identityHeader h2 { font-size: 18px; line-height: 1.35; font-weight: 600; }
 .identityHeader p { color: var(--text-muted); font-size: 12px; line-height: 1.5; margin-block-start: 4px; }
@@ -118,8 +120,16 @@
 .detailScroll > :not(:empty), .contactContent > :not(:empty) { margin-block-end: 16px; }
 .detailScroll > :last-child, .contactContent > :last-child { margin-block-end: 0; }
 .insightCard, .recordCard { padding: 20px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); box-shadow: 0 1px 3px rgb(0 0 0 / 2%); overflow-wrap: anywhere; }
+.insightCard { --insight-accent: var(--primary); border-block-start: 3px solid color-mix(in srgb,var(--insight-accent) 50%,var(--border)); background: linear-gradient(160deg,color-mix(in srgb,var(--insight-accent) 4%,var(--surface)),var(--surface) 60%); }
+.insightCard[data-tone="success"] { --insight-accent: var(--success); }
+.insightCard[data-tone="warning"] { --insight-accent: var(--warning); }
+.insightCard[data-tone="danger"] { --insight-accent: var(--danger); }
+.insightCard .sectionIcon { color: var(--insight-accent); background: color-mix(in srgb,var(--insight-accent) 12%,var(--surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb,var(--insight-accent) 12%,transparent); }
+.insightCard:focus-within, .recordCard:focus-within { border-color: var(--primary); box-shadow: 0 0 0 2px color-mix(in srgb,var(--primary) 12%,transparent); }
+.searchInput:focus-within > svg { color: var(--primary); }
+.contactsPane:focus-within { border-color: color-mix(in srgb,var(--primary) 45%,var(--border)); }
 .sectionTitle { display: inline-flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 600; }
-.sectionIcon { display: grid; place-items: center; flex: none; inline-size: 36px; block-size: 36px; border-radius: 11px; color: var(--primary); background: var(--primary-subtle); }
+.sectionIcon { display: grid; place-items: center; flex: none; inline-size: 40px; block-size: 40px; border-radius: 12px; color: var(--primary); background: var(--primary-subtle); }
 .pressureBar { appearance: none; display: block; inline-size: 100%; block-size: 9px; margin-block: 16px 12px; overflow: hidden; border: 0; border-radius: 6px; background: var(--surface-subtle); color: var(--success); }
 .pressureBar[data-tone="warning"] { color: var(--warning); }
 .pressureBar[data-tone="danger"] { color: var(--danger); }
@@ -129,6 +139,7 @@
 .workspace summary, .contactEmbedded summary { padding-block: 8px; border-radius: 6px; }
 .workspace summary::marker, .contactEmbedded summary::marker { color: var(--primary); }
 .workspace details[open] > summary, .contactEmbedded details[open] > summary { color: var(--primary); }
+.workspace details[open] > summary { margin-block-end: 10px; border-block-end: 1px solid color-mix(in srgb,var(--primary) 20%,var(--border)); border-radius: 6px 6px 0 0; }
 .workspace :global(.btn), .contactEmbedded :global(.btn) { max-inline-size: 100%; white-space: normal; line-height: 1.35; padding-block: 9px; }
 .workspace input, .workspace textarea { min-inline-size: 0; }
 .tabBody { flex: 1; border-radius: 20px; }
@@ -138,11 +149,13 @@
 .contactScroll:focus-visible, .detailScroll:focus-visible, .tabBody:focus-visible { outline: 2px solid var(--primary); outline-offset: -3px; }
 
 @media (hover: hover) {
+  .insightCard:hover, .recordCard:hover { box-shadow: 0 4px 16px color-mix(in srgb,var(--insight-accent,var(--primary)) 9%,transparent); }
   .tab:not([aria-pressed="true"]):hover { background: var(--surface); color: var(--text-strong); }
   .contactButton:not([aria-pressed="true"]):hover { background: color-mix(in srgb, var(--primary-subtle) 40%, var(--surface)); border-color: var(--border); }
   .workspace summary:hover, .contactEmbedded summary:hover { color: var(--primary); background: color-mix(in srgb, var(--primary-subtle) 35%, transparent); }
 }
 @media (prefers-reduced-motion: no-preference) {
+  .insightCard, .recordCard, .contactsPane { transition: border-color 140ms cubic-bezier(0.2,0,0,1),box-shadow 140ms cubic-bezier(0.2,0,0,1); }
   .tab, .contactButton, .backButton { transition: background-color 140ms cubic-bezier(0.2, 0, 0, 1), color 140ms cubic-bezier(0.2, 0, 0, 1), border-color 140ms cubic-bezier(0.2, 0, 0, 1), box-shadow 140ms cubic-bezier(0.2, 0, 0, 1), scale 140ms cubic-bezier(0.2, 0, 0, 1); }
   .tab:active, .contactButton:active, .backButton:active { scale: 0.96; }
   .selectedMark { transition: opacity 140ms cubic-bezier(0.2, 0, 0, 1); }
