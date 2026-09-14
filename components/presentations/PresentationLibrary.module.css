@@ -54,3 +54,5 @@
 @media (max-width: 1200px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; } }
 @media (max-width: 620px) { .grid { grid-template-columns: minmax(0, 1fr); } .toolbar { padding: 12px; } .toolbar > div:nth-child(2) { flex: 1 1 100%; } }
 @media (prefers-reduced-motion: reduce) { .card, .stack, .stack::before, .stack::after, .favorite, .collection, .previewHint, .slideSamples button { transition: none; } .card:hover, .coverButton:hover .stack, .favorite:active, .collection:active { transform: none; } .coverButton:hover .stack::before, .coverButton:hover .stack::after { transform: none; } }
+.page { display: grid; grid-template-columns: minmax(0,1fr); align-content: start; gap: 24px; min-inline-size: 0; padding-block: 4px 20px; }
+.page > * { min-inline-size: 0; }

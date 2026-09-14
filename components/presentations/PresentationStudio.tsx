@@ -13,10 +13,12 @@ import { estimatedTextLines } from "@/lib/design-readability";
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type CSSProperties,
+  type TextareaHTMLAttributes,
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -69,6 +71,7 @@ import {
 } from "@/data/presentation-templates";
 import { presentationPatternCatalog } from "@/data/presentation-patterns";
 import libraryStyles from "./PresentationLibrary.module.css";
+import studioStyles from "./PresentationStudio.module.css";
 import type {
   ApiError,
   EmailTemplateRecord,
@@ -603,6 +606,31 @@ function presentationPatternStyle(
   }
 }
 
+function SlideTextInput(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const input = ref.current;
+    if (!input) return;
+    let measuredWidth = -1;
+    const resize = () => {
+      const width = input.getBoundingClientRect().width;
+      if (!width || width === measuredWidth) return;
+      measuredWidth = width;
+      input.style.height = "0px";
+      input.style.height = `${input.scrollHeight}px`;
+    };
+    resize();
+    let frame = 0;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(resize);
+    });
+    observer.observe(input);
+    return () => { observer.disconnect(); cancelAnimationFrame(frame); };
+  }, [props.value, props.className, props.style?.fontFamily]);
+  return <textarea {...props} ref={ref} />;
+}
+
 function SlidePreview({
   project: baseProject,
   slide,
@@ -657,7 +685,7 @@ function SlidePreview({
   ) : null;
   const editableTitle = (className: string) =>
     editable ? (
-      <textarea
+      <SlideTextInput
         aria-label="Заголовок слайда"
         style={{ fontFamily: presentationFontFamily(project.themeId) }}
         value={slide.title}
@@ -675,7 +703,7 @@ function SlidePreview({
     );
   const editableBody = (className: string) =>
     editable ? (
-      <textarea
+      <SlideTextInput
         aria-label="Текст слайда"
         value={slide.body}
         onChange={(event) => onChange?.({ body: event.target.value })}
@@ -715,7 +743,7 @@ function SlidePreview({
 
   return (
     <div
-      className="relative aspect-video w-full overflow-hidden rounded-[inherit]"
+      className={cn(studioStyles.slidePreview, "relative aspect-video w-full overflow-hidden rounded-[inherit]")}
       onDoubleClick={(event) => {
         if (!editable || !onOpenQuickEdit) return;
         const target = event.target as HTMLElement;
@@ -1396,6 +1424,7 @@ export function PresentationStudio() {
   const [slideImageOpen, setSlideImageOpen] = useState(false);
   const [quickSlideOpen, setQuickSlideOpen] = useState(false);
   const [slidesPanelOpen, setSlidesPanelOpen] = useState(true);
+  const [inspectorTab, setInspectorTab] = useState<"content" | "design" | "links">("content");
   const [aiGoal, setAiGoal] = useState("");
   const [aiCreativeSource, setAiCreativeSource] =
     useState<AiCreationSource>("original");
@@ -2036,9 +2065,9 @@ export function PresentationStudio() {
 
   if (projectId && project && selectedSlide) {
     return (
-      <div className="studio-shell flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-[22px] border border-white/70 bg-surface/80 p-2 shadow-[0_20px_70px_rgba(25,20,45,.10)]">
+      <div className={studioStyles.editor}>
         {workshopDialogs}
-        <div className="mb-2 flex flex-wrap items-center gap-2 rounded-2xl border border-border/80 bg-surface/95 px-3 py-2 shadow-[var(--shadow-xs)] backdrop-blur-xl">
+        <header className={studioStyles.header}><div className={studioStyles.identity}>
           <Button
             variant="ghost"
             size="sm"
@@ -2047,7 +2076,7 @@ export function PresentationStudio() {
           >
             Презентации
           </Button>
-          <div className="h-5 w-px bg-border" />
+
           <span className="rounded-full bg-primary-subtle px-2.5 py-1 text-[10px] font-semibold text-primary">
             {sourceLabels[project.sourceType]}
           </span>
@@ -2055,16 +2084,16 @@ export function PresentationStudio() {
             aria-label="Название презентации"
             value={project.name}
             onChange={(event) => updateProject({ name: event.target.value })}
-            className="min-w-[220px] flex-1 border-0 bg-transparent font-semibold shadow-none focus:shadow-none"
+            className={studioStyles.name}
           />
           <span
-            className={cn(
-              "text-[11px]",
-              dirty ? "text-warning" : "text-text-subtle",
-            )}
+            className={studioStyles.saveState}
+            data-dirty={dirty || undefined}
+            role="status"
           >
-            {dirty ? "Есть несохранённые изменения" : notice || "Сохранено"}
+            {dirty ? "Не сохранено" : notice || "Сохранено"}
           </span>
+          </div><div className={studioStyles.projectActions}>
           <Button
             variant="outline"
             size="sm"
@@ -2108,28 +2137,21 @@ export function PresentationStudio() {
           >
             Сохранить
           </Button>
-        </div>
+        </div></header>
         {error ? (
           <Alert tone="danger" className="mb-4">
             {error}
           </Alert>
         ) : null}
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border/80 bg-surface shadow-[var(--shadow-sm)]">
-          <div
-            className={cn(
-              "grid min-h-0 flex-1 grid-cols-1",
-              slidesPanelOpen
-                ? "lg:grid-cols-[148px_minmax(0,1fr)] xl:grid-cols-[148px_minmax(0,1fr)_272px]"
-                : "lg:grid-cols-[minmax(0,1fr)] xl:grid-cols-[minmax(0,1fr)_272px]",
-            )}
-          >
+        <div className={studioStyles.workspace}>
+          <div className={studioStyles.layout} data-slides={slidesPanelOpen}>
             {slidesPanelOpen ? (
-              <aside className="flex min-h-0 flex-col border-b border-border bg-[linear-gradient(180deg,var(--surface-subtle),var(--surface))] p-2.5 lg:border-b-0 lg:border-r">
-              <div className="mb-3 flex items-center justify-between">
+              <aside className={studioStyles.slides} aria-label="Слайды презентации">
+              <div className={studioStyles.railHeader}>
                 <div>
                   <strong className="block text-[12px]">Слайды</strong>
                   <span className="text-[9px] text-text-subtle">
-                    {project.slides.length} доступны для редактирования
+                    {project.slides.length} слайдов
                   </span>
                 </div>
                 <Button
@@ -2145,7 +2167,7 @@ export function PresentationStudio() {
                   <Plus className="size-6" />
                 </Button>
               </div>
-              <div className="flex max-h-48 gap-2 overflow-x-auto pb-1 lg:grid lg:max-h-none lg:min-h-0 lg:flex-1 lg:grid-cols-1 lg:overflow-x-hidden lg:overflow-y-auto lg:pr-1">
+              <div className={studioStyles.filmstrip}>
                 {project.slides.map((slide, index) => {
                   return (
                     <button
@@ -2154,11 +2176,11 @@ export function PresentationStudio() {
                       onClick={() => setSelectedSlideId(slide.id)}
                       aria-pressed={slide.id === selectedSlide.id}
                       aria-label={`Слайд ${index + 1}: ${slide.title || layoutLabels[slide.layout]}`}
-                      className="w-36 shrink-0 rounded-xl border border-border bg-surface p-1.5 text-left shadow-[var(--shadow-xs)] transition duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-[var(--shadow-sm)] aria-pressed:border-primary aria-pressed:ring-2 aria-pressed:ring-primary/20 lg:w-auto"
+                      className={studioStyles.thumbnail}
                     >
-                      <span className="mb-1 flex items-center justify-between px-0.5 text-[9px] text-text-subtle">
+                      <span className={studioStyles.thumbnailLabel}>
                         <span>{index + 1}</span>
-                        <span>{layoutLabels[slide.layout]}</span>
+                        <span>{layoutLabels[slide.layout]}</span>{slide.id === selectedSlide.id && <Check aria-hidden className="size-4" />}
                       </span>
                       <div className="overflow-hidden rounded-md">
                         <SlidePreview project={project} slide={slide} compact />
@@ -2169,8 +2191,8 @@ export function PresentationStudio() {
               </div>
               </aside>
             ) : null}
-            <section className="flex min-w-0 min-h-0 flex-col bg-[radial-gradient(circle_at_50%_18%,rgba(124,53,242,.07),transparent_28%),#eef0f4]">
-              <div className="flex min-h-11 items-center justify-between gap-2 border-b border-border bg-surface/90 px-2.5 py-1.5">
+            <section className={studioStyles.stage} aria-label="Рабочая область слайда">
+              <div className={studioStyles.stageToolbar}>
                 <div className="flex min-w-0 items-center gap-2">
                   <Button
                     variant="ghost"
@@ -2198,20 +2220,21 @@ export function PresentationStudio() {
                     {selectedSlideIndex + 1} / {project.slides.length}
                   </span>
                   <span
-                    className="hidden truncate text-[10px] font-medium text-text-muted md:block"
+                    className={studioStyles.layoutLabel}
                     title="Двойной клик по свободной области — быстро изменить слайд"
                   >
-                    Все слайды доступны · двойной клик — быстрые настройки
+                    {layoutLabels[selectedSlide.layout]}
                   </span>
                 </div>
-                <div className="flex items-center gap-0.5">
-                  <div className="hidden items-center gap-0.5 sm:flex">
+                <div className={studioStyles.slideActions}>
+                  <div className="flex items-center gap-0.5">
                   <Button
                     variant="ghost"
                     size="icon"
                     className="size-8"
                     aria-label="Переместить слайд выше"
                     title="Выше"
+                    disabled={selectedSlideIndex === 0}
                     onClick={() => moveSlide(-1)}
                   >
                     <ArrowUp className="size-5" />
@@ -2222,6 +2245,7 @@ export function PresentationStudio() {
                     className="size-8"
                     aria-label="Переместить слайд ниже"
                     title="Ниже"
+                    disabled={selectedSlideIndex === project.slides.length - 1}
                     onClick={() => moveSlide(1)}
                   >
                     <ArrowDown className="size-5" />
@@ -2259,8 +2283,8 @@ export function PresentationStudio() {
                   </Button>
                 </div>
               </div>
-              <div className="grid min-h-0 flex-1 place-items-center overflow-hidden p-4 sm:p-5 xl:p-6">
-                <div className="w-full max-w-[1080px] overflow-hidden rounded-xl border border-border/80 bg-surface shadow-[0_22px_65px_rgb(17_24_39/0.16)]">
+              <div className={studioStyles.canvas}>
+                <div className={studioStyles.slideFrame} style={{ "--slide-ratio": selectedSlide.canvas ? selectedSlide.canvas.width / selectedSlide.canvas.height : 16 / 9 } as CSSProperties}>
                   <SlidePreview
                     project={project}
                     slide={selectedSlide}
@@ -2272,20 +2296,12 @@ export function PresentationStudio() {
                 </div>
               </div>
             </section>
-            <aside className="hidden min-h-0 overflow-hidden border-l border-border bg-surface-subtle/55 p-2.5 xl:block">
-              {selectedSlide.canvas ? <div className="grid gap-4 p-3"><strong>Импортированный слайд</strong><p className="text-sm">Положение, размеры, текст и ссылки доступны в редакторе элементов.</p><Button onClick={() => setQuickSlideOpen(true)}>Редактировать элементы</Button></div> : <div className="grid h-full min-h-0 gap-2.5 overflow-y-auto pr-0.5 [&>section]:rounded-xl [&>section]:border [&>section]:border-border/80 [&>section]:bg-surface [&>section]:p-3 [&>section]:shadow-[var(--shadow-xs)]">
-                <div className="sticky top-0 z-10 -mx-3 -mt-3 border-b border-border bg-surface px-3 py-2">
-                  <strong className="block text-[12px]">
-                    Инструменты слайда
-                  </strong>
-                  <span className="text-[9px] text-text-subtle">
-                    Контент, композиция и оформление
-                  </span>
-                </div>
-                <section>
-                  <h3 className="mb-1.5 mt-0 text-[11px] font-semibold">
-                    Добавить на слайд
-                  </h3>
+            <aside className={studioStyles.inspector} aria-label="Инструменты слайда">
+              {selectedSlide.canvas ? <div className="grid gap-4 p-3"><strong>Импортированный слайд</strong><p className="text-sm">Положение, размеры, текст и ссылки доступны в редакторе элементов.</p><Button onClick={() => setQuickSlideOpen(true)}>Редактировать элементы</Button></div> : <>
+                <div className={studioStyles.inspectorTabs} role="group" aria-label="Категория инструментов">{([["content", "Текст", Type], ["design", "Дизайн", Palette], ["links", "Ссылки", Mail]] as const).map(([id, label, Icon]) => <button key={id} type="button" aria-pressed={inspectorTab === id} aria-controls="slide-inspector-fields" onClick={() => setInspectorTab(id)}><Icon aria-hidden className="size-5" />{label}</button>)}</div>
+                <div id="slide-inspector-fields" className={studioStyles.inspectorFields}>
+                <details hidden={inspectorTab !== "content"} className={studioStyles.quickLayouts}>
+                  <summary>Быстрые макеты</summary>
                   <div className="grid grid-cols-3 gap-1.5">
                     {[
                       ["Текст", "statement"],
@@ -2336,18 +2352,20 @@ export function PresentationStudio() {
                               : {}),
                           });
                         }}
-                  className="rounded-lg border border-border bg-surface px-1.5 py-2 text-[9px] font-semibold transition hover:-translate-y-0.5 hover:border-primary/40 hover:bg-primary-subtle hover:shadow-[var(--shadow-xs)]"
+                  className={studioStyles.layoutOption}
+                        aria-pressed={selectedSlide.layout === layout}
                       >
                         {label}
                       </button>
                     ))}
                   </div>
-                </section>
-                <section>
+                </details>
+                <section hidden={inspectorTab !== "content"}>
                   <h3 className="mb-2 mt-0 text-[12px] font-semibold">
                     Композиция
                   </h3>
                   <Select
+                    aria-label="Композиция слайда"
                     value={selectedSlide.layout}
                     onChange={(event) =>
                       updateSlide({
@@ -2359,7 +2377,7 @@ export function PresentationStudio() {
                     )}
                   />
                 </section>
-                <section className="grid gap-3">
+                <section hidden={inspectorTab !== "content"} className="grid gap-3">
                   <h3 className="m-0 text-[12px] font-semibold">Содержание</h3>
                   <FormField label="Надзаголовок" htmlFor="slide-eyebrow">
                     <Input
@@ -2411,7 +2429,7 @@ export function PresentationStudio() {
                     />
                   </FormField>
                 </section>
-                <section className="grid gap-3 rounded-xl border border-primary/15 bg-primary-subtle/20 p-3">
+                <section hidden={inspectorTab !== "links"} className="grid gap-3">
                   <h3 className="m-0 text-[12px] font-semibold">
                     Кнопка и социальные сети
                   </h3>
@@ -2474,7 +2492,7 @@ export function PresentationStudio() {
                     );
                   })}
                 </section>
-                <section>
+                <section hidden={inspectorTab !== "design"}>
                   <div className="mb-2 flex items-center justify-between">
                     <h3 className="m-0 text-[12px] font-semibold">
                       Изображение
@@ -2503,7 +2521,7 @@ export function PresentationStudio() {
                     }
                   />
                 </section>
-                <section>
+                <section hidden={inspectorTab !== "design"}>
                   <h3 className="mb-2 mt-0 text-[12px] font-semibold">
                     Стиль текущего слайда
                   </h3>
@@ -2515,10 +2533,8 @@ export function PresentationStudio() {
                     value={selectedSlide.themeId ?? project.themeId}
                     onChange={changeSlideTheme}
                   />
-                  <div className="mt-3">
-                    <p className="mb-0 mt-0 text-[11px] font-semibold">
-                      Библиотека фонов и узоров
-                    </p>
+                  <details className={studioStyles.patterns}>
+                    <summary>Фоны и узоры · {presentationPatterns.length}</summary>
                     <p className="mb-2 mt-0.5 text-[9px] leading-3 text-text-subtle">
                       64 адаптивных мотива в цветах текущего слайда
                     </p>
@@ -2555,7 +2571,7 @@ export function PresentationStudio() {
                         </button>
                       ))}
                     </div>
-                  </div>
+                  </details>
                   <div className="mt-3 grid grid-cols-3 gap-2">
                     <FormField label="Акцент">
                       <Input
@@ -2620,7 +2636,7 @@ export function PresentationStudio() {
                     </Button>
                   ) : null}
                 </section>
-                <section>
+                <section hidden={inspectorTab !== "content"}>
                   <FormField
                     label="Заметки выступающего"
                     hint="Факты и внешние источники указывайте здесь. Они сохраняются в проекте."
@@ -2636,7 +2652,7 @@ export function PresentationStudio() {
                     />
                   </FormField>
                 </section>
-              </div>}
+              </div></>}
             </aside>
           </div>
         </div>
@@ -2647,11 +2663,13 @@ export function PresentationStudio() {
           title="Быстро изменить слайд"
           description="Текст, изображение и фон меняются здесь и сразу видны на холсте."
           size="lg"
+          className={studioStyles.quickDialog}
           footer={
             <Button onClick={() => setQuickSlideOpen(false)}>Готово</Button>
           }
         >
           <div className="grid gap-5">
+            <FormField label="Композиция слайда"><Select aria-label="Композиция слайда" value={selectedSlide.layout} onChange={event => updateSlide({ layout: event.target.value as PresentationSlideLayout })} options={Object.entries(layoutLabels).map(([value, label]) => ({ value, label }))} /></FormField>
             <section className="grid gap-3 rounded-xl border border-border bg-surface-subtle/45 p-4">
               <div className="flex items-center gap-2">
                 <Type className="size-6 text-primary" aria-hidden="true" />
@@ -2694,6 +2712,11 @@ export function PresentationStudio() {
                   rows={3}
                 />
               </FormField>
+            </section>
+            <section className="grid gap-3 rounded-xl border border-border bg-surface p-4">
+              <strong className="text-sm">Кнопка на слайде</strong>
+              <FormField label="Текст кнопки" htmlFor="quick-slide-cta-label"><Input id="quick-slide-cta-label" value={selectedSlide.ctaLabel ?? ""} onChange={event => updateSlide({ ctaLabel: event.target.value })} /></FormField>
+              <FormField label="HTTPS-ссылка" htmlFor="quick-slide-cta-url"><Input id="quick-slide-cta-url" type="url" value={selectedSlide.ctaUrl ?? ""} onChange={event => updateSlide({ ctaUrl: event.target.value })} placeholder="https://…" /></FormField>
             </section>
             <div className="grid gap-3 sm:grid-cols-2">
               <button
@@ -2808,7 +2831,7 @@ export function PresentationStudio() {
   }
 
   return (
-    <div className="presentation-studio-home grid h-full min-h-0 auto-rows-max content-start gap-7 overflow-y-auto overscroll-contain pr-1">
+    <div className={libraryStyles.page}>
       {workshopDialogs}
       <PageHeader
         title={libraryView === "templates" ? "Шаблоны презентаций" : "Презентации"}

@@ -1,20 +1,14 @@
 import type { Metadata } from "next";
 
-import { AppShell } from "@/components/layout/AppShell";
+import { PresentationPageFrame } from "@/components/presentations/PresentationPageFrame";
 import { PresentationStudio } from "@/components/presentations";
 
 export const metadata: Metadata = { title: "Презентации" };
 
 export default function PresentationsPage() {
   return (
-    <AppShell
-      title="Презентации"
-      contentWidth="full"
-      viewportLocked
-      desktopSidebarCollapsible
-      contentClassName="!py-3"
-    >
+    <PresentationPageFrame>
       <PresentationStudio />
-    </AppShell>
+    </PresentationPageFrame>
   );
 }
