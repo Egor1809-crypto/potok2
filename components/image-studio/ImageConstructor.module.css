@@ -1,0 +1,21 @@
+.workspace { display: grid; grid-template-rows: auto 1fr; grid-auto-rows: auto; gap: 20px; height: 100%; min-height: 0; overflow: auto; padding: 3px; }
+.layout { display: grid; grid-template-columns: minmax(300px,380px) minmax(0,1fr); gap: 20px; min-width: 0; align-items: stretch; }
+.prompt { min-width: 0; padding: 20px; border-top: 3px solid var(--primary); background: linear-gradient(155deg,color-mix(in srgb,var(--primary) 3%,var(--surface)),var(--surface) 40%); }
+.prompt textarea { background: var(--surface); border-color: color-mix(in srgb,var(--primary) 24%,var(--border)); transition: box-shadow .2s,border-color .2s; }
+.prompt textarea:focus { box-shadow: 0 0 0 4px var(--primary-subtle); }
+.prompt button { transition: background .18s, border-color .18s, box-shadow .18s; }
+.prompt button:hover { box-shadow: 0 3px 10px #39215812; }
+.result { display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+.stage { position: relative; display: grid; flex: 1; min-height: 440px; place-items: center; padding: 28px; overflow: hidden; background: radial-gradient(circle,#7c35f221 .8px,transparent .8px) 0 0 / 18px 18px,linear-gradient(140deg,#f2edfa,#f6f7fa 55%,#ede8f6); isolation: isolate; }
+.stage::before { content: ""; position: absolute; inset: 14px; border: 1px solid #7c35f219; border-radius: 15px; pointer-events: none; z-index: -1; }
+.stage[data-generating=true]::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(110deg,transparent 30%,#ffffff85 50%,transparent 70%); animation: image-studio-shimmer 2.8s ease-in-out infinite; }
+.artwork { overflow: hidden; border-radius: 12px; border: 1px solid #ffffffb3; background: white; box-shadow: 0 24px 55px #29154429,0 2px 4px #2915440d; transition: box-shadow .25s,transform .25s; }
+.artwork:hover { transform: translateY(-3px); box-shadow: 0 30px 65px #29154433; }
+.preview { display: block; max-height: 650px; width: 100%; max-width: 100%; object-fit: contain; animation: image-studio-reveal .35s ease-out; }
+@keyframes image-studio-reveal { from { opacity: .5; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes image-studio-shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+@media (max-width: 1000px) { .layout { grid-template-columns: minmax(0,1fr); } .stage { min-height: 320px; } .workspace { grid-template-rows: auto; } }
+@media (max-width: 540px) { .prompt { padding: 16px; } .stage { padding: 18px; min-height: 260px; } }
+@media (prefers-reduced-motion: reduce) { .preview,.stage[data-generating=true]::after { animation: none; } .artwork,.prompt button,.prompt textarea { transition: none; } .artwork:hover { transform: none; } }
+
+.prompt fieldset button { display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 5px; }

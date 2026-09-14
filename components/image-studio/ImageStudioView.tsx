@@ -1,5 +1,7 @@
 "use client";
 
+import studioStyles from "./ImageConstructor.module.css";
+
 /* eslint-disable @next/next/no-img-element */
 
 import { useEffect, useMemo, useState } from "react";
@@ -9,7 +11,6 @@ import {
   ArrowRight,
   Download,
   Image as ImageIcon,
-  Images,
   Presentation,
   ShieldCheck,
   Sparkles,
@@ -35,88 +36,7 @@ import type {
   ImageStudioAspect,
   ImageStudioGenerateResponse,
   ImageStudioStatusResponse,
-  ImageStudioStyle,
 } from "@/types/api";
-
-const styles: Array<{
-  id: ImageStudioStyle;
-  name: string;
-  description: string;
-  swatch: string;
-}> = [
-  {
-    id: "editorial",
-    name: "Редакционный",
-    description: "Сетка, воздух и выразительная арт-дирекция",
-    swatch: "from-[#17131d] via-[#5134c8] to-[#f5c7d8]",
-  },
-  {
-    id: "minimal",
-    name: "Минимализм",
-    description: "Один акцент и чистая композиция",
-    swatch: "from-[#f7f1e8] via-[#f7f1e8] to-[#ff5a36]",
-  },
-  {
-    id: "photo",
-    name: "Фотография",
-    description: "Правдоподобный свет без стоковых клише",
-    swatch: "from-[#193246] via-[#d9a56c] to-[#eae1d2]",
-  },
-  {
-    id: "abstract",
-    name: "Абстракция",
-    description: "Цвет, геометрия и пластичный ритм",
-    swatch: "from-[#3523c7] via-[#ef66ad] to-[#ffd23f]",
-  },
-  {
-    id: "collage",
-    name: "Коллаж",
-    description: "Бумага, вырезки и тактильные слои",
-    swatch: "from-[#eee2cf] via-[#de5543] to-[#163e73]",
-  },
-  {
-    id: "three-dimensional",
-    name: "3D",
-    description: "Матовые объекты и студийный свет",
-    swatch: "from-[#d9d2ff] via-[#7968ee] to-[#b8f2dc]",
-  },
-  {
-    id: "cinematic",
-    name: "Кино",
-    description: "Драматичный свет и глубина кадра",
-    swatch: "from-[#0d1624] via-[#8e3b2f] to-[#e0ad67]",
-  },
-  {
-    id: "architectural",
-    name: "Архитектура",
-    description: "Перспектива, материал и дневной свет",
-    swatch: "from-[#d9d3c7] via-[#79848a] to-[#32383d]",
-  },
-  {
-    id: "botanical",
-    name: "Ботаника",
-    description: "Органические формы и природная палитра",
-    swatch: "from-[#e9eadc] via-[#758b63] to-[#263c31]",
-  },
-  {
-    id: "technical",
-    name: "Технический",
-    description: "Чертёжная ясность и точная геометрия",
-    swatch: "from-[#10203c] via-[#2d64c8] to-[#91d4e8]",
-  },
-  {
-    id: "luxury",
-    name: "Тихий люкс",
-    description: "Дорогие фактуры без показного блеска",
-    swatch: "from-[#17140f] via-[#806b45] to-[#e8ddca]",
-  },
-  {
-    id: "paper-cut",
-    name: "Бумажная пластика",
-    description: "Слои, глубина и мягкие тени",
-    swatch: "from-[#f0ddd2] via-[#df6a55] to-[#633c7e]",
-  },
-];
 
 const promptIdeas = [
   "Обложка для отчёта о правовых технологиях: светлая бумага, тонкие кобальтовые линии и один алый акцент",
@@ -134,10 +54,10 @@ const promptIdeas = [
 ];
 
 const aspectLabels: Record<ImageStudioAspect, string> = {
-  square: "Квадрат · 1024 × 1024",
-  landscape: "Альбом · 1536 × 1024",
-  portrait: "Портрет · 1024 × 1536",
-  banner: "Баннер · 1536 × 1024",
+  square: "Квадрат",
+  landscape: "Альбом",
+  portrait: "Портрет",
+  banner: "Баннер",
 };
 
 function formatBytes(value: number) {
@@ -159,7 +79,6 @@ export function ImageStudioView() {
   const [selectedId, setSelectedId] = useState("");
   const [prompt, setPrompt] = useState("");
   const [title, setTitle] = useState("");
-  const [style, setStyle] = useState<ImageStudioStyle>("editorial");
   const [aspect, setAspect] = useState<ImageStudioAspect>("landscape");
   const [quality, setQuality] = useState<"standard" | "high">("standard");
   const [purpose, setPurpose] = useState<"illustration" | "email-background">(
@@ -235,7 +154,7 @@ export function ImageStudioView() {
               ? `${prompt.trim()}\n\nЭто фон email-письма: спокойный низкий контраст, много свободного пространства для читаемого текста поверх, без текста, логотипов, центрального лица и мелких шумных деталей.`
               : prompt.trim(),
           title: title.trim(),
-          style,
+          style: "editorial",
           aspect: purpose === "email-background" ? "portrait" : aspect,
           quality,
         }),
@@ -275,25 +194,24 @@ export function ImageStudioView() {
       viewportLocked
       contentClassName="!py-4"
     >
-      <div className="grid h-full min-h-0 gap-6 overflow-y-auto overscroll-contain pr-1">
+      <div className={studioStyles.workspace}>
         <header className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
           <div className="max-w-3xl">
             <h1 className="m-0 text-[24px] font-semibold tracking-[-0.035em] text-text-strong sm:text-[28px]">
-              Изображения
+              Конструктор изображений
             </h1>
           </div>
           <div className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2 text-[11px] text-text-muted">
-            <ShieldCheck aria-hidden="true" className="size-6 text-success" />
+            <ShieldCheck aria-hidden="true" className={cn("size-6", status?.configured ? "text-success" : "text-text-muted")} />
             {status?.configured
-              ? `NavyAI подключён · ${status.model}`
+              ? "Готов к созданию"
               : "Провайдер не подключён"}
           </div>
         </header>
 
         {!loading && status && !status.configured ? (
           <Alert tone="warning" title="Генерация пока недоступна">
-            Добавьте NAVYAI_API_KEY на сервере. Галерея и ранее сохранённые
-            файлы остаются доступны.
+            Подключите генерацию изображений в настройках платформы.
           </Alert>
         ) : null}
         {error ? (
@@ -304,9 +222,9 @@ export function ImageStudioView() {
 
         <div
           id="image-constructor"
-          className="scroll-mt-6 grid min-w-0 gap-5 xl:grid-cols-[minmax(340px,0.8fr)_minmax(520px,1.2fr)]"
+          className={studioStyles.layout}
         >
-          <Card className="min-w-0 p-5 sm:p-6">
+          <Card className={studioStyles.prompt}>
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <h2 className="m-0 text-[17px] font-semibold">Новая работа</h2>
@@ -315,7 +233,7 @@ export function ImageStudioView() {
                 <WandSparkles aria-hidden="true" className="size-7" />
               </span>
             </div>
-            <div className="grid gap-4">
+            <div className="grid gap-3">
               <fieldset className="grid gap-2">
                 <legend className="text-[12px] font-medium">Назначение</legend>
                 <div className="grid grid-cols-2 gap-2">
@@ -356,34 +274,34 @@ export function ImageStudioView() {
                 }
                 htmlFor="image-studio-prompt"
                 required
-                hint={`${prompt.length}/1600 · укажите сюжет, палитру, настроение и ограничения`}
+                hint={`${prompt.length}/1600`}
               >
                 <Textarea
                   id="image-studio-prompt"
                   value={prompt}
                   maxLength={1600}
                   onChange={(event) => setPrompt(event.target.value)}
-                  rows={7}
+                  rows={5}
                   placeholder="Например: обложка для приглашения на деловой форум. Молочный фон, кобальтовая сетка, тонкие контуры и один алый круг. Без людей, текста и логотипов."
-                  className="min-h-40 resize-y text-[13px] leading-6"
+                  className="min-h-32 resize-y text-[13px] leading-5"
                 />
               </FormField>
               <div className="flex flex-wrap gap-2">
-                {promptIdeas.map((idea, index) => (
+                {promptIdeas.slice(0, 4).map((idea, index) => (
                   <button
                     key={idea}
                     type="button"
                     onClick={() => setPrompt(idea)}
                     className="rounded-full border border-border bg-surface-subtle px-3 py-1.5 text-left text-[10px] text-text-muted transition hover:border-primary/30 hover:text-primary"
                   >
-                    Идея {index + 1}
+                    {["Обложка отчёта", "Приглашение", "Натюрморт", "Город ночью"][index]}
                   </button>
                 ))}
               </div>
               <FormField
                 label="Название файла"
                 htmlFor="image-studio-title"
-                hint="Необязательно — поможет найти работу в галерее"
+                hint="Необязательно"
               >
                 <Input
                   id="image-studio-title"
@@ -393,38 +311,7 @@ export function ImageStudioView() {
                   placeholder="Обложка форума 2026"
                 />
               </FormField>
-              <fieldset className="grid gap-2.5">
-                <legend className="mb-1 text-[12px] font-medium">
-                  Арт-направление
-                </legend>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {styles.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      aria-pressed={style === item.id}
-                      onClick={() => setStyle(item.id)}
-                      className="flex min-w-0 items-center gap-3 rounded-xl border border-border bg-surface px-3 py-2.5 text-left outline-none transition hover:border-primary/30 aria-pressed:border-primary aria-pressed:bg-primary-subtle/40 focus-visible:ring-2 focus-visible:ring-primary/25"
-                    >
-                      <span
-                        className={cn(
-                          "size-9 shrink-0 rounded-lg bg-gradient-to-br",
-                          item.swatch,
-                        )}
-                      />
-                      <span className="min-w-0">
-                        <strong className="block text-[11px]">
-                          {item.name}
-                        </strong>
-                        <span className="mt-0.5 block text-[9px] leading-3.5 text-text-subtle">
-                          {item.description}
-                        </span>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid items-start gap-3 sm:grid-cols-2">
                 <FormField
                   label="Формат"
                   htmlFor="image-studio-aspect"
@@ -468,20 +355,10 @@ export function ImageStudioView() {
                   />
                 </FormField>
               </div>
-              <div className="rounded-xl border border-dashed border-border bg-surface-subtle p-3.5">
-                <p className="m-0 text-[11px] font-semibold">
-                  Референс с компьютера
-                </p>
-                <p className="mb-0 mt-1 text-[10px] leading-4 text-text-muted">
-                  Активный NavyAI API пока не поддерживает image-to-image. Мы не
-                  показываем неработающую загрузку: опишите нужные черты
-                  референса в промпте.
-                </p>
-              </div>
               <Button
                 onClick={() => void generate()}
                 loading={generating}
-                loadingText="NavyAI создаёт изображение…"
+                loadingText="Создаём изображение…"
                 disabled={!status?.configured || prompt.trim().length < 12}
                 size="lg"
                 className="w-full"
@@ -501,7 +378,7 @@ export function ImageStudioView() {
             </div>
           </Card>
 
-          <Card className="min-w-0 overflow-hidden">
+          <Card className={studioStyles.result}>
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
               <div>
                 <h2 className="m-0 text-[15px] font-semibold">Результат</h2>
@@ -543,14 +420,14 @@ export function ImageStudioView() {
                 </div>
               ) : null}
             </div>
-            <div className="grid min-h-[480px] place-items-center bg-[radial-gradient(circle_at_top,#f1eaff_0,transparent_42%),linear-gradient(135deg,#f7f4fa,#efe9e2)] p-5 sm:p-8">
+            <div className={studioStyles.stage} data-generating={generating}>
               {selectedAsset ? (
                 <div className="grid max-h-[700px] max-w-full gap-3 text-center">
-                  <div className="overflow-hidden rounded-2xl border border-white/70 bg-white shadow-[0_24px_80px_rgba(42,27,60,0.16)]">
+                  <div className={studioStyles.artwork}>
                     <img
                       src={selectedAsset.url}
                       alt={selectedAsset.filename}
-                      className="max-h-[610px] max-w-full object-contain"
+                      className={studioStyles.preview}
                     />
                   </div>
                   <div>
@@ -574,8 +451,7 @@ export function ImageStudioView() {
                     Здесь появится первая работа
                   </h3>
                   <p className="mb-0 mt-2 text-[12px] leading-5 text-text-muted">
-                    Заполните промпт слева или выберите ранее сохранённое
-                    изображение в галерее ниже.
+                    Опишите сюжет и выберите формат. Готовое изображение появится на этом холсте.
                   </p>
                 </div>
               )}
@@ -583,111 +459,7 @@ export function ImageStudioView() {
           </Card>
         </div>
 
-        <section
-          id="image-template-library"
-          aria-labelledby="image-gallery-title"
-          className="scroll-mt-6 grid gap-4"
-        >
-          <div className="flex items-end justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <Images aria-hidden="true" className="size-6 text-primary" />
-                <h2
-                  id="image-gallery-title"
-                  className="m-0 text-[18px] font-semibold"
-                >
-                  Шаблоны фотографий
-                </h2>
-              </div>
-              <p className="mb-0 mt-1 text-[12px] text-text-muted">
-                Сохранённые ИИ-работы и загруженные фотографии можно повторно
-                использовать как визуальную основу.
-              </p>
-            </div>
-            <span className="rounded-full border border-border bg-surface px-2.5 py-1 text-[10px] tabular-nums text-text-muted">
-              {assets.length} файлов
-            </span>
-          </div>
-          {loading ? (
-            <Card role="status" className="p-6 text-[12px] text-text-muted">
-              Загружаем сохранённые изображения…
-            </Card>
-          ) : assets.length ? (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
-              {assets.map((asset) => (
-                <Card
-                  key={asset.id}
-                  className={cn(
-                    "group overflow-hidden border transition",
-                    selectedAsset?.id === asset.id
-                      ? "border-primary ring-2 ring-primary/15"
-                      : "hover:border-primary/30",
-                  )}
-                >
-                  <button
-                    type="button"
-                    aria-label={`Выбрать ${asset.filename}`}
-                    aria-pressed={selectedAsset?.id === asset.id}
-                    onClick={() => setSelectedId(asset.id)}
-                    className="block aspect-[4/3] w-full overflow-hidden bg-surface-subtle"
-                  >
-                    <img
-                      src={asset.url}
-                      alt=""
-                      loading="lazy"
-                      className="size-full object-cover transition duration-300 group-hover:scale-[1.02]"
-                    />
-                  </button>
-                  <div className="grid gap-2 p-3">
-                    <button
-                      type="button"
-                      aria-pressed={selectedAsset?.id === asset.id}
-                      onClick={() => setSelectedId(asset.id)}
-                      className="truncate text-left text-[11px] font-semibold"
-                      title={asset.filename}
-                    >
-                      {asset.filename}
-                    </button>
-                    <div className="flex items-center justify-between gap-2 text-[9px] text-text-subtle">
-                      <span>{formatBytes(asset.size)}</span>
-                      <div className="flex gap-1">
-                        <a
-                          href={`${asset.url}?download=1`}
-                          aria-label={`Скачать ${asset.filename}`}
-                          className="grid size-7 place-items-center rounded-lg border border-border bg-surface hover:border-primary/30 hover:text-primary"
-                        >
-                          <Download aria-hidden="true" className="size-4" />
-                        </a>
-                        <Link
-                          href={`/email-builder?new=1&asset=${encodeURIComponent(asset.id)}&assetName=${encodeURIComponent(asset.filename)}`}
-                          aria-label={`Использовать ${asset.filename} в письме`}
-                          className="grid size-7 place-items-center rounded-lg bg-primary text-primary-foreground"
-                        >
-                          <ArrowRight aria-hidden="true" className="size-4" />
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <Card className="grid min-h-40 place-items-center p-6 text-center">
-              <div>
-                <ImageIcon
-                  aria-hidden="true"
-                  className="mx-auto size-7 text-text-subtle"
-                />
-                <p className="mb-0 mt-2 text-[12px] font-medium">
-                  Медиатека пока пуста
-                </p>
-                <p className="mb-0 mt-1 text-[10px] text-text-muted">
-                  Первая успешная генерация сохранится здесь автоматически.
-                </p>
-              </div>
-            </Card>
-          )}
-        </section>
+
       </div>
     </AppShell>
   );

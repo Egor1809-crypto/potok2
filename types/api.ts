@@ -497,6 +497,32 @@ export type PresentationSlideLayout =
   | "callout"
   | "closing";
 
+export type PresentationElement = {
+  id: string;
+  kind: "text" | "image" | "shape";
+  x: number; y: number; width: number; height: number;
+  rotation?: number;
+  text?: string;
+  fontSize?: number;
+  fontFamily?: string;
+  bold?: boolean;
+  italic?: boolean;
+  align?: "left" | "center" | "right";
+  color?: string;
+  fill?: string;
+  shape?: "rect" | "roundRect" | "ellipse";
+  imageUrl?: string;
+  fit?: "contain" | "cover";
+  crop?: { left: number; top: number; right: number; bottom: number };
+  href?: string;
+};
+
+export type PresentationCanvas = {
+  width: number; height: number;
+  source: "pptx" | "pdf";
+  elements: PresentationElement[];
+};
+
 export type PresentationSlide = {
   id: string;
   layout: PresentationSlideLayout;
@@ -509,6 +535,7 @@ export type PresentationSlide = {
   assetId?: string;
   imageUrl?: string;
   fullBleedImage?: boolean;
+  canvas?: PresentationCanvas;
   imagePrompt?: string;
   ctaLabel?: string;
   ctaUrl?: string;
@@ -519,7 +546,7 @@ export type PresentationSlide = {
   patternId?: PresentationPatternId;
 };
 
-export type PresentationSourceType = "blank" | "template" | "ai" | "email";
+export type PresentationSourceType = "blank" | "template" | "ai" | "email" | "import";
 
 export type PresentationProjectRecord = {
   id: string;

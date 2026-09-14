@@ -1,5 +1,8 @@
 "use client";
 
+import { PresentationImport } from "./PresentationImport";
+import { PresentationDirector } from "./PresentationDirector";
+import { ImportedSlidePreview, ImportedSlideEditor } from "./ImportedSlide";
 import { useEditorDraft } from "@/lib/use-editor-draft";
 
 import { confirmAction } from "@/components/ui/confirm-action";
@@ -102,6 +105,7 @@ const sourceLabels: Record<PresentationProjectRecord["sourceType"], string> = {
   template: "Из сценария",
   ai: "Черновик ИИ",
   email: "Из email-шаблона",
+  import: "Импорт",
 };
 
 const presentationPatterns = presentationPatternCatalog;
@@ -618,6 +622,7 @@ function SlidePreview({
   onPickImage?: () => void;
   onOpenQuickEdit?: () => void;
 }) {
+  if (slide.canvas) return <div onDoubleClick={editable ? onOpenQuickEdit : undefined}><ImportedSlidePreview slide={slide} /></div>;
   const slideTheme = slide.themeId
     ? presentationTheme(slide.themeId)
     : undefined;
@@ -1383,6 +1388,8 @@ export function PresentationStudio() {
   const [templateUseCase, setTemplateUseCase] = useState("Все задачи");
   const [previewTemplate, setPreviewTemplate] = useState<(typeof presentationTemplates)[number] | null>(null);
   const [previewSlide, setPreviewSlide] = useState(0);
+  const [importOpen, setImportOpen] = useState(false);
+  const [directorOpen, setDirectorOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
   const [slideImageOpen, setSlideImageOpen] = useState(false);
@@ -2021,9 +2028,15 @@ export function PresentationStudio() {
       </div>
     );
 
+  const workshopDialogs = <>
+    {importOpen && <PresentationImport onClose={() => setImportOpen(false)} onCreate={input => createProject(input, "import")} />}
+    {directorOpen && <PresentationDirector projects={presentations} initial={project || undefined} onClose={() => setDirectorOpen(false)} renderSlide={(p, slide) => <SlidePreview project={p} slide={slide} />} onSaved={p => { setPresentations(items => items.map(item => item.id === p.id ? p : item)); if (project?.id === p.id) { setProject(p); setDirty(false); } }} />}
+  </>;
+
   if (projectId && project && selectedSlide) {
     return (
       <div className="studio-shell flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-[22px] border border-white/70 bg-surface/80 p-2 shadow-[0_20px_70px_rgba(25,20,45,.10)]">
+        {workshopDialogs}
         <div className="mb-2 flex flex-wrap items-center gap-2 rounded-2xl border border-border/80 bg-surface/95 px-3 py-2 shadow-[var(--shadow-xs)] backdrop-blur-xl">
           <Button
             variant="ghost"
@@ -2059,6 +2072,7 @@ export function PresentationStudio() {
           >
             Новая с ИИ
           </Button>
+          <Button size="sm" variant="outline" onClick={async () => { if (dirty && !(await saveProject())) return; setDirectorOpen(true); }}>Арт-директор</Button>
           <Button
             variant="outline"
             size="sm"
@@ -2258,7 +2272,7 @@ export function PresentationStudio() {
               </div>
             </section>
             <aside className="hidden min-h-0 overflow-hidden border-l border-border bg-surface-subtle/55 p-2.5 xl:block">
-              <div className="grid h-full min-h-0 gap-2.5 overflow-y-auto pr-0.5 [&>section]:rounded-xl [&>section]:border [&>section]:border-border/80 [&>section]:bg-surface [&>section]:p-3 [&>section]:shadow-[var(--shadow-xs)]">
+              {selectedSlide.canvas ? <div className="grid gap-4 p-3"><strong>Импортированный слайд</strong><p className="text-sm">Положение, размеры, текст и ссылки доступны в редакторе элементов.</p><Button onClick={() => setQuickSlideOpen(true)}>Редактировать элементы</Button></div> : <div className="grid h-full min-h-0 gap-2.5 overflow-y-auto pr-0.5 [&>section]:rounded-xl [&>section]:border [&>section]:border-border/80 [&>section]:bg-surface [&>section]:p-3 [&>section]:shadow-[var(--shadow-xs)]">
                 <div className="sticky top-0 z-10 -mx-3 -mt-3 border-b border-border bg-surface px-3 py-2">
                   <strong className="block text-[12px]">
                     Инструменты слайда
@@ -2621,12 +2635,13 @@ export function PresentationStudio() {
                     />
                   </FormField>
                 </section>
-              </div>
+              </div>}
             </aside>
           </div>
         </div>
+        {quickSlideOpen && selectedSlide.canvas && <Modal open onOpenChange={setQuickSlideOpen} title="Элементы слайда" size="full" panelClassName="!max-w-[min(1600px,calc(100vw-32px))]"><ImportedSlideEditor key={selectedSlide.id} slide={selectedSlide} onChange={updateSlide} /></Modal>}
         <Modal
-          open={quickSlideOpen}
+          open={quickSlideOpen && !selectedSlide.canvas}
           onOpenChange={setQuickSlideOpen}
           title="Быстро изменить слайд"
           description="Текст, изображение и фон меняются здесь и сразу видны на холсте."
@@ -2793,10 +2808,13 @@ export function PresentationStudio() {
 
   return (
     <div className="presentation-studio-home grid h-full min-h-0 auto-rows-max content-start gap-7 overflow-y-auto overscroll-contain pr-1">
+      {workshopDialogs}
       <PageHeader
         title={libraryView === "templates" ? "Шаблоны презентаций" : "Презентации"}
         action={
           <>
+            <Button variant="outline" onClick={() => setImportOpen(true)}>Импорт</Button>
+            <Button variant="outline" onClick={() => setDirectorOpen(true)}>Арт-директор</Button>
             <Button
               variant="outline"
               leadingIcon={<Mail className="size-6" />}

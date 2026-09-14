@@ -1,0 +1,29 @@
+.workshop { display: grid; gap: 18px; min-width: 0; }
+.layout { display: grid; grid-template-columns: 180px minmax(0, 1fr) 300px; min-height: 460px; gap: 16px; align-items: start; }
+.rail { display: grid; gap: 10px; max-height: 65vh; overflow: auto; padding: 4px; }
+.rail button { text-align: left; border: 1px solid var(--border); border-radius: 12px; padding: 8px; background: var(--surface); transition: border-color .18s, transform .18s, box-shadow .18s; }
+.rail button:hover { transform: translateY(-2px); box-shadow: 0 6px 18px #30204c14; }
+.rail button[aria-pressed=true] { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-subtle); }
+.rail button:focus-visible, .element:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+.rail span { display: block; margin-top: 6px; font-size: 12px; color: var(--text-muted); }
+.canvas { display: grid; align-content: center; justify-items: center; min-width: 0; min-height: 340px; padding: 20px; border: 1px solid var(--border); border-radius: 18px; background: radial-gradient(circle,#7c35f218 1px, transparent 1px) 0 0 / 16px 16px, var(--surface-subtle); overflow: auto; }
+.canvas > div { width: 100%; box-shadow: 0 18px 50px #21182720; }
+.inspector { display: grid; align-content: start; gap: 14px; min-width: 0; max-height: 65vh; overflow: auto; padding: 3px; }
+.inspector p { margin: 0; font-size: 13px; line-height: 1.6; }
+.inspector ul { padding-left: 18px; font-size: 13px; line-height: 1.6; }
+.fields { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.dropzone { display: grid; place-items: center; text-align: center; gap: 14px; min-height: 240px; padding: 32px; border: 2px dashed color-mix(in srgb,var(--primary) 40%,var(--border)); border-radius: 22px; background: linear-gradient(135deg,var(--primary-subtle),var(--surface)); transition: border-color .2s, box-shadow .2s; }
+.dropzone:focus-within, .dropzone:hover { border-color: var(--primary); box-shadow: inset 0 0 0 5px var(--surface); }
+.dropzone input { width: 100%; max-width: 420px; }
+.dropzone input::file-selector-button { padding: 10px 18px; margin-right: 12px; background: var(--primary); color: #fff; border: 0; border-radius: 10px; cursor: pointer; }
+.importedSlide { position: relative; width: 100%; container-type: inline-size; max-width: min(100%, calc(60vh * var(--slide-ratio, 1.77778))); margin-inline: auto; overflow: hidden; isolation: isolate; }
+.element { position: absolute; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.18; padding: 0; margin: 0; }
+.element[role=button] { cursor: pointer; }
+.element[data-selected=true] { outline: 2px solid #7c35f2; outline-offset: 3px; }
+.imageCrop { position: relative; width: 100%; height: 100%; overflow: hidden; }
+.imageCrop img { display: block; }
+.elementEditor { display: grid; grid-template-columns: minmax(0,1fr) 280px; gap: 18px; }
+@media (max-width: 1050px) { .layout { grid-template-columns: 130px minmax(0,1fr); } .layout > .inspector { grid-column: 1/-1; max-height: none; } }
+@media (max-width: 720px) { .layout, .elementEditor { grid-template-columns: minmax(0,1fr); } .rail { display: flex; max-height: 160px; overflow-x: auto; } .rail button { width: 140px; flex-shrink: 0; } .canvas { min-height: 200px; padding: 10px; } .inspector { max-height: none; } }
+@media (prefers-reduced-motion: reduce) { .rail button, .dropzone { transition: none; transform: none; } }

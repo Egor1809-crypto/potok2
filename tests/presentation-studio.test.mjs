@@ -129,8 +129,8 @@ test("presentation library offers varied scenarios and practical filters", async
   assert.match(view, /filteredPresentationTemplates/);
   assert.match(view, /auto-rows-max content-start/);
   assert.match(view, /min-h-\[50px\] w-full shrink-0 overflow-x-auto/);
-  assert.match(view, /group flex min-h-10 shrink-0 items-center/);
-  assert.match(view, /Найти шаблон/);
+  assert.match(view, /libraryStyles.collections/);
+  assert.match(view, /Поиск шаблонов презентаций/);
   assert.match(view, /Все задачи/);
   assert.match(view, /Действие после презентации/);
   assert.match(view, /Факты и исходные данные/);
@@ -380,6 +380,6 @@ test("presentation library persists project and template favorites", async () =>
   assert.match(store, /setPresentationFavorite/);
   assert.match(route, /setPresentationFavorite/);
   assert.match(studio, /Избранные презентации/);
-  assert.match(studio, /Избранные шаблоны/);
+  assert.match(studio, /Избранное/);
   assert.match(studio, /\/api\/presentations\/favorites/);
 });

@@ -1,3 +1,4 @@
+import { parsePresentationCanvas } from "@/lib/presentation-import/model";
 import { and, desc, eq } from "drizzle-orm";
 
 import { getDb } from "@/db";
@@ -89,6 +90,7 @@ const SOURCES = new Set<PresentationSourceType>([
   "template",
   "ai",
   "email",
+  "import",
 ]);
 const HEX = /^#[0-9a-f]{6}$/i;
 
@@ -149,7 +151,7 @@ function parseBullets(value: unknown, index: number): string[] {
     .filter(Boolean);
 }
 
-function parseSlide(value: unknown, index: number): PresentationSlide {
+export function parseSlide(value: unknown, index: number): PresentationSlide {
   const object = asObject(value);
   const rawLayout =
     optionalText(object.layout, `Макет слайда ${index + 1}`, 30) ?? "statement";
@@ -218,6 +220,10 @@ function parseSlide(value: unknown, index: number): PresentationSlide {
       ? { imageUrl: safeImageUrl(object.imageUrl, assetId) }
       : {}),
     ...(object.fullBleedImage === true ? { fullBleedImage: true } : {}),
+    ...(object.canvas !== undefined ? { canvas: (() => {
+      try { return parsePresentationCanvas(object.canvas); }
+      catch { throw new ApiRequestError("Не удалось проверить элементы слайда. Повторите импорт."); }
+    })() } : {}),
     ...(optionalText(
       object.imagePrompt,
       `Описание изображения слайда ${index + 1}`,

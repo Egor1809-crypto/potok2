@@ -8,12 +8,13 @@ async function png(canvas: HTMLCanvasElement) {
 }
 export async function pdfPages(file: File, progress: (message: string) => void): Promise<PageImage[]> {
   const pdfjs = await import("pdfjs-dist");
-  const { default: workerUrl } = await import("pdfjs-dist/build/pdf.worker.min.mjs?url");
-  pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+  // Serve the matching worker as a static module. Dev transforms inject window-only
+  // HMR code into this upstream file when it is loaded through a normal module URL.
+  pdfjs.GlobalWorkerOptions.workerSrc = "/pdfjs/pdf.worker.min.mjs";
   const task = pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()), cMapUrl: "/pdfjs/cmaps/", cMapPacked: true, standardFontDataUrl: "/pdfjs/standard_fonts/", wasmUrl: "/pdfjs/wasm/" });
   try {
     const pdf = await task.promise;
-    if (pdf.numPages > MAX_PAGES) throw new Error("В письме может быть до 20 страниц. Разделите PDF на несколько файлов.");
+    if (pdf.numPages > MAX_PAGES) throw new Error("Можно импортировать до 20 страниц PDF. Разделите документ на несколько файлов.");
     const pages: PageImage[] = [];
     for (let i = 1; i <= pdf.numPages; i++) {
       progress(`Читаем PDF: страница ${i} из ${pdf.numPages}`);

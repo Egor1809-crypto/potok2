@@ -1,3 +1,4 @@
+import { getEmailAsset } from "./email-asset-store";
 import { fittedPresentationFont, presentationChartData, presentationFontFamily, presentationReadableColors, presentationStepText } from "@/lib/presentation-design-quality";
 import { estimatedTextLines } from "@/lib/design-readability";
 import type {
@@ -1213,10 +1214,34 @@ function slideShapes(
   return shapes.join("");
 }
 
+function importedShapes(slide: PresentationSlide, images: Array<ImageEntry | undefined>) {
+  const c = slide.canvas!;
+  const scale = Math.min(SLIDE_WIDTH / c.width, SLIDE_HEIGHT / c.height), ox = (SLIDE_WIDTH - c.width * scale) / 2, oy = (SLIDE_HEIGHT - c.height * scale) / 2;
+  return c.elements.map((e, i) => {
+    let x = ox + e.x * scale, y = oy + e.y * scale, w = e.width * scale, h = e.height * scale;
+    const image = images[i];
+    if (e.kind === "image" && !image) throw new Error("Не удалось загрузить изображение для PowerPoint. Повторите скачивание.");
+    if (image && !e.crop && e.fit !== "cover" && image.width && image.height) { const s = Math.min(w / image.width, h / image.height), nw = s * image.width, nh = s * image.height; x += (w - nw) / 2; y += (h - nh) / 2; w = nw; h = nh; }
+    const transform = `<a:xfrm rot="${Math.round((e.rotation || 0) * 60000)}"><a:off x="${Math.round(x)}" y="${Math.round(y)}"/><a:ext cx="${Math.round(w)}" cy="${Math.round(h)}"/></a:xfrm>`;
+    const link = e.href ? `<a:hlinkClick r:id="rId${500 + i}"/>` : "";
+    const common = `<p:cNvPr id="${i + 2}" name="${xml(e.text?.slice(0, 60) || e.kind)}">${link}</p:cNvPr>`;
+    const geometry = `<a:prstGeom prst="${e.shape || "rect"}"><a:avLst/></a:prstGeom>`;
+    if (image) {
+      const crop = e.crop ? `<a:srcRect l="${Math.round(e.crop.left * 100000)}" t="${Math.round(e.crop.top * 100000)}" r="${Math.round(e.crop.right * 100000)}" b="${Math.round(e.crop.bottom * 100000)}"/>` : e.fit === "cover" ? cropForCover(image, w, h) : "";
+      return `<p:pic><p:nvPicPr>${common}<p:cNvPicPr/><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="rId${100 + i}"/>${crop}<a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr>${transform}${geometry}<a:ln><a:noFill/></a:ln></p:spPr></p:pic>`;
+    }
+    const fill = e.fill && e.fill !== "transparent" ? `<a:solidFill><a:srgbClr val="${hex(e.fill)}"/></a:solidFill>` : "<a:noFill/>";
+    const size = Math.round((e.fontSize || 24) * scale / 12700 * 100);
+    const paragraphs = (e.text || "").split("\n").map(t => `<a:p><a:pPr algn="${e.align === "center" ? "ctr" : e.align === "right" ? "r" : "l"}"/><a:r><a:rPr lang="ru-RU" sz="${size}" b="${e.bold ? 1 : 0}" i="${e.italic ? 1 : 0}"><a:solidFill><a:srgbClr val="${hex(e.color || "#111111")}"/></a:solidFill><a:latin typeface="${xml(e.fontFamily || "Arial")}"/></a:rPr><a:t xml:space="preserve">${xml(t)}</a:t></a:r><a:endParaRPr sz="${size}"/></a:p>`).join("");
+    return `<p:sp><p:nvSpPr>${common}<p:cNvSpPr txBox="${e.kind === "text" ? 1 : 0}"/><p:nvPr/></p:nvSpPr><p:spPr>${transform}${geometry}${fill}<a:ln><a:noFill/></a:ln></p:spPr>${e.kind === "text" ? `<p:txBody><a:bodyPr wrap="square" lIns="0" tIns="0" rIns="0" bIns="0" anchor="t"><a:noAutofit/></a:bodyPr><a:lstStyle/>${paragraphs}</p:txBody>` : ""}</p:sp>`;
+  }).join("");
+}
+
 function slideXml(
   project: PresentationProjectRecord,
   slide: PresentationSlide,
   image?: ImageEntry,
+  elementImages: Array<ImageEntry | undefined> = [],
 ) {
   const slideTheme = slide.themeId
     ? presentationTheme(slide.themeId)
@@ -1232,7 +1257,7 @@ function slideXml(
       project.backgroundColor,
     textColor: slide.textColor ?? slideTheme?.textColor ?? project.textColor,
   };
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:bg><p:bgPr><a:solidFill><a:srgbClr val="${hex(effectiveProject.backgroundColor)}"/></a:solidFill><a:effectLst/></p:bgPr></p:bg><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>${slideShapes(effectiveProject, slide, image)}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:bg><p:bgPr><a:solidFill><a:srgbClr val="${hex(effectiveProject.backgroundColor)}"/></a:solidFill><a:effectLst/></p:bgPr></p:bg><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>${slide.canvas ? importedShapes(slide, elementImages) : slideShapes(effectiveProject, slide, image)}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
 }
 
 async function loadImage(
@@ -1257,7 +1282,7 @@ async function loadImage(
         url.pathname !== `/api/assets/${encodeURIComponent(slide.assetId ?? "")}`)
     )
       return undefined;
-    const response = await fetch(url, {
+    const response = slide.assetId ? await getEmailAsset(request, slide.assetId) : await fetch(url, {
       headers: { Accept: "image/png,image/jpeg,image/gif" },
       redirect: "error",
       signal: AbortSignal.timeout(15_000),
@@ -1427,6 +1452,7 @@ function contentTypes(slides: number, images: ImageEntry[]) {
 function packageEntries(
   project: PresentationProjectRecord,
   images: Array<ImageEntry | undefined>,
+  elementImages: Array<Array<ImageEntry | undefined>> = [],
 ) {
   const files: Array<{ name: string; bytes: Uint8Array }> = [];
   const slideIds = project.slides
@@ -1445,7 +1471,7 @@ function packageEntries(
     "[Content_Types].xml",
     contentTypes(
       project.slides.length,
-      images.filter((item): item is ImageEntry => Boolean(item)),
+      [...images, ...elementImages.flat()].filter((item): item is ImageEntry => Boolean(item)),
     ),
   );
   xmlFile(
@@ -1505,12 +1531,19 @@ function packageEntries(
     const image = images[index];
     xmlFile(
       `ppt/slides/slide${index + 1}.xml`,
-      slideXml(project, slide, image),
+      slideXml(project, slide, image, elementImages[index]),
     );
     const imageRelationship = image
       ? `<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image${imageIndex + 1}.${image.extension}"/>`
       : "";
+    const importedRelationships = (elementImages[index] ?? []).map((asset, i) => {
+      if (!asset) return "";
+      const name = `imported-${index + 1}-${i + 1}.${asset.extension}`;
+      files.push({ name: `ppt/media/${name}`, bytes: asset.bytes });
+      return `<Relationship Id="rId${100 + i}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/${name}"/>`;
+    }).join("");
     const hyperlinkRelationships = [
+      ...(slide.canvas?.elements.flatMap((e, i) => e.href ? [{ id: 500 + i, url: e.href }] : []) ?? []),
       ...(slide.ctaUrl ? [{ id: 50, url: slide.ctaUrl }] : []),
       ...(slide.socialLinks ?? [])
         .slice(0, 5)
@@ -1523,7 +1556,7 @@ function packageEntries(
       .join("");
     xmlFile(
       `ppt/slides/_rels/slide${index + 1}.xml.rels`,
-      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>${imageRelationship}${hyperlinkRelationships}</Relationships>`,
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>${imageRelationship}${importedRelationships}${hyperlinkRelationships}</Relationships>`,
     );
     if (image) {
       imageIndex += 1;
@@ -1543,7 +1576,20 @@ export async function buildPresentationPptx(
   const images = await Promise.all(
     project.slides.map((slide) => loadImage(request, slide)),
   );
-  return zipStore(packageEntries(project, images));
+  const elementImages: Array<Array<ImageEntry | undefined>> = [];
+  const imageCache = new Map<string, ImageEntry>();
+  for (const slide of project.slides) {
+    const loaded: Array<ImageEntry | undefined> = [];
+    for (const element of slide.canvas?.elements ?? []) {
+      const assetId = element.imageUrl?.match(/^\/api\/assets\/([\w-]+)$/)?.[1];
+      const image = element.kind === "image" && assetId ? imageCache.get(assetId) ?? await loadImage(request, { ...slide, imageUrl: element.imageUrl, assetId }) : undefined;
+      if (assetId && image) imageCache.set(assetId, image);
+      if (element.kind === "image" && !image) throw new Error("Не удалось экспортировать изображение. Используйте PNG или JPEG и повторите скачивание.");
+      loaded.push(image);
+    }
+    elementImages.push(loaded);
+  }
+  return zipStore(packageEntries(project, images, elementImages));
 }
 
 export function safePresentationFilename(name: string) {

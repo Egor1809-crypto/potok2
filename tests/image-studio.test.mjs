@@ -28,7 +28,7 @@ test("image studio connects its gallery to download and the email builder", asyn
     readFile(new URL("../components/image-studio/ImageStudioView.tsx", import.meta.url), "utf8"),
     readFile(new URL("../components/email-builder/EmailBuilderView.tsx", import.meta.url), "utf8"),
   ]);
-  for (const control of ["Арт-направление", "Формат", "Качество", "Создать и сохранить"]) {
+  for (const control of ["Формат", "Качество", "Создать и сохранить"]) {
     assert.match(view, new RegExp(control));
   }
   assert.match(view, /download=1/);
@@ -36,9 +36,8 @@ test("image studio connects its gallery to download and the email builder", asyn
   assert.match(builder, /createDocumentWithStudioAsset/);
   assert.match(builder, /window\.location\.origin/);
   assert.match(builder, /\/api\/assets\/\$\{encodeURIComponent\(assetId\)\}/);
-  for (const label of ["Кино", "Архитектура", "Ботаника", "Технический", "Тихий люкс", "Бумажная пластика"]) {
-    assert.match(view, new RegExp(label));
-  }
+  assert.doesNotMatch(view, /Арт-направление/);
+  assert.doesNotMatch(view, /id="image-template-library"/);
 });
 
 test("image generation authenticates before provider spend and persists abuse controls", async () => {
@@ -82,7 +81,8 @@ test("image studio controls and gallery selection expose accessible state", asyn
   assert.match(view, /id="image-studio-aspect"/);
   assert.match(view, /htmlFor="image-studio-quality"/);
   assert.match(view, /id="image-studio-quality"/);
-  assert.match(view, /aria-pressed=\{selectedAsset\?\.id === asset\.id\}/);
-  assert.match(view, /aria-label=\{`Выбрать \$\{asset\.filename\}`\}/);
-  assert.match(view, /<Card role="status"/);
+  const gallery = await readFile(new URL("../components/image-studio/PhotoLibrary.tsx", import.meta.url), "utf8");
+  assert.match(gallery, /aria-pressed=\{selected\?\.id === asset\.id\}/);
+  assert.match(gallery, /aria-label=\{`Выбрать \$\{asset\.filename\}`\}/);
+  assert.match(gallery, /role="status"/);
 });
