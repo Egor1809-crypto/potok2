@@ -1,6 +1,7 @@
 import { ApiRequestError, asObject, cleanText, optionalBoolean } from "./api-utils";
 import { getD1 } from "@/db";
 import { WORKSPACE_ID } from "./database-init";
+import { findDiscoveredPhones, isIdentifierPhoneContext, normalizeDiscoveredPhone } from "@/lib/contact-finder/phones";
 import type {
   ContactFinderCandidate,
   ContactFinderPageReport,
@@ -234,9 +235,14 @@ function decodeEntities(value: string): string {
     nbsp: " ",
   };
   return value
-    .replace(/&#(\d+);/g, (_match, code: string) => String.fromCodePoint(Number(code)))
-    .replace(/&#x([\da-f]+);/gi, (_match, code: string) => String.fromCodePoint(Number.parseInt(code, 16)))
+    .replace(/&#(\d+);/g, (_match, code: string) => safeCodePoint(Number(code)))
+    .replace(/&#x([\da-f]+);/gi, (_match, code: string) => safeCodePoint(Number.parseInt(code, 16)))
     .replace(/&([a-z]+);/gi, (match, name: string) => named[name.toLowerCase()] ?? match);
+}
+
+function safeCodePoint(code: number): string {
+  return Number.isInteger(code) && code > 0 && code <= 0x10ffff && !(code >= 0xd800 && code <= 0xdfff)
+    ? String.fromCodePoint(code) : "\uFFFD";
 }
 
 function visibleText(html: string): string {
@@ -245,7 +251,7 @@ function visibleText(html: string): string {
       .replace(/<!--[^]*?-->/g, " ")
       .replace(/<(script|style|noscript|svg|template)\b[^>]*>[^]*?<\/\1>/gi, " ")
       .replace(/<br\s*\/?>/gi, "\n")
-      .replace(/<\/p\s*>|<\/div\s*>|<\/li\s*>|<\/h[1-6]\s*>/gi, "\n")
+      .replace(/<\/(?:p|div|li|h[1-6]|td|th|tr|dt|dd|address|section|footer)\s*>/gi, "\n")
       .replace(/<[^>]+>/g, " "),
   )
     .replace(/[\t\r ]+/g, " ")
@@ -347,14 +353,6 @@ function suggestedNameFromContext(context: string, fallback: string): string {
   return ignored.test(person) ? fallback : person;
 }
 
-function normalizePhone(value: string): string | null {
-  const trimmed = value.replace(/\s+/g, " ").trim();
-  const digits = trimmed.replace(/\D/g, "");
-  if (digits.length < 10 || digits.length > 15) return null;
-  if (/^(\d)\1+$/.test(digits)) return null;
-  return trimmed.startsWith("+") ? `+${digits}` : digits.length === 11 && digits.startsWith("8") ? `+7${digits.slice(1)}` : `+${digits}`;
-}
-
 function extractFromText(
   input: string,
   sourceUrl: string | null,
@@ -409,11 +407,12 @@ function extractFromText(
     confidence: "high" | "medium",
     contextOverride?: string,
   ) => {
-    const phone = normalizePhone(raw.replace(/^tel:/i, "").split(/[?&#]/)[0]);
+    const phone = normalizeDiscoveredPhone(raw);
     if (!phone || phoneSeen.has(phone)) return;
-    phoneSeen.add(phone);
     const context =
       contextOverride || nearbyContext(text, Math.min(index, text.length), raw.length);
+    if (isIdentifierPhoneContext(context, phone)) return;
+    phoneSeen.add(phone);
     results.push({
       type: "phone",
       value: phone,
@@ -426,52 +425,62 @@ function extractFromText(
   };
 
   if (html) {
-    for (const match of decoded.matchAll(/href\s*=\s*["']mailto:([^"']+)["']/gi)) {
+    const markup = decoded.replace(/<!--[^]*?-->/g, " ")
+      .replace(/<(script|style|noscript|svg|template)\b[^>]*>[^]*?<\/\1>/gi, " ");
+    for (const match of markup.matchAll(/href\s*=\s*["']mailto:([^"']+)["']/gi)) {
       const index = match.index ?? 0;
       addEmail(
         match[1],
         index,
         "high",
-        htmlLinkContext(decoded, index, match[0].length),
+        htmlLinkContext(markup, index, match[0].length),
       );
     }
-    for (const match of decoded.matchAll(/href\s*=\s*["']tel:([^"']+)["']/gi)) {
+    for (const match of markup.matchAll(/href\s*=\s*["']tel:([^"']+)["']/gi)) {
       const index = match.index ?? 0;
       addPhone(
         match[1],
         index,
         "high",
-        htmlLinkContext(decoded, index, match[0].length),
+        htmlLinkContext(markup, index, match[0].length),
       );
     }
-    for (const match of decoded.matchAll(
+    for (const match of markup.matchAll(
       /data-(?:email|mail|contact-email)\s*=\s*["']([^"']+)["']/gi,
     )) {
       const index = match.index ?? 0;
-      addEmail(match[1], index, "high", htmlLinkContext(decoded, index, match[0].length));
+      addEmail(match[1], index, "high", htmlLinkContext(markup, index, match[0].length));
     }
-    for (const match of decoded.matchAll(
+    for (const match of markup.matchAll(
       /data-(?:phone|tel|telephone|contact-phone)\s*=\s*["']([^"']+)["']/gi,
     )) {
       const index = match.index ?? 0;
-      addPhone(match[1], index, "high", htmlLinkContext(decoded, index, match[0].length));
+      addPhone(match[1], index, "high", htmlLinkContext(markup, index, match[0].length));
     }
-    for (const match of decoded.matchAll(
-      /["'](?:email|contactEmail)["']\s*:\s*["']([^"']+)["']/gi,
-    )) {
-      addEmail(match[1], match.index ?? 0, "high");
-    }
-    for (const match of decoded.matchAll(
-      /["'](?:telephone|phone|contactPhone)["']\s*:\s*["']([^"']+)["']/gi,
-    )) {
-      addPhone(match[1], match.index ?? 0, "high");
+    // Only actual JSON contact fields, not quoted strings in arbitrary JS or CSS.
+    for (const script of input.matchAll(/<script\b[^>]*type\s*=\s*["']application\/(?:ld\+)?json["'][^>]*>([^]*?)<\/script>/gi)) {
+      let visited = 0;
+      const visit = (node: unknown, depth = 0) => {
+        if (++visited > 500 || depth > 8 || !node || typeof node !== "object") return;
+        for (const [key, value] of Object.entries(node)) {
+          if (/^(email|contactEmail|telephone|phone|contactPhone)$/i.test(key)) {
+            for (const raw of Array.isArray(value) ? value.slice(0, 30) : [value]) {
+              if (typeof raw !== "string") continue;
+              const context = `${key}: ${raw}`.slice(0, 240);
+              if (/email/i.test(key)) addEmail(raw, 0, "high", context);
+              else addPhone(raw, 0, "high", context);
+            }
+          } else if (value && typeof value === "object") visit(value, depth + 1);
+        }
+      };
+      try { visit(JSON.parse(script[1])); } catch { /* Malformed metadata is not contact evidence. */ }
     }
   }
   for (const match of text.matchAll(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,24}/gi)) {
     addEmail(match[0], match.index ?? 0, "medium");
   }
-  for (const match of text.matchAll(/(?:\+?\d[\d\s().-]{7,}\d)/g)) {
-    addPhone(match[0], match.index ?? 0, "medium");
+  for (const match of findDiscoveredPhones(text)) {
+    addPhone(match.raw, match.start, "medium");
   }
   const emails = results.filter((candidate) => candidate.type === "email");
   const phones = results.filter((candidate) => candidate.type === "phone");
