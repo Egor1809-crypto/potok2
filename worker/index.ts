@@ -60,7 +60,25 @@ const worker = {
       }, allowedWidths);
     }
 
-    const response = await handler.fetch(request, env, ctx);
+    // Public auth and webhooks establish their own identity. Business APIs run
+    // inside the workspace obtained from the signed-in participant, never a URL.
+    let response: Response;
+    const publicApi = /^\/api\/(?:auth\/|assets\/[^/]+$|telegram\/webhook\/|communications\/inbound$)/.test(url.pathname);
+    if (url.pathname.startsWith("/api/") && !publicApi) {
+      try {
+        const { ensureSystemDatabase, requireWorkspaceParticipant } = await import("../lib/server/database-init");
+        const { withWorkspace } = await import("../lib/server/workspace-context");
+        await ensureSystemDatabase();
+        const session = await requireWorkspaceParticipant(request);
+        response = await withWorkspace(session.participant.workspaceId,
+          () => handler.fetch(request, env, ctx), session, request);
+      } catch (error) {
+        const { jsonError } = await import("../lib/server/api-utils");
+        response = jsonError(error);
+      }
+    } else {
+      response = await handler.fetch(request, env, ctx);
+    }
 
     // Sites deployments can briefly miss a newly-published cron trigger. The
     // calendar polls this authenticated endpoint every 30 seconds, so use that

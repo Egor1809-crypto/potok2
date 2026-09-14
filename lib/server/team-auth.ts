@@ -1,3 +1,5 @@
+import { privateWorkspaceStatements } from "./workspace-provisioning";
+import { cachedWorkspaceSession, getWorkspaceId } from "./workspace-context";
 import { and, eq, gt, isNotNull, isNull, sql } from "drizzle-orm";
 
 import { getD1, getDb } from "@/db";
@@ -117,7 +119,7 @@ function cookieValue(request: Request, name: string): string | null {
   const cookies = request.headers.get("cookie") ?? "";
   for (const part of cookies.split(";")) {
     const [key, ...rest] = part.trim().split("=");
-    if (key === name) return decodeURIComponent(rest.join("="));
+    if (key === name) { try { return decodeURIComponent(rest.join("=")); } catch { return null; } }
   }
   return null;
 }
@@ -154,7 +156,7 @@ export function toTeamParticipant(row: ParticipantRow): ParticipantRecord {
   };
 }
 
-async function applyRateLimit(request: Request, login: string) {
+export async function applyRateLimit(request: Request, login: string) {
   const rawIp = request.headers.get("cf-connecting-ip") ?? request.headers.get("x-forwarded-for") ?? "local";
   const actor = await sha256(`${rawIp.split(",")[0].trim()}:${login}`);
   const key = `auth:${actor}`;
@@ -180,7 +182,7 @@ async function applyRateLimit(request: Request, login: string) {
   return nextWindow;
 }
 
-async function createSession(participantId: string, request: Request) {
+export async function createSession(participantId: string, request: Request) {
   const token = randomToken();
   const tokenHash = await sha256(token);
   const now = new Date();
@@ -198,6 +200,8 @@ async function createSession(participantId: string, request: Request) {
 }
 
 export async function getTeamSession(request: Request): Promise<TeamSession | null> {
+  const cached = cachedWorkspaceSession(request);
+  if (cached) return cached;
   const token = cookieValue(request, SESSION_COOKIE);
   if (!token) return null;
   const tokenHash = await sha256(token);
@@ -223,11 +227,7 @@ export async function requireTeamSession(request: Request): Promise<TeamSession>
 }
 
 export async function getRegistrationStatus() {
-  const [row] = await getDb()
-    .select({ count: sql<number>`count(*)` })
-    .from(participants)
-    .where(isNotNull(participants.passwordHash));
-  return { teamName: TEAM_NAME, firstAccountAvailable: Number(row?.count ?? 0) === 0 };
+  return { teamName: TEAM_NAME, firstAccountAvailable: false, publicRegistration: true };
 }
 
 export async function registerTeamMember(request: Request, payload: unknown) {
@@ -244,7 +244,7 @@ export async function registerTeamMember(request: Request, payload: unknown) {
   const [existingLogin] = await db
     .select({ id: participants.id })
     .from(participants)
-    .where(and(eq(participants.workspaceId, TEAM_WORKSPACE_ID), eq(participants.login, login)))
+    .where(eq(participants.login, login))
     .limit(1);
   if (existingLogin) throw new ApiRequestError("Этот логин уже занят.", 409);
 
@@ -252,18 +252,28 @@ export async function registerTeamMember(request: Request, payload: unknown) {
     .select({ count: sql<number>`count(*)` })
     .from(participants)
     .where(isNotNull(participants.passwordHash));
-  const isFirst = Number(accountCount) === 0;
+  // Public signup always creates a private tenant, including an empty database.
+  const isFirst = false;
+  if (!isFirst && !String(object.inviteCode ?? "").trim()) {
+    const participantId = newId("participant"), salt = randomToken(18);
+    const workspace = await privateWorkspaceStatements({participantId, displayName, login, email: `${login}@account.potok.local`, passwordHash: await passwordDigest(password, salt), passwordSalt: salt});
+    await getD1().batch(workspace.statements);
+    const [participant] = await db.select().from(participants).where(eq(participants.id, participantId)).limit(1);
+    const session = await createSession(participantId, request);
+    return { participant: toTeamParticipant(participant), cookie: session.cookie, firstAccount: false };
+  }
   const now = new Date().toISOString();
   let invite: typeof teamInvites.$inferSelect | undefined;
   if (!isFirst) {
     const code = cleanText(object.inviteCode, "Код приглашения", 120);
-    [invite] = await db.select().from(teamInvites).where(and(eq(teamInvites.workspaceId, TEAM_WORKSPACE_ID), eq(teamInvites.codeHash, await sha256(code.toLocaleUpperCase("ru-RU"))), gt(teamInvites.expiresAt, now), isNull(teamInvites.revokedAt))).limit(1);
+    [invite] = await db.select().from(teamInvites).where(and(eq(teamInvites.codeHash, await sha256(code.toLocaleUpperCase("ru-RU"))), gt(teamInvites.expiresAt, now), isNull(teamInvites.revokedAt))).limit(1);
     if (!invite || invite.useCount >= invite.maxUses) throw new ApiRequestError("Приглашение истекло, отменено или уже использовано. Попросите администратора создать новое.", 403);
   }
+  const workspaceId = invite?.workspaceId ?? TEAM_WORKSPACE_ID;
   const salt = randomToken(18);
   const passwordHash = await passwordDigest(password, salt);
   const targetId = invite?.targetParticipantId || (isFirst ? "participant-main" : null);
-  const [target] = targetId ? await db.select().from(participants).where(and(eq(participants.id, targetId), eq(participants.workspaceId, TEAM_WORKSPACE_ID))).limit(1) : [];
+  const [target] = targetId ? await db.select().from(participants).where(and(eq(participants.id, targetId), eq(participants.workspaceId, workspaceId))).limit(1) : [];
   if (target && (target.login || target.passwordHash)) throw new ApiRequestError("Для этого участника уже создан аккаунт. Войдите по логину и паролю.", 409);
   const participantId = target?.id || newId("participant");
   const nonce = randomToken(24);
@@ -271,13 +281,13 @@ export async function registerTeamMember(request: Request, payload: unknown) {
   const scope = JSON.stringify(role === "admin" ? { ...emptyContactAccess(), all: true } : normalizeContactAccess(invite?.accessScope));
   const d1 = getD1();
   const statements: D1PreparedStatement[] = [];
-  if (invite) statements.push(d1.prepare(`UPDATE team_invites SET use_count=use_count+1,claim_nonce=?,accepted_participant_id=? WHERE id=? AND workspace_id=? AND (target_participant_id IS NULL OR EXISTS (SELECT 1 FROM participants target WHERE target.id=team_invites.target_participant_id AND target.workspace_id=team_invites.workspace_id AND target.login IS NULL AND target.password_hash IS NULL)) AND use_count<max_uses AND revoked_at IS NULL AND expires_at>? AND EXISTS (SELECT 1 FROM participants p WHERE p.id=team_invites.created_by_participant_id AND p.role='admin' AND p.status='active')`).bind(nonce, participantId, invite.id, TEAM_WORKSPACE_ID, now));
+  if (invite) statements.push(d1.prepare(`UPDATE team_invites SET use_count=use_count+1,claim_nonce=?,accepted_participant_id=? WHERE id=? AND workspace_id=? AND (target_participant_id IS NULL OR EXISTS (SELECT 1 FROM participants target WHERE target.id=team_invites.target_participant_id AND target.workspace_id=team_invites.workspace_id AND target.login IS NULL AND target.password_hash IS NULL)) AND use_count<max_uses AND revoked_at IS NULL AND expires_at>? AND EXISTS (SELECT 1 FROM participants p WHERE p.id=team_invites.created_by_participant_id AND p.role='admin' AND p.status='active')`).bind(nonce, participantId, invite.id, workspaceId, now));
   const guard = invite ? "EXISTS (SELECT 1 FROM team_invites WHERE id=? AND claim_nonce=?)" : "NOT EXISTS (SELECT 1 FROM participants WHERE password_hash IS NOT NULL)";
   const guardArgs = invite ? [invite.id, nonce] : [];
   if (target) {
     statements.push(d1.prepare(`UPDATE participants SET login=?,password_hash=?,password_salt=?,display_name=?,email=?,status='active',role=?,access_scope=?,last_login_at=?,updated_at=? WHERE id=? AND login IS NULL AND password_hash IS NULL AND ${guard}`).bind(login,passwordHash,salt,target.displayName || displayName,`${login}@team.potok.local`,role,scope,now,now,participantId,...guardArgs));
   } else {
-    statements.push(d1.prepare(`INSERT INTO participants (id,workspace_id,login,password_hash,password_salt,display_name,email,color,status,role,access_scope,last_login_at,created_at,updated_at) SELECT ?,?,?,?,?,?,?,?,'active',?,?,?,?,? WHERE ${guard}`).bind(participantId,TEAM_WORKSPACE_ID,login,passwordHash,salt,displayName,`${login}@team.potok.local`,TEAM_COLORS[Number(accountCount)%TEAM_COLORS.length],role,scope,now,now,now,...guardArgs));
+    statements.push(d1.prepare(`INSERT INTO participants (id,workspace_id,login,password_hash,password_salt,display_name,email,color,status,role,access_scope,last_login_at,created_at,updated_at) SELECT ?,?,?,?,?,?,?,?,'active',?,?,?,?,? WHERE ${guard}`).bind(participantId,workspaceId,login,passwordHash,salt,displayName,`${login}@team.potok.local`,TEAM_COLORS[Number(accountCount)%TEAM_COLORS.length],role,scope,now,now,now,...guardArgs));
   }
   const results = await d1.batch(statements);
   if (Number(results[results.length-1]?.meta.changes || 0) !== 1) throw new ApiRequestError("Приглашение уже использовано или отменено. Попросите администратора проверить доступ.", 409);
@@ -294,7 +304,7 @@ export async function loginTeamMember(request: Request, payload: unknown) {
   const [participant] = await getDb()
     .select()
     .from(participants)
-    .where(and(eq(participants.workspaceId, TEAM_WORKSPACE_ID), eq(participants.login, login)))
+    .where(eq(participants.login, login))
     .limit(1);
   if (!participant?.passwordHash || !participant.passwordSalt) {
     throw new ApiRequestError("Неверный логин или пароль.", 401);
@@ -354,7 +364,7 @@ export async function listTeamMembers() {
   const rows = await getDb()
     .select()
     .from(participants)
-    .where(eq(participants.workspaceId, TEAM_WORKSPACE_ID))
+    .where(eq(participants.workspaceId, getWorkspaceId()))
     .orderBy(participants.createdAt);
   return rows.map(toTeamParticipant);
 }

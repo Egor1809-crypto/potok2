@@ -9,13 +9,14 @@ import * as sqliteCore from "drizzle-orm/sqlite-core";
 // Exercise the production orchestration without touching contacts, storage or mail.
 export async function loadAiServer(entry, { env = {}, fetch = globalThis.fetch, expose = [], assetStore, overrides = {} } = {}) {
   const root = path.resolve(import.meta.dirname, "../..");
-  const context = vm.createContext({ console, process: { env: { NODE_ENV: "test" } }, fetch, crypto, URL, Request, Response, Headers, AbortSignal, TextEncoder, TextDecoder, Uint8Array, ArrayBuffer, atob, btoa, setTimeout, clearTimeout });
+  const context = vm.createContext({ console, process: { env: { NODE_ENV: "test" } }, fetch, crypto, URL, URLSearchParams, Request, Response, Headers, AbortSignal, TextEncoder, TextDecoder, Uint8Array, ArrayBuffer, atob, btoa, setTimeout, clearTimeout });
   const synthetic = (values) => new vm.SyntheticModule(Object.keys(values), function () {
     for (const [key, value] of Object.entries(values)) this.setExport(key, value);
   }, { context });
   const db = { prepare(sql) { return { bind() { return this; }, async run() { return { meta: { changes: 1 } }; }, async first() { return sql.includes("RETURNING request_count") ? { request_count: 1 } : null; } }; } };
   const mocks = {
     "cloudflare:workers": synthetic({ env }),
+    "./workspace-context": synthetic({getWorkspaceId: () => overrides["./database-init"]?.WORKSPACE_ID ?? "design-evaluation", cachedWorkspaceSession: () => undefined, isLegacyWorkspace: () => true, LEGACY_WORKSPACE_ID:"workspace-main", withWorkspace: (_id, operation) => operation()}),
     "fflate": synthetic(fflate),
     "drizzle-orm": synthetic(orm),
     "drizzle-orm/sqlite-core": synthetic(sqliteCore),
@@ -35,7 +36,10 @@ export async function loadAiServer(entry, { env = {}, fetch = globalThis.fetch, 
       return jsonModule;
     }
     const code = ts.transpileModule(source + (file === entry && expose.length ? `\nexport { ${expose.join(", ")} };` : ""), { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
-    const loadedModule = new vm.SourceTextModule(code, { context, identifier: file });
+    const loadedModule = new vm.SourceTextModule(code, { context, identifier: file, importModuleDynamically: async (specifier) => {
+      if (mocks[specifier]) { if (mocks[specifier].status === "unlinked") await mocks[specifier].link(() => {}); if (mocks[specifier].status !== "evaluated") await mocks[specifier].evaluate(); return mocks[specifier]; }
+      throw new Error(`Dynamic test import needs an explicit mock: ${specifier}`);
+    } });
     modules.set(file, loadedModule);
     return loadedModule;
   }

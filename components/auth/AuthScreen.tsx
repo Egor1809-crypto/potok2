@@ -2,10 +2,14 @@
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Eye, EyeOff, LockKeyhole, UsersRound } from "@/components/ui/icons";
+import { ArrowRight, ArrowLeft, Eye, EyeOff, Mail, Presentation, Image as ImageIcon } from "@/components/ui/icons";
 import { useSearchParams } from "next/navigation";
 
 import { BrandMark } from "@/components/layout/brand-mark";
+
+import { clearAccountDrafts } from "@/lib/browser-session";
+import { authFeedback } from "@/lib/auth-feedback";
+import styles from "./AuthScreen.module.css";
 
 const TEAM_NAME = "ТехнологИИ Права";
 
@@ -16,28 +20,20 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
   const [password, setPassword] = useState("");
   const [inviteCode, setInviteCode] = useState(searchParams.get("invite") || "");
   const [showPassword, setShowPassword] = useState(false);
-  const [firstAccount, setFirstAccount] = useState<boolean | null>(null);
+  const [yandexAvailable, setYandexAvailable] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const activeRequest = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    // Login does not need the registration check. Each request owns its work.
-    if (mode !== "register") return;
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 15_000);
-    fetch("/api/auth/status", { cache: "no-store", signal: controller.signal })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("Registration status unavailable");
-        return response.json();
-      })
-      .then((payload) => setFirstAccount(Boolean((payload as { firstAccountAvailable?: boolean }).firstAccountAvailable)))
-      .catch(() => setFirstAccount(false))
-      .finally(() => window.clearTimeout(timeout));
-    return () => { window.clearTimeout(timeout); controller.abort(); };
-  }, [mode]);
+    void fetch("/api/auth/yandex/status", { cache: "no-store", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10000)]) })
+      .then(async response => { if (response.ok) { const body = await response.json() as { configured?: boolean }; setYandexAvailable(body.configured === true); } })
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
 
-  useEffect(() => () => activeRequest.current?.abort(), []);
+  useEffect(() => { clearAccountDrafts(); return () => activeRequest.current?.abort(); }, []);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -54,7 +50,7 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
         headers: { "Content-Type": "application/json" },
         signal: controller.signal,
         body: JSON.stringify(mode === "register"
-          ? { team: TEAM_NAME, displayName, login, password, inviteCode: firstAccount ? undefined : inviteCode }
+          ? { team: TEAM_NAME, displayName, login, password, inviteCode: inviteCode || undefined }
           : { login, password }),
       });
       let payload: { error?: string };
@@ -80,42 +76,40 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
   }
 
   const isRegister = mode === "register";
-  return (
-    <main className="grid min-h-screen lg:grid-cols-[1.05fr_.95fr] bg-background text-text-strong">
-      <section className="hidden border-r border-border bg-[#15121d] p-12 text-white lg:flex lg:flex-col lg:justify-between">
-        <BrandMark href="/" className="[&_span]:text-white" />
-        <div className="max-w-xl">
-          <p className="text-sm font-semibold text-[#bca8ff]">Одна команда — одна точная база</p>
-          <h1 className="mt-4 text-5xl font-semibold leading-[1.04] tracking-[-0.05em]">Контакты не теряются и не дублируются.</h1>
-          <p className="mt-6 text-lg leading-8 text-white/75">Каждый участник работает под своим логином. Цвет автора сразу показывает, кто добавил контакт, а общая проверка защищает базу от повторов.</p>
-        </div>
-        <div className="flex gap-6 text-sm text-white/65"><span>10+ участников</span><span>10 000 контактов</span><span>Доступ к назначенным базам</span></div>
-      </section>
-
-      <section className="flex min-h-screen items-center justify-center px-5 py-10 sm:px-10">
-        <div className="w-full max-w-[480px]">
-          <div className="lg:hidden"><BrandMark href="/" /></div>
-          <div className="mt-10 flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary lg:mt-0"><UsersRound aria-hidden className="size-8" /></div>
-          <p className="mt-7 text-sm font-semibold text-primary">Команда «{TEAM_NAME}»</p>
-          <h2 className="mt-2 text-4xl font-semibold tracking-[-0.045em]">{isRegister ? "Создать аккаунт" : "Войти в Поток"}</h2>
-          <p className="mt-3 text-base leading-7 text-text-muted">
-            {isRegister
-              ? firstAccount ? "Вы активируете первый аккаунт команды." : "Регистрация доступна по одноразовому приглашению коллеги."
-              : "Продолжите работу с общей базой команды."}
-          </p>
-
-          <form className="mt-8 space-y-5" onSubmit={submit} aria-busy={busy}>
-            {isRegister && <label className="block"><span className="mb-2 block text-sm font-semibold">Команда</span><input value={TEAM_NAME} readOnly className="h-12 w-full rounded-xl border border-border bg-surface-subtle px-4 text-base font-medium" /></label>}
-            {isRegister && <label className="block"><span className="mb-2 block text-sm font-semibold">Ваше имя</span><input autoComplete="name" value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Например, Егор Шабалин" required minLength={2} maxLength={100} className="h-12 w-full rounded-xl border border-border bg-surface px-4 text-base outline-none focus:border-primary focus:ring-4 focus:ring-primary/10" /><span className="mt-2 block text-sm text-text-muted">Так коллеги увидят ответственного за контакт. Администратор назначает доступ к базам и группам.</span></label>}
-            <label className="block"><span className="mb-2 block text-sm font-semibold">Логин</span><input autoComplete="username" value={login} onChange={(event) => setLogin(event.target.value)} placeholder="Например, egor" required minLength={3} className="h-12 w-full rounded-xl border border-border bg-surface px-4 text-base outline-none focus:border-primary focus:ring-4 focus:ring-primary/10" /></label>
-            <label className="block"><span className="mb-2 block text-sm font-semibold">Пароль</span><span className="relative block"><LockKeyhole aria-hidden className="absolute left-4 top-3.5 size-7 text-text-muted" /><input autoComplete={isRegister ? "new-password" : "current-password"} type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} required minLength={10} className="h-12 w-full rounded-xl border border-border bg-surface pl-12 pr-12 text-base outline-none focus:border-primary focus:ring-4 focus:ring-primary/10" /><button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Скрыть пароль" : "Показать пароль"} className="absolute right-2 top-2 grid size-8 place-items-center rounded-lg hover:bg-surface-subtle">{showPassword ? <EyeOff className="size-7" /> : <Eye className="size-7" />}</button></span>{isRegister && <span className="mt-2 block text-sm text-text-muted">Минимум 10 символов, хотя бы одна буква и цифра.</span>}</label>
-            {isRegister && firstAccount === false && <label className="block"><span className="mb-2 block text-sm font-semibold">Код приглашения</span><input value={inviteCode} onChange={(event) => setInviteCode(event.target.value)} required placeholder="POTOK-..." className="h-12 w-full rounded-xl border border-border bg-surface px-4 font-mono text-base uppercase outline-none focus:border-primary focus:ring-4 focus:ring-primary/10" /></label>}
-            {error && <div role="alert" className="rounded-xl border border-danger/25 bg-danger/5 px-4 py-3 text-sm font-medium text-danger">{error}</div>}
-            <button disabled={busy || (isRegister && firstAccount === null)} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 text-base font-semibold text-primary-foreground transition hover:-translate-y-0.5 hover:shadow-lg disabled:translate-y-0 disabled:opacity-60">{busy ? "Подождите…" : isRegister ? "Создать аккаунт" : "Войти"}<ArrowRight aria-hidden className="size-7" /></button>
-          </form>
-          <p className="mt-7 text-center text-sm text-text-muted">{isRegister ? "Уже есть аккаунт?" : "Вас пригласили в команду?"} <Link className="font-semibold text-primary hover:underline" href={isRegister ? "/login" : "/register"}>{isRegister ? "Войти" : "Зарегистрироваться"}</Link></p>
-        </div>
-      </section>
-    </main>
-  );
+  const visibleError = error || authFeedback[searchParams.get("auth_error") || ""] || "";
+  const contextParams = new URLSearchParams();
+  if (searchParams.get("next")) contextParams.set("next", searchParams.get("next")!);
+  if (searchParams.get("invite")) contextParams.set("invite", searchParams.get("invite")!);
+  const contextSuffix = contextParams.size ? `?${contextParams}` : "";
+  const yandexParams = new URLSearchParams({ intent: isRegister ? "register" : "login", next: searchParams.get("next") || "/dashboard" });
+  if (inviteCode) yandexParams.set("invite", inviteCode);
+  return <main className={styles.page}>
+    <aside className={styles.story} aria-label="Творческая студия Поток">
+      <BrandMark href="/" className={styles.storyBrand} />
+      <div className={styles.storyCopy}><span>Ваше пространство для хороших идей</span><h2>Всё начинается<br />с одной <em>идеи.</em></h2><p>Соберите письмо, расскажите историю в слайдах или найдите нужный образ. Остальное сложится в Поток.</p>
+        <div className={styles.art} aria-hidden><div /><div /><div><small>НОВЫЙ ПРОЕКТ</small><strong>Самое важное.<br />В вашей<br />подаче.</strong><i /></div></div>
+      </div>
+      <div className={styles.storyFooter}><span><Mail aria-hidden />Письма</span><span><Presentation aria-hidden />Презентации</span><span><ImageIcon aria-hidden />Изображения</span></div>
+    </aside>
+    <section className={styles.content}>
+      <Link href="/" className={styles.back}><ArrowLeft aria-hidden className="size-5" />На главную</Link>
+      <div className={styles.mobileBrand}><BrandMark href="/" /></div>
+      <div className={styles.formWrap}>
+        <nav className={styles.mode} aria-label="Вход и регистрация"><Link href={`/login${contextSuffix}`} aria-current={!isRegister ? "page" : undefined}>Вход</Link><Link href={`/register${contextSuffix}`} aria-current={isRegister ? "page" : undefined}>Регистрация</Link></nav>
+        <h1>{isRegister ? "Присоединяйтесь к Потоку" : "С возвращением"}</h1>
+        <p className={styles.intro}>{isRegister ? "Создайте своё пространство. Приглашайте команду, когда будете готовы." : "Войдите, чтобы продолжить работу над проектами."}</p>
+        {yandexAvailable && <><a href={`/api/auth/yandex/start?${yandexParams}`} className={styles.yandex}><span aria-hidden className={styles.yandexMark}>Я</span>{isRegister ? "Зарегистрироваться с Яндекс ID" : "Войти с Яндекс ID"}</a><div className={styles.divider}>или с логином и паролем</div></>}
+        <form className={styles.form} onSubmit={submit} aria-busy={busy}>
+          {isRegister && <label className={styles.field}>Ваше имя<input name="name" autoComplete="name" value={displayName} onChange={event => setDisplayName(event.target.value)} placeholder="Имя и фамилия" required minLength={2} maxLength={100} className={styles.input} /></label>}
+          <label className={styles.field}>Логин<input name="username" autoComplete="username" value={login} onChange={event => setLogin(event.target.value)} placeholder="Например, egor.shabalin" required minLength={3} maxLength={40} className={styles.input} /></label>
+          <label className={styles.field}>Пароль<span className={styles.password}><input name="password" autoComplete={isRegister ? "new-password" : "current-password"} type={showPassword ? "text" : "password"} value={password} onChange={event => setPassword(event.target.value)} required minLength={10} maxLength={128} className={styles.input} aria-describedby={isRegister ? "password-hint" : undefined} /><button type="button" onClick={() => setShowPassword(value => !value)} aria-label={showPassword ? "Скрыть пароль" : "Показать пароль"} aria-pressed={showPassword}>{showPassword ? <EyeOff aria-hidden /> : <Eye aria-hidden />}</button></span>{isRegister && <small id="password-hint">От 10 символов, хотя бы одна буква и цифра.</small>}</label>
+          {isRegister && <label className={styles.field}>Код приглашения (необязательно)<input name="invite" value={inviteCode} onChange={event => setInviteCode(event.target.value)} placeholder="POTOK-…" className={styles.input} /><small>Оставьте пустым, чтобы создать отдельное пространство.</small></label>}
+          {visibleError && <p role="alert" className={styles.error}>{visibleError}</p>}
+          <button disabled={busy} className={styles.submit}>{busy ? isRegister ? "Создаём аккаунт…" : "Входим…" : isRegister ? "Создать аккаунт" : "Войти"}<ArrowRight aria-hidden className="size-5" /></button>
+        </form>
+        <p className={styles.help}>{isRegister ? <>Уже зарегистрированы? <Link href={`/login${contextSuffix}`}>Войти в аккаунт</Link></> : <>Нет аккаунта? <Link href={`/register${contextSuffix}`}>Зарегистрироваться</Link></>}</p>
+      </div>
+      <footer className={styles.footer}><span>© {new Date().getFullYear()} Поток</span><span>Письма. Презентации. Изображения.</span></footer>
+    </section>
+  </main>;
 }

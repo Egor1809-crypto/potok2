@@ -1,3 +1,5 @@
+import { yandexSchema } from "./yandex-schema";
+import { withWorkspace, LEGACY_WORKSPACE_ID } from "./workspace-context";
 import { and, eq } from "drizzle-orm";
 import { getD1, getDb } from "@/db";
 import {
@@ -45,7 +47,7 @@ let initialized = false;
 // template-seeding routine in every new isolate made even a simple page load
 // wait several seconds for D1. Keep a durable completion marker instead.
 // Bump this value whenever a runtime-only schema migration is added here.
-const RUNTIME_SCHEMA_VERSION = "runtime-schema-v31-conference-brief-subject";
+const RUNTIME_SCHEMA_VERSION = "runtime-schema-v32-private-workspaces";
 const DEFAULT_SENDER_NAME = "ТехнологИИ Права";
 const DEFAULT_SENDER_EMAIL = "tickets@notify.tech-pravo.ru";
 
@@ -1767,7 +1769,15 @@ async function initializeSystemDatabase(): Promise<void> {
     marker = null;
   }
   if (marker?.value === RUNTIME_SCHEMA_VERSION) return;
+  if (marker?.value === "runtime-schema-v31-conference-brief-subject") {
+    // Upgrade authentication without re-seeding the team's templates/accounts.
+    await d1.batch([...yandexSchema.map(statement => d1.prepare(statement)),
+      d1.prepare("UPDATE system_state SET value=?,updated_at=? WHERE key='runtime-schema-version'")
+        .bind(RUNTIME_SCHEMA_VERSION,new Date().toISOString())]);
+    return;
+  }
   await createSchema();
+  await getD1().batch(yandexSchema.map(statement => getD1().prepare(statement)));
   await seedDatabase(new Request("http://potok.internal/system"));
   await applyTeamDirectoryCorrections();
   await d1
@@ -1781,6 +1791,6 @@ async function initializeSystemDatabase(): Promise<void> {
 
 export async function ensureSystemDatabase(): Promise<void> {
   if (initialized) return;
-  await initializeSystemDatabase();
+  await withWorkspace(LEGACY_WORKSPACE_ID, initializeSystemDatabase);
   initialized = true;
 }

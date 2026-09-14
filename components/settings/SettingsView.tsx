@@ -3,6 +3,8 @@
 import { Select } from "@/components/ui/select";
 
 import Link from "next/link";
+import { authFeedback } from "@/lib/auth-feedback";
+import { useSearchParams } from "next/navigation";
 import styles from "./settings.module.css";
 import workflow from "@/components/shared/workflow.module.css";
 import {
@@ -272,6 +274,7 @@ function AccountSection({ form, participant, canManage, update }: { form: Worksp
 
       <div className={styles.teamLink}><p className="text-sm">Приглашения, роли и доступ к отдельным базам и группам.</p><Link className="btn btn-secondary" href="/team">Открыть команду</Link></div>
 
+      <YandexPanel />
       <PasswordPanel />
 
       {canManage && <FormBlock title="Рабочее пространство" description="Название видно в навигации и в выгрузке данных.">
@@ -288,6 +291,23 @@ function AccountSection({ form, participant, canManage, update }: { form: Worksp
       </FormBlock>}
     </div>
   );
+}
+
+function YandexPanel() {
+  const params = useSearchParams();
+  const issue = authFeedback[params.get("auth_error") || ""];
+  const [account, setAccount] = useState<{configured:boolean; linked:boolean} | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch("/api/auth/yandex/account", {cache:"no-store", signal:controller.signal})
+      .then(async response => { if (response.ok) setAccount(await response.json()); }).catch(() => {});
+    return () => controller.abort();
+  }, []);
+  if (!account?.configured) return null;
+  return <FormBlock title="Яндекс ID" description="Подключите Яндекс к текущему аккаунту, чтобы входить без пароля.">
+    {issue && <p role="alert" className="mb-3 text-[var(--danger)]">{issue}</p>}
+    {account.linked ? <p className="flex items-center gap-2 text-[var(--success)]"><Check aria-hidden className="size-5" />Яндекс ID подключён</p> : <a href="/api/auth/yandex/start?intent=link&next=%2Fsettings" className="btn btn-outline">Подключить Яндекс ID</a>}
+  </FormBlock>;
 }
 
 function PasswordPanel() {

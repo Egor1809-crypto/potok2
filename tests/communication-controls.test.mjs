@@ -41,6 +41,7 @@ async function harness(){
  const synthetic=(exports)=>new vm.SyntheticModule(Object.keys(exports),function(){for(const [key,value]of Object.entries(exports))this.setExport(key,value);},{context});
  const runtimeEnv={};
  const mocks={
+  "./workspace-context":synthetic({getWorkspaceId:()=>"workspace-main",LEGACY_WORKSPACE_ID:"workspace-main",isLegacyWorkspace:()=>true,withWorkspace:(_id,operation)=>operation()}),
   "cloudflare:workers":synthetic({env:runtimeEnv}),
   "drizzle-orm":synthetic(orm),
   "@/db/schema":synthetic({contacts:{id:"id",workspaceId:"workspace_id"}, campaigns:{}}),

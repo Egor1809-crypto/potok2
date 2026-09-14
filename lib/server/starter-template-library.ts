@@ -15,7 +15,7 @@ const STARTER_EMAIL_TEMPLATE_IDS = new Set(
 );
 
 export function isStarterEmailTemplateId(id: string): boolean {
-  return STARTER_EMAIL_TEMPLATE_IDS.has(id);
+  return STARTER_EMAIL_TEMPLATE_IDS.has(id) || STARTER_EMAIL_TEMPLATE_IDS.has(id.split(":starter:")[1] ?? "");
 }
 
 type BlockStyle = Pick<
@@ -222,8 +222,8 @@ function ensureStarterHeader(template: (typeof templates)[number], blocks: Email
   return [starterHeaderBlock(template), ...blocks];
 }
 
-export function starterEmailTemplateValues(): StarterEmailTemplateValue[] {
-  return templates.map((template) => {
+export function starterEmailTemplateValues(ids?: string[]): StarterEmailTemplateValue[] {
+  return templates.filter(template => !ids || ids.includes(template.id)).map((template) => {
     const rawDocument: EmailBuilderDocumentInput = {
       templateId: template.id,
       subject: template.subject,

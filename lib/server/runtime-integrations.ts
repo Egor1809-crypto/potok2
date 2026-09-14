@@ -1,3 +1,4 @@
+import { isLegacyWorkspace } from "./workspace-context";
 import { env } from "cloudflare:workers";
 import {
   integrationProviders,
@@ -9,6 +10,8 @@ import type {
 } from "@/types/api";
 
 type RuntimeEnv = Record<string, string | undefined>;
+
+const PRIVATE_TEAM_SECRETS = new Set(["UNISENDER_API_KEY", "VK_WORKSPACE_SMTP_PASSWORD", "VK_COMMUNITY_ACCESS_TOKEN", "TELEGRAM_BOT_TOKEN", "TELEGRAM_BOT_TOKEN_2", "COMMUNICATION_WEBHOOK_SECRET"]);
 
 const requiredSecretKeys: Record<IntegrationProviderId, string[]> = {
   "vk-workspace": ["VK_WORKSPACE_SMTP_PASSWORD"],
@@ -40,7 +43,9 @@ export type StoredIntegration = {
 };
 
 function runtimeEnvironment(): RuntimeEnv {
-  return env as unknown as RuntimeEnv;
+  const runtime = { ...env } as unknown as RuntimeEnv;
+  if (!isLegacyWorkspace()) for (const key of PRIVATE_TEAM_SECRETS) delete runtime[key];
+  return runtime;
 }
 
 export function hasRuntimeCredentials(

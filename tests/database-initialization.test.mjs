@@ -17,6 +17,8 @@ async function loadDatabaseInitializer(readMarker) {
     '@/db/schema': Object.fromEntries(['emailTemplates', 'integrations', 'participants', 'systemState', 'workspaces'].map(name => [name, {}])),
     '@/config/integrations': { integrationProviders: [] },
     '@/config/brand': { BRAND_NAME: 'Поток' },
+    './workspace-context': { LEGACY_WORKSPACE_ID:'workspace-main', withWorkspace: (_id, operation) => operation() },
+    './yandex-schema': { yandexSchema: [] },
     './api-utils': { ApiRequestError: Error },
     './starter-template-library': { starterEmailTemplateValues: [] },
     '@/data/conference-production-templates.generated': { conferenceProductionTemplateValues: [] },

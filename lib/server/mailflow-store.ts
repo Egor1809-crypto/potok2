@@ -1,3 +1,4 @@
+import { getWorkspaceId, withWorkspace } from "./workspace-context";
 import { contactListOrder } from "./contact-list-order";
 import { hasAllContactAccess, isTeamAdmin, normalizeContactAccess } from "@/lib/team-access";
 import { accessParticipant, campaignAccessSql, contactAccessSql, rawContactAccess, requireAudienceAccess, requireCampaignAccess, requireContactAccess, requireTeamAdmin } from "./team-access";
@@ -106,11 +107,8 @@ import {
   isUniSenderAggregateFinal,
   uniqueAcceptedContactIds,
 } from "./delivery-metrics";
-import {
-  ensureDatabase,
-  ensureSystemDatabase,
-  WORKSPACE_ID,
-} from "./database-init";
+import {ensureDatabase,
+  ensureSystemDatabase, } from "./database-init";
 import { sendVkWorkspaceSmtpBatch } from "./vk-workspace-smtp";
 import {
   assertEmailTemplateReference,
@@ -463,7 +461,7 @@ function toSegment(
 }
 
 function accessibleCampaignIds(actor: ParticipantRecord) {
-  return getDb().select({ id: campaigns.id }).from(campaigns).where(and(eq(campaigns.workspaceId, WORKSPACE_ID), campaignAccessSql(actor)));
+  return getDb().select({ id: campaigns.id }).from(campaigns).where(and(eq(campaigns.workspaceId, getWorkspaceId()), campaignAccessSql(actor)));
 }
 function scopedNewContact(input: ContactCreateInput, actor: ParticipantRecord) {
   if (hasAllContactAccess(actor) || input.responsibleParticipantId != null) return input;
@@ -485,7 +483,7 @@ async function loadCoreRows(actor: ParticipantRecord, includeContacts: boolean) 
     jobRows,
     eventRows,
   ] = await Promise.all([
-    db.select().from(workspaces).where(eq(workspaces.id, WORKSPACE_ID)).limit(1),
+    db.select().from(workspaces).where(eq(workspaces.id, getWorkspaceId())).limit(1),
     db
       .select()
       .from(participants)
@@ -494,46 +492,46 @@ async function loadCoreRows(actor: ParticipantRecord, includeContacts: boolean) 
     db
       .select()
       .from(participants)
-      .where(eq(participants.workspaceId, WORKSPACE_ID))
+      .where(eq(participants.workspaceId, getWorkspaceId()))
       .orderBy(participants.createdAt),
     includeContacts
       ? db
           .select()
           .from(contacts)
-          .where(and(eq(contacts.workspaceId, WORKSPACE_ID), contactAccessSql(actor)))
+          .where(and(eq(contacts.workspaceId, getWorkspaceId()), contactAccessSql(actor)))
           .orderBy(desc(contacts.updatedAt))
       : Promise.resolve([] as ContactRow[]),
     db
       .select()
       .from(segments)
-      .where(eq(segments.workspaceId, WORKSPACE_ID))
+      .where(eq(segments.workspaceId, getWorkspaceId()))
       .orderBy(desc(segments.updatedAt)),
     db
       .select()
       .from(integrations)
-      .where(eq(integrations.workspaceId, WORKSPACE_ID))
+      .where(eq(integrations.workspaceId, getWorkspaceId()))
       .orderBy(integrations.providerId),
     db
       .select()
       .from(emailTemplates)
-      .where(eq(emailTemplates.workspaceId, WORKSPACE_ID))
+      .where(eq(emailTemplates.workspaceId, getWorkspaceId()))
       .orderBy(desc(emailTemplates.updatedAt)),
     db
       .select()
       .from(campaigns)
-      .where(and(eq(campaigns.workspaceId, WORKSPACE_ID), campaignAccessSql(actor)))
+      .where(and(eq(campaigns.workspaceId, getWorkspaceId()), campaignAccessSql(actor)))
       .orderBy(desc(campaigns.updatedAt)),
     db.select().from(deliveryPlans).where(inArray(deliveryPlans.campaignId, accessibleCampaignIds(actor))),
     db
       .select()
       .from(deliveryJobs)
-      .where(and(eq(deliveryJobs.workspaceId, WORKSPACE_ID), inArray(deliveryJobs.campaignId, accessibleCampaignIds(actor))))
+      .where(and(eq(deliveryJobs.workspaceId, getWorkspaceId()), inArray(deliveryJobs.campaignId, accessibleCampaignIds(actor))))
       .orderBy(desc(deliveryJobs.createdAt))
       .limit(WORKSPACE_HISTORY_LIMIT),
     db
       .select()
       .from(campaignEvents)
-      .where(and(eq(campaignEvents.workspaceId, WORKSPACE_ID), inArray(campaignEvents.campaignId, accessibleCampaignIds(actor))))
+      .where(and(eq(campaignEvents.workspaceId, getWorkspaceId()), inArray(campaignEvents.campaignId, accessibleCampaignIds(actor))))
       .orderBy(desc(campaignEvents.occurredAt))
       .limit(WORKSPACE_HISTORY_LIMIT),
   ]);
@@ -582,7 +580,7 @@ export async function getWorkspaceSnapshot(
           active: sql<number>`coalesce(sum(case when ${contacts.status} = 'active' then 1 else 0 end), 0)`,
         })
         .from(contacts)
-        .where(and(eq(contacts.workspaceId, WORKSPACE_ID), contactAccessSql(actor.participant)));
+        .where(and(eq(contacts.workspaceId, getWorkspaceId()), contactAccessSql(actor.participant)));
   return {
     workspace: toWorkspace(rows.workspace),
     participant: toParticipant(rows.participant),
@@ -657,8 +655,8 @@ async function campaignSummaryRecords(actor: ParticipantRecord, options: { sched
     updatedAt: campaigns.updatedAt,
   }).from(campaigns)
     .where(options.scheduledOnly
-      ? and(eq(campaigns.workspaceId, WORKSPACE_ID), campaignAccessSql(actor), isNotNull(campaigns.scheduledAt), sql`${campaigns.status} <> 'completed'`)
-      : and(eq(campaigns.workspaceId, WORKSPACE_ID), campaignAccessSql(actor)))
+      ? and(eq(campaigns.workspaceId, getWorkspaceId()), campaignAccessSql(actor), isNotNull(campaigns.scheduledAt), sql`${campaigns.status} <> 'completed'`)
+      : and(eq(campaigns.workspaceId, getWorkspaceId()), campaignAccessSql(actor)))
     .orderBy(desc(campaigns.updatedAt))
     .limit(options.limit ?? 250);
   // List, dashboard and analytics screens never need every recipient id. Large
@@ -674,7 +672,7 @@ export async function getWorkspaceBootstrap(request: Request) {
   const scope = url.searchParams.get("scope") ?? "identity";
   const db = getDb();
   const [workspaceRows, participantRows] = await Promise.all([
-    db.select().from(workspaces).where(eq(workspaces.id, WORKSPACE_ID)).limit(1),
+    db.select().from(workspaces).where(eq(workspaces.id, getWorkspaceId())).limit(1),
     db.select().from(participants).where(eq(participants.id, actor.participant.id)).limit(1),
   ]);
   const workspace = workspaceRows[0];
@@ -688,15 +686,15 @@ export async function getWorkspaceBootstrap(request: Request) {
   if (sourceId) requireCampaignAccess(actor.participant, (await campaignBundle(sourceId)).campaign);
   const base = { workspace: toWorkspace(workspace), participant: toParticipant(participant) };
   if (scope === "integrations") {
-    const rows = await db.select().from(integrations).where(eq(integrations.workspaceId, WORKSPACE_ID)).orderBy(integrations.providerId);
+    const rows = await db.select().from(integrations).where(eq(integrations.workspaceId, getWorkspaceId())).orderBy(integrations.providerId);
     return { ...base, integrations: rows.filter((row) => PROVIDERS.includes(row.providerId)).map(toIntegrationRecord) };
   }
   if (scope === "campaign-detail" && sourceId) {
     const [campaignRows, planRows, jobRows, eventRows] = await Promise.all([
-      db.select().from(campaigns).where(and(eq(campaigns.workspaceId, WORKSPACE_ID), eq(campaigns.id, sourceId))).limit(1),
+      db.select().from(campaigns).where(and(eq(campaigns.workspaceId, getWorkspaceId()), eq(campaigns.id, sourceId))).limit(1),
       db.select().from(deliveryPlans).where(eq(deliveryPlans.campaignId, sourceId)),
-      db.select().from(deliveryJobs).where(and(eq(deliveryJobs.workspaceId, WORKSPACE_ID), eq(deliveryJobs.campaignId, sourceId))).orderBy(desc(deliveryJobs.createdAt)).limit(WORKSPACE_HISTORY_LIMIT),
-      db.select().from(campaignEvents).where(and(eq(campaignEvents.workspaceId, WORKSPACE_ID), eq(campaignEvents.campaignId, sourceId))).orderBy(desc(campaignEvents.occurredAt)).limit(WORKSPACE_HISTORY_LIMIT),
+      db.select().from(deliveryJobs).where(and(eq(deliveryJobs.workspaceId, getWorkspaceId()), eq(deliveryJobs.campaignId, sourceId))).orderBy(desc(deliveryJobs.createdAt)).limit(WORKSPACE_HISTORY_LIMIT),
+      db.select().from(campaignEvents).where(and(eq(campaignEvents.workspaceId, getWorkspaceId()), eq(campaignEvents.campaignId, sourceId))).orderBy(desc(campaignEvents.occurredAt)).limit(WORKSPACE_HISTORY_LIMIT),
     ]);
     return { ...base, campaigns: campaignRows.map(toCampaign), deliveryPlans: planRows.map(toDeliveryPlan), deliveryJobs: jobRows.map(toDeliveryJob), events: eventRows.map(toCampaignEvent) };
   }
@@ -706,7 +704,7 @@ export async function getWorkspaceBootstrap(request: Request) {
     const pendingRows = await db.select({ id: campaigns.id })
       .from(campaigns)
       .where(and(
-        eq(campaigns.workspaceId, WORKSPACE_ID),
+        eq(campaigns.workspaceId, getWorkspaceId()),
         eq(campaigns.status, "sending"), campaignAccessSql(actor.participant),
         isNotNull(campaigns.scheduledAt),
         lte(campaigns.scheduledAt, new Date().toISOString()),
@@ -720,7 +718,7 @@ export async function getWorkspaceBootstrap(request: Request) {
     await Promise.allSettled(pendingRows.map(({ id }) => syncCampaignDelivery(request, id)));
     const [campaignRecords, segmentRows, report] = await Promise.all([
       campaignSummaryRecords(actor.participant, { scheduledOnly: true }),
-      db.select().from(segments).where(eq(segments.workspaceId, WORKSPACE_ID)).orderBy(desc(segments.updatedAt)),
+      db.select().from(segments).where(eq(segments.workspaceId, getWorkspaceId())).orderBy(desc(segments.updatedAt)),
       calendarReport(actor.participant),
     ]);
     return {
@@ -733,33 +731,33 @@ export async function getWorkspaceBootstrap(request: Request) {
   if (scope === "campaign-list" || scope === "history" || scope === "dashboard") {
     const latestCampaignIds = db.select({ id: campaigns.id })
       .from(campaigns)
-      .where(and(eq(campaigns.workspaceId, WORKSPACE_ID), campaignAccessSql(actor.participant)))
+      .where(and(eq(campaigns.workspaceId, getWorkspaceId()), campaignAccessSql(actor.participant)))
       .orderBy(desc(campaigns.updatedAt))
       .limit(250);
     const [campaignRecords, segmentRows, integrationRows, planRows, jobRows, eventRows, statsRows, campaignStatsRows, templateCountRows, memberRows, calendarSchedule, creativeCounts] = await Promise.all([
       campaignSummaryRecords(actor.participant, { limit: 250 }),
-      db.select().from(segments).where(eq(segments.workspaceId, WORKSPACE_ID)).orderBy(desc(segments.updatedAt)),
-      db.select().from(integrations).where(eq(integrations.workspaceId, WORKSPACE_ID)).orderBy(integrations.providerId),
+      db.select().from(segments).where(eq(segments.workspaceId, getWorkspaceId())).orderBy(desc(segments.updatedAt)),
+      db.select().from(integrations).where(eq(integrations.workspaceId, getWorkspaceId())).orderBy(integrations.providerId),
       scope === "campaign-list"
         ? db.select().from(deliveryPlans).where(inArray(deliveryPlans.campaignId, latestCampaignIds))
         : Promise.resolve([]),
-      scope === "history" ? db.select().from(deliveryJobs).where(and(eq(deliveryJobs.workspaceId, WORKSPACE_ID), inArray(deliveryJobs.campaignId, accessibleCampaignIds(actor.participant)))).orderBy(desc(deliveryJobs.createdAt)).limit(WORKSPACE_HISTORY_LIMIT) : Promise.resolve([]),
-      scope === "history" ? db.select().from(campaignEvents).where(and(eq(campaignEvents.workspaceId, WORKSPACE_ID), inArray(campaignEvents.campaignId, accessibleCampaignIds(actor.participant)))).orderBy(desc(campaignEvents.occurredAt)).limit(WORKSPACE_HISTORY_LIMIT) : Promise.resolve([]),
-      db.select({ total: sql<number>`count(*)`, active: sql<number>`coalesce(sum(case when ${contacts.status} = 'active' then 1 else 0 end), 0)` }).from(contacts).where(and(eq(contacts.workspaceId, WORKSPACE_ID), contactAccessSql(actor.participant))),
+      scope === "history" ? db.select().from(deliveryJobs).where(and(eq(deliveryJobs.workspaceId, getWorkspaceId()), inArray(deliveryJobs.campaignId, accessibleCampaignIds(actor.participant)))).orderBy(desc(deliveryJobs.createdAt)).limit(WORKSPACE_HISTORY_LIMIT) : Promise.resolve([]),
+      scope === "history" ? db.select().from(campaignEvents).where(and(eq(campaignEvents.workspaceId, getWorkspaceId()), inArray(campaignEvents.campaignId, accessibleCampaignIds(actor.participant)))).orderBy(desc(campaignEvents.occurredAt)).limit(WORKSPACE_HISTORY_LIMIT) : Promise.resolve([]),
+      db.select({ total: sql<number>`count(*)`, active: sql<number>`coalesce(sum(case when ${contacts.status} = 'active' then 1 else 0 end), 0)` }).from(contacts).where(and(eq(contacts.workspaceId, getWorkspaceId()), contactAccessSql(actor.participant))),
       db.select({
         total: sql<number>`count(*)`,
         active: sql<number>`coalesce(sum(case when ${campaigns.status} in ('ready', 'scheduled', 'sending') then 1 else 0 end), 0)`,
-      }).from(campaigns).where(and(eq(campaigns.workspaceId, WORKSPACE_ID), campaignAccessSql(actor.participant))),
-      db.select({ total: sql<number>`count(*)` }).from(emailTemplates).where(eq(emailTemplates.workspaceId, WORKSPACE_ID)),
-      db.select().from(participants).where(and(eq(participants.workspaceId, WORKSPACE_ID), eq(participants.status, "active"))).orderBy(participants.createdAt),
+      }).from(campaigns).where(and(eq(campaigns.workspaceId, getWorkspaceId()), campaignAccessSql(actor.participant))),
+      db.select({ total: sql<number>`count(*)` }).from(emailTemplates).where(eq(emailTemplates.workspaceId, getWorkspaceId())),
+      db.select().from(participants).where(and(eq(participants.workspaceId, getWorkspaceId()), eq(participants.status, "active"))).orderBy(participants.createdAt),
       // Calendar markers cover all active plans, independently of the 250-item activity list.
       scope === "dashboard" ? db.select({ status: campaigns.status, scheduledAt: campaigns.scheduledAt }).from(campaigns)
-        .where(and(eq(campaigns.workspaceId, WORKSPACE_ID), campaignAccessSql(actor.participant),
+        .where(and(eq(campaigns.workspaceId, getWorkspaceId()), campaignAccessSql(actor.participant),
           inArray(campaigns.status, ["scheduled", "sending"]), isNotNull(campaigns.scheduledAt))) : Promise.resolve([]),
       scope === "dashboard" ? getD1().prepare(`SELECT
         (SELECT count(*) FROM presentation_projects WHERE workspace_id = ?) AS presentations,
         (SELECT count(*) FROM email_assets WHERE workspace_id = ? AND kind = 'photo') AS images
-      `).bind(WORKSPACE_ID, WORKSPACE_ID).first<{ presentations: number; images: number }>() : Promise.resolve(null),
+      `).bind(getWorkspaceId(), getWorkspaceId()).first<{ presentations: number; images: number }>() : Promise.resolve(null),
     ]);
     const integrationRecords = integrationRows.filter((row) => PROVIDERS.includes(row.providerId)).map(toIntegrationRecord);
     return {
@@ -788,10 +786,10 @@ export async function getWorkspaceBootstrap(request: Request) {
   }
 
   const [memberRows, segmentRows, integrationRows, sourceCampaignRows, sourcePlanRows] = await Promise.all([
-    db.select().from(participants).where(eq(participants.workspaceId, WORKSPACE_ID)).orderBy(participants.createdAt),
-    db.select().from(segments).where(eq(segments.workspaceId, WORKSPACE_ID)).orderBy(desc(segments.updatedAt)),
-    db.select().from(integrations).where(eq(integrations.workspaceId, WORKSPACE_ID)).orderBy(integrations.providerId),
-    sourceId ? db.select().from(campaigns).where(and(eq(campaigns.workspaceId, WORKSPACE_ID), eq(campaigns.id, sourceId))).limit(1) : Promise.resolve([]),
+    db.select().from(participants).where(eq(participants.workspaceId, getWorkspaceId())).orderBy(participants.createdAt),
+    db.select().from(segments).where(eq(segments.workspaceId, getWorkspaceId())).orderBy(desc(segments.updatedAt)),
+    db.select().from(integrations).where(eq(integrations.workspaceId, getWorkspaceId())).orderBy(integrations.providerId),
+    sourceId ? db.select().from(campaigns).where(and(eq(campaigns.workspaceId, getWorkspaceId()), eq(campaigns.id, sourceId))).limit(1) : Promise.resolve([]),
     sourceId ? db.select().from(deliveryPlans).where(eq(deliveryPlans.campaignId, sourceId)) : Promise.resolve([]),
   ]);
   return {
@@ -813,7 +811,7 @@ export async function getUniSenderLifetimeStats(
   const providerRows = await getDb().select({
     campaignId: deliveryJobs.campaignId,
   }).from(deliveryJobs).where(and(
-    eq(deliveryJobs.workspaceId, WORKSPACE_ID), inArray(deliveryJobs.campaignId, accessibleCampaignIds(actor.participant)),
+    eq(deliveryJobs.workspaceId, getWorkspaceId()), inArray(deliveryJobs.campaignId, accessibleCampaignIds(actor.participant)),
     sql`json_extract(${deliveryJobs.providerExternalIds}, '$.unisender') is not null`,
   )).orderBy(asc(deliveryJobs.createdAt), asc(deliveryJobs.id));
 
@@ -828,7 +826,7 @@ export async function getUniSenderLifetimeStats(
     const pendingRows = await getDb().select({ campaignId: deliveryJobs.campaignId })
       .from(deliveryJobs)
       .where(and(
-        eq(deliveryJobs.workspaceId, WORKSPACE_ID), inArray(deliveryJobs.campaignId, accessibleCampaignIds(actor.participant)),
+        eq(deliveryJobs.workspaceId, getWorkspaceId()), inArray(deliveryJobs.campaignId, accessibleCampaignIds(actor.participant)),
         eq(deliveryJobs.status, "processing"),
         sql`json_extract(${deliveryJobs.providerExternalIds}, '$.unisender') is not null`,
       ))
@@ -837,7 +835,7 @@ export async function getUniSenderLifetimeStats(
     const staleRows = await getDb().select({ campaignId: deliveryJobs.campaignId })
       .from(deliveryJobs)
       .where(and(
-        eq(deliveryJobs.workspaceId, WORKSPACE_ID), inArray(deliveryJobs.campaignId, accessibleCampaignIds(actor.participant)),
+        eq(deliveryJobs.workspaceId, getWorkspaceId()), inArray(deliveryJobs.campaignId, accessibleCampaignIds(actor.participant)),
         sql`${deliveryJobs.status} <> 'processing'`,
         sql`json_extract(${deliveryJobs.providerExternalIds}, '$.unisender') is not null`,
       ))
@@ -868,7 +866,7 @@ export async function getUniSenderLifetimeStats(
   const [campaignRecords, memberRows] = await Promise.all([
     campaignSummaryRecords(actor.participant),
     getDb().select().from(participants).where(and(
-      eq(participants.workspaceId, WORKSPACE_ID),
+      eq(participants.workspaceId, getWorkspaceId()),
       eq(participants.status, "active"),
     )).orderBy(participants.createdAt),
   ]);
@@ -1115,7 +1113,7 @@ function contactValues(
 ) {
   return {
     id,
-    workspaceId: WORKSPACE_ID,
+    workspaceId: getWorkspaceId(),
     firstName: input.firstName,
     lastName: input.lastName,
     fullName: `${input.firstName} ${input.lastName}`.trim(),
@@ -1150,7 +1148,7 @@ function contactValues(
 
 async function ensureContactAssignmentEditable(ids: string[]) {
   for (const part of chunksOf(ids, 80)) {
-    const blocked = await getD1().prepare("SELECT o.contact_id FROM delivery_outbox o JOIN campaigns c ON c.id=o.campaign_id WHERE c.workspace_id=? AND c.status IN ('scheduled','sending') AND o.contact_id IN (SELECT value FROM json_each(?)) LIMIT 1").bind(WORKSPACE_ID, JSON.stringify(part)).first();
+    const blocked = await getD1().prepare("SELECT o.contact_id FROM delivery_outbox o JOIN campaigns c ON c.id=o.campaign_id WHERE c.workspace_id=? AND c.status IN ('scheduled','sending') AND o.contact_id IN (SELECT value FROM json_each(?)) LIMIT 1").bind(getWorkspaceId(), JSON.stringify(part)).first();
     if (blocked) throw new ApiRequestError("Контакт уже включён в запланированную или выполняемую отправку. Сначала отмените рассылку или дождитесь завершения, затем измените базу или группы.", 409);
   }
 }
@@ -1159,7 +1157,7 @@ async function contactById(id: string): Promise<ContactRecord> {
   const [row] = await db
     .select()
     .from(contacts)
-    .where(and(eq(contacts.id, id), eq(contacts.workspaceId, WORKSPACE_ID)))
+    .where(and(eq(contacts.id, id), eq(contacts.workspaceId, getWorkspaceId())))
     .limit(1);
   if (!row) throw new ApiRequestError("Контакт не найден.", 404);
   return toContact(row);
@@ -1199,7 +1197,7 @@ async function findContactsByIdentifiers(
     .from(contacts)
     .where(
       and(
-        eq(contacts.workspaceId, WORKSPACE_ID),
+        eq(contacts.workspaceId, getWorkspaceId()),
         or(
           input.email ? eq(contacts.email, input.email) : undefined,
           input.phone ? eq(contacts.phone, input.phone) : undefined,
@@ -1233,7 +1231,7 @@ function positiveInteger(value: string | null, fallback: number, maximum: number
 }
 
 function contactListFilters(url: URL, actor: ParticipantRecord): SQL[] {
-  const filters: SQL[] = [eq(contacts.workspaceId, WORKSPACE_ID), contactAccessSql(actor)];
+  const filters: SQL[] = [eq(contacts.workspaceId, getWorkspaceId()), contactAccessSql(actor)];
   const search = url.searchParams.get("q")?.trim().slice(0, 160) ?? "";
   const status = url.searchParams.get("status")?.trim() ?? "";
   const company = url.searchParams.get("company")?.trim().slice(0, 160) ?? "";
@@ -1286,11 +1284,11 @@ export async function listContactEndpoints(request: Request): Promise<ContactEnd
         vkUserId: contacts.vkUserId,
       })
       .from(contacts)
-      .where(and(eq(contacts.workspaceId, WORKSPACE_ID), contactAccessSql(actor.participant))),
+      .where(and(eq(contacts.workspaceId, getWorkspaceId()), contactAccessSql(actor.participant))),
     db
       .select()
       .from(participants)
-      .where(eq(participants.workspaceId, WORKSPACE_ID))
+      .where(eq(participants.workspaceId, getWorkspaceId()))
       .orderBy(participants.createdAt),
   ]);
   return { contacts: rows, members: memberRows.map(toParticipant) };
@@ -1327,28 +1325,28 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
         phoneFound: sql<number>`coalesce(sum(case when ${contacts.phone} <> '' then 1 else 0 end), 0)`,
       })
       .from(contacts)
-      .where(and(eq(contacts.workspaceId, WORKSPACE_ID), contactAccessSql(actor.participant))) : Promise.resolve([]),
+      .where(and(eq(contacts.workspaceId, getWorkspaceId()), contactAccessSql(actor.participant))) : Promise.resolve([]),
     db
       .select({ timezone: workspaces.timezone })
       .from(workspaces)
-      .where(eq(workspaces.id, WORKSPACE_ID))
+      .where(eq(workspaces.id, getWorkspaceId()))
       .limit(1),
     db
       .select()
       .from(participants)
-      .where(eq(participants.workspaceId, WORKSPACE_ID))
+      .where(eq(participants.workspaceId, getWorkspaceId()))
       .orderBy(participants.createdAt),
     includeMeta ? db
       .select({ value: contacts.companyName, count: sql<number>`count(*)` })
       .from(contacts)
-      .where(and(eq(contacts.workspaceId, WORKSPACE_ID), contactAccessSql(actor.participant), sql`${contacts.companyName} <> ''`))
+      .where(and(eq(contacts.workspaceId, getWorkspaceId()), contactAccessSql(actor.participant), sql`${contacts.companyName} <> ''`))
       .groupBy(contacts.companyName)
       .orderBy(desc(sql<number>`count(*)`), asc(contacts.companyName))
       .limit(300) : Promise.resolve([]),
     includeMeta ? db
       .select({ value: contacts.city })
       .from(contacts)
-      .where(and(eq(contacts.workspaceId, WORKSPACE_ID), contactAccessSql(actor.participant), sql`${contacts.city} <> ''`))
+      .where(and(eq(contacts.workspaceId, getWorkspaceId()), contactAccessSql(actor.participant), sql`${contacts.city} <> ''`))
       .groupBy(contacts.city)
       .orderBy(asc(contacts.city))
       .limit(500) : Promise.resolve([]),
@@ -1361,7 +1359,7 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
         GROUP BY json_each.value
         ORDER BY json_each.value
       `)
-      .bind(WORKSPACE_ID, ...access.params)
+      .bind(getWorkspaceId(), ...access.params)
       .all<{ label: string; count: number }>() : Promise.resolve({ results: [] as Array<{ label: string; count: number }> }),
     includeMeta ? getD1()
       .prepare(`
@@ -1379,7 +1377,7 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
         WHERE workspace_id = ? AND ${access.condition} AND coalesce(responsible_participant_id, created_by_participant_id) IS NOT NULL
         GROUP BY coalesce(responsible_participant_id, created_by_participant_id)
       `)
-      .bind(WORKSPACE_ID, ...access.params)
+      .bind(getWorkspaceId(), ...access.params)
       .all<{ participantId: string; total: number; email: number; telegram: number; vk: number; phone: number; readyEmail: number; serviceEmail: number; readyTelegram: number }>() : Promise.resolve({ results: [] }),
     includeMeta ? getD1()
       .prepare(`
@@ -1394,7 +1392,7 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
         GROUP BY coalesce(contacts.responsible_participant_id, contacts.created_by_participant_id), json_each.value
         ORDER BY json_each.value
       `)
-      .bind(WORKSPACE_ID, ...access.params)
+      .bind(getWorkspaceId(), ...access.params)
       .all<{ participantId: string; label: string; count: number }>() : Promise.resolve({ results: [] }),
     includeMeta ? getD1()
       .prepare(`
@@ -1411,7 +1409,7 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
           AND EXISTS (SELECT 1 FROM json_each(campaigns.delivery_channels) WHERE json_each.value = 'email')
         GROUP BY participant_id
       `)
-      .bind(WORKSPACE_ID, isTeamAdmin(actor.participant) ? 1 : 0, actor.participant.id)
+      .bind(getWorkspaceId(), isTeamAdmin(actor.participant) ? 1 : 0, actor.participant.id)
       .all<{ participantId: string; campaigns: number; sent: number; delivered: number; opened: number; clicked: number; lastActivityAt: string | null }>() : Promise.resolve({ results: [] }),
   ]);
 
@@ -1656,7 +1654,7 @@ export async function createContactsBatch(
       .from(contacts)
       .where(
         and(
-          eq(contacts.workspaceId, WORKSPACE_ID),
+          eq(contacts.workspaceId, getWorkspaceId()),
           inArray(contacts.email, emailChunk),
         ),
       );
@@ -1668,7 +1666,7 @@ export async function createContactsBatch(
       .from(contacts)
       .where(
         and(
-          eq(contacts.workspaceId, WORKSPACE_ID),
+          eq(contacts.workspaceId, getWorkspaceId()),
           inArray(contacts.phone, phoneChunk),
         ),
       );
@@ -1680,7 +1678,7 @@ export async function createContactsBatch(
       .from(contacts)
       .where(
         and(
-          eq(contacts.workspaceId, WORKSPACE_ID),
+          eq(contacts.workspaceId, getWorkspaceId()),
           inArray(contacts.telegramChatId, telegramChunk),
         ),
       );
@@ -1692,7 +1690,7 @@ export async function createContactsBatch(
       .from(contacts)
       .where(
         and(
-          eq(contacts.workspaceId, WORKSPACE_ID),
+          eq(contacts.workspaceId, getWorkspaceId()),
           inArray(contacts.vkUserId, vkChunk),
         ),
       );
@@ -1700,7 +1698,7 @@ export async function createContactsBatch(
   }
   const existingRows = [...existingById.values()];
   const teamMembers = await db.select({ id: participants.id }).from(participants).where(and(
-    eq(participants.workspaceId, WORKSPACE_ID),
+    eq(participants.workspaceId, getWorkspaceId()),
     eq(participants.status, "active"),
     isNotNull(participants.login),
   )).orderBy(asc(participants.login));
@@ -1852,13 +1850,13 @@ export async function updateContactsBatch(
   if (responsibleParticipantId === undefined && !addTags.length && !markContacted) throw new ApiRequestError("Нет изменений для контактов.");
   if (responsibleParticipantId) {
     const [member] = await getDb().select({ id: participants.id }).from(participants).where(and(
-      eq(participants.workspaceId, WORKSPACE_ID), eq(participants.id, responsibleParticipantId), eq(participants.status, "active"),
+      eq(participants.workspaceId, getWorkspaceId()), eq(participants.id, responsibleParticipantId), eq(participants.status, "active"),
     )).limit(1);
     if (!member) throw new ApiRequestError("Ответственный не найден в активной команде.", 404);
   }
   // Preflight the complete selection before the first write (including explicit ids).
   for (const part of chunksOf(ids, 80)) {
-    const rows = await getDb().select().from(contacts).where(and(eq(contacts.workspaceId, WORKSPACE_ID), inArray(contacts.id, part)));
+    const rows = await getDb().select().from(contacts).where(and(eq(contacts.workspaceId, getWorkspaceId()), inArray(contacts.id, part)));
     if (rows.length !== part.length) throw new ApiRequestError("Часть контактов недоступна. Обновите выбор.", 404);
     for (const row of rows) {
       requireContactAccess(actor.participant, toContact(row));
@@ -1871,7 +1869,7 @@ export async function updateContactsBatch(
   let bulkUpdatedCount = 0;
   for (const idChunk of chunksOf(ids, 80)) {
     const rows = await getDb().select().from(contacts).where(and(
-      eq(contacts.workspaceId, WORKSPACE_ID), inArray(contacts.id, idChunk),
+      eq(contacts.workspaceId, getWorkspaceId()), inArray(contacts.id, idChunk),
     ));
     if (!addTags.length) {
       const updatedRows = await getDb().update(contacts).set({
@@ -1879,7 +1877,7 @@ export async function updateContactsBatch(
         ...(markContacted ? { lastContactedAt: now } : {}),
         updatedByParticipantId: actor.participant.id,
         updatedAt: now,
-      }).where(and(eq(contacts.workspaceId, WORKSPACE_ID), inArray(contacts.id, idChunk))).returning();
+      }).where(and(eq(contacts.workspaceId, getWorkspaceId()), inArray(contacts.id, idChunk))).returning();
       bulkUpdatedCount += updatedRows.length;
       if (!bulkSelection) affected.push(...updatedRows);
       continue;
@@ -1913,7 +1911,7 @@ export async function deleteContact(
   const affectedCampaigns = (await db
     .select()
     .from(campaigns)
-    .where(eq(campaigns.workspaceId, WORKSPACE_ID)))
+    .where(eq(campaigns.workspaceId, getWorkspaceId())))
     .filter((campaign) => campaign.contactIds.includes(id));
   if (affectedCampaigns.some((campaign) => campaign.status === "sending")) {
     throw new ApiRequestError(
@@ -2124,14 +2122,14 @@ function parseSegment(
 async function allSegmentRecords(actor: ParticipantRecord) {
   const db = getDb();
   const segmentRows = await db.select().from(segments)
-    .where(eq(segments.workspaceId, WORKSPACE_ID))
+    .where(eq(segments.workspaceId, getWorkspaceId()))
     .orderBy(desc(segments.updatedAt));
   if (!segmentRows.length) return [];
 
   const campaignRows = await db
     .select({ segmentId: campaigns.segmentId, count: sql<number>`count(*)` })
     .from(campaigns)
-    .where(and(eq(campaigns.workspaceId, WORKSPACE_ID), campaignAccessSql(actor)))
+    .where(and(eq(campaigns.workspaceId, getWorkspaceId()), campaignAccessSql(actor)))
     .groupBy(campaigns.segmentId);
   const campaignsBySegment = new Map(
     campaignRows.flatMap((row) => row.segmentId ? [[row.segmentId, Number(row.count)] as const] : []),
@@ -2143,7 +2141,7 @@ async function allSegmentRecords(actor: ParticipantRecord) {
     const ruleQuery = segmentRuleSql(segment.rules);
     const countRow = await d1
       .prepare(`SELECT COUNT(*) AS count FROM contacts WHERE workspace_id = ? AND ${access.condition} AND (${ruleQuery.text})`)
-      .bind(WORKSPACE_ID, ...access.params, ...ruleQuery.values)
+      .bind(getWorkspaceId(), ...access.params, ...ruleQuery.values)
       .first<{ count: number }>();
     records.push({
       id: segment.id,
@@ -2235,7 +2233,7 @@ export async function listSegments(request: Request): Promise<SegmentsListRespon
     getDb()
       .select({ timezone: workspaces.timezone })
       .from(workspaces)
-      .where(eq(workspaces.id, WORKSPACE_ID))
+      .where(eq(workspaces.id, getWorkspaceId()))
       .limit(1),
   ]);
   return {
@@ -2255,7 +2253,7 @@ export async function createSegment(
   const duplicate = await db
     .select({ id: segments.id, name: segments.name })
     .from(segments)
-    .where(eq(segments.workspaceId, WORKSPACE_ID));
+    .where(eq(segments.workspaceId, getWorkspaceId()));
   const normalizedName = input.name.toLocaleLowerCase("ru-RU");
   if (
     duplicate.some(
@@ -2268,7 +2266,7 @@ export async function createSegment(
   const id = newId("segment");
   await db.insert(segments).values({
     id,
-    workspaceId: WORKSPACE_ID,
+    workspaceId: getWorkspaceId(),
     name: input.name,
     description: input.description ?? "",
     rules: input.rules,
@@ -2297,7 +2295,7 @@ export async function updateSegment(
   const duplicates = await db
     .select({ id: segments.id, name: segments.name })
     .from(segments)
-    .where(eq(segments.workspaceId, WORKSPACE_ID));
+    .where(eq(segments.workspaceId, getWorkspaceId()));
   const normalizedName = input.name.toLocaleLowerCase("ru-RU");
   if (
     duplicates.some(
@@ -2335,7 +2333,7 @@ export async function deleteSegment(
   const [row] = await db
     .select()
     .from(segments)
-    .where(and(eq(segments.id, id), eq(segments.workspaceId, WORKSPACE_ID)))
+    .where(and(eq(segments.id, id), eq(segments.workspaceId, getWorkspaceId())))
     .limit(1);
   if (!row) throw new ApiRequestError("Сегмент не найден.", 404);
   const linked = await db
@@ -2420,7 +2418,7 @@ export async function updateWorkspace(
     await db
       .update(workspaces)
       .set({ ...workspaceChanges, updatedAt: now })
-      .where(eq(workspaces.id, WORKSPACE_ID));
+      .where(eq(workspaces.id, getWorkspaceId()));
   }
   if (participantName !== undefined || participantEmail !== undefined) {
     await db
@@ -2433,7 +2431,7 @@ export async function updateWorkspace(
       .where(eq(participants.id, actor.participant.id));
   }
   const [workspaceRow, participantRow] = await Promise.all([
-    db.select().from(workspaces).where(eq(workspaces.id, WORKSPACE_ID)).limit(1),
+    db.select().from(workspaces).where(eq(workspaces.id, getWorkspaceId())).limit(1),
     db.select().from(participants).where(eq(participants.id, actor.participant.id)).limit(1),
   ]);
   return {
@@ -2504,7 +2502,7 @@ async function allIntegrationRecords(): Promise<IntegrationRecord[]> {
   const rows = await getDb()
     .select()
     .from(integrations)
-    .where(eq(integrations.workspaceId, WORKSPACE_ID))
+    .where(eq(integrations.workspaceId, getWorkspaceId()))
     .orderBy(integrations.providerId);
   return rows
     .filter((row) => PROVIDERS.includes(row.providerId))
@@ -2546,7 +2544,7 @@ export async function updateIntegration(
     .from(integrations)
     .where(
       and(
-        eq(integrations.workspaceId, WORKSPACE_ID),
+        eq(integrations.workspaceId, getWorkspaceId()),
         eq(integrations.providerId, input.providerId),
       ),
     )
@@ -2795,7 +2793,7 @@ async function workspaceRecord(): Promise<WorkspaceRecord> {
   const [row] = await getDb()
     .select()
     .from(workspaces)
-    .where(eq(workspaces.id, WORKSPACE_ID))
+    .where(eq(workspaces.id, getWorkspaceId()))
     .limit(1);
   if (!row) throw new Error("Workspace is unavailable");
   return toWorkspace(row);
@@ -2807,7 +2805,7 @@ async function campaignBundle(id: string) {
     db
       .select()
       .from(campaigns)
-      .where(and(eq(campaigns.id, id), eq(campaigns.workspaceId, WORKSPACE_ID)))
+      .where(and(eq(campaigns.id, id), eq(campaigns.workspaceId, getWorkspaceId())))
       .limit(1),
     db.select().from(deliveryPlans).where(eq(deliveryPlans.campaignId, id)),
   ]);
@@ -2829,7 +2827,7 @@ async function validateAudience(input: ParsedCampaign, actor: ParticipantRecord)
       .where(
         and(
           eq(segments.id, input.segmentId!),
-          eq(segments.workspaceId, WORKSPACE_ID),
+          eq(segments.workspaceId, getWorkspaceId()),
         ),
       )
       .limit(1);
@@ -2845,7 +2843,7 @@ async function validateAudience(input: ParsedCampaign, actor: ParticipantRecord)
         .from(contacts)
         .where(
           and(
-            eq(contacts.workspaceId, WORKSPACE_ID), contactAccessSql(actor),
+            eq(contacts.workspaceId, getWorkspaceId()), contactAccessSql(actor),
             inArray(contacts.id, idChunk),
           ),
         )),
@@ -2914,7 +2912,7 @@ async function appendEvent(
     .insert(campaignEvents)
     .values({
       id: newId("event"),
-      workspaceId: WORKSPACE_ID,
+      workspaceId: getWorkspaceId(),
       campaignId,
       type,
       message,
@@ -2931,15 +2929,15 @@ export async function listCampaigns(
   const actor = await ensureDatabase(request);
   const db = getDb();
   const [campaignRows, planRows, jobRows, eventRows] = await Promise.all([
-    db.select().from(campaigns).where(and(eq(campaigns.workspaceId, WORKSPACE_ID), campaignAccessSql(actor.participant))).orderBy(desc(campaigns.updatedAt)),
+    db.select().from(campaigns).where(and(eq(campaigns.workspaceId, getWorkspaceId()), campaignAccessSql(actor.participant))).orderBy(desc(campaigns.updatedAt)),
     db.select().from(deliveryPlans).where(inArray(deliveryPlans.campaignId, accessibleCampaignIds(actor.participant))),
     db
       .select()
       .from(deliveryJobs)
-      .where(and(eq(deliveryJobs.workspaceId, WORKSPACE_ID), inArray(deliveryJobs.campaignId, accessibleCampaignIds(actor.participant))))
+      .where(and(eq(deliveryJobs.workspaceId, getWorkspaceId()), inArray(deliveryJobs.campaignId, accessibleCampaignIds(actor.participant))))
       .orderBy(desc(deliveryJobs.createdAt))
       .limit(WORKSPACE_HISTORY_LIMIT),
-    db.select().from(campaignEvents).where(and(eq(campaignEvents.workspaceId, WORKSPACE_ID), inArray(campaignEvents.campaignId, accessibleCampaignIds(actor.participant)))).orderBy(desc(campaignEvents.occurredAt)).limit(WORKSPACE_HISTORY_LIMIT),
+    db.select().from(campaignEvents).where(and(eq(campaignEvents.workspaceId, getWorkspaceId()), inArray(campaignEvents.campaignId, accessibleCampaignIds(actor.participant)))).orderBy(desc(campaignEvents.occurredAt)).limit(WORKSPACE_HISTORY_LIMIT),
   ]);
   return {
     campaigns: campaignRows.map(toCampaign),
@@ -2970,7 +2968,7 @@ export async function createCampaign(
   const db = getDb();
   await db.insert(campaigns).values({
     id,
-    workspaceId: WORKSPACE_ID,
+    workspaceId: getWorkspaceId(),
     participantId: actor.participant.id,
     name: input.name,
     purpose: input.purpose,
@@ -3020,7 +3018,7 @@ async function audienceForCampaign(
   const contactRows = await db
     .select()
     .from(contacts)
-    .where(and(eq(contacts.workspaceId, WORKSPACE_ID), contactAccessSql(owner)));
+    .where(and(eq(contacts.workspaceId, getWorkspaceId()), contactAccessSql(owner)));
   const records = contactRows.map(toContact);
   if (campaign.audienceType === "contacts") {
     const selected = new Set(campaign.contactIds);
@@ -3046,7 +3044,7 @@ export async function checkCommunicationAudience(request: Request, payload: unkn
   const segmentId = typeof p.segmentId === "string" ? p.segmentId : null;
   const selectedChannels = Array.isArray(p.channels) ? [...new Set(p.channels.filter((c): c is DeliveryChannelId => c === "email" || c === "telegram" || c === "vk"))] : ["email" as const];
   if (!selectedChannels.length) throw new ApiRequestError("Выберите канал.");
-  const audience = await audienceForCampaign({ participantId: actor.participant.id, workspaceId: WORKSPACE_ID, audienceType: p.audienceType === "segment" ? "segment" : "contacts", contactIds: ids, segmentId } as CampaignRecord);
+  const audience = await audienceForCampaign({ participantId: actor.participant.id, workspaceId: getWorkspaceId(), audienceType: p.audienceType === "segment" ? "segment" : "contacts", contactIds: ids, segmentId } as CampaignRecord);
   return assessCommunications(audience, selectedChannels, p.purpose === "transactional" ? "transactional" : "marketing", typeof p.scheduledAt === "string" && p.scheduledAt ? parseIsoDate(p.scheduledAt, "Дата отправки") ?? undefined : undefined);
 }
 
@@ -3539,7 +3537,7 @@ async function verifyOutboxAccess(rows: DeliveryOutboxRecord[]) {
     const campaign = (await campaignBundle(campaignId)).campaign;
     const recipients: ContactRecord[] = [];
     const ids = [...new Set(rows.filter(row => row.campaignId === campaignId).map(row => row.contactId))];
-    for (const part of chunksOf(ids, 80)) recipients.push(...(await getDb().select().from(contacts).where(and(eq(contacts.workspaceId, WORKSPACE_ID), inArray(contacts.id, part)))).map(toContact));
+    for (const part of chunksOf(ids, 80)) recipients.push(...(await getDb().select().from(contacts).where(and(eq(contacts.workspaceId, getWorkspaceId()), inArray(contacts.id, part)))).map(toContact));
     if (recipients.length !== ids.length) await blockDispatch(campaignId, "Часть контактов удалена. Обновите аудиторию.");
     try { await requireAudienceAccess(campaign.participantId, recipients); }
     catch (error) { await blockDispatch(campaignId, error instanceof Error ? error.message : "Доступ к аудитории отозван."); }
@@ -3555,7 +3553,7 @@ async function processDirectOutbox(
     (await getDb()
       .select()
       .from(contacts)
-      .where(eq(contacts.workspaceId, WORKSPACE_ID)))
+      .where(eq(contacts.workspaceId, getWorkspaceId())))
       .map(toContact)
       .map((contact) => [contact.id, contact]),
   );
@@ -3646,7 +3644,7 @@ async function processUniSenderOutbox(
   const selectedContactRows: ContactRow[] = [];
   for (const idChunk of chunksOf(Array.from(new Set(rows.map((row) => row.contactId))))) {
     selectedContactRows.push(...await getDb().select().from(contacts).where(and(
-      eq(contacts.workspaceId, WORKSPACE_ID),
+      eq(contacts.workspaceId, getWorkspaceId()),
       inArray(contacts.id, idChunk),
     )));
   }
@@ -3794,7 +3792,7 @@ async function processVkWorkspaceSmtpOutbox(
   if (!rows.length) return {} as Record<string, string>;
   await verifyOutboxAccess(rows);
   const contactsById = new Map(
-    (await getDb().select().from(contacts).where(eq(contacts.workspaceId, WORKSPACE_ID)))
+    (await getDb().select().from(contacts).where(eq(contacts.workspaceId, getWorkspaceId())))
       .map(toContact)
       .map((contact) => [contact.id, contact]),
   );
@@ -3894,7 +3892,7 @@ async function dispatchCampaign(
       .from(deliveryJobs)
       .where(
         and(
-          eq(deliveryJobs.workspaceId, WORKSPACE_ID),
+          eq(deliveryJobs.workspaceId, getWorkspaceId()),
           eq(deliveryJobs.idempotencyKey, clientKey),
         ),
       )
@@ -4037,7 +4035,7 @@ async function dispatchCampaign(
     .insert(deliveryJobs)
     .values({
       id: jobId,
-      workspaceId: WORKSPACE_ID,
+      workspaceId: getWorkspaceId(),
       campaignId,
       campaignVersionId: version.id,
       idempotencyKey,
@@ -4062,7 +4060,7 @@ async function dispatchCampaign(
         or(
           eq(deliveryJobs.campaignVersionId, version.id),
           and(
-            eq(deliveryJobs.workspaceId, WORKSPACE_ID),
+            eq(deliveryJobs.workspaceId, getWorkspaceId()),
             eq(deliveryJobs.idempotencyKey, idempotencyKey),
           ),
         ),
@@ -4332,7 +4330,7 @@ export async function syncCampaignDelivery(
     .select()
     .from(deliveryJobs)
     .where(and(
-      eq(deliveryJobs.workspaceId, WORKSPACE_ID),
+      eq(deliveryJobs.workspaceId, getWorkspaceId()),
       eq(deliveryJobs.campaignId, campaignId),
     ))
     .orderBy(desc(deliveryJobs.createdAt))
@@ -4473,7 +4471,7 @@ export type ScheduledRunResult = {
 async function runDueScheduledCampaignsCore(): Promise<ScheduledRunResult> {
   const now = new Date().toISOString();
   const due = await getDb().select().from(campaigns).where(and(
-    eq(campaigns.workspaceId, WORKSPACE_ID),
+    eq(campaigns.workspaceId, getWorkspaceId()),
     eq(campaigns.status, "scheduled"),
     lte(campaigns.scheduledAt, now),
   )).orderBy(asc(campaigns.scheduledAt)).limit(20);
@@ -4495,7 +4493,11 @@ async function runDueScheduledCampaignsCore(): Promise<ScheduledRunResult> {
 
 export async function runDueScheduledCampaignsSystem() {
   await ensureSystemDatabase();
-  return runDueScheduledCampaignsCore();
+  const dueWorkspaces = await getDb().selectDistinct({ id: campaigns.workspaceId }).from(campaigns)
+    .where(and(eq(campaigns.status, "scheduled"), lte(campaigns.scheduledAt, new Date().toISOString()))).limit(100);
+  const results = [];
+  for (const workspace of dueWorkspaces) results.push(await withWorkspace(workspace.id, runDueScheduledCampaignsCore));
+  return results;
 }
 
 export async function runDueScheduledCampaigns(request: Request) {
@@ -4633,7 +4635,7 @@ export async function updateCampaign(
     .select()
     .from(deliveryJobs)
     .where(and(
-      eq(deliveryJobs.workspaceId, WORKSPACE_ID),
+      eq(deliveryJobs.workspaceId, getWorkspaceId()),
       eq(deliveryJobs.campaignId, id),
     ))
     .orderBy(desc(deliveryJobs.createdAt))

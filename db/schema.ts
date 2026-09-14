@@ -102,6 +102,7 @@ export const participants = sqliteTable(
     ...timestamps,
   },
   (table) => [
+    uniqueIndex("idx_participants_global_login").on(table.login).where(sql`${table.login} IS NOT NULL`),
     uniqueIndex("idx_participants_workspace_login")
       .on(table.workspaceId, table.login)
       .where(sql`${table.login} IS NOT NULL`),
@@ -786,3 +787,14 @@ export const teamAccessEvents = sqliteTable("team_access_events", {
   details: text("details", { mode: "json" }).$type<Record<string, unknown>>().notNull(),
   createdAt: text("created_at").notNull(),
 }, table => [index("idx_team_access_events_workspace_created").on(table.workspaceId, table.createdAt)]);
+
+export const oauthIdentities = sqliteTable("oauth_identities", {
+  provider: text("provider").notNull(), subject: text("subject").notNull(),
+  participantId: text("participant_id").notNull().references(() => participants.id, {onDelete:"cascade"}),
+  createdAt: text("created_at").notNull(),
+}, t => [uniqueIndex("idx_oauth_identity_subject").on(t.provider,t.subject), uniqueIndex("idx_oauth_identity_participant").on(t.provider,t.participantId)]);
+export const oauthFlows = sqliteTable("oauth_flows", {
+  stateHash:text("state_hash").primaryKey(), browserHash:text("browser_hash").notNull(), verifier:text("verifier").notNull(),
+  intent:text("intent").notNull(), nextPath:text("next_path").notNull(), origin:text("origin").notNull(),
+  participantId:text("participant_id"), sessionId:text("session_id"), expiresAt:text("expires_at").notNull(),
+}, t => [index("idx_oauth_flows_expiry").on(t.expiresAt)]);

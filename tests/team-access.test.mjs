@@ -27,7 +27,7 @@ async function harness() {
   let queue=Promise.resolve();
   d1.batch = statements => { const job=queue.then(async () => { sqlite.exec("BEGIN"); try { const results=[]; for (const statement of statements) { const result=await statement.all(); result.meta={changes:Number(sqlite.prepare("SELECT changes() n").get().n)}; results.push(result); } sqlite.exec("COMMIT");return results; } catch(e){sqlite.exec("ROLLBACK");throw e;} }); queue=job.catch(()=>{}); return job; };
   const db = drizzle(d1,{schema});
-  const options={overrides:{"@/db":{getD1:()=>d1,getDb:()=>db},"./database-init":{ensureDatabase:async()=>({participant:current}),WORKSPACE_ID:workspace}}};
+  const options={overrides:{"./starter-template-library":{starterEmailTemplateValues:()=>[]},"@/db":{getD1:()=>d1,getDb:()=>db},"./database-init":{ensureDatabase:async()=>({participant:current}),WORKSPACE_ID:workspace}}};
   const management=await loadAiServer("lib/server/team-management.ts",options);
   const auth=await loadAiServer("lib/server/team-auth.ts",options);
   const access=await loadAiServer("lib/server/team-access.ts",options);

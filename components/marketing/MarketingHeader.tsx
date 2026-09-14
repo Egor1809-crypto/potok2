@@ -1,80 +1,12 @@
 "use client";
-
-import { ArrowRight, Menu, X } from "@/components/ui/icons";
-import Image from "next/image";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useState } from "react";
-import { BRAND_NAME, brandConfig } from "@/config/brand";
-
+import { Menu, X, ArrowRight } from "@/components/ui/icons";
+import { BrandMark } from "@/components/layout/brand-mark";
+import styles from "./Marketing.module.css";
+const links = [["Возможности", "#product"], ["Как работает", "#workflow"], ["Вопросы", "#questions"]];
 export function MarketingHeader() {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <header className="fixed inset-x-0 top-0 z-50 border-b border-border bg-surface/85 backdrop-blur-xl">
-      <div className="container-shell flex h-[72px] items-center justify-between">
-        <Link href="/" className="group flex shrink-0 items-center gap-3" aria-label={`${BRAND_NAME}: главная`}>
-          <Image
-            src={brandConfig.logoPath}
-            alt=""
-            width={44}
-            height={44}
-            priority
-            className="size-11 shrink-0 rounded-xl object-cover shadow-[0_6px_18px_rgba(124,53,242,.25)] transition-transform group-hover:-rotate-3"
-          />
-          <span className="whitespace-nowrap text-2xl font-semibold leading-tight tracking-[0.02em] text-text-strong">{BRAND_NAME}</span>
-        </Link>
-
-        <nav className="hidden items-center gap-6 xl:flex" aria-label="Главная навигация">
-          {[
-            ["Продукт", "#product"],
-            ["Решения", "#solutions"],
-            ["Интеграции", "/integrations"],
-            ["Шаблоны", "#templates"],
-            ["Начать", "#start"],
-          ].map(([label, href]) => (
-            <a key={label} href={href} className="text-sm font-medium text-text-muted transition-colors hover:text-text-strong">
-              {label}
-            </a>
-          ))}
-        </nav>
-
-        <div className="hidden items-center gap-2 xl:flex">
-          <Link href="/login" className="btn btn-ghost">Войти</Link>
-          <Link href="/register" className="btn btn-primary gap-2">Начать работу <ArrowRight size={15} /></Link>
-        </div>
-
-        <button
-          type="button"
-          className="grid size-10 place-items-center rounded-lg text-[#454754] xl:hidden"
-          aria-label={open ? "Закрыть меню" : "Открыть меню"}
-          aria-expanded={open}
-          onClick={() => setOpen((value) => !value)}
-        >
-          {open ? <X size={21} /> : <Menu size={21} />}
-        </button>
-      </div>
-
-      {open && (
-        <div className="border-t border-border bg-surface px-5 py-5 xl:hidden">
-          <nav className="mx-auto flex max-w-xl flex-col gap-1" aria-label="Мобильная навигация">
-            {[
-              ["Продукт", "#product"],
-              ["Решения", "#solutions"],
-              ["Интеграции", "/integrations"],
-              ["Шаблоны", "#templates"],
-              ["Начать", "#start"],
-            ].map(([label, href]) => (
-              <a key={label} href={href} onClick={() => setOpen(false)} className="rounded-lg px-3 py-3 text-sm font-medium text-text hover:bg-surface-subtle">
-                {label}
-              </a>
-            ))}
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <Link href="/login" className="btn btn-secondary justify-center">Войти</Link>
-              <Link href="/register" className="btn btn-primary justify-center">Начать работу</Link>
-            </div>
-          </nav>
-        </div>
-      )}
-    </header>
-  );
+  const [open, setOpen] = useState(false);const button=useRef<HTMLButtonElement>(null);
+  useEffect(()=>{if(!open)return;const close=(event:KeyboardEvent)=>{if(event.key==='Escape'){setOpen(false);button.current?.focus()}};window.addEventListener('keydown',close);return()=>window.removeEventListener('keydown',close)},[open]);
+  return <header className={styles.header}><div><BrandMark href="/" /><nav aria-label="Возможности Потока">{links.map(([label,href])=><a key={href} href={href}>{label}</a>)}</nav><div className={styles.headerActions}><Link href="/login">Войти</Link><Link className={styles.smallPrimary} href="/register">Начать<ArrowRight aria-hidden className="size-5" /></Link></div><button ref={button} type="button" aria-label={open?"Закрыть меню":"Открыть меню"} aria-expanded={open} aria-controls="marketing-menu" className={styles.menuButton} onClick={()=>setOpen(v=>!v)}>{open?<X aria-hidden />:<Menu aria-hidden />}</button></div>{open&&<nav id="marketing-menu" className={styles.mobileMenu} aria-label="Мобильное меню">{links.map(([label,href])=><a key={href} href={href} onClick={()=>setOpen(false)}>{label}</a>)}<Link href="/login">Войти</Link><Link href="/register">Создать аккаунт</Link></nav>}</header>;
 }

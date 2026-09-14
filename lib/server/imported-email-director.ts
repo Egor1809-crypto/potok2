@@ -1,10 +1,11 @@
+import { getWorkspaceId } from "./workspace-context";
 import { getD1 } from "@/db";
 import { importedSource, type ImportCrop, type ImportDirection, type ImportFinding } from "@/lib/email-import/director";
 import { checkEmailHtml, completeHtml, MAX_HTML_CODE_LENGTH } from "@/lib/email-import/formats";
 import { ApiRequestError, asObject, cleanText, optionalText } from "./api-utils";
 import { aiProvider, parseAiJson } from "./email-ai";
 import { getEmailAssetDataUrl } from "./email-asset-store";
-import { ensureDatabase, WORKSPACE_ID } from "./database-init";
+import {ensureDatabase } from "./database-init";
 
 const string = { type: "string" };
 const schema = { type: "object", additionalProperties: false, required: ["summary", "findings", "notes", "patches", "html", "crops", "imagesReadable"], properties: {
@@ -131,7 +132,7 @@ export async function directImportedEmail(request: Request, value: unknown): Pro
     window_started_at = CASE WHEN window_started_at < ? THEN excluded.window_started_at ELSE window_started_at END,
     request_count = CASE WHEN window_started_at < ? THEN 1 ELSE request_count + 1 END, updated_at = excluded.updated_at
     WHERE window_started_at < ? OR request_count < 20 RETURNING request_count`)
-    .bind(`${WORKSPACE_ID}:import-director:${session.participant.id}`, WORKSPACE_ID, now, now, cutoff, cutoff, cutoff).first();
+    .bind(`${getWorkspaceId()}:import-director:${session.participant.id}`, getWorkspaceId(), now, now, cutoff, cutoff, cutoff).first();
   if (!rate) throw new ApiRequestError("Достигнут лимит разборов за час. Повторите позже.", 429);
   const images = await visionImages(request, source.images, source.imageOnly || action === "rebuild");
   // Long data URLs belong in the image input, not repeated in text tokens.

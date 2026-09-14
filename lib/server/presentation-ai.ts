@@ -1,3 +1,4 @@
+import { getWorkspaceId } from "./workspace-context";
 import { env } from "cloudflare:workers";
 import { presentationLayoutContracts, presentationVisualIssues, requestedPresentationColors } from "@/lib/presentation-design-quality";
 
@@ -33,7 +34,7 @@ import {
   optionalInteger,
   optionalText,
 } from "./api-utils";
-import { ensureDatabase, WORKSPACE_ID } from "./database-init";
+import {ensureDatabase } from "./database-init";
 import {
   storeGeneratedEmailAsset,
   storeGeneratedEmailAssetBytes,
@@ -893,7 +894,7 @@ async function reservePresentationGeneration(
     digest(JSON.stringify(input)),
   ]);
   const key = await digest(
-    `${WORKSPACE_ID}:presentation-outline:${actorHash}:${rawKey}`,
+    `${getWorkspaceId()}:presentation-outline:${actorHash}:${rawKey}`,
   );
   const replayed = await existingPresentationRequest(key, requestHash);
   if (replayed) return { key, replayed };
@@ -908,7 +909,7 @@ async function reservePresentationGeneration(
     VALUES (?, ?, 'presentation-outline', ?, 'pending', NULL, ?, ?)
   `,
     )
-    .bind(key, WORKSPACE_ID, requestHash, nowIso, nowIso)
+    .bind(key, getWorkspaceId(), requestHash, nowIso, nowIso)
     .run();
   if ((inserted.meta.changes ?? 0) === 0) {
     const concurrent = await existingPresentationRequest(key, requestHash);
@@ -922,7 +923,7 @@ async function reservePresentationGeneration(
   const cutoffIso = new Date(
     now.getTime() - GENERATION_WINDOW_MS,
   ).toISOString();
-  const rateKey = `${WORKSPACE_ID}:presentation-outline:${actorHash}`;
+  const rateKey = `${getWorkspaceId()}:presentation-outline:${actorHash}`;
   const rate = await getD1()
     .prepare(
       `
@@ -938,7 +939,7 @@ async function reservePresentationGeneration(
     )
     .bind(
       rateKey,
-      WORKSPACE_ID,
+      getWorkspaceId(),
       nowIso,
       nowIso,
       cutoffIso,

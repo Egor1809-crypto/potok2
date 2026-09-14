@@ -6,6 +6,7 @@ import { LogOut, Search } from "@/components/ui/icons";
 
 import { Avatar } from "@/components/ui/avatar";
 import { IconButton } from "@/components/ui/button";
+import { clearAccountDrafts } from "@/lib/browser-session";
 import { demoUser } from "@/config/brand";
 
 type TopbarProps = {
@@ -66,6 +67,7 @@ export function Topbar({
           variant="ghost"
           onClick={() => {
             void fetch("/api/auth/logout", { method: "POST" }).finally(() => {
+              clearAccountDrafts();
               window.location.assign("/");
             });
           }}

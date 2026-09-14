@@ -1,3 +1,4 @@
+import { getWorkspaceId } from "./workspace-context";
 import { env } from "cloudflare:workers";
 
 import { getD1 } from "@/db";
@@ -17,7 +18,7 @@ import {
   storeGeneratedEmailAsset,
   storeGeneratedEmailAssetBytes,
 } from "./email-asset-store";
-import { ensureDatabase, WORKSPACE_ID } from "./database-init";
+import {ensureDatabase } from "./database-init";
 
 const STYLES = new Set<ImageStudioStyle>([
   "editorial",
@@ -164,14 +165,14 @@ async function reserveGeneration(request: Request, input: ImageStudioGenerateReq
     digest(actor),
     digest(JSON.stringify(input)),
   ]);
-  const key = await digest(`${WORKSPACE_ID}:image-studio:${actorHash}:${rawKey}`);
+  const key = await digest(`${getWorkspaceId()}:image-studio:${actorHash}:${rawKey}`);
   const replayed = await existingIdempotentResult(request, key, requestHash);
   if (replayed) return { key, requestHash, replayed };
 
   const now = new Date();
   const nowIso = now.toISOString();
   const cutoffIso = new Date(now.getTime() - GENERATION_WINDOW_MS).toISOString();
-  const rateKey = `${WORKSPACE_ID}:image-studio:${actorHash}`;
+  const rateKey = `${getWorkspaceId()}:image-studio:${actorHash}`;
   const rate = await getD1().prepare(`
     INSERT INTO ai_request_limits (key, workspace_id, scope, window_started_at, request_count, updated_at)
     VALUES (?, ?, 'image-studio', ?, 1, ?)
@@ -183,7 +184,7 @@ async function reserveGeneration(request: Request, input: ImageStudioGenerateReq
     RETURNING request_count
   `).bind(
     rateKey,
-    WORKSPACE_ID,
+    getWorkspaceId(),
     nowIso,
     nowIso,
     cutoffIso,
@@ -203,7 +204,7 @@ async function reserveGeneration(request: Request, input: ImageStudioGenerateReq
     INSERT OR IGNORE INTO ai_idempotency
       (key, workspace_id, operation, request_hash, status, asset_id, created_at, updated_at)
     VALUES (?, ?, 'image-studio', ?, 'pending', NULL, ?, ?)
-  `).bind(key, WORKSPACE_ID, requestHash, nowIso, nowIso).run();
+  `).bind(key, getWorkspaceId(), requestHash, nowIso, nowIso).run();
   if ((inserted.meta.changes ?? 0) === 0) {
     const concurrent = await existingIdempotentResult(request, key, requestHash);
     if (concurrent) return { key, requestHash, replayed: concurrent };

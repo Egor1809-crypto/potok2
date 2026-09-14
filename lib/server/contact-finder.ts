@@ -1,6 +1,7 @@
+import { getWorkspaceId } from "./workspace-context";
 import { ApiRequestError, asObject, cleanText, optionalBoolean } from "./api-utils";
 import { getD1 } from "@/db";
-import { WORKSPACE_ID } from "./database-init";
+
 import { findDiscoveredPhones, isIdentifierPhoneContext, normalizeDiscoveredPhone } from "@/lib/contact-finder/phones";
 import type {
   ContactFinderCandidate,
@@ -615,7 +616,7 @@ async function reserveAnalysis(request: Request): Promise<void> {
   const now = new Date();
   const nowIso = now.toISOString();
   const cutoffIso = new Date(now.getTime() - REQUEST_WINDOW_MS).toISOString();
-  const key = `${WORKSPACE_ID}:contact-finder:${await actorHash(request)}`;
+  const key = `${getWorkspaceId()}:contact-finder:${await actorHash(request)}`;
   const rate = await getD1()
     .prepare(`
       INSERT INTO ai_request_limits (key, workspace_id, scope, window_started_at, request_count, updated_at)
@@ -629,7 +630,7 @@ async function reserveAnalysis(request: Request): Promise<void> {
     `)
     .bind(
       key,
-      WORKSPACE_ID,
+      getWorkspaceId(),
       nowIso,
       nowIso,
       cutoffIso,

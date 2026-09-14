@@ -1,3 +1,4 @@
+import { getWorkspaceId } from "./workspace-context";
 import { parsePresentationCanvas } from "@/lib/presentation-import/model";
 import { and, desc, eq } from "drizzle-orm";
 
@@ -36,7 +37,7 @@ import {
   newId,
   optionalText,
 } from "./api-utils";
-import { ensureDatabase, WORKSPACE_ID } from "./database-init";
+import {ensureDatabase } from "./database-init";
 
 const THEMES = new Set<PresentationThemeId>([
   "atelier",
@@ -502,7 +503,7 @@ async function parseCreate(
       .where(
         and(
           eq(emailTemplates.id, sourceEmailTemplateId),
-          eq(emailTemplates.workspaceId, WORKSPACE_ID),
+          eq(emailTemplates.workspaceId, getWorkspaceId()),
         ),
       )
       .limit(1);
@@ -546,13 +547,13 @@ export async function listPresentationProjects(
     getDb()
       .select()
       .from(presentationProjects)
-      .where(eq(presentationProjects.workspaceId, WORKSPACE_ID))
+      .where(eq(presentationProjects.workspaceId, getWorkspaceId()))
       .orderBy(desc(presentationProjects.updatedAt))
       .limit(100),
     getDb()
       .select({ itemType: presentationFavorites.itemType, itemId: presentationFavorites.itemId })
       .from(presentationFavorites)
-      .where(eq(presentationFavorites.workspaceId, WORKSPACE_ID)),
+      .where(eq(presentationFavorites.workspaceId, getWorkspaceId())),
   ]);
   return {
     presentations: rows.map(toRecord),
@@ -589,7 +590,7 @@ export async function setPresentationFavorite(
       .where(
         and(
           eq(presentationProjects.id, itemId),
-          eq(presentationProjects.workspaceId, WORKSPACE_ID),
+          eq(presentationProjects.workspaceId, getWorkspaceId()),
         ),
       )
       .limit(1);
@@ -601,7 +602,7 @@ export async function setPresentationFavorite(
       .insert(presentationFavorites)
       .values({
         id: newId("presentation-favorite"),
-        workspaceId: WORKSPACE_ID,
+        workspaceId: getWorkspaceId(),
         itemType,
         itemId,
         createdAt: new Date().toISOString(),
@@ -612,7 +613,7 @@ export async function setPresentationFavorite(
       .delete(presentationFavorites)
       .where(
         and(
-          eq(presentationFavorites.workspaceId, WORKSPACE_ID),
+          eq(presentationFavorites.workspaceId, getWorkspaceId()),
           eq(presentationFavorites.itemType, itemType),
           eq(presentationFavorites.itemId, itemId),
         ),
@@ -633,7 +634,7 @@ export async function getPresentationProject(
     .where(
       and(
         eq(presentationProjects.id, id),
-        eq(presentationProjects.workspaceId, WORKSPACE_ID),
+        eq(presentationProjects.workspaceId, getWorkspaceId()),
       ),
     )
     .limit(1);
@@ -653,7 +654,7 @@ export async function createPresentationProject(
     .insert(presentationProjects)
     .values({
       id,
-      workspaceId: WORKSPACE_ID,
+      workspaceId: getWorkspaceId(),
       ...input,
       createdAt: now,
       updatedAt: now,
@@ -674,7 +675,7 @@ export async function updatePresentationProject(
     .where(
       and(
         eq(presentationProjects.id, id),
-        eq(presentationProjects.workspaceId, WORKSPACE_ID),
+        eq(presentationProjects.workspaceId, getWorkspaceId()),
       ),
     )
     .limit(1);
@@ -730,7 +731,7 @@ export async function updatePresentationProject(
     .where(
       and(
         eq(presentationProjects.id, id),
-        eq(presentationProjects.workspaceId, WORKSPACE_ID),
+        eq(presentationProjects.workspaceId, getWorkspaceId()),
       ),
     );
   return getPresentationProject(request, id);
@@ -747,7 +748,7 @@ export async function deletePresentationProject(
     .where(
       and(
         eq(presentationProjects.id, id),
-        eq(presentationProjects.workspaceId, WORKSPACE_ID),
+        eq(presentationProjects.workspaceId, getWorkspaceId()),
       ),
     )
     .returning({ id: presentationProjects.id });
@@ -756,7 +757,7 @@ export async function deletePresentationProject(
     .delete(presentationFavorites)
     .where(
       and(
-        eq(presentationFavorites.workspaceId, WORKSPACE_ID),
+        eq(presentationFavorites.workspaceId, getWorkspaceId()),
         eq(presentationFavorites.itemType, "project"),
         eq(presentationFavorites.itemId, id),
       ),

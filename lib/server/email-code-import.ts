@@ -1,8 +1,9 @@
+import { getWorkspaceId } from "./workspace-context";
 import { getD1 } from "@/db";
 import { checkEmailHtml, completeHtml, MAX_AI_CODE_LENGTH, MAX_HTML_CODE_LENGTH } from "@/lib/email-import/formats";
 import { ApiRequestError, asObject, cleanText, optionalText } from "./api-utils";
 import { aiProvider, parseAiJson } from "./email-ai";
-import { ensureDatabase, WORKSPACE_ID } from "./database-init";
+import {ensureDatabase } from "./database-init";
 
 type CodeLetter = { name: string; subject: string; previewText: string; html: string; notes: string[] };
 const schema = {
@@ -48,7 +49,7 @@ export async function convertEmailCode(request: Request, value: unknown): Promis
     window_started_at = CASE WHEN window_started_at < ? THEN excluded.window_started_at ELSE window_started_at END,
     request_count = CASE WHEN window_started_at < ? THEN 1 ELSE request_count + 1 END, updated_at = excluded.updated_at
     WHERE window_started_at < ? OR request_count < 20 RETURNING request_count`)
-    .bind(`${WORKSPACE_ID}:email-code:${session.participant.id}`, WORKSPACE_ID, now, now, cutoff, cutoff, cutoff).first();
+    .bind(`${getWorkspaceId()}:email-code:${session.participant.id}`, getWorkspaceId(), now, now, cutoff, cutoff, cutoff).first();
   if (!rate) throw new ApiRequestError("Достигнут лимит преобразований за час. Попробуйте позже.", 429);
   let model = provider.model;
   const call = async (repair?: string) => {

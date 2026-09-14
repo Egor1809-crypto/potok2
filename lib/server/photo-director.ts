@@ -1,4 +1,5 @@
-import { ensureDatabase, WORKSPACE_ID } from "./database-init";
+import { getWorkspaceId } from "./workspace-context";
+import {ensureDatabase } from "./database-init";
 import { ApiRequestError, asObject, cleanText } from "./api-utils";
 import { aiProvider, parseAiJson } from "./email-ai";
 import { getEmailAssetDataUrl } from "./email-asset-store";
@@ -26,8 +27,8 @@ export async function directPhoto(request: Request, value: unknown) {
       `INSERT INTO ai_request_limits (key, workspace_id, scope, window_started_at, request_count, updated_at) VALUES (?, ?, 'photo-director', ?, 1, ?) ON CONFLICT(key) DO UPDATE SET window_started_at = CASE WHEN window_started_at < ? THEN excluded.window_started_at ELSE window_started_at END, request_count = CASE WHEN window_started_at < ? THEN 1 ELSE request_count + 1 END, updated_at = excluded.updated_at WHERE window_started_at < ? OR request_count < 40 RETURNING request_count`,
     )
     .bind(
-      `${WORKSPACE_ID}:photo-director:${session.participant.id}`,
-      WORKSPACE_ID,
+      `${getWorkspaceId()}:photo-director:${session.participant.id}`,
+      getWorkspaceId(),
       now,
       now,
       cutoff,

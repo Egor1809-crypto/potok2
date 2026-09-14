@@ -1,3 +1,4 @@
+import { getWorkspaceId } from "./workspace-context";
 import { requireTeamAdmin } from "./team-access";
 import { and, desc, eq } from "drizzle-orm";
 
@@ -26,7 +27,7 @@ import {
   emailDocumentPlainText,
   parseEmailBuilderDocument,
 } from "./email-document";
-import { ensureDatabase, WORKSPACE_ID } from "./database-init";
+import {ensureDatabase } from "./database-init";
 import { unknownMergeTokens } from "./provider-adapters";
 import { isStarterEmailTemplateId } from "./starter-template-library";
 
@@ -241,7 +242,7 @@ async function templateById(id: string): Promise<EmailTemplateRecord> {
     .where(
       and(
         eq(emailTemplates.id, id),
-        eq(emailTemplates.workspaceId, WORKSPACE_ID),
+        eq(emailTemplates.workspaceId, getWorkspaceId()),
       ),
     )
     .limit(1);
@@ -255,7 +256,7 @@ async function assertNameAvailable(nameKey: string, exceptId?: string) {
     .from(emailTemplates)
     .where(
       and(
-        eq(emailTemplates.workspaceId, WORKSPACE_ID),
+        eq(emailTemplates.workspaceId, getWorkspaceId()),
         eq(emailTemplates.nameKey, nameKey),
       ),
     );
@@ -282,7 +283,7 @@ export async function listEmailTemplates(
   const rows = await getDb()
     .select()
     .from(emailTemplates)
-    .where(eq(emailTemplates.workspaceId, WORKSPACE_ID))
+    .where(eq(emailTemplates.workspaceId, getWorkspaceId()))
     .orderBy(desc(emailTemplates.updatedAt));
   return {
     templates: rows.map(toEmailTemplateRecord),
@@ -321,7 +322,7 @@ export async function createEmailTemplate(
   try {
     await getDb().insert(emailTemplates).values({
       id,
-      workspaceId: WORKSPACE_ID,
+      workspaceId: getWorkspaceId(),
       ...input,
       createdAt: now,
       updatedAt: now,
@@ -370,7 +371,7 @@ export async function updateEmailTemplate(
       .where(
         and(
           eq(emailTemplates.id, id),
-          eq(emailTemplates.workspaceId, WORKSPACE_ID),
+          eq(emailTemplates.workspaceId, getWorkspaceId()),
           eq(emailTemplates.updatedAt, expectedUpdatedAt),
         ),
       )
@@ -396,7 +397,7 @@ async function availableCloneName(sourceName: string): Promise<string> {
   const rows = await getDb()
     .select({ nameKey: emailTemplates.nameKey })
     .from(emailTemplates)
-    .where(eq(emailTemplates.workspaceId, WORKSPACE_ID));
+    .where(eq(emailTemplates.workspaceId, getWorkspaceId()));
   const occupied = new Set(rows.map((row) => row.nameKey));
   const root = sourceName.slice(0, 140).trimEnd();
   for (let number = 1; number <= 10_000; number += 1) {
@@ -446,7 +447,7 @@ export async function deleteEmailTemplate(
     .from(campaigns)
     .where(
       and(
-        eq(campaigns.workspaceId, WORKSPACE_ID),
+        eq(campaigns.workspaceId, getWorkspaceId()),
         eq(campaigns.templateId, id),
       ),
     );
@@ -457,7 +458,7 @@ export async function deleteEmailTemplate(
       .set({ templateId: null, updatedAt: now })
       .where(
         and(
-          eq(campaigns.workspaceId, WORKSPACE_ID),
+          eq(campaigns.workspaceId, getWorkspaceId()),
           eq(campaigns.templateId, id),
         ),
       ),
@@ -466,7 +467,7 @@ export async function deleteEmailTemplate(
       .where(
         and(
           eq(emailTemplates.id, id),
-          eq(emailTemplates.workspaceId, WORKSPACE_ID),
+          eq(emailTemplates.workspaceId, getWorkspaceId()),
         ),
       ),
   ]);

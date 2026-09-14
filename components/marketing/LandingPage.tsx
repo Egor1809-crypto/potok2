@@ -1,83 +1,54 @@
-import { ArrowRight, Check, Play } from "@/components/ui/icons";
-import Image from "next/image";
 import Link from "next/link";
-import { FeatureShowcase } from "./FeatureShowcase";
+import { ArrowRight, Check, Mail, Presentation, Image as ImageIcon, Sparkles, Send, ChevronDown } from "@/components/ui/icons";
 import { MarketingHeader } from "./MarketingHeader";
-import { BRAND_NAME, brandConfig } from "@/config/brand";
+import { ProductPreview } from "./ProductPreview";
+import { BrandMark } from "@/components/layout/brand-mark";
+import { brandConfig } from "@/config/brand";
+import styles from "./Marketing.module.css";
 
-const footerGroups = [
-  {
-    title: "Продукт",
-    links: [
-      ["Контакты", "/contacts"],
-      ["Кампании", "/campaigns"],
-      ["Каналы и интеграции", "/integrations"],
-      ["Аналитика", "/analytics"],
-    ],
-  },
-  {
-    title: "Инструменты",
-    links: [
-      ["Аудитории", "/segments"],
-      ["Импорт контактов", "/import"],
-      ["Шаблоны писем", "/templates"],
-      ["Настройки", "/settings"],
-    ],
-  },
-  {
-    title: "Начало работы",
-    links: [
-      ["Возможности", "#product"],
-      ["Новая кампания", "/campaigns/new"],
-      ["Войти", "/login"],
-      ["Открыть аккаунт", "/register"],
-    ],
-  },
-] as const;
-
+const steps = [
+  ["01", "Сформулируйте идею", "Опишите задачу ИИ, выберите шаблон или загрузите готовый материал."],
+  ["02", "Соберите материал", "Редактируйте текст, изображения и элементы прямо на холсте."],
+  ["03", "Посмотрите свежим взглядом", "Арт-директор найдёт слабые места и предложит конкретные улучшения."],
+  ["04", "Поделитесь результатом", "Экспортируйте презентацию или запланируйте отправку письма аудитории."],
+];
+const questions = [
+  ["Можно работать с готовыми материалами?", "Да. Импортируйте письмо, загрузите презентацию в PowerPoint или PDF, выберите изображения из медиатеки. После импорта можно продолжить работу в конструкторе."],
+  ["Что проверяет арт-директор?", "В письмах — текст, оформление и призыв к действию. В презентациях — отдельные слайды и логику всей истории. В фотографиях — композицию, цвет и читаемость будущего макета. Рекомендации остаются под вашим контролем."],
+  ["Как отправляются рассылки?", "Подготовьте письмо, выберите контакты или сегмент и укажите время отправки. Поток передаст рассылку подключённому провайдеру, а календарь и история помогут следить за её состоянием."],
+  ["Можно работать вместе с командой?", "Да. Участники работают под своими аккаунтами. Администратор управляет приглашениями и доступом к контактным базам."],
+];
 export function LandingPage() {
-  return (
-    <main className="mailflow-marketing min-h-screen overflow-hidden bg-background text-text-strong">
-      <MarketingHeader />
-      <section className="relative overflow-hidden bg-[#11111b] pb-16 pt-32 text-white sm:pb-24 sm:pt-40">
-        <div className="container-shell relative grid items-center gap-12 lg:grid-cols-[.92fr_1.08fr]">
-          <div className="relative z-10"><p className="text-[11px] font-semibold uppercase tracking-[.18em] text-[#bba6ff]">Поток · платформа деловой коммуникации</p><h1 className="mt-6 max-w-xl text-[clamp(3.2rem,6vw,6.1rem)] font-medium leading-[.92] tracking-[-.065em]">Письма, которые <span className="text-[#9b72ff]">ведут к действию.</span></h1><p className="mt-7 max-w-lg text-[17px] leading-8 text-white/65">Соберите письмо, выберите аудиторию и запустите рассылку в одном рабочем пространстве — с контролем каждого шага команды.</p><div className="mt-9 flex flex-col gap-3 sm:flex-row"><Link href="/register" className="btn min-h-12 bg-[#8a4cff] px-6 text-white hover:bg-[#9b64ff]">Открыть рабочее пространство <ArrowRight size={24}/></Link><Link href="/login" className="btn min-h-12 border-white/20 bg-white/5 px-6 text-white hover:bg-white/10"><Play size={13} fill="currentColor"/> Войти</Link></div><div className="mt-11 grid max-w-md grid-cols-3 border-t border-white/12 pt-5 text-[11px] text-white/50"><span>Письма и шаблоны</span><span>Единая база</span><span>Контроль отправок</span></div></div>
-          <div className="relative"><div className="absolute -inset-8 rounded-full bg-[#7544ff]/25 blur-3xl"/><Image src="/landing/potok-executive-hero.png" alt="Рабочее пространство Поток для подготовки деловых писем" width={1536} height={1024} priority className="relative rounded-[28px] border border-white/15 shadow-2xl"/></div>
+  return <div className={styles.site}>
+    <a className={styles.skip} href="#main">К содержанию</a>
+    <MarketingHeader />
+    <main id="main">
+      <section className={styles.hero}>
+        <div className={styles.heroCopy}>
+          <p className={styles.intro}><span aria-hidden />Творческая студия для вашей команды</p>
+          <h1>От первой идеи<br />до последнего<br /><em>штриха.</em></h1>
+          <p className={styles.lead}>Письма, презентации и изображения — в одном Потоке. Создавайте с ИИ, доводите до ума и отправляйте тем, кому это важно.</p>
+          <div className={styles.heroActions}><Link href="/register" className={styles.primary}>Начать работу<ArrowRight aria-hidden className="size-6" /></Link><a href="#product" className={styles.textLink}>Посмотреть возможности<span aria-hidden>↗</span></a></div>
+          <div className={styles.heroNote}><Check aria-hidden className="size-5" />Шаблоны, редактор и арт-директор под рукой</div>
+        </div>
+        <ProductPreview />
+      </section>
+      <section id="product" className={styles.product}>
+        <div className={styles.sectionHead}><h2>Три формата.<br /><span>Один подход к работе.</span></h2><p>Меньше переключений между сервисами.<br />Больше внимания тому, что вы создаёте.</p></div>
+        <div className={styles.formats}>
+          <article><span className={styles.formatIcon}><Mail aria-hidden /></span><h3>Письма, которые хочется открыть</h3><p>Собирайте макеты из блоков, добавляйте изображения и персонализацию. Проверьте результат перед отправкой.</p><a href="#workflow">От макета до рассылки<ArrowRight aria-hidden className="size-5" /></a><div className={styles.emailVisual} aria-hidden><span>ПРИГЛАШЕНИЕ</span><strong>Есть идея.<br />Давайте обсудим.</strong><i /><b>Открыть программу ↗</b></div></article>
+          <article><span className={styles.formatIcon}><Presentation aria-hidden /></span><h3>Презентации с ясной мыслью</h3><p>Начните с шаблона или импортируйте PowerPoint и PDF. Редактируйте слайды и проверяйте всю историю целиком.</p><a href="#workflow">От идеи до выступления<ArrowRight aria-hidden className="size-5" /></a><div className={styles.deckVisual} aria-hidden><div><span>ПЛАН НА ЗАВТРА</span><strong>Большие идеи.<br />Понятные шаги.</strong><i>01 — 03</i></div><span>02</span><span>03</span></div></article>
+          <article><span className={styles.formatIcon}><ImageIcon aria-hidden /></span><h3>Изображения с нужным настроением</h3><p>Опишите сюжет, создайте визуал и сохраните его в медиатеке. Используйте одну работу в письме и презентации.</p><a href="#workflow">От описания до визуала<ArrowRight aria-hidden className="size-5" /></a><div className={styles.imageVisual} aria-hidden><div /><div /><span>Свет. Форма. Характер.</span></div></article>
         </div>
       </section>
-
-      <section className="border-y border-border bg-surface-subtle/55 py-10">
-        <div className="container-shell">
-          <p className="text-center text-[11px] font-medium uppercase tracking-[.14em] text-[#9698a5]">Для специалистов, которые работают с большой аудиторией</p>
-          <div className="mt-7 grid grid-cols-2 items-center gap-x-8 gap-y-7 text-center sm:grid-cols-3 lg:grid-cols-6">
-            {[["АРБИТРА","Право"],["ВЕКТОР","Партнёры"],["ПРИЗМА","Консалтинг"],["СЕВЕР","Группа"],["МАЯК","События"],["МОСТ","Практика"]].map(([name, suffix])=><div key={name} className="text-[12px] font-semibold tracking-[.08em] text-[#7d7f8b]">{name}<span className="ml-1 font-normal text-[#aaa]">{suffix}</span></div>)}
-          </div>
-        </div>
+      <section className={styles.director}>
+        <div className={styles.directorCopy}><span className={styles.darkIcon}><Sparkles aria-hidden /></span><h2>Взгляд со стороны.<br /><em>Прямо в проекте.</em></h2><p>Когда всё почти готово, откройте арт-директора. Он поможет заметить перегруженный слайд, слабый заголовок или неудачное кадрирование.</p><span className={styles.directorNote}>Вы решаете, какие замечания применить.</span></div>
+        <div className={styles.reviewExample}><div><span>Пример разбора</span><Sparkles aria-hidden className="size-6" /></div><h3>Дайте главной мысли больше места</h3><p>На слайде сразу три акцента. Укоротите заголовок и оставьте один основной визуал — так идею будет легче считать.</p><div className={styles.reviewChips}><span>Композиция</span><span>Иерархия</span><span>Читаемость</span></div><div className={styles.reviewCompare} aria-hidden><div><i /><i /><i /><b /><b /><b /></div><ArrowRight className="size-6" /><div><strong>Одна<br />главная<br />мысль.</strong><span /></div></div></div>
       </section>
-
-      <FeatureShowcase />
-
-      <section id="start" className="px-4 py-20 sm:py-28">
-        <div className="relative mx-auto max-w-[1180px] overflow-hidden rounded-[28px] bg-[#20212c] px-6 py-16 text-center text-white sm:px-12 sm:py-24">
-          <div className="absolute -left-20 -top-44 size-[420px] rounded-full bg-[#746df8]/25 blur-3xl" />
-          <div className="absolute -bottom-48 -right-10 size-[420px] rounded-full bg-[#3d9ce8]/15 blur-3xl" />
-          <div className="relative">
-            <p className="section-eyebrow !text-[#a9a5ff]">Всё в одном пространстве</p>
-            <h2 className="mx-auto mt-5 max-w-3xl text-[clamp(2.4rem,5vw,4.8rem)] font-medium leading-[1] tracking-[-.055em]">Превращайте базу контактов в живые диалоги.</h2>
-            <p className="mx-auto mt-6 max-w-lg text-[15px] leading-7 text-[#b7b8c2]">Начните с тех, кого уже знаете. {BRAND_NAME} даст вам нужный контекст и уберёт лишние шаги.</p>
-            <Link href="/register" className="mt-9 inline-flex min-h-12 items-center justify-center gap-2 rounded-[10px] bg-white px-5 text-[14px] font-semibold text-[#242530] shadow-lg transition-transform hover:-translate-y-0.5">Начать работу <ArrowRight size={24} /></Link>
-            <div className="mx-auto mt-8 flex max-w-md flex-wrap justify-center gap-x-5 gap-y-2 text-[11px] text-[#b7b8c2]">{["Общая база команды","Цвет автора у контакта","Одинаковый полный доступ"].map(item=><span key={item} className="flex items-center gap-1.5"><Check size={16} className="text-[#a9a5ff]" />{item}</span>)}</div>
-          </div>
-        </div>
-      </section>
-
-      <footer className="border-t border-border bg-surface-subtle/55">
-        <div className="container-shell grid gap-10 py-12 sm:grid-cols-[1.5fr_repeat(3,1fr)]">
-          <div><Link href="/" className="flex items-center gap-2.5"><Image src={brandConfig.logoPath} alt="" width={32} height={32} className="size-8 rounded-[9px] object-cover" /><span className="text-[14px] font-semibold tracking-[.12em]">{BRAND_NAME}</span></Link><p className="mt-4 max-w-xs text-[12px] leading-5 text-text-muted">Единое пространство для контактов, кампаний и всех диалогов между ними.</p></div>
-          {footerGroups.map(group=><div key={group.title}><p className="text-[11px] font-semibold text-[#393a46]">{group.title}</p><div className="mt-4 space-y-3">{group.links.map(([label,href])=><Link key={label} href={href} className="block text-[12px] text-[#858793] hover:text-[#4d4f5c]">{label}</Link>)}</div></div>)}
-        </div>
-        <div className="container-shell flex flex-col gap-3 border-t border-[#e9eaf0] py-5 text-[10px] text-[#9698a5] sm:flex-row sm:items-center sm:justify-between"><span>© 2026 {BRAND_NAME}.</span><span>Контакты, согласия и кампании — в одном рабочем пространстве.</span></div>
-      </footer>
+      <section id="workflow" className={styles.workflow}><div className={styles.sectionHead}><h2>От задумки<br /><span>к готовому проекту.</span></h2><p>Весь процесс перед глазами.<br />Следующий шаг всегда понятен.</p></div><div className={styles.steps}>{steps.map(([number,title,copy])=><article key={number}><span>{number}</span><h3>{title}</h3><p>{copy}</p></article>)}</div></section>
+      <section id="questions" className={styles.faq}><h2>До начала работы</h2><div>{questions.map(([question,answer])=><details key={question}><summary>{question}<ChevronDown aria-hidden className="size-5" /></summary><p>{answer}</p></details>)}</div></section>
+      <section className={styles.start}><Send aria-hidden /><h2>Дайте идее<br />свой <em>Поток.</em></h2><Link href="/register" className={styles.primary}>Создать аккаунт<ArrowRight aria-hidden className="size-6" /></Link><Link href="/login" className={styles.textLink}>Уже с нами? Войти</Link></section>
     </main>
-  );
+    <footer className={styles.footer}><BrandMark href="/" /><span>© {new Date().getFullYear()} Поток</span><a href={`mailto:${brandConfig.supportEmail}`}>Связаться с нами ↗</a><Link href="/login">Войти</Link></footer>
+  </div>;
 }

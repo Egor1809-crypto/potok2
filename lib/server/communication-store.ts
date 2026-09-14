@@ -1,10 +1,11 @@
+import { getWorkspaceId, withWorkspace, LEGACY_WORKSPACE_ID, isLegacyWorkspace } from "./workspace-context";
 import { accessParticipant, rawContactAccess, requireContactAccess, requireTeamAdmin } from "./team-access";
 import { env } from "cloudflare:workers";
 import { and, eq } from "drizzle-orm";
 import { getD1, getDb } from "@/db";
 import { contacts } from "@/db/schema";
 import type { ContactRecord } from "@/types/api";
-import { ensureDatabase, ensureSystemDatabase, WORKSPACE_ID } from "./database-init";
+import {ensureDatabase, ensureSystemDatabase } from "./database-init";
 import { ApiRequestError, asObject, cleanText, newId, parseIsoDate } from "./api-utils";
 import { classifyReply, companyKey, consentState, endpointFor, replyCategories, usagePercent, type Channel, type Evidence, type ReplyAnalysis, type ReplyCategory } from "@/lib/communications/rules";
 type Policy = {
@@ -48,17 +49,17 @@ function asContact(row: typeof contacts.$inferSelect): ContactRecord {
         marketingConsentText: f.marketingConsentText ?? "", serviceEmailAllowed: f.serviceEmailAllowed === "true", serviceEmailBasis: f.serviceEmailBasis ?? "", serviceEmailAllowedAt: f.serviceEmailAllowedAt || null };
 }
 export async function communicationContact(id: string) {
-    const [row] = await getDb().select().from(contacts).where(and(eq(contacts.workspaceId, WORKSPACE_ID), eq(contacts.id, id))).limit(1);
+    const [row] = await getDb().select().from(contacts).where(and(eq(contacts.workspaceId, getWorkspaceId()), eq(contacts.id, id))).limit(1);
     if (!row)
         throw new ApiRequestError("Контакт не найден.", 404);
     return asContact(row);
 }
 export async function communicationPolicy() {
-    return await getD1().prepare("SELECT * FROM communication_policy WHERE workspace_id = ?").bind(WORKSPACE_ID).first<Policy>() ?? defaults;
+    return await getD1().prepare("SELECT * FROM communication_policy WHERE workspace_id = ?").bind(getWorkspaceId()).first<Policy>() ?? defaults;
 }
 async function audit(actor: string, action: string, entity: string, details: unknown) {
     await getD1().prepare("INSERT INTO communication_audit VALUES (?, ?, ?, ?, ?, ?, ?)")
-        .bind(newId("audit"), WORKSPACE_ID, actor, action, entity, JSON.stringify(details), new Date().toISOString()).run();
+        .bind(newId("audit"), getWorkspaceId(), actor, action, entity, JSON.stringify(details), new Date().toISOString()).run();
 }
 const touchUnion = `SELECT t.id, t.endpoint, t.channel, t.company_key, t.campaign_id, t.actor_id, t.occurred_at FROM communication_touches t WHERE t.workspace_id = ?
  UNION ALL SELECT o.id, lower(trim(o.recipient_endpoint)), o.channel,
@@ -69,7 +70,7 @@ export async function assessCommunications(audience: ContactRecord[], selectedCh
     const db = getD1();
     const policy = await communicationPolicy();
     const now = new Date().toISOString();
-    const workspace = await db.prepare("SELECT company_name,name FROM workspaces WHERE id=?").bind(WORKSPACE_ID).first<{
+    const workspace = await db.prepare("SELECT company_name,name FROM workspaces WHERE id=?").bind(getWorkspaceId()).first<{
         company_name: string;
         name: string;
     }>();
@@ -77,12 +78,12 @@ export async function assessCommunications(audience: ContactRecord[], selectedCh
     const sameOperator = (value: string) => value.trim().toLocaleLowerCase("ru-RU") === operatorName.trim().toLocaleLowerCase("ru-RU");
     const cutoff = new Date(Date.parse(at) - policy.window_days * 86400000).toISOString();
     const [touches, holds] = await Promise.all([
-        db.prepare(`SELECT endpoint, channel, count(*) AS total FROM (${touchUnion}) WHERE occurred_at >= ? AND occurred_at <= ? GROUP BY endpoint,channel`).bind(WORKSPACE_ID, WORKSPACE_ID, cutoff, now).all<{
+        db.prepare(`SELECT endpoint, channel, count(*) AS total FROM (${touchUnion}) WHERE occurred_at >= ? AND occurred_at <= ? GROUP BY endpoint,channel`).bind(getWorkspaceId(), getWorkspaceId(), cutoff, now).all<{
             endpoint: string;
             channel: string;
             total: number;
         }>(),
-        db.prepare("SELECT * FROM communication_holds WHERE workspace_id = ? AND active = 1 AND (until_at IS NULL OR until_at > ?)").bind(WORKSPACE_ID, at).all<{
+        db.prepare("SELECT * FROM communication_holds WHERE workspace_id = ? AND active = 1 AND (until_at IS NULL OR until_at > ?)").bind(getWorkspaceId(), at).all<{
             endpoint: string;
             channel: string;
             reason: string;
@@ -92,7 +93,7 @@ export async function assessCommunications(audience: ContactRecord[], selectedCh
     const evidence: Evidence[] = [];
     for (let i = 0; i < endpoints.length; i += 80) {
         const part = endpoints.slice(i, i + 80);
-        const rows = await db.prepare(`SELECT * FROM communication_consents WHERE workspace_id = ? AND endpoint IN (${part.map(() => "?").join(",")})`).bind(WORKSPACE_ID, ...part).all<Evidence>();
+        const rows = await db.prepare(`SELECT * FROM communication_consents WHERE workspace_id = ? AND endpoint IN (${part.map(() => "?").join(",")})`).bind(getWorkspaceId(), ...part).all<Evidence>();
         evidence.push(...rows.results);
     }
     const totals = new Map(touches.results.map(t => [`${t.channel}:${t.endpoint}`, Number(t.total)]));
@@ -112,7 +113,7 @@ export async function assessCommunications(audience: ContactRecord[], selectedCh
         set.add(contact.email.trim().toLowerCase() || contact.id);
         companyRecipients.set(key, set);
     }
-    const pending = await db.prepare("SELECT id,contact_ids,delivery_channels,audience_type FROM campaigns WHERE workspace_id=? AND status='scheduled' AND scheduled_at>=? AND scheduled_at<=? AND id<>?").bind(WORKSPACE_ID, cutoff, at, campaignId ?? "").all<{
+    const pending = await db.prepare("SELECT id,contact_ids,delivery_channels,audience_type FROM campaigns WHERE workspace_id=? AND status='scheduled' AND scheduled_at>=? AND scheduled_at<=? AND id<>?").bind(getWorkspaceId(), cutoff, at, campaignId ?? "").all<{
         id: string;
         contact_ids: string;
         delivery_channels: string;
@@ -184,7 +185,7 @@ export async function recordCommunicationTouches(campaignId: string) {
     SELECT o.id,a.workspace_id,o.contact_id,lower(trim(o.recipient_endpoint)),CASE WHEN c.company_id IS NOT NULL THEN 'id:' || c.company_id WHEN trim(c.company_name) <> '' THEN 'name:' || trim(c.company_name) ELSE '' END,o.channel,o.campaign_id,a.participant_id,a.sent_at
     FROM delivery_outbox o JOIN campaigns a ON a.id=o.campaign_id JOIN contacts c ON c.id=o.contact_id
     WHERE a.id=? AND a.workspace_id=? AND a.sent_at IS NOT NULL AND a.sent_at <= ? AND o.status='accepted'`)
-        .bind(campaignId, WORKSPACE_ID, new Date().toISOString()).run();
+        .bind(campaignId, getWorkspaceId(), new Date().toISOString()).run();
 }
 export async function communicationOverview(request: Request) {
     const actor = await ensureDatabase(request);
@@ -196,10 +197,10 @@ export async function communicationOverview(request: Request) {
         const contact = await communicationContact(id);
         requireContactAccess(actor.participant, contact);
         const [evidence, history, holds, companyHistory, check] = await Promise.all([
-            db.prepare("SELECT * FROM communication_consents WHERE workspace_id=? AND (contact_id=? OR endpoint=?) ORDER BY created_at DESC,id DESC").bind(WORKSPACE_ID, id, contact.email.trim().toLowerCase()).all(),
-            db.prepare(`SELECT x.*,a.name AS campaign_name,p.display_name AS author FROM (${touchUnion}) x LEFT JOIN campaigns a ON a.id=x.campaign_id LEFT JOIN participants p ON p.id=x.actor_id WHERE x.endpoint IN (?,?,?) AND x.endpoint<>'' AND x.occurred_at<=? ORDER BY x.occurred_at DESC LIMIT 100`).bind(WORKSPACE_ID, WORKSPACE_ID, contact.email.toLowerCase(), contact.telegramChatId ?? "", contact.vkUserId ?? "", new Date().toISOString()).all(),
-            db.prepare("SELECT * FROM communication_holds WHERE workspace_id=? AND endpoint=? AND active=1").bind(WORKSPACE_ID, contact.email.toLowerCase()).all(),
-            db.prepare(`SELECT count(*) AS total,count(DISTINCT endpoint) AS recipients FROM (${touchUnion}) WHERE company_key=? AND company_key<>'' AND occurred_at>=? AND occurred_at<=?`).bind(WORKSPACE_ID, WORKSPACE_ID, companyKey(contact), new Date(Date.now() - policy.window_days * 86400000).toISOString(), new Date().toISOString()).first(),
+            db.prepare("SELECT * FROM communication_consents WHERE workspace_id=? AND (contact_id=? OR endpoint=?) ORDER BY created_at DESC,id DESC").bind(getWorkspaceId(), id, contact.email.trim().toLowerCase()).all(),
+            db.prepare(`SELECT x.*,a.name AS campaign_name,p.display_name AS author FROM (${touchUnion}) x LEFT JOIN campaigns a ON a.id=x.campaign_id LEFT JOIN participants p ON p.id=x.actor_id WHERE x.endpoint IN (?,?,?) AND x.endpoint<>'' AND x.occurred_at<=? ORDER BY x.occurred_at DESC LIMIT 100`).bind(getWorkspaceId(), getWorkspaceId(), contact.email.toLowerCase(), contact.telegramChatId ?? "", contact.vkUserId ?? "", new Date().toISOString()).all(),
+            db.prepare("SELECT * FROM communication_holds WHERE workspace_id=? AND endpoint=? AND active=1").bind(getWorkspaceId(), contact.email.toLowerCase()).all(),
+            db.prepare(`SELECT count(*) AS total,count(DISTINCT endpoint) AS recipients FROM (${touchUnion}) WHERE company_key=? AND company_key<>'' AND occurred_at>=? AND occurred_at<=?`).bind(getWorkspaceId(), getWorkspaceId(), companyKey(contact), new Date(Date.now() - policy.window_days * 86400000).toISOString(), new Date().toISOString()).first(),
             assessCommunications([contact], ["email"], "marketing"),
         ]);
         if (url.searchParams.get("export") === "1") {
@@ -212,12 +213,12 @@ export async function communicationOverview(request: Request) {
     const relatedAccess = access.condition.replaceAll("contacts.", "c.");
     const query = (url.searchParams.get("q") ?? "").trim().slice(0, 100);
     const [people, replies, tasks, members] = await Promise.all([
-        db.prepare(`SELECT id,full_name,email,company_name FROM contacts WHERE workspace_id=? AND ${access.condition} AND (full_name LIKE ? OR email LIKE ? OR company_name LIKE ?) ORDER BY updated_at DESC LIMIT 50`).bind(WORKSPACE_ID, ...access.params, `%${query}%`, `%${query}%`, `%${query}%`).all(),
-        db.prepare(`SELECT m.*,c.full_name AS contact_name,a.name AS campaign_name FROM communication_messages m JOIN contacts c ON c.id=m.contact_id LEFT JOIN campaigns a ON a.id=m.campaign_id WHERE m.workspace_id=? AND ${relatedAccess} ORDER BY received_at DESC LIMIT 100`).bind(WORKSPACE_ID, ...access.params).all(),
-        db.prepare(`SELECT t.*,c.full_name AS contact_name,p.display_name AS assignee FROM communication_tasks t JOIN contacts c ON c.id=t.contact_id LEFT JOIN participants p ON p.id=t.assigned_to WHERE t.workspace_id=? AND ${relatedAccess} ORDER BY CASE t.status WHEN 'done' THEN 1 ELSE 0 END,t.due_date LIMIT 100`).bind(WORKSPACE_ID, ...access.params).all(),
-        db.prepare("SELECT id,display_name FROM participants WHERE workspace_id=? AND status='active'").bind(WORKSPACE_ID).all(),
+        db.prepare(`SELECT id,full_name,email,company_name FROM contacts WHERE workspace_id=? AND ${access.condition} AND (full_name LIKE ? OR email LIKE ? OR company_name LIKE ?) ORDER BY updated_at DESC LIMIT 50`).bind(getWorkspaceId(), ...access.params, `%${query}%`, `%${query}%`, `%${query}%`).all(),
+        db.prepare(`SELECT m.*,c.full_name AS contact_name,a.name AS campaign_name FROM communication_messages m JOIN contacts c ON c.id=m.contact_id LEFT JOIN campaigns a ON a.id=m.campaign_id WHERE m.workspace_id=? AND ${relatedAccess} ORDER BY received_at DESC LIMIT 100`).bind(getWorkspaceId(), ...access.params).all(),
+        db.prepare(`SELECT t.*,c.full_name AS contact_name,p.display_name AS assignee FROM communication_tasks t JOIN contacts c ON c.id=t.contact_id LEFT JOIN participants p ON p.id=t.assigned_to WHERE t.workspace_id=? AND ${relatedAccess} ORDER BY CASE t.status WHEN 'done' THEN 1 ELSE 0 END,t.due_date LIMIT 100`).bind(getWorkspaceId(), ...access.params).all(),
+        db.prepare("SELECT id,display_name FROM participants WHERE workspace_id=? AND status='active'").bind(getWorkspaceId()).all(),
     ]);
-    return { policy, people: people.results, replies: replies.results, tasks: tasks.results, members: members.results, webhookConfigured: Boolean(runtime().COMMUNICATION_WEBHOOK_SECRET), aiConfigured: Boolean(runtime().OPENAI_API_KEY || runtime().NAVYAI_API_KEY), webhookPath: "/api/communications/inbound" };
+    return { policy, people: people.results, replies: replies.results, tasks: tasks.results, members: members.results, webhookConfigured: Boolean(isLegacyWorkspace() && runtime().COMMUNICATION_WEBHOOK_SECRET), aiConfigured: Boolean(runtime().OPENAI_API_KEY || runtime().NAVYAI_API_KEY), webhookPath: "/api/communications/inbound" };
 }
 async function digest(value: string) { return [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)))].map(v => v.toString(16).padStart(2, "0")).join(""); }
 async function analyseReply(body: string, receivedAt: string): Promise<ReplyAnalysis> {
@@ -266,7 +267,7 @@ export async function ingestReply(payload: unknown, actorId: string) {
     const sender = cleanText(p.sender ?? contact.email, "Отправитель", 320).toLowerCase();
     if (sender !== contact.email.trim().toLowerCase())
         throw new ApiRequestError("Адрес отправителя не совпадает с контактом. Сначала сопоставьте контакт.");
-    const existing = await db.prepare("SELECT id FROM communication_messages WHERE workspace_id=? AND external_id=?").bind(WORKSPACE_ID, externalId).first();
+    const existing = await db.prepare("SELECT id FROM communication_messages WHERE workspace_id=? AND external_id=?").bind(getWorkspaceId(), externalId).first();
     if (existing)
         return { duplicate: true };
     const now = new Date().toISOString();
@@ -274,10 +275,10 @@ export async function ingestReply(payload: unknown, actorId: string) {
     if (Date.parse(receivedAt) > Date.now() + 60000)
         throw new ApiRequestError("Дата ответа не может быть в будущем.");
     let campaignId = p.campaignId ? cleanText(p.campaignId, "Кампания", 150) : null;
-    if (campaignId && !await db.prepare("SELECT id FROM campaigns WHERE id=? AND workspace_id=?").bind(campaignId, WORKSPACE_ID).first())
+    if (campaignId && !await db.prepare("SELECT id FROM campaigns WHERE id=? AND workspace_id=?").bind(campaignId, getWorkspaceId()).first())
         throw new ApiRequestError("Кампания не найдена.");
     if (!campaignId) {
-        const candidates = await db.prepare("SELECT DISTINCT o.campaign_id FROM delivery_outbox o JOIN campaigns a ON a.id=o.campaign_id WHERE a.workspace_id=? AND lower(trim(o.recipient_endpoint))=? AND a.sent_at<=? ORDER BY a.sent_at DESC LIMIT 2").bind(WORKSPACE_ID, sender, receivedAt).all<{
+        const candidates = await db.prepare("SELECT DISTINCT o.campaign_id FROM delivery_outbox o JOIN campaigns a ON a.id=o.campaign_id WHERE a.workspace_id=? AND lower(trim(o.recipient_endpoint))=? AND a.sent_at<=? ORDER BY a.sent_at DESC LIMIT 2").bind(getWorkspaceId(), sender, receivedAt).all<{
             campaign_id: string;
         }>();
         if (candidates.results.length === 1)
@@ -285,25 +286,25 @@ export async function ingestReply(payload: unknown, actorId: string) {
     }
     const analysis = await analyseReply(body, receivedAt);
     const id = newId("reply");
-    const owner = await db.prepare("SELECT id FROM participants WHERE workspace_id=? AND status='active' ORDER BY CASE WHEN id=? THEN 0 WHEN id=? THEN 1 WHEN id=? THEN 2 ELSE 3 END,id LIMIT 1").bind(WORKSPACE_ID, contact.responsibleParticipantId ?? "", contact.createdByParticipantId ?? "", actorId).first<{
+    const owner = await db.prepare("SELECT id FROM participants WHERE workspace_id=? AND status='active' ORDER BY CASE WHEN id=? THEN 0 WHEN id=? THEN 1 WHEN id=? THEN 2 ELSE 3 END,id LIMIT 1").bind(getWorkspaceId(), contact.responsibleParticipantId ?? "", contact.createdByParticipantId ?? "", actorId).first<{
         id: string;
     }>();
     if (!owner)
         throw new ApiRequestError("Нет участника для обработки ответа.", 409);
     const assignedTo = owner.id;
     const policy = await communicationPolicy();
-    const statements = [db.prepare("INSERT OR IGNORE INTO communication_messages VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(id, WORKSPACE_ID, contact.id, campaignId, externalId, sender, cleanText(p.subject ?? "", "Тема", 500), body, analysis.category, analysis.confidence, analysis.classifier, analysis.quote, analysis.suggestedDate, analysis.suggestedAction, receivedAt, actorId, 0)];
+    const statements = [db.prepare("INSERT OR IGNORE INTO communication_messages VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(id, getWorkspaceId(), contact.id, campaignId, externalId, sender, cleanText(p.subject ?? "", "Тема", 500), body, analysis.category, analysis.confidence, analysis.classifier, analysis.quote, analysis.suggestedDate, analysis.suggestedAction, receivedAt, actorId, 0)];
     if (analysis.category !== "automatic")
-        statements.push(db.prepare(`INSERT INTO communication_holds (id,workspace_id,endpoint,channel,reason,active,actor_id,created_at) SELECT ?,?,?,?,?,1,?,? WHERE EXISTS (SELECT 1 FROM communication_messages WHERE id=?)`).bind(`reply:${id}`, WORKSPACE_ID, sender, "email", analysis.category === "unsubscribe" ? "Получен запрос на отписку" : "Получен ответ: автоматические письма приостановлены до решения ответственного", actorId, now, id));
+        statements.push(db.prepare(`INSERT INTO communication_holds (id,workspace_id,endpoint,channel,reason,active,actor_id,created_at) SELECT ?,?,?,?,?,1,?,? WHERE EXISTS (SELECT 1 FROM communication_messages WHERE id=?)`).bind(`reply:${id}`, getWorkspaceId(), sender, "email", analysis.category === "unsubscribe" ? "Получен запрос на отписку" : "Получен ответ: автоматические письма приостановлены до решения ответственного", actorId, now, id));
     if (analysis.suggestedAction && !["unsubscribe", "automatic", "refusal"].includes(analysis.category))
-        statements.push(db.prepare("INSERT OR IGNORE INTO communication_tasks SELECT ?,?,?,?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM communication_messages WHERE id=?)").bind(newId("task"), WORKSPACE_ID, id, contact.id, assignedTo, `${analysis.suggestedAction}: ${contact.fullName}`, analysis.suggestedDate, policy.auto_tasks && analysis.confidence >= 90 && analysis.suggestedDate ? "open" : "proposed", now, now, id));
+        statements.push(db.prepare("INSERT OR IGNORE INTO communication_tasks SELECT ?,?,?,?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM communication_messages WHERE id=?)").bind(newId("task"), getWorkspaceId(), id, contact.id, assignedTo, `${analysis.suggestedAction}: ${contact.fullName}`, analysis.suggestedDate, policy.auto_tasks && analysis.confidence >= 90 && analysis.suggestedDate ? "open" : "proposed", now, now, id));
     const inserted = await db.batch(statements);
     if (!inserted[0].meta.changes)
         return { duplicate: true };
     if (analysis.category === "unsubscribe")
-        await db.prepare("UPDATE contacts SET status='unsubscribed',email_consent=0 WHERE workspace_id=? AND lower(trim(email))=?").bind(WORKSPACE_ID, sender).run();
+        await db.prepare("UPDATE contacts SET status='unsubscribed',email_consent=0 WHERE workspace_id=? AND lower(trim(email))=?").bind(getWorkspaceId(), sender).run();
     if (campaignId)
-        await db.prepare("UPDATE campaigns SET metrics=json_set(metrics,'$.replies',(SELECT count(DISTINCT sender) FROM communication_messages WHERE workspace_id=? AND campaign_id=? AND category<>'automatic')) WHERE workspace_id=? AND id=?").bind(WORKSPACE_ID, campaignId, WORKSPACE_ID, campaignId).run();
+        await db.prepare("UPDATE campaigns SET metrics=json_set(metrics,'$.replies',(SELECT count(DISTINCT sender) FROM communication_messages WHERE workspace_id=? AND campaign_id=? AND category<>'automatic')) WHERE workspace_id=? AND id=?").bind(getWorkspaceId(), campaignId, getWorkspaceId(), campaignId).run();
     await audit(actorId, "reply-received", id, { category: analysis.category });
     return { id, analysis };
 }
@@ -322,8 +323,8 @@ export async function mutateCommunications(request: Request, payload: unknown) {
         const number = (value: unknown, min: number, max: number) => { if (!Number.isInteger(value) || Number(value) < min || Number(value) > max)
             throw new ApiRequestError("Недопустимый лимит."); return Number(value); };
         const windowDays = number(p.windowDays, 1, 90), contactLimit = number(p.contactLimit, 1, 100), companyLimit = number(p.companyLimit, 1, 100);
-        await db.prepare("INSERT INTO communication_policy VALUES (?,?,?,?,?,?,?) ON CONFLICT(workspace_id) DO UPDATE SET window_days=excluded.window_days,contact_limit=excluded.contact_limit,company_limit=excluded.company_limit,auto_tasks=excluded.auto_tasks,updated_at=excluded.updated_at,actor_id=excluded.actor_id").bind(WORKSPACE_ID, windowDays, contactLimit, companyLimit, p.autoTasks === true ? 1 : 0, now, actor.participant.id).run();
-        await audit(actor.participant.id, action, WORKSPACE_ID, { windowDays, contactLimit, companyLimit });
+        await db.prepare("INSERT INTO communication_policy VALUES (?,?,?,?,?,?,?) ON CONFLICT(workspace_id) DO UPDATE SET window_days=excluded.window_days,contact_limit=excluded.contact_limit,company_limit=excluded.company_limit,auto_tasks=excluded.auto_tasks,updated_at=excluded.updated_at,actor_id=excluded.actor_id").bind(getWorkspaceId(), windowDays, contactLimit, companyLimit, p.autoTasks === true ? 1 : 0, now, actor.participant.id).run();
+        await audit(actor.participant.id, action, getWorkspaceId(), { windowDays, contactLimit, companyLimit });
         return { ok: true };
     }
     if (action === "task") {
@@ -331,18 +332,18 @@ export async function mutateCommunications(request: Request, payload: unknown) {
         const status = cleanText(p.status, "Статус", 20);
         if (!["open", "done", "dismissed", "proposed"].includes(status))
             throw new ApiRequestError("Неверный статус задачи.");
-        const task = await db.prepare("SELECT contact_id FROM communication_tasks WHERE id=? AND workspace_id=?").bind(id, WORKSPACE_ID).first<{contact_id:string}>();
+        const task = await db.prepare("SELECT contact_id FROM communication_tasks WHERE id=? AND workspace_id=?").bind(id, getWorkspaceId()).first<{contact_id:string}>();
         if (!task) throw new ApiRequestError("Задача не найдена.", 404);
         const taskContact = await communicationContact(task.contact_id);
         requireContactAccess(actor.participant, taskContact);
         const assignee = cleanText(p.assignedTo, "Ответственный", 100);
-        if (!await db.prepare("SELECT id FROM participants WHERE id=? AND workspace_id=? AND status='active'").bind(assignee, WORKSPACE_ID).first())
+        if (!await db.prepare("SELECT id FROM participants WHERE id=? AND workspace_id=? AND status='active'").bind(assignee, getWorkspaceId()).first())
             throw new ApiRequestError("Ответственный не найден.");
         requireContactAccess(await accessParticipant(assignee), taskContact);
         const dueDate = p.dueDate ? cleanText(p.dueDate, "Дата", 10) : null;
         if (dueDate && (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate) || !Number.isFinite(Date.parse(dueDate)) || new Date(`${dueDate}T00:00:00Z`).toISOString().slice(0, 10) !== dueDate))
             throw new ApiRequestError("Некорректная дата.");
-        await db.prepare("UPDATE communication_tasks SET status=?,assigned_to=?,due_date=?,updated_at=? WHERE id=? AND workspace_id=?").bind(status, assignee, dueDate, now, id, WORKSPACE_ID).run();
+        await db.prepare("UPDATE communication_tasks SET status=?,assigned_to=?,due_date=?,updated_at=? WHERE id=? AND workspace_id=?").bind(status, assignee, dueDate, now, id, getWorkspaceId()).run();
         await audit(actor.participant.id, action, id, { status, assignee, dueDate });
         return { ok: true };
     }
@@ -351,7 +352,7 @@ export async function mutateCommunications(request: Request, payload: unknown) {
         const category = cleanText(p.category, "Категория", 40) as ReplyCategory;
         if (!Object.hasOwn(replyCategories, category))
             throw new ApiRequestError("Неизвестная категория.");
-        const reply = await db.prepare("SELECT * FROM communication_messages WHERE id=? AND workspace_id=?").bind(id, WORKSPACE_ID).first<{
+        const reply = await db.prepare("SELECT * FROM communication_messages WHERE id=? AND workspace_id=?").bind(id, getWorkspaceId()).first<{
             contact_id: string;
             sender: string;
             suggested_date: string | null;
@@ -360,16 +361,16 @@ export async function mutateCommunications(request: Request, payload: unknown) {
             throw new ApiRequestError("Ответ не найден.", 404);
         const contact = await communicationContact(reply.contact_id);
         requireContactAccess(actor.participant, contact);
-        const statements = [db.prepare("UPDATE communication_messages SET category=?,reviewed=1 WHERE id=? AND workspace_id=?").bind(category, id, WORKSPACE_ID)];
+        const statements = [db.prepare("UPDATE communication_messages SET category=?,reviewed=1 WHERE id=? AND workspace_id=?").bind(category, id, getWorkspaceId())];
         if (category !== "automatic")
-            statements.push(db.prepare("INSERT INTO communication_holds (id,workspace_id,endpoint,channel,reason,active,actor_id,created_at) VALUES (?,?,?,'email',?,1,?,?) ON CONFLICT(id) DO UPDATE SET active=1,resolved_at=NULL,reason=excluded.reason").bind(`reply:${id}`, WORKSPACE_ID, reply.sender, category === "unsubscribe" ? "Получен запрос на отписку" : "Получен ответ: автоматические письма приостановлены до решения ответственного", actor.participant.id, now));
+            statements.push(db.prepare("INSERT INTO communication_holds (id,workspace_id,endpoint,channel,reason,active,actor_id,created_at) VALUES (?,?,?,'email',?,1,?,?) ON CONFLICT(id) DO UPDATE SET active=1,resolved_at=NULL,reason=excluded.reason").bind(`reply:${id}`, getWorkspaceId(), reply.sender, category === "unsubscribe" ? "Получен запрос на отписку" : "Получен ответ: автоматические письма приостановлены до решения ответственного", actor.participant.id, now));
         if (["unsubscribe", "automatic", "refusal"].includes(category))
-            statements.push(db.prepare("UPDATE communication_tasks SET status='dismissed',updated_at=? WHERE workspace_id=? AND message_id=? AND status IN ('proposed','open')").bind(now, WORKSPACE_ID, id));
+            statements.push(db.prepare("UPDATE communication_tasks SET status='dismissed',updated_at=? WHERE workspace_id=? AND message_id=? AND status IN ('proposed','open')").bind(now, getWorkspaceId(), id));
         if (category === "unsubscribe") {
-            statements.push(db.prepare("UPDATE contacts SET status='unsubscribed',email_consent=0 WHERE workspace_id=? AND lower(trim(email))=?").bind(WORKSPACE_ID, reply.sender));
+            statements.push(db.prepare("UPDATE contacts SET status='unsubscribed',email_consent=0 WHERE workspace_id=? AND lower(trim(email))=?").bind(getWorkspaceId(), reply.sender));
         }
         if (!["unsubscribe", "automatic", "refusal"].includes(category))
-            statements.push(db.prepare("INSERT OR IGNORE INTO communication_tasks VALUES (?,?,?,?,?,?,?,?,?,?)").bind(newId("task"), WORKSPACE_ID, id, contact.id, contact.responsibleParticipantId ?? actor.participant.id, `${category === "call" ? "Позвонить" : "Связаться"}: ${contact.fullName}`, reply.suggested_date, "proposed", now, now));
+            statements.push(db.prepare("INSERT OR IGNORE INTO communication_tasks VALUES (?,?,?,?,?,?,?,?,?,?)").bind(newId("task"), getWorkspaceId(), id, contact.id, contact.responsibleParticipantId ?? actor.participant.id, `${category === "call" ? "Позвонить" : "Связаться"}: ${contact.fullName}`, reply.suggested_date, "proposed", now, now));
         await db.batch(statements);
         await audit(actor.participant.id, action, id, { category });
         return { ok: true };
@@ -384,7 +385,7 @@ export async function mutateCommunications(request: Request, payload: unknown) {
         throw new ApiRequestError("Добавьте адрес выбранного канала.");
     if (action === "resume") {
         // An unsubscribe cannot be bypassed by resuming an ordinary conversation hold.
-        await db.prepare("UPDATE communication_holds SET active=0,resolved_at=? WHERE workspace_id=? AND endpoint=? AND channel=? AND reason NOT LIKE '%отписк%'").bind(now, WORKSPACE_ID, endpoint, channel).run();
+        await db.prepare("UPDATE communication_holds SET active=0,resolved_at=? WHERE workspace_id=? AND endpoint=? AND channel=? AND reason NOT LIKE '%отписк%'").bind(now, getWorkspaceId(), endpoint, channel).run();
         await audit(actor.participant.id, action, contact.id, {});
         return { ok: true };
     }
@@ -399,7 +400,7 @@ export async function mutateCommunications(request: Request, payload: unknown) {
     if (action === "grant" && (!source || !version || !statement || !operator || Date.parse(obtainedAt) > Date.now() || (expiresAt && Date.parse(expiresAt) <= Date.parse(obtainedAt))))
         throw new ApiRequestError("Заполните источник, версию, текст, оператора и действительные даты.");
     if (action === "grant") {
-        const revoked = await db.prepare("SELECT max(obtained_at) AS at FROM communication_consents WHERE workspace_id=? AND endpoint=? AND channel=? AND purpose=? AND kind='revoke'").bind(WORKSPACE_ID, endpoint, channel, purpose).first<{
+        const revoked = await db.prepare("SELECT max(obtained_at) AS at FROM communication_consents WHERE workspace_id=? AND endpoint=? AND channel=? AND purpose=? AND kind='revoke'").bind(getWorkspaceId(), endpoint, channel, purpose).first<{
             at: string | null;
         }>();
         if (revoked?.at && obtainedAt <= revoked.at)
@@ -407,7 +408,7 @@ export async function mutateCommunications(request: Request, payload: unknown) {
     }
     const id = newId("consent");
     const hash = await digest(JSON.stringify({ endpoint, channel, purpose, source, version, statement, operator, obtainedAt, expiresAt }));
-    await db.prepare("INSERT INTO communication_consents VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(id, WORKSPACE_ID, contact.id, endpoint, channel, purpose, action, source, obtainedAt, expiresAt, version, statement, operator, hash, actor.participant.id, now).run();
+    await db.prepare("INSERT INTO communication_consents VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(id, getWorkspaceId(), contact.id, endpoint, channel, purpose, action, source, obtainedAt, expiresAt, version, statement, operator, hash, actor.participant.id, now).run();
     await audit(actor.participant.id, action, contact.id, { evidenceId: id, digest: hash });
     return { ok: true };
 }
@@ -454,5 +455,5 @@ export async function ingestWebhook(request: Request) {
     catch {
         throw new ApiRequestError("Некорректный JSON.");
     }
-    return ingestReply(payload, "mail-webhook");
+    return withWorkspace(LEGACY_WORKSPACE_ID, () => ingestReply(payload, "mail-webhook"));
 }

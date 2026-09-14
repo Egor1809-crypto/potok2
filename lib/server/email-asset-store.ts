@@ -1,3 +1,5 @@
+import { requireTeamSession } from "./team-auth";
+import { getWorkspaceId } from "./workspace-context";
 import { env } from "cloudflare:workers";
 import { and, desc, eq } from "drizzle-orm";
 
@@ -10,7 +12,7 @@ import type {
 } from "@/types/api";
 
 import { ApiRequestError, cleanText, newId } from "./api-utils";
-import { ensureDatabase, ensureSystemDatabase, WORKSPACE_ID } from "./database-init";
+import {ensureDatabase, ensureSystemDatabase } from "./database-init";
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const MAX_DOCUMENT_BYTES = 20 * 1024 * 1024;
@@ -84,14 +86,14 @@ function inlineImageDataUrl(value: string): { bytes: Uint8Array; mimeType: Allow
 async function persistEmailAsset(request: Request, bytes: Uint8Array, mimeType: AllowedMime, filename: string, kind: "photo" | "logo") {
   const id = newId("asset");
   const extension = mimeType === "image/png" ? "png" : mimeType === "image/gif" ? "gif" : mimeType === "image/webp" ? "webp" : "jpg";
-  const objectKey = `${WORKSPACE_ID}/email/${id}.${extension}`;
+  const objectKey = `${getWorkspaceId()}/email/${id}.${extension}`;
   const now = new Date().toISOString();
   await bucket().put(objectKey, bytes, {
     httpMetadata: { contentType: mimeType, cacheControl: "public, max-age=31536000, immutable" },
-    customMetadata: { workspaceId: WORKSPACE_ID, originalFilename: filename, kind },
+    customMetadata: { workspaceId: getWorkspaceId(), originalFilename: filename, kind },
   });
   try {
-    await getDb().insert(emailAssets).values({ id, workspaceId: WORKSPACE_ID, objectKey, filename, mimeType, size: bytes.byteLength, kind, createdAt: now });
+    await getDb().insert(emailAssets).values({ id, workspaceId: getWorkspaceId(), objectKey, filename, mimeType, size: bytes.byteLength, kind, createdAt: now });
   } catch (error) {
     await bucket().delete(objectKey);
     throw error;
@@ -105,7 +107,7 @@ export async function listEmailAssets(request: Request): Promise<EmailAssetsList
   const rows = await getDb()
     .select()
     .from(emailAssets)
-    .where(eq(emailAssets.workspaceId, WORKSPACE_ID))
+    .where(eq(emailAssets.workspaceId, getWorkspaceId()))
     .orderBy(desc(emailAssets.createdAt))
     .limit(80);
   return { assets: rows.map((row) => toRecord(request, row)) };
@@ -116,7 +118,7 @@ export async function getEmailAssetRecord(request: Request, idValue: unknown): P
   const [row] = await getDb()
     .select()
     .from(emailAssets)
-    .where(and(eq(emailAssets.id, id), eq(emailAssets.workspaceId, WORKSPACE_ID)))
+    .where(and(eq(emailAssets.id, id), eq(emailAssets.workspaceId, getWorkspaceId())))
     .limit(1);
   if (!row) throw new ApiRequestError("Изображение не найдено.", 404);
   return toRecord(request, row);
@@ -137,11 +139,11 @@ export async function uploadEmailAsset(request: Request): Promise<EmailAssetMuta
     if (bytes.byteLength < 5 || new TextDecoder().decode(bytes.slice(0, 5)) !== "%PDF-") throw new ApiRequestError("Содержимое файла не соответствует формату PDF.");
     const id = newId("asset");
     const filename = cleanText(file.name || "document.pdf", "Название файла", 180) || "document.pdf";
-    const objectKey = `${WORKSPACE_ID}/documents/${id}.pdf`;
+    const objectKey = `${getWorkspaceId()}/documents/${id}.pdf`;
     const now = new Date().toISOString();
-    await bucket().put(objectKey, bytes, { httpMetadata: { contentType: "application/pdf", cacheControl: "private, max-age=3600" }, customMetadata: { workspaceId: WORKSPACE_ID, originalFilename: filename, kind } });
+    await bucket().put(objectKey, bytes, { httpMetadata: { contentType: "application/pdf", cacheControl: "private, max-age=3600" }, customMetadata: { workspaceId: getWorkspaceId(), originalFilename: filename, kind } });
     try {
-      await getDb().insert(emailAssets).values({ id, workspaceId: WORKSPACE_ID, objectKey, filename, mimeType: "application/pdf", size: bytes.byteLength, kind, createdAt: now });
+      await getDb().insert(emailAssets).values({ id, workspaceId: getWorkspaceId(), objectKey, filename, mimeType: "application/pdf", size: bytes.byteLength, kind, createdAt: now });
     } catch (error) {
       await bucket().delete(objectKey);
       throw error;
@@ -229,16 +231,20 @@ export async function getEmailAsset(request: Request, idValue: unknown): Promise
   const [row] = await getDb()
     .select()
     .from(emailAssets)
-    .where(and(eq(emailAssets.id, id), eq(emailAssets.workspaceId, WORKSPACE_ID)))
+    .where(eq(emailAssets.id, id))
     .limit(1);
   if (!row) throw new ApiRequestError("Изображение не найдено.", 404);
+  if (row.mimeType === "application/pdf") {
+    const session = await requireTeamSession(request);
+    if (session.participant.workspaceId !== row.workspaceId) throw new ApiRequestError("Файл не найден.", 404);
+  }
   const object = await bucket().get(row.objectKey);
   if (!object) throw new ApiRequestError("Файл изображения не найден в хранилище.", 404);
   const download = new URL(request.url).searchParams.get("download") === "1";
   const headers: Record<string, string> = {
     "Content-Type": row.mimeType,
     "Content-Length": String(row.size),
-    "Cache-Control": "public, max-age=31536000, immutable",
+    "Cache-Control": row.mimeType === "application/pdf" ? "private, no-store" : "public, max-age=31536000, immutable",
     "X-Content-Type-Options": "nosniff",
     "Content-Security-Policy": "default-src 'none'; sandbox",
   };
@@ -259,7 +265,7 @@ export async function getEmailAssetDataUrl(
   const [row] = await getDb()
     .select()
     .from(emailAssets)
-    .where(and(eq(emailAssets.id, id), eq(emailAssets.workspaceId, WORKSPACE_ID)))
+    .where(and(eq(emailAssets.id, id), eq(emailAssets.workspaceId, getWorkspaceId())))
     .limit(1);
   if (!row) throw new ApiRequestError("Изображение из медиатеки не найдено.", 404);
   const object = await bucket().get(row.objectKey);
@@ -277,10 +283,10 @@ export async function deleteEmailAsset(request: Request, idValue: unknown) {
   const [row] = await getDb()
     .select()
     .from(emailAssets)
-    .where(and(eq(emailAssets.id, id), eq(emailAssets.workspaceId, WORKSPACE_ID)))
+    .where(and(eq(emailAssets.id, id), eq(emailAssets.workspaceId, getWorkspaceId())))
     .limit(1);
   if (!row) throw new ApiRequestError("Изображение не найдено.", 404);
   await bucket().delete(row.objectKey);
-  await getDb().delete(emailAssets).where(and(eq(emailAssets.id, id), eq(emailAssets.workspaceId, WORKSPACE_ID)));
+  await getDb().delete(emailAssets).where(and(eq(emailAssets.id, id), eq(emailAssets.workspaceId, getWorkspaceId())));
   return { deletedId: id };
 }

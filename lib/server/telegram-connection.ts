@@ -1,8 +1,9 @@
+import { getWorkspaceId } from "./workspace-context";
 import { requireTeamAdmin } from "./team-access";
 import { getD1 } from "@/db";
 import type { TelegramConnectionInfo } from "@/types/telegram";
 import { ApiRequestError, asObject } from "./api-utils";
-import { ensureDatabase, WORKSPACE_ID } from "./database-init";
+import {ensureDatabase } from "./database-init";
 import { runtimeSecret } from "./runtime-integrations";
 import { openTelegramToken, sealTelegramToken, sha256, telegramApi, validateTelegramToken, type TelegramUser } from "./telegram-api";
 
@@ -13,22 +14,22 @@ export type TelegramConnection = {
 };
 const vaultSecret = () => runtimeSecret("TELEGRAM_CREDENTIAL_KEY");
 export const telegramTokenScope = (workspaceId: string, botId: string) => `telegram:${workspaceId}:${botId}`;
-export const telegramConnection = () => getD1().prepare("SELECT * FROM telegram_connections WHERE workspace_id=?").bind(WORKSPACE_ID).first<TelegramConnection>();
+export const telegramConnection = () => getD1().prepare("SELECT * FROM telegram_connections WHERE workspace_id=?").bind(getWorkspaceId()).first<TelegramConnection>();
 
 export async function resolveTelegramToken(config: Record<string, string>): Promise<string> {
   if (config.credentialSource !== "vault") return runtimeSecret(config.botSlot === "secondary" ? "TELEGRAM_BOT_TOKEN_2" : "TELEGRAM_BOT_TOKEN");
   const connection = await telegramConnection();
   if (!connection || connection.state !== "connected" || connection.bot_id !== config.botId) throw new ApiRequestError("Бот отключён или заменён. Проверьте подключение Telegram.", 409);
-  return openTelegramToken(connection.encrypted_token, vaultSecret(), telegramTokenScope(WORKSPACE_ID, connection.bot_id));
+  return openTelegramToken(connection.encrypted_token, vaultSecret(), telegramTokenScope(getWorkspaceId(), connection.bot_id));
 }
 
 export async function telegramConnectionInfo(request?: Request): Promise<TelegramConnectionInfo> {
   if (request) await ensureDatabase(request);
   const connection = await telegramConnection();
-  const integration = await getD1().prepare("SELECT enabled,check_status,check_message FROM integrations WHERE workspace_id=? AND provider_id='telegram-bot-api'").bind(WORKSPACE_ID).first<{ enabled: number; check_status: string; check_message: string }>();
+  const integration = await getD1().prepare("SELECT enabled,check_status,check_message FROM integrations WHERE workspace_id=? AND provider_id='telegram-bot-api'").bind(getWorkspaceId()).first<{ enabled: number; check_status: string; check_message: string }>();
   const connected = Boolean(connection?.state === "connected" && integration?.enabled && integration.check_status === "connected");
   const count = connection ? await getD1().prepare(`SELECT count(*) AS n FROM telegram_subscribers s JOIN contacts c ON c.workspace_id=s.workspace_id AND c.telegram_chat_id=s.chat_id
-    WHERE s.workspace_id=? AND s.bot_id=? AND s.status='subscribed' AND c.status='active' AND c.telegram_consent=1`).bind(WORKSPACE_ID, connection.bot_id).first<{ n: number }>() : null;
+    WHERE s.workspace_id=? AND s.bot_id=? AND s.status='subscribed' AND c.status='active' AND c.telegram_consent=1`).bind(getWorkspaceId(), connection.bot_id).first<{ n: number }>() : null;
   return { configured: Boolean(vaultSecret()), connected, username: connection?.username ?? "", displayName: connection?.display_name ?? "",
     subscribeUrl: connected ? `https://t.me/${connection!.username}?start=potok` : "", subscribers: count?.n ?? 0,
     lastReceivedAt: connection?.last_received_at ?? null, message: connection ? integration?.check_message ?? "Проверьте подключение." : "Подключите бота, чтобы получить ссылку подписки." };
@@ -36,7 +37,7 @@ export async function telegramConnectionInfo(request?: Request): Promise<Telegra
 
 async function integrationState(enabled: boolean, status: string, message: string) {
   await getD1().prepare("UPDATE integrations SET enabled=?,check_status=?,check_message=?,last_checked_at=?,updated_at=? WHERE workspace_id=? AND provider_id='telegram-bot-api'")
-    .bind(Number(enabled), status, message, new Date().toISOString(), new Date().toISOString(), WORKSPACE_ID).run();
+    .bind(Number(enabled), status, message, new Date().toISOString(), new Date().toISOString(), getWorkspaceId()).run();
 }
 
 export async function checkTelegramConnection(): Promise<{ ok: boolean; message: string }> {
@@ -64,13 +65,13 @@ export async function disconnectTelegramConnection() {
   await integrationState(false, "disconnected", "Telegram отключён. Рассылки через бота остановлены.");
   let message = "Telegram отключён. Подписчики сохранены для повторного подключения этого бота.";
   try {
-    const token = await openTelegramToken(connection.encrypted_token, vaultSecret(), telegramTokenScope(WORKSPACE_ID, connection.bot_id));
+    const token = await openTelegramToken(connection.encrypted_token, vaultSecret(), telegramTokenScope(getWorkspaceId(), connection.bot_id));
     const hook = await telegramApi<{ url: string }>(token, "getWebhookInfo");
     if (hook.url === connection.webhook_url) await telegramApi(token, "deleteWebhook");
   } catch { message = "Рассылки остановлены. Telegram не подтвердил отключение приёма подписок; при необходимости отзовите токен в BotFather."; }
   await getD1().batch([
-    getD1().prepare("UPDATE telegram_connections SET state='disconnected',encrypted_token='',webhook_secret_hash='',updated_at=? WHERE workspace_id=?").bind(new Date().toISOString(), WORKSPACE_ID),
-    getD1().prepare("UPDATE integrations SET public_config='{}',enabled=0,check_status='disconnected',check_message=? WHERE workspace_id=? AND provider_id='telegram-bot-api'").bind(message, WORKSPACE_ID),
+    getD1().prepare("UPDATE telegram_connections SET state='disconnected',encrypted_token='',webhook_secret_hash='',updated_at=? WHERE workspace_id=?").bind(new Date().toISOString(), getWorkspaceId()),
+    getD1().prepare("UPDATE integrations SET public_config='{}',enabled=0,check_status='disconnected',check_message=? WHERE workspace_id=? AND provider_id='telegram-bot-api'").bind(message, getWorkspaceId()),
   ]);
 }
 
@@ -99,8 +100,8 @@ export async function manageTelegramConnection(request: Request, payload: unknow
   const webhookId = previous?.bot_id === botId ? previous.webhook_id : crypto.randomUUID();
   const webhookUrl = `${configuredOrigin}/api/telegram/webhook/${webhookId}`;
   const webhookSecret = crypto.randomUUID().replaceAll("-", "") + crypto.randomUUID().replaceAll("-", "");
-  const encrypted = await sealTelegramToken(token, vaultSecret(), telegramTokenScope(WORKSPACE_ID, botId));
-  const workspace = await db.prepare("SELECT company_name,name FROM workspaces WHERE id=?").bind(WORKSPACE_ID).first<{ company_name: string; name: string }>();
+  const encrypted = await sealTelegramToken(token, vaultSecret(), telegramTokenScope(getWorkspaceId(), botId));
+  const workspace = await db.prepare("SELECT company_name,name FROM workspaces WHERE id=?").bind(getWorkspaceId()).first<{ company_name: string; name: string }>();
   const operator = workspace?.company_name || workspace?.name;
   if (!operator) throw new ApiRequestError("Заполните название организации в настройках рабочего пространства.", 422);
   const now = new Date().toISOString(), operation = crypto.randomUUID();
@@ -108,7 +109,7 @@ export async function manageTelegramConnection(request: Request, payload: unknow
     VALUES (?,?,?,?,?,?,?,?,'connecting',?,?,?,?) ON CONFLICT(workspace_id) DO UPDATE SET bot_id=excluded.bot_id,username=excluded.username,display_name=excluded.display_name,encrypted_token=excluded.encrypted_token,
     webhook_id=excluded.webhook_id,webhook_secret_hash=excluded.webhook_secret_hash,webhook_url=excluded.webhook_url,state='connecting',operation_id=excluded.operation_id,operator=excluded.operator,updated_at=excluded.updated_at
     WHERE (telegram_connections.state<>'connecting' OR telegram_connections.updated_at<?) AND (telegram_connections.bot_id=excluded.bot_id OR telegram_connections.state='disconnected')`)
-    .bind(WORKSPACE_ID, botId, bot.username!, bot.first_name ?? bot.username!, encrypted, webhookId, await sha256(webhookSecret), webhookUrl, operation, operator, now, now, new Date(Date.now() - 120_000).toISOString()).run();
+    .bind(getWorkspaceId(), botId, bot.username!, bot.first_name ?? bot.username!, encrypted, webhookId, await sha256(webhookSecret), webhookUrl, operation, operator, now, now, new Date(Date.now() - 120_000).toISOString()).run();
   if (!lock.meta.changes) throw new ApiRequestError("Подключение уже выполняется. Дождитесь результата и обновите статус.", 409);
   await integrationState(false, "needs_attention", "Подключаем Telegram…");
   try {
@@ -116,13 +117,13 @@ export async function manageTelegramConnection(request: Request, payload: unknow
     const verified = await telegramApi<{ url: string }>(token, "getWebhookInfo");
     if (verified.url !== webhookUrl) throw new ApiRequestError("Telegram не подтвердил приём подписок. Повторите подключение.", 502);
     await db.batch([
-      db.prepare("UPDATE telegram_subscribers SET pending_nonce='' WHERE workspace_id=? AND bot_id=?").bind(WORKSPACE_ID, botId),
-      db.prepare("UPDATE telegram_connections SET state='connected',updated_at=? WHERE workspace_id=? AND operation_id=?").bind(now, WORKSPACE_ID, operation),
+      db.prepare("UPDATE telegram_subscribers SET pending_nonce='' WHERE workspace_id=? AND bot_id=?").bind(getWorkspaceId(), botId),
+      db.prepare("UPDATE telegram_connections SET state='connected',updated_at=? WHERE workspace_id=? AND operation_id=?").bind(now, getWorkspaceId(), operation),
       db.prepare("UPDATE integrations SET enabled=1,public_config=?,check_status='connected',check_message=?,last_checked_at=?,updated_at=? WHERE workspace_id=? AND provider_id='telegram-bot-api'")
-        .bind(JSON.stringify({ credentialSource: "vault", botId, botUsername: bot.username! }), `@${bot.username}: подключён, приём подписок включён.`, now, now, WORKSPACE_ID),
+        .bind(JSON.stringify({ credentialSource: "vault", botId, botUsername: bot.username! }), `@${bot.username}: подключён, приём подписок включён.`, now, now, getWorkspaceId()),
     ]);
   } catch (error) {
-    await db.prepare("UPDATE telegram_connections SET state='error',updated_at=? WHERE workspace_id=? AND operation_id=?").bind(new Date().toISOString(), WORKSPACE_ID, operation).run();
+    await db.prepare("UPDATE telegram_connections SET state='error',updated_at=? WHERE workspace_id=? AND operation_id=?").bind(new Date().toISOString(), getWorkspaceId(), operation).run();
     await integrationState(false, "needs_attention", "Подключение не завершено. Повторите его с токеном бота.");
     throw error;
   }
@@ -131,18 +132,18 @@ export async function manageTelegramConnection(request: Request, payload: unknow
 
 export async function telegramRecipientAllowed(config: Record<string, string>, chatId: string) {
   const db = getD1();
-  const integration = await db.prepare("SELECT enabled,check_status,public_config FROM integrations WHERE workspace_id=? AND provider_id='telegram-bot-api'").bind(WORKSPACE_ID).first<{ enabled: number; check_status: string; public_config: string }>();
+  const integration = await db.prepare("SELECT enabled,check_status,public_config FROM integrations WHERE workspace_id=? AND provider_id='telegram-bot-api'").bind(getWorkspaceId()).first<{ enabled: number; check_status: string; public_config: string }>();
   if (!integration?.enabled || integration.check_status !== "connected") return false;
   const current = JSON.parse(integration.public_config) as Record<string, string>;
   if (current.credentialSource !== config.credentialSource || current.botId !== config.botId || current.botSlot !== config.botSlot) return false;
-  const contact = await db.prepare("SELECT telegram_consent,status FROM contacts WHERE workspace_id=? AND telegram_chat_id=?").bind(WORKSPACE_ID, chatId).first<{ telegram_consent: number; status: string }>();
+  const contact = await db.prepare("SELECT telegram_consent,status FROM contacts WHERE workspace_id=? AND telegram_chat_id=?").bind(getWorkspaceId(), chatId).first<{ telegram_consent: number; status: string }>();
   if (!contact?.telegram_consent || contact.status !== "active") return false;
   if (config.credentialSource !== "vault") return true;
-  return Boolean(await db.prepare("SELECT 1 FROM telegram_subscribers WHERE workspace_id=? AND bot_id=? AND chat_id=? AND status='subscribed'").bind(WORKSPACE_ID, config.botId, chatId).first());
+  return Boolean(await db.prepare("SELECT 1 FROM telegram_subscribers WHERE workspace_id=? AND bot_id=? AND chat_id=? AND status='subscribed'").bind(getWorkspaceId(), config.botId, chatId).first());
 }
 
 export async function telegramSubscribedChatIds(config: Record<string, string>): Promise<Set<string> | null> {
   if (config.credentialSource !== "vault") return null;
-  const rows = await getD1().prepare("SELECT chat_id FROM telegram_subscribers WHERE workspace_id=? AND bot_id=? AND status='subscribed'").bind(WORKSPACE_ID, config.botId).all<{ chat_id: string }>();
+  const rows = await getD1().prepare("SELECT chat_id FROM telegram_subscribers WHERE workspace_id=? AND bot_id=? AND status='subscribed'").bind(getWorkspaceId(), config.botId).all<{ chat_id: string }>();
   return new Set(rows.results.map(row => row.chat_id));
 }

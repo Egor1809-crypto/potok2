@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `idx_participants_global_login` ON `participants` (`login`) WHERE "participants"."login" IS NOT NULL;

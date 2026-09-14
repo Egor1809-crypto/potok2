@@ -2,10 +2,22 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 type Draft<T> = { value: T; revision: string | null; at: number };
-export function useEditorDraft<T>({ storageKey, value, dirty, revision, onRestore, onError }: {
+export function useEditorDraft<T>({ storageKey: draftKey, value, dirty, revision, onRestore, onError }: {
   storageKey: string | null; value: T; dirty: boolean; revision: string | null;
   onRestore: (value: T, stale: boolean) => void; onError: (message: string) => void;
 }) {
+  const [storageKey, setStorageKey] = useState<string | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setStorageKey(null);
+    if (!draftKey) return;
+    void fetch("/api/auth/session", {cache:"no-store", signal:AbortSignal.any([controller.signal, AbortSignal.timeout(15000)])})
+      .then(async response => response.ok ? await response.json() as {participant?:{id:string;workspaceId:string}} : null)
+      .then(payload => { if (!controller.signal.aborted && payload?.participant) setStorageKey(`${draftKey}:account:${payload.participant.workspaceId}:${payload.participant.id}`); })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [draftKey]);
   const latest = useRef({ storageKey, value, dirty, revision, onRestore, onError });
   useLayoutEffect(() => { latest.current = { storageKey, value, dirty, revision, onRestore, onError }; });
   const [readyKey, setReadyKey] = useState<string | null>(null);
