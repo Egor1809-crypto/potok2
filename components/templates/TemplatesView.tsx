@@ -4,7 +4,7 @@ import { confirmAction } from "@/components/ui/confirm-action";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { ArrowLeft, PenTool, RefreshCw, SearchX, Sparkles, Star, Upload } from "@/components/ui/icons";
+import { ArrowLeft, CalendarDays, CheckCircle2, Mail, MessageCircle, PenTool, RefreshCw, SearchX, Send, Sparkles, Star, Upload } from "@/components/ui/icons";
 
 import { importLetter, uploadImportedResources, type ImportedLetter } from "@/lib/email-import/import-letter";
 import { importCodeLetter, type CodeImportInput } from "@/lib/email-import/code";
@@ -57,6 +57,9 @@ type StyleFilter = "all" | "minimal" | "editorial" | "bold";
 type DensityFilter = "all" | "compact" | "balanced" | "rich";
 type PaletteFilter = "all" | "light" | "dark" | "warm" | "cool" | "neutral";
 type LoadState = "loading" | "ready" | "error";
+
+const categoryIcons = { All: Sparkles, Business: Mail, Events: CalendarDays, Outreach: Send, Newsletter: Mail, "Follow-up": MessageCircle, Transactional: CheckCircle2 };
+const categoryTitles = { All: "Все письма", Business: "Бизнес", Events: "События", Outreach: "Знакомство", Newsletter: "Рассылки", "Follow-up": "Диалог", Transactional: "Уведомления" };
 
 function isStudioTemplate(template: EmailTemplateRecord) {
   return template.id.startsWith("template-v7-studio-") || template.id.startsWith("template-v8-creative-");
@@ -474,18 +477,18 @@ export function TemplatesView() {
             </button>
           </div>
         <Tabs value={category} onValueChange={(value) => setCategory(value as CategoryFilter)} className="min-w-0">
-          <TabsList className="-mb-px">
-            {categories.map((item) => (
-              <TabsTrigger key={item} value={item}>
-                {item === "All" ? "Все" : templateCategoryLabels[item]}
-                <span className="ml-1.5 text-[10px] font-normal text-text-subtle">
-                  {item === "All" ? scopedTemplates.length : scopedTemplates.filter((template) => template.category === (item as TemplateCategory)).length}
-                </span>
-              </TabsTrigger>
-            ))}
+          <TabsList className={styles.categories} aria-label="Категории писем">
+            {categories.map((item, index) => {
+              const Icon = categoryIcons[item];
+              return <TabsTrigger key={item} value={item} className={styles.category} data-tone={index % 4} title={item === "All" ? "Все письма" : templateCategoryLabels[item]}>
+                <span className={styles.categoryArt} aria-hidden="true"><Icon className="size-6" /></span>
+                <span className={styles.categoryName}>{categoryTitles[item]}</span>
+                <span className={styles.categoryCount}>{item === "All" ? scopedTemplates.length : scopedTemplates.filter(template => template.category === item).length}</span>
+              </TabsTrigger>;
+            })}
           </TabsList>
 
-          <TabsContent value={category} className="pt-5">
+          <TabsContent value={category} className="pt-4">
             <div className={styles.filters}>
               <SearchInput value={query} onChange={(event) => setQuery(event.target.value)} onClear={() => setQuery("")} placeholder="Поиск по задаче, теме или названию…" aria-label="Поиск шаблонов" wrapperClassName={styles.filterSearch} />
               <Select value={style} onChange={(event) => setStyle(event.target.value as StyleFilter)} aria-label="Стиль шаблона" options={[{value:"all",label:"Любой стиль"},{value:"minimal",label:"Минималистичный"},{value:"editorial",label:"Редакционный"},{value:"bold",label:"Контрастный"}]} className={`${styles.filterControl} ${style !== "all" ? styles.filterActive : ""}`} />

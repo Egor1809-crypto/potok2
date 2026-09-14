@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/icons";
 
 import { AppShell } from "@/components/layout/AppShell";
+import { PhotoLibrary } from "./PhotoLibrary";
 import {
   Alert,
   Button,
@@ -201,12 +202,9 @@ export function ImageStudioView() {
   }, []);
 
   useEffect(() => {
-    const targetId =
-      requestedView === "library"
-        ? "image-template-library"
-        : "image-constructor";
+    if (requestedView === "library") return;
     const frame = window.requestAnimationFrame(() =>
-      document.getElementById(targetId)?.scrollIntoView({ block: "start" }),
+      document.getElementById("image-constructor")?.scrollIntoView({ block: "start" }),
     );
     return () => window.cancelAnimationFrame(frame);
   }, [requestedView]);
@@ -267,6 +265,8 @@ export function ImageStudioView() {
       setGenerating(false);
     }
   };
+
+  if (requestedView === "library") return <AppShell title="Шаблоны фотографий" contentWidth="full" viewportLocked desktopSidebarCollapsible contentClassName="!py-3"><PhotoLibrary assets={assets} selectedId={selectedId} onSelect={setSelectedId} loading={loading} error={error} /></AppShell>;
 
   return (
     <AppShell

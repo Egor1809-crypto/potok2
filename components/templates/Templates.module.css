@@ -14,7 +14,7 @@
 .preview { position: relative; overflow: hidden; border-radius: 15px 15px 0 0; border-bottom: 1px solid var(--border); }
 .previewLink { display: block; }
 .previewLink:focus-visible { outline-offset: -4px; }
-.thumbnail { display: grid; height: 300px; place-items: start center; overflow: hidden; padding: 24px 28px 0; }
+.thumbnail { display: grid; height: 300px; place-items: start center; overflow: hidden; padding: 30px 34px 0; background-color: color-mix(in srgb, var(--letter-accent) 9%, var(--surface)); background-image: radial-gradient(color-mix(in srgb, var(--letter-accent) 23%, transparent) .7px, transparent .7px); background-size: 12px 12px; }
 .paper { position: relative; width: 100%; height: 300px; overflow: hidden; background: #fff; outline: 1px solid rgb(0 0 0 / .08); box-shadow: 0 2px 4px rgb(0 0 0 / .06), 0 12px 24px rgb(0 0 0 / .12); transition: transform 150ms cubic-bezier(0.2, 0, 0, 1); pointer-events: none; }
 .letterFrame { position: absolute; top: 0; left: 0; transform-origin: top left; }
 .thumbnailPlaceholder { position: absolute; inset: 0; background: var(--surface-subtle); }
@@ -38,6 +38,20 @@
 .utilities { display: flex; gap: 2px; margin-left: auto; }
 .utilities > button { width: 32px; height: 32px; min-height: 32px; padding: 6px; }
 .utilities .delete:hover { color: var(--danger); background: var(--danger-subtle); }
+.categories { display: flex; align-items: stretch; gap: 10px; border: 0; padding: 4px 2px 8px; scrollbar-width: thin; }
+.category { --category-ink: #763cce; --category-bg: #eee5fb; position: relative; display: grid; flex: 1 0 120px; grid-template-columns: 1fr auto; align-content: space-between; gap: 10px 4px; height: 100px; padding: 12px; border: 1px solid transparent; border-radius: 12px; text-align: start; color: var(--text-strong); background: var(--surface); box-shadow: var(--shadow-xs); transition: border-color 150ms, background-color 150ms, box-shadow 150ms; }
+.category[data-tone="1"] { --category-ink: #276bad; --category-bg: #e5f1fc; }
+.category[data-tone="2"] { --category-ink: #b55132; --category-bg: #ffeddf; }
+.category[data-tone="3"] { --category-ink: #277b69; --category-bg: #e1f5ee; }
+.category::after { display: none; }
+.categoryArt { position: relative; isolation: isolate; display: grid; width: 36px; height: 36px; place-items: center; color: var(--category-ink); background: var(--category-bg); border-radius: 8px; }
+.categoryArt::before { content: ''; position: absolute; inset: 0; z-index: -1; border: 1px solid var(--category-ink); border-radius: 8px; opacity: .16; transform: rotate(-9deg) translate(3px, -1px); transition: transform 150ms cubic-bezier(0.2, 0, 0, 1); }
+.categoryName { grid-column: 1; font-size: 14px; font-weight: 650; }
+.categoryCount { grid-column: 2; grid-row: 1; color: var(--text-subtle); font-size: 12px; font-variant-numeric: tabular-nums; }
+.category:hover, .category[aria-selected="true"] { border-color: var(--primary-muted); background: color-mix(in srgb, var(--primary-subtle) 35%, var(--surface)); }
+.category[aria-selected="true"] { box-shadow: inset 0 0 0 1px var(--primary-muted); }
+.category:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.category:hover .categoryArt::before, .category[aria-selected="true"] .categoryArt::before { transform: rotate(-16deg) translate(5px, -2px); }
 @container (min-width: 310px) { .cardActions { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 1200px) { .filters { grid-template-columns: minmax(220px, 1.4fr) repeat(4, minmax(0, 1fr)); } .filterSearch { grid-column: auto; } }
 @media (max-width: 639px) { .collections { display: grid; width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); } .collection { flex-wrap: wrap; padding-inline: 8px; font-size: 13px; } .filters { grid-template-columns: minmax(0, 1fr); } }
@@ -48,6 +62,7 @@
   .preview:hover .previewAction, .preview:focus-within .previewAction { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .card, .paper, .previewAction, .favorite, .collection, .filters .filterControl { transition: none; }
+  .card, .paper, .previewAction, .favorite, .collection, .filters .filterControl, .category, .categoryArt::before { transition: none; }
+  .category:hover .categoryArt::before, .category[aria-selected="true"] .categoryArt::before { transform: none; }
   .card:hover, .card:hover .paper, .favorite:not(:disabled):active, .collection:active { transform: none; }
 }

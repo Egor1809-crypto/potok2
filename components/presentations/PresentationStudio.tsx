@@ -20,8 +20,11 @@ import {
   ArrowLeft,
   ArrowUp,
   Check,
+  ChevronLeft,
+  ChevronRight,
   Copy,
   Download,
+  Eye,
   FilePlus2,
   LayoutTemplate,
   Mail,
@@ -61,6 +64,7 @@ import {
   presentationThemes,
 } from "@/data/presentation-templates";
 import { presentationPatternCatalog } from "@/data/presentation-patterns";
+import libraryStyles from "./PresentationLibrary.module.css";
 import type {
   ApiError,
   EmailTemplateRecord,
@@ -1318,6 +1322,33 @@ function ThemeStrip({
   );
 }
 
+function PresentationTemplateCard({ template, favorite, busy, onFavorite, onUse, onPreview }: {
+  template: (typeof presentationTemplates)[number]; favorite: boolean; busy: string;
+  onFavorite: () => void; onUse: () => void; onPreview: (slide: number) => void;
+}) {
+  return <article className={libraryStyles.card} aria-label={template.name} style={{ "--deck-accent": template.accentColor } as CSSProperties}>
+    <div className={libraryStyles.cover}>
+      <button type="button" className={libraryStyles.coverButton} aria-label={`Посмотреть презентацию «${template.name}»`} onClick={() => onPreview(0)}>
+        <div className={libraryStyles.stack} aria-hidden="true" inert><SlidePreview project={template} slide={template.slides[0]} compact /></div>
+        <span className={libraryStyles.previewHint}><Eye aria-hidden className="size-5" />Смотреть слайды</span>
+      </button>
+      <button type="button" className={libraryStyles.favorite} onClick={onFavorite} disabled={busy === `favorite-template-${template.id}`} aria-pressed={favorite} aria-label={`${favorite ? "Убрать из избранного" : "Добавить в избранное"}: ${template.name}`} title={favorite ? "Убрать из избранного" : "Добавить в избранное"}><Star aria-hidden className={`size-6 ${favorite ? "fill-current" : ""}`} /></button>
+      <span className={libraryStyles.slideCount}>{template.slides.length} слайдов</span>
+    </div>
+    <div className={libraryStyles.slideSamples}>
+      {template.slides.slice(1, 4).map((slide, i) => <button key={slide.id} type="button" aria-label={`Посмотреть слайд ${i + 2} шаблона «${template.name}»`} onClick={() => onPreview(i + 1)}><div aria-hidden="true" inert><SlidePreview project={template} slide={slide} compact /></div></button>)}
+    </div>
+    <div className={libraryStyles.cardBody}>
+      <span className={libraryStyles.useCase}>{template.useCase}</span>
+      <h3>{template.name}</h3><p>{template.description}</p>
+      <div className={libraryStyles.cardFooter}>
+        <div className={libraryStyles.palette} title={`Оформление: ${presentationTheme(template.themeId).name}`}><span aria-hidden style={{ background: template.backgroundColor }} /><span aria-hidden style={{ background: template.accentColor }} /><span aria-hidden style={{ background: template.textColor }} /><span>{presentationTheme(template.themeId).name}</span></div>
+        <Button size="sm" variant="secondary" onClick={onUse} loading={busy === template.id}>Использовать</Button>
+      </div>
+    </div>
+  </article>;
+}
+
 export function PresentationStudio() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1350,6 +1381,8 @@ export function PresentationStudio() {
   const [query, setQuery] = useState("");
   const [templateQuery, setTemplateQuery] = useState("");
   const [templateUseCase, setTemplateUseCase] = useState("Все задачи");
+  const [previewTemplate, setPreviewTemplate] = useState<(typeof presentationTemplates)[number] | null>(null);
+  const [previewSlide, setPreviewSlide] = useState(0);
   const [aiOpen, setAiOpen] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
   const [slideImageOpen, setSlideImageOpen] = useState(false);
@@ -2761,7 +2794,7 @@ export function PresentationStudio() {
   return (
     <div className="presentation-studio-home grid h-full min-h-0 auto-rows-max content-start gap-7 overflow-y-auto overscroll-contain pr-1">
       <PageHeader
-        title="Презентации"
+        title={libraryView === "templates" ? "Шаблоны презентаций" : "Презентации"}
         action={
           <>
             <Button
@@ -2791,7 +2824,7 @@ export function PresentationStudio() {
       {error ? <Alert tone="danger">{error}</Alert> : null}
       <div className="min-h-[50px] w-full shrink-0 overflow-x-auto pb-1">
         <nav
-          className="flex min-h-12 w-max items-center gap-1 rounded-xl border border-border bg-surface p-1"
+          className={libraryStyles.collections}
           aria-label="Разделы библиотеки презентаций"
         >
           {[
@@ -2816,9 +2849,9 @@ export function PresentationStudio() {
               type="button"
               aria-pressed={libraryView === item.id}
               onClick={() => setLibraryView(item.id)}
-              className="group flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-[12px] font-semibold text-text-muted transition hover:bg-surface-subtle aria-pressed:bg-primary aria-pressed:text-white"
+              className={libraryStyles.collection}
             >
-              {item.label}
+              {item.id === "favorites" ? <Star aria-hidden className="size-5" /> : item.id === "templates" ? <LayoutTemplate aria-hidden className="size-5" /> : <FilePlus2 aria-hidden className="size-5" />}{item.label}
               <span className="rounded-full bg-black/5 px-1.5 py-0.5 text-[9px] group-aria-pressed:bg-white/15">
                 {item.count}
               </span>
@@ -2937,96 +2970,14 @@ export function PresentationStudio() {
       ) : null}
       {libraryView !== "presentations" ? (
       <section id="presentation-template-library" className="scroll-mt-6">
-        <div className="mb-4 flex flex-col justify-between gap-3 lg:flex-row lg:items-end">
-          <div>
-            <h2 className={libraryView === "favorites" ? "m-0 text-[18px] font-semibold" : "sr-only"}>
-              {libraryView === "favorites"
-                ? "Избранные шаблоны"
-                : "Шаблоны презентаций"}
-            </h2>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-[240px_210px]">
-            <SearchInput
-              value={templateQuery}
-              onChange={(event) => setTemplateQuery(event.target.value)}
-              onClear={() => setTemplateQuery("")}
-              placeholder="Найти шаблон"
-            />
-            <Select
-              value={templateUseCase}
-              onChange={(event) => setTemplateUseCase(event.target.value)}
-              options={templateUseCases.map((value) => ({
-                value,
-                label: value,
-              }))}
-            />
-          </div>
+        <div className={libraryStyles.toolbar}>
+          <SearchInput value={templateQuery} onChange={event => setTemplateQuery(event.target.value)} onClear={() => setTemplateQuery("")} placeholder="Найти презентацию по теме" aria-label="Поиск шаблонов презентаций" />
+          <Select value={templateUseCase} onChange={event => setTemplateUseCase(event.target.value)} aria-label="Задача презентации" options={templateUseCases.map(value => ({ value, label: value }))} className={templateUseCase !== "Все задачи" ? libraryStyles.activeFilter : ""} />
+          <span className={libraryStyles.resultCount} role="status">Найдено: {visiblePresentationTemplates.length}</span>
+          {(templateQuery || templateUseCase !== "Все задачи") && <Button variant="ghost" size="sm" onClick={() => { setTemplateQuery(""); setTemplateUseCase("Все задачи"); }}>Сбросить</Button>}
         </div>
-        <p className="mb-3 mt-0 text-[10px] text-text-subtle">
-          Найдено: {visiblePresentationTemplates.length} из{" "}
-          {presentationTemplates.length}
-        </p>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {visiblePresentationTemplates.map((template) => (
-            <article
-              key={template.id}
-              className="group overflow-hidden rounded-xl border border-border bg-surface shadow-[var(--shadow-xs)] transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-[var(--shadow-md)]"
-            >
-              <div className="p-3">
-                <div className="overflow-hidden rounded-lg">
-                  <SlidePreview
-                    project={template}
-                    slide={template.slides[0]}
-                    compact
-                  />
-                </div>
-                <div className="px-1 pt-3">
-                  <span className="text-[11px] text-text-muted">
-                    {template.useCase}
-                  </span>
-                  <h3 className="mb-0 mt-1 text-[14px] font-semibold">
-                    {template.name}
-                  </h3>
-                  <p className="mb-0 mt-1 min-h-8 text-[11px] leading-4 text-text-muted">
-                    {template.description}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center justify-between border-t border-border px-4 py-3">
-                <span className="text-[10px] text-text-subtle">
-                  {template.slides.length} слайдов ·{" "}
-                  {presentationTheme(template.themeId).name}
-                </span>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => void toggleFavorite("template", template.id)}
-                    disabled={busy === `favorite-template-${template.id}`}
-                    aria-pressed={favoriteTemplateIds.includes(template.id)}
-                    className="rounded-md p-2 text-text-subtle transition hover:bg-warning-subtle hover:text-warning aria-pressed:text-warning"
-                    aria-label={`${favoriteTemplateIds.includes(template.id) ? "Убрать из избранного" : "Добавить в избранное"}: ${template.name}`}
-                  >
-                    <Star
-                      className="size-5"
-                      fill={
-                        favoriteTemplateIds.includes(template.id)
-                          ? "currentColor"
-                          : "none"
-                      }
-                    />
-                  </button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => createFromScenario(template)}
-                    loading={busy === template.id}
-                  >
-                    Использовать
-                  </Button>
-                </div>
-              </div>
-            </article>
-          ))}
+        <div className={libraryStyles.grid}>
+          {visiblePresentationTemplates.map(template => <PresentationTemplateCard key={template.id} template={template} favorite={favoriteTemplateIds.includes(template.id)} busy={busy} onFavorite={() => void toggleFavorite("template", template.id)} onUse={() => createFromScenario(template)} onPreview={slide => { setPreviewTemplate(template); setPreviewSlide(slide); }} />)}
         </div>
         {!visiblePresentationTemplates.length ? (
           <div className="rounded-xl border border-dashed border-border p-8 text-center text-[12px] text-text-muted">
@@ -3037,6 +2988,16 @@ export function PresentationStudio() {
         ) : null}
       </section>
       ) : null}
+
+      <Modal open={Boolean(previewTemplate)} onOpenChange={open => { if (!open) setPreviewTemplate(null); }} title={previewTemplate?.name ?? "Просмотр презентации"} size="full" footer={<>
+        <div className={libraryStyles.previewPaging}><Button variant="secondary" size="icon" aria-label="Предыдущий слайд" disabled={previewSlide === 0} onClick={() => setPreviewSlide(value => value - 1)}><ChevronLeft aria-hidden className="size-5" /></Button><span aria-live="polite">{previewSlide + 1} / {previewTemplate?.slides.length ?? 0}</span><Button variant="secondary" size="icon" aria-label="Следующий слайд" disabled={!previewTemplate || previewSlide >= previewTemplate.slides.length - 1} onClick={() => setPreviewSlide(value => value + 1)}><ChevronRight aria-hidden className="size-5" /></Button></div>
+        <Button loading={busy === previewTemplate?.id} onClick={() => { if (previewTemplate) { createFromScenario(previewTemplate); setPreviewTemplate(null); } }}>Использовать шаблон</Button>
+      </>}>
+        {previewTemplate && <div className={libraryStyles.slideBrowser}>
+          <div className={libraryStyles.fullSlide}><SlidePreview project={previewTemplate} slide={previewTemplate.slides[previewSlide]} /></div>
+          <div className={libraryStyles.filmstrip} aria-label="Слайды презентации">{previewTemplate.slides.map((slide, i) => <button key={slide.id} type="button" aria-label={`Слайд ${i + 1}: ${slide.title}`} aria-pressed={i === previewSlide} onClick={() => setPreviewSlide(i)}><div aria-hidden="true" inert><SlidePreview project={previewTemplate} slide={slide} compact /></div><span>{String(i + 1).padStart(2, "0")}</span></button>)}</div>
+        </div>}
+      </Modal>
 
       <Modal
         open={aiOpen}

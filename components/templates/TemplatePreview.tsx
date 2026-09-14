@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { ArrowRight, Copy, Eye, PencilLine, Sparkles, Star, Trash2 } from "@/components/ui/icons";
 import type { EmailTemplateRecord } from "@/types/api";
@@ -83,7 +83,7 @@ export function TemplateThumbnail({ template }: { template: EmailTemplateRecord 
     resize.observe(element); intersection.observe(element);
     return () => { resize.disconnect(); intersection.disconnect(); };
   }, []);
-  return <div className={styles.thumbnail} style={{ backgroundColor: template.builderDocument.workspaceBackground }}>
+  return <div className={styles.thumbnail} style={{ "--letter-accent": template.builderDocument.accentColor || "#7c35f2" } as CSSProperties}>
     <div ref={container} className={styles.paper} aria-hidden="true" inert>
       {visible && width > 0 ? <div className={styles.letterFrame} style={{ width: pageWidth, transform: `scale(${width / pageWidth})` }}>
         <LetterPreview html={template.emailBodyHtml} title={`Миниатюра: ${template.name}`} className="h-[1600px]" />
