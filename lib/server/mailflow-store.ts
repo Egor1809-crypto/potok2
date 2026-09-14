@@ -1,3 +1,4 @@
+import { contactListOrder } from "./contact-list-order";
 import { hasAllContactAccess, isTeamAdmin, normalizeContactAccess } from "@/lib/team-access";
 import { accessParticipant, campaignAccessSql, contactAccessSql, rawContactAccess, requireAudienceAccess, requireCampaignAccess, requireContactAccess, requireTeamAdmin } from "./team-access";
 import { calendarReport } from "./calendar-report";
@@ -1301,6 +1302,7 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
   const includeMeta = url.searchParams.get("meta") !== "0";
   const pageSize = positiveInteger(url.searchParams.get("pageSize"), CONTACTS_PAGE_SIZE, CONTACTS_MAX_PAGE_SIZE);
   const requestedPage = positiveInteger(url.searchParams.get("page"), 1, 1_000_000);
+  const contactOrder = contactListOrder(url.searchParams.get("sort"));
   const filters = contactListFilters(url, actor.participant);
   const where = and(...filters);
   const db = getDb();
@@ -1420,7 +1422,7 @@ export async function listContacts(request: Request): Promise<ContactsListRespon
     .select()
     .from(contacts)
     .where(where)
-    .orderBy(desc(contacts.updatedAt), desc(contacts.id))
+    .orderBy(...contactOrder)
     .limit(pageSize)
     .offset((page - 1) * pageSize);
   const includeDeliveryHistory = url.searchParams.get("delivery") === "sent";

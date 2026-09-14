@@ -9,7 +9,7 @@ test("contacts page uses server pagination and database-side filtering", async (
     readFile(new URL("../app/api/contacts/route.ts", import.meta.url), "utf8"),
   ]);
 
-  assert.match(view, /pageSize: "100"/);
+  assert.match(view, /pageSize: String\(pageSize\)/);
   assert.match(view, /setTotalPages\(payload\.totalPages\)/);
   assert.match(view, /metadataLoaded\.current/);
   assert.match(view, /params\.set\("meta", "0"\)/);
@@ -34,7 +34,6 @@ test("contacts page exposes four deduplicated channel databases and balanced own
   assert.match(view, /База №2 · Telegram/);
   assert.match(view, /База №3 · ВКонтакте/);
   assert.match(view, /База №4 · Телефоны/);
-  assert.match(view, /одной объединённой базы/);
   assert.match(view, /Открыть TG/);
   assert.match(store, /markContacted/);
   assert.match(databaseInit, /UPDATE contacts AS target/);
@@ -138,7 +137,6 @@ test("sent contacts stay durable and are separated by provider history", async (
 
   assert.match(view, /К отправке/);
   assert.match(view, /Отправлено/);
-  assert.match(view, /Контакт остаётся в общей базе/);
   assert.match(view, /Управление ответственными/);
   assert.match(store, /delivery === "sent"/);
   assert.match(store, /delivery === "pending"/);

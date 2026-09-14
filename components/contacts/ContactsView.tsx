@@ -7,6 +7,8 @@ import { Select } from "@/components/ui/select";
 import Link from "next/link";
 import {
   Check,
+  Copy,
+  ArrowDown,
   ChevronLeft,
   ChevronRight,
   CircleAlert,
@@ -42,6 +44,7 @@ import type {
   ParticipantRecord,
 } from "@/types/api";
 import { ContactDrawer } from "./ContactDrawer";
+import styles from "./contacts.module.css";
 
 type StatusFilter = "all" | ContactRecord["status"];
 export type ContactDraft = ContactCreateInput & { email: string; tagsText: string };
@@ -170,6 +173,11 @@ export function ContactsView() {
   const [teams, setTeams] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [sort, setSort] = useState("updated-desc");
+  const requestRef = useRef<AbortController | null>(null);
+  const selectAllRef = useRef<HTMLInputElement>(null);
+  const listCardRef = useRef<HTMLElement>(null);
   const [filteredCount, setFilteredCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -182,7 +190,7 @@ export function ContactsView() {
   const [channel, setChannel] = useState("all");
   const [owner, setOwner] = useState("all");
   const [sheet, setSheet] = useState("all");
-  const [delivery, setDelivery] = useState<"pending" | "sent" | "all">("pending");
+  const [delivery, setDelivery] = useState<"pending" | "sent" | "all">("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [teamName, setTeamName] = useState("");
   const [responsibleId, setResponsibleId] = useState("");
@@ -214,10 +222,14 @@ export function ContactsView() {
   }, [search]);
 
   const load = useCallback(async (refreshMeta = false) => {
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
+    setSelected(new Set());
     setLoading(true);
     setError("");
     try {
-      const params = new URLSearchParams({ page: String(page), pageSize: "100" });
+      const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize), sort });
       if (refreshMeta) metadataLoaded.current = false;
       if (metadataLoaded.current) params.set("meta", "0");
       if (debouncedSearch) params.set("q", debouncedSearch);
@@ -229,9 +241,10 @@ export function ContactsView() {
       if (owner !== "all") params.set("owner", owner);
       if (sheet !== "all") params.set("sheet", sheet);
       if (delivery !== "all") params.set("delivery", delivery);
-      const response = await fetch(`/api/contacts?${params.toString()}`, { cache: "no-store" });
+      const response = await fetch(`/api/contacts?${params.toString()}`, { cache: "no-store", signal: controller.signal });
       const payload: ContactsListResponse | ApiError = await response.json();
       if (!response.ok || !("contacts" in payload)) throw new Error(messageFrom(payload, "Не удалось загрузить контакты"));
+      if (controller.signal.aborted) return;
       setContacts(payload.contacts);
       setDeliveryHistory(payload.deliveryHistory ?? {});
       setMembers(payload.members);
@@ -251,16 +264,16 @@ export function ContactsView() {
       if (payload.page !== page) setPage(payload.page);
       setSelected(new Set());
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Не удалось загрузить контакты");
+      if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : "Не удалось загрузить контакты");
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
-  }, [channel, city, company, debouncedSearch, delivery, owner, page, sheet, status, team]);
+  }, [channel, city, company, debouncedSearch, delivery, owner, page, pageSize, sheet, sort, status, team]);
 
   useEffect(() => {
     if (activeView !== "contacts") return;
     const frame = window.requestAnimationFrame(() => void load());
-    return () => window.cancelAnimationFrame(frame);
+    return () => { window.cancelAnimationFrame(frame); requestRef.current?.abort(); };
   }, [activeView, load]);
 
   const visible = contacts;
@@ -284,6 +297,9 @@ export function ContactsView() {
     }
   }, [timezone]);
   const allVisibleSelected = visible.length > 0 && visible.every((contact) => selected.has(contact.id));
+  useEffect(() => {
+    if (selectAllRef.current) selectAllRef.current.indeterminate = selected.size > 0 && !allVisibleSelected;
+  }, [selected, allVisibleSelected, loading]);
   const activeCount = summary.active;
   const primaryBaseCount = summary.primaryBase;
   const secondaryBaseCount = summary.secondaryBase;
@@ -313,6 +329,7 @@ export function ContactsView() {
   const resetFilters = () => {
     setPage(1);
     setSearch("");
+    setDelivery("all");
     setStatus("all");
     setCompany("all");
     setCity("all");
@@ -543,7 +560,8 @@ export function ContactsView() {
   };
 
   return (
-    <div className="space-y-6">
+    <>
+    <div className={styles.page}>
       <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="text-[28px] font-semibold tracking-[-.04em]">Контакты</h1>
@@ -553,15 +571,12 @@ export function ContactsView() {
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={() => setView("import")} className="btn btn-secondary gap-2"><Upload aria-hidden="true" className="size-6" />Импорт таблицы</button>
-          <button type="button" onClick={() => setEditing("new")} className="btn btn-secondary gap-2"><Plus aria-hidden="true" className="size-6" />Добавить контакт</button>
-          <Link href={campaignHref(selectedIds)} className="btn btn-primary gap-2"><SendHorizontal aria-hidden="true" className="size-6" />{selectedIds.length ? `Кампания · ${selectedIds.length}` : "Новая кампания"}</Link>
+          <button type="button" onClick={() => { setView("contacts"); setEditing("new"); }} className="btn btn-primary gap-2"><Plus aria-hidden="true" className="size-6" />Добавить контакт</button>
+          <Link href={campaignHref(selectedIds)} className="btn btn-secondary gap-2"><SendHorizontal aria-hidden="true" className="size-6" />{selectedIds.length ? `Кампания · ${selectedIds.length}` : "Новая кампания"}</Link>
         </div>
       </header>
 
-      <nav aria-label="Режим работы с контактами" className="inline-flex rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)] p-1">
-        <button type="button" onClick={() => setView("contacts")} aria-pressed={activeView === "contacts"} className={`rounded-lg px-3 py-2 text-[12px] font-semibold transition ${activeView === "contacts" ? "bg-white text-[var(--primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-strong)]"}`}>База команды</button>
-        <button type="button" onClick={() => setView("import")} aria-pressed={activeView === "import"} className={`rounded-lg px-3 py-2 text-[12px] font-semibold transition ${activeView === "import" ? "bg-white text-[var(--primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-strong)]"}`}>Импорт таблицы</button>
-      </nav>
+      {activeView === "import" ? <button type="button" onClick={() => setView("contacts")} className="btn btn-secondary"><ChevronLeft size={22} aria-hidden="true"/>К контактам</button> : null}
 
       {activeView === "import" ? (
         <section className="card p-4 sm:p-6">
@@ -572,42 +587,113 @@ export function ContactsView() {
         </section>
       ) : <>
 
-      <section className="card p-3" aria-label="Статус отправки контактам">
-        <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => { setPage(1); setDelivery("pending"); }} aria-pressed={delivery === "pending"} className={`btn ${delivery === "pending" ? "btn-primary" : "btn-secondary"}`}>К отправке · {summary.pending.toLocaleString("ru-RU")}</button>
-          <button type="button" onClick={() => { setPage(1); setDelivery("sent"); }} aria-pressed={delivery === "sent"} className={`btn ${delivery === "sent" ? "btn-primary" : "btn-secondary"}`}>Отправлено · {summary.sent.toLocaleString("ru-RU")}</button>
-          <button type="button" onClick={() => { setPage(1); setDelivery("all"); }} aria-pressed={delivery === "all"} className={`btn ${delivery === "all" ? "btn-primary" : "btn-secondary"}`}>Все · {summary.total.toLocaleString("ru-RU")}</button>
+      <section className={styles.coverage} aria-label="Каналы контактов">
+        {coverage.map(({ id, label, found, ready, Icon }) => <button type="button" key={id} aria-pressed={channel === id} onClick={() => { setPage(1); setChannel(channel === id ? "all" : id); }}>
+          <span className={styles.channelIcon}><Icon size={26} aria-hidden="true"/></span><span><span className={styles.channelName}>{label.replace(/^База №\d · /, "")}</span><strong>{found.toLocaleString("ru-RU")}</strong></span><Check className={styles.channelCheck} size={18} aria-hidden="true"/>
+          <span className={styles.channelHint}>{id === "phone" ? "Найдено номеров" : id === "email" ? `Активных: ${ready.toLocaleString("ru-RU")} · сервисные: ${summary.coverage.email.serviceReady.toLocaleString("ru-RU")}` : `С согласием: ${ready.toLocaleString("ru-RU")}`}</span>
+        </button>)}
+      </section>
+      {error && <div role="alert" className="flex items-start gap-3 rounded-xl border border-[var(--danger)]/20 bg-[var(--danger-subtle)] p-4 text-[12px] text-[var(--danger)]"><CircleAlert aria-hidden="true" className="mt-0.5 size-6 shrink-0" /><span className="flex-1">{error}</span><button type="button" onClick={() => void load()} className="font-semibold underline underline-offset-2">Повторить</button></div>}
+
+      <section ref={listCardRef} className={styles.listCard} aria-label="База контактов">
+        <div className={styles.toolbar}>
+          <div className={styles.listViews} role="group" aria-label="Статус отправки контактам">
+            {([{id:"all",label:"Все",count:summary.total},{id:"pending",label:"К отправке",count:summary.pending},{id:"sent",label:"Отправлено",count:summary.sent}] as const).map(item => <button type="button" key={item.id} aria-pressed={delivery === item.id} onClick={() => { setPage(1); setDelivery(item.id); }}>{item.label}<span>{item.count.toLocaleString("ru-RU")}</span></button>)}
+            <button type="button" aria-pressed={owner === participantId} disabled={!participantId} onClick={() => { setPage(1); setOwner(owner === participantId ? "all" : participantId); }}><UsersRound size={20} aria-hidden="true"/>Мои контакты</button>
+          </div>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <label className={`relative min-w-0 flex-1 ${styles.search}`}><span className="sr-only">Поиск контактов</span><Search aria-hidden="true" className="absolute left-3 top-1/2 size-6 -translate-y-1/2 text-[var(--text-subtle)]" /><input type="search" className="input input-with-leading-icon" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Имя, email, телефон, компания или тег" /></label>
+            <button type="button" onClick={() => setFiltersOpen((value) => !value)} aria-expanded={filtersOpen} className={`btn gap-2 ${filtersOpen || activeFilterCount ? "btn-primary" : "btn-secondary"}`}><SlidersHorizontal aria-hidden="true" className="size-6" />Фильтры{activeFilterCount ? ` · ${activeFilterCount}` : ""}</button>
+            <button type="button" onClick={exportCsv} disabled={!selectedIds.length && !visible.length} className="btn btn-secondary gap-2"><Download aria-hidden="true" className="size-6" />{selected.size ? "Экспорт выбранных" : "Экспорт страницы"}</button>
+          </div>
+          <div className={styles.viewOptions}>
+            <label><span>Лист базы</span><Select value={sheet} onChange={event => { setPage(1); setSheet(event.target.value); }}><option value="all">Все листы</option>{sheets.map(item => <option key={item.label} value={item.label}>{item.label.replace(/^Импорт: /, "")} · {item.count.toLocaleString("ru-RU")}</option>)}</Select></label>
+            <label><span><ArrowDown size={16} aria-hidden="true"/>Порядок</span><Select value={sort} onChange={event => { setPage(1); setSort(event.target.value); }}><option value="updated-desc">Недавно обновлённые</option><option value="updated-asc">Давно не обновлялись</option><option value="name-asc">Имя: А → Я</option><option value="name-desc">Имя: Я → А</option></Select></label>
+          </div>
+          <div className={styles.filterChips}>
+            {[
+              {key:"search",label: search ? `Поиск: ${search}` : "", clear: () => setSearch("")},
+              {key:"status",label: status !== "all" ? statusLabel[status] : "", clear: () => setStatus("all")},
+              {key:"company",label: company !== "all" ? company : "", clear: () => setCompany("all")},
+              {key:"city",label: city !== "all" ? city : "", clear: () => setCity("all")},
+              {key:"team",label: team !== "all" ? team : "", clear: () => setTeam("all")},
+              {key:"channel",label: channel !== "all" ? coverage.find(item => item.id === channel)?.label.replace(/^База №\d · /, "") : "", clear: () => setChannel("all")},
+              {key:"owner",label: owner !== "all" ? membersById.get(owner)?.displayName : "", clear: () => setOwner("all")},
+              {key:"sheet",label: sheet !== "all" ? sheet.replace(/^Импорт: /, "") : "", clear: () => setSheet("all")},
+            ].filter(item => item.label).map(item => <button type="button" key={item.key} aria-label={`Убрать фильтр: ${item.label}`} onClick={() => { setPage(1); item.clear(); }}>{item.label}<X size={16} aria-hidden="true"/></button>)}
+            {activeFilterCount || search || delivery !== "all" ? <button type="button" className={styles.reset} onClick={resetFilters}>Сбросить всё</button> : null}
+          </div>
+          {filtersOpen ? (
+            <div className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)]/60 p-3">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+                <label><span className="mb-1 block text-[10px] font-semibold text-[var(--text-muted)]">Статус</span><Select className="input" value={status} onChange={(event) => { setPage(1); setStatus(event.target.value as StatusFilter); }}><option value="all">Любой статус</option><option value="active">Активные</option><option value="unsubscribed">Отписанные</option><option value="bounced">Недоставляемые</option><option value="invalid">Некорректные</option></Select></label>
+                <label><span className="mb-1 block text-[10px] font-semibold text-[var(--text-muted)]">Компания</span><Select className="input" value={company} onChange={(event) => { setPage(1); setCompany(event.target.value); }}><option value="all">Любая компания</option>{companies.map((value) => <option key={value}>{value}</option>)}</Select></label>
+                <label><span className="mb-1 block text-[10px] font-semibold text-[var(--text-muted)]">Город</span><Select className="input" value={city} onChange={(event) => { setPage(1); setCity(event.target.value); }}><option value="all">Любой город</option>{cities.map((value) => <option key={value}>{value}</option>)}</Select></label>
+                <label><span className="mb-1 block text-[10px] font-semibold text-[var(--text-muted)]">Команда</span><Select className="input" value={team} onChange={(event) => { setPage(1); setTeam(event.target.value); }}><option value="all">Любая команда</option>{teams.map((value) => <option key={value}>{value}</option>)}</Select></label>
+                <label><span className="mb-1 block text-[10px] font-semibold text-[var(--text-muted)]">Канал</span><Select className="input" value={channel} onChange={(event) => { setPage(1); setChannel(event.target.value); }}><option value="all">Любой канал</option><option value="email">Есть Email</option><option value="telegram">Есть Telegram</option><option value="vk">Есть ВКонтакте</option><option value="phone">Есть телефон</option></Select></label>
+                <label><span className="mb-1 block text-[10px] font-semibold text-[var(--text-muted)]">Ответственный</span><Select className="input" value={owner} onChange={(event) => { setPage(1); setOwner(event.target.value); }}><option value="all">Любой ответственный</option>{members.map((member) => <option key={member.id} value={member.id}>{member.displayName}</option>)}</Select></label>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[10px] text-[var(--text-muted)]"><span>Фильтры применяются сразу. Найдено: <b className="text-[var(--text-strong)]">{filteredCount.toLocaleString("ru-RU")}</b></span>{activeFilterCount || search ? <button type="button" onClick={resetFilters} className="btn btn-ghost btn-sm">Сбросить всё</button> : null}</div>
+            </div>
+          ) : null}
         </div>
-        <p className="mt-2 text-[10px] text-[var(--text-muted)]">Контакт остаётся в общей базе. Когда провайдер принял письмо, он автоматически показывается в таблице «Отправлено».
-        </p>
+        <div className={styles.selectionBar}>
+          <label className={styles.selectPage}><input ref={selectAllRef} type="checkbox" checked={allVisibleSelected} disabled={loading || !visible.length} onChange={toggleAll}/>Выбрать страницу</label>
+          <span role="status">{loading ? "Обновляем…" : `Найдено: ${filteredCount.toLocaleString("ru-RU")}`}</span>
+        </div>
+        {selectedIds.length > 0 && <div className={styles.bulkActions}><span className="font-semibold text-[var(--text-strong)]">Выбрано на странице: {selectedIds.length}</span><div className="flex items-center gap-1 rounded-lg border border-[var(--border)] bg-white p-1"><Select aria-label="Ответственный выбранных контактов" value={responsibleId} onChange={(event) => setResponsibleId(event.target.value)} className="h-7 max-w-44 border-0 bg-transparent px-1 text-[11px] outline-none"><option value="">Назначить ответственного</option>{members.map((member) => <option key={member.id} value={member.id}>{member.displayName}</option>)}</Select><button type="button" onClick={() => void assignResponsible()} disabled={busy || !responsibleId} className="btn btn-primary btn-sm">Назначить</button></div><div className="flex items-center gap-1 rounded-lg border border-[var(--border)] bg-white p-1"><UsersRound aria-hidden="true" className="ml-1 size-5 text-[var(--primary)]" /><input aria-label="Название команды для выбранных контактов" value={teamName} onChange={(event) => setTeamName(event.target.value)} className="h-7 w-36 border-0 bg-transparent px-1 text-[11px] outline-none" placeholder="Название команды" /><button type="button" onClick={() => void assignTeam()} disabled={busy || !teamName.trim()} className="btn btn-primary btn-sm">Добавить</button></div><button type="button" onClick={() => void removeSelected()} disabled={busy} className="btn btn-danger btn-sm gap-2"><Trash2 aria-hidden="true" className="size-5" />Удалить</button><button type="button" onClick={() => setSelected(new Set())} className="btn btn-ghost btn-sm gap-2"><X aria-hidden="true" className="size-5" />Снять выбор</button></div>}
+
+        {loading ? (
+          <div className="grid min-h-64 place-items-center"><LoaderCircle aria-hidden="true" className="size-8 animate-spin text-[var(--primary)]" /><span className="sr-only">Загрузка контактов</span></div>
+        ) : visible.length ? (
+          <div className={styles.tableScroll} role="region" aria-label="Список контактов" tabIndex={0}>
+            <table className={`data-table ${styles.table}`}><caption className="sr-only">Контакты на странице {page}</caption>
+              <thead><tr><th className="w-12"><span className="sr-only">Выбор</span></th><th>Контакт</th><th>Компания</th><th>Каналы</th><th>Отправка</th><th>Статус</th><th>Обновлён</th><th className="w-24"><span className="sr-only">Действия</span></th></tr></thead>
+              <tbody>{visible.map((contact) => {
+                const checked = selected.has(contact.id);
+                const creator = contact.createdByParticipantId ? membersById.get(contact.createdByParticipantId) : undefined;
+                const responsible = membersById.get(contact.responsibleParticipantId ?? contact.createdByParticipantId ?? "");
+                const primaryEndpoint = contact.email || contact.phone || (contact.telegramChatId ? `Telegram: ${contact.telegramChatId}` : contact.vkUserId ? `ВК: ${contact.vkUserId}` : "Канал не указан");
+                const telegramHref = personalTelegramHref(contact.telegramChatId);
+                const contactHistory = deliveryHistory[contact.id] ?? [];
+                const latestDelivery = contactHistory[0];
+                return <tr key={contact.id} data-selected={checked} style={{ boxShadow: `inset 4px 0 0 ${responsible?.color ?? creator?.color ?? "#CBD5E1"}` }}>
+                  <td><label className={styles.rowCheckbox}><input type="checkbox" checked={checked} onChange={() => setSelected(current => { const next = new Set(current); if (next.has(contact.id)) next.delete(contact.id); else next.add(contact.id); return next; })}/><span className="sr-only">Выбрать {contact.fullName}</span></label></td>
+                  <td><button type="button" onClick={() => setDrawerContact(contact)} className={styles.contactIdentity}><span className="grid size-9 shrink-0 place-items-center rounded-full text-[10px] font-semibold text-white" style={{ backgroundColor: responsible?.color ?? creator?.color ?? contact.avatarColor }}>{contact.firstName[0]}{contact.lastName[0]}</span><span><span className="block text-[12px] font-semibold hover:text-[var(--primary)]">{contact.fullName}</span><span className="mt-0.5 block text-[10px] text-[var(--text-subtle)]">{primaryEndpoint}</span>{responsible && <span className="mt-1 inline-flex items-center gap-1 text-[9px] font-semibold" style={{ color: responsible.color }}><i className="size-1.5 rounded-full" style={{ backgroundColor: responsible.color }} />Ответственный: {responsible.displayName}</span>}</span></button></td>
+                  <td><p className="text-[11px] font-medium">{contact.companyName || "—"}</p><p className="mt-0.5 text-[10px] text-[var(--text-subtle)]">{contact.jobTitle || "Должность не указана"}</p></td>
+                  <td><div className="flex max-w-44 flex-wrap gap-1">{contact.email && <SourcePill label="Email" color="#F43CB8" ready={Boolean(contact.emailConsent && contact.marketingConsentSource && contact.marketingConsentAt && contact.marketingConsentText)} />}{contact.telegramChatId && <SourcePill label="TG" color="#229ED9" ready={contact.telegramConsent} />}{contact.vkUserId && <SourcePill label="VK" color="#0077FF" ready={contact.vkConsent} />}{contact.phone && <SourcePill label="Телефон" color="#0E7490" />}</div></td>
+                  <td>{contact.lastContactedAt ? <span className="block"><span className="badge badge-success">✓ Отправлено</span>{latestDelivery ? <details className="mt-1 max-w-56 text-[9px] text-[var(--text-muted)]"><summary className="cursor-pointer truncate" title={latestDelivery.statusMessage}>{latestDelivery.campaignName} · {latestDelivery.participantName}</summary><div className="mt-1 space-y-1 rounded-lg bg-[var(--surface-subtle)] p-2">{contactHistory.map((entry, index) => <p key={`${entry.campaignId}-${entry.updatedAt}-${index}`}><b>{entry.campaignName}</b><br />Отправитель: <b>{entry.participantName}</b><br />{entry.providerId} · {entry.channel} · {entry.status}<br />{entry.statusMessage}{entry.externalId ? <><br />ID: {entry.externalId}</> : null}</p>)}</div></details> : null}</span> : telegramHref ? <span className="flex flex-wrap gap-1"><a href={telegramHref} target="_blank" rel="noreferrer" className="badge badge-primary">Открыть TG</a><button type="button" disabled={busy} onClick={() => void markContacted(contact)} className="badge badge-neutral">Отметить</button></span> : <span className="badge badge-neutral">Не отправляли</span>}</td>
+                  <td><span className={`badge ${statusTone[contact.status]}`}>{statusLabel[contact.status]}</span></td>
+                  <td className="text-[11px] text-[var(--text-muted)]">{dateFormatter.format(new Date(contact.updatedAt))}</td>
+                  <td><div className={styles.rowActions}>{(contact.email || contact.phone) ? <button type="button" onClick={() => { void (navigator.clipboard?.writeText(contact.email || contact.phone) ?? Promise.reject(new Error("Clipboard unavailable"))).then(() => notify("Контакт скопирован"), () => setError("Не удалось скопировать адрес. Откройте карточку и скопируйте его вручную.")); }} aria-label={`Скопировать ${contact.email ? "email" : "телефон"} ${contact.fullName}`}><Copy size={22} aria-hidden="true"/></button> : null}<Link href={campaignHref([contact.id])} className="grid size-8 place-items-center rounded-lg text-[var(--primary)] hover:bg-[var(--primary-subtle)]" aria-label={`Написать ${contact.fullName}`}><SendHorizontal aria-hidden="true" className="size-6" /></Link><button type="button" onClick={() => setEditing(contact)} className="grid size-8 place-items-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface-subtle)]" aria-label={`Изменить ${contact.fullName}`}><Pencil aria-hidden="true" className="size-6" /></button></div></td>
+                </tr>;
+              })}</tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="px-6 py-12 text-center"><Search aria-hidden="true" className="mx-auto size-9 text-[var(--text-subtle)]" /><p className="mt-3 text-[13px] font-semibold">Контакты не найдены</p><p className="mt-1 text-[11px] text-[var(--text-muted)]">Измените поиск или добавьте новый контакт.</p>{activeFilterCount || search || delivery !== "all" ? <button type="button" onClick={resetFilters} className="btn btn-secondary mt-4">Сбросить фильтры</button> : <button type="button" onClick={() => setEditing("new")} className="btn btn-primary mt-4">Добавить контакт</button>}</div>
+        )}
+
+        <footer className={styles.pagination}>
+          <label>На странице<Select value={String(pageSize)} onChange={event => { setPage(1); setPageSize(Number(event.target.value)); }}><option value="25">25</option><option value="50">50</option><option value="100">100</option></Select></label>
+          <span>{filteredCount ? `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, filteredCount)} из ${filteredCount.toLocaleString("ru-RU")}` : "0 контактов"}</span>
+          <div><button type="button" onClick={() => setPage(current => Math.max(1, current - 1))} disabled={loading || page <= 1} className="btn btn-secondary btn-sm" aria-label="Предыдущая страница"><ChevronLeft size={22} aria-hidden="true"/></button><span>Страница {page} из {totalPages}</span><button type="button" onClick={() => setPage(current => Math.min(totalPages, current + 1))} disabled={loading || page >= totalPages} className="btn btn-secondary btn-sm" aria-label="Следующая страница"><ChevronRight size={22} aria-hidden="true"/></button></div>
+        </footer>
       </section>
 
-      <section className="card p-4" aria-labelledby="base-responsible-title">
+      <details className={styles.management}><summary><UsersRound size={22} aria-hidden="true"/>Управление базой и статистика</summary><div className={styles.managementBody}>      <section className="card p-4" aria-labelledby="base-responsible-title">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h2 id="base-responsible-title" className="text-[13px] font-semibold">Управление ответственными</h2>
             <p className="mt-1 text-[10px] text-[var(--text-muted)]">Выбрана {sheet === "all" ? "вся база" : `база «${sheet.replace(/^Импорт: /, "")}»`}. Можно назначить или снять ответственного сразу для всего листа.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Select value={responsibleId} onChange={(event) => setResponsibleId(event.target.value)} className="input min-w-52"><option value="">Выберите ответственного</option>{members.map((member) => <option key={member.id} value={member.id}>{member.displayName}</option>)}</Select>
+            <Select aria-label="Ответственный базы" value={responsibleId} onChange={(event) => setResponsibleId(event.target.value)} className="input min-w-52"><option value="">Выберите ответственного</option>{members.map((member) => <option key={member.id} value={member.id}>{member.displayName}</option>)}</Select>
             <button type="button" onClick={() => void assignResponsibleToBase(false)} disabled={busy || !responsibleId} className="btn btn-primary">Назначить базе</button>
             <button type="button" onClick={() => void assignResponsibleToBase(true)} disabled={busy} className="btn btn-secondary">Снять с базы</button>
           </div>
         </div>
       </section>
-
-      {sheets.length > 0 && (
-        <section className="card overflow-hidden" aria-labelledby="contact-sheets-title">
-          <div className="flex flex-col gap-1 border-b border-[var(--border)] px-4 py-3 sm:px-5">
-            <h2 id="contact-sheets-title" className="text-[13px] font-semibold">Листы баз</h2>
-            <p className="text-[10px] text-[var(--text-muted)]">Каждая загруженная таблица сохраняется отдельным листом. Контакт остаётся в общей базе и может входить в кампании.</p>
-          </div>
-          <div className="flex gap-2 overflow-x-auto px-4 py-3 sm:px-5">
-            <button type="button" onClick={() => { setPage(1); setSheet("all"); }} aria-pressed={sheet === "all"} className={`shrink-0 rounded-lg border px-3 py-2 text-[11px] font-semibold transition ${sheet === "all" ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-[var(--border)] bg-white text-[var(--text-muted)] hover:border-[var(--primary)]/35"}`}>Все контакты · {summary.total.toLocaleString("ru-RU")}</button>
-            {sheets.map((item) => <button key={item.label} type="button" onClick={() => { setPage(1); setSheet(item.label); }} aria-pressed={sheet === item.label} className={`shrink-0 rounded-lg border px-3 py-2 text-[11px] font-semibold transition ${sheet === item.label ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-[var(--border)] bg-white text-[var(--text-muted)] hover:border-[var(--primary)]/35"}`}>{item.label.replace(/^Импорт: /, "")} · {item.count.toLocaleString("ru-RU")}</button>)}
-          </div>
-        </section>
-      )}
 
       {(primaryBaseCount > 0 || secondaryBaseCount > 0) && <section className="flex flex-col gap-3 rounded-2xl border border-[#16E7EE]/20 bg-[linear-gradient(105deg,#101118_0%,#142430_64%,#16121D_100%)] px-4 py-3 text-white shadow-[0_12px_28px_rgba(10,17,29,.12)] sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
@@ -616,13 +702,6 @@ export function ContactsView() {
         </div>
         <p className="text-[10px] font-medium text-[#A9F9FC]">{assignedCount} закреплены за участниками — цветная линия слева показывает ответственного</p>
       </section>}
-
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Четыре канальные базы">
-        {coverage.map(({ id, label, found, ready, Icon, color }) => (
-          <button type="button" key={id} onClick={() => { setPage(1); setChannel(channel === id ? "all" : id); }} aria-pressed={channel === id} className={`card flex items-center gap-3 p-4 text-left transition hover:-translate-y-px hover:shadow-sm ${channel === id ? "ring-2 ring-[var(--primary)]/45" : ""}`}><span className="grid size-9 place-items-center rounded-xl" style={{ backgroundColor: `${color}18`, color }}><Icon aria-hidden="true" className="size-6" /></span><div><p className="text-[12px] font-semibold">{label}</p><p className="mt-0.5 text-[11px] text-[var(--text-muted)]">Уникальных контактов: {found.toLocaleString("ru-RU")}{id === "email" ? ` · доступно для отправки: ${ready.toLocaleString("ru-RU")} · сервисные: ${summary.coverage.email.serviceReady.toLocaleString("ru-RU")}` : id !== "phone" ? ` · разрешено: ${ready.toLocaleString("ru-RU")}` : ""}</p></div></button>
-        ))}
-      </section>
-      <p className="-mt-3 text-[10px] text-[var(--text-muted)]">Это четыре представления одной объединённой базы: контакт не дублируется, даже если у него несколько каналов.</p>
 
       {owners.length > 0 && (
         <section className="card overflow-hidden" aria-labelledby="owner-statistics-title">
@@ -634,7 +713,7 @@ export function ContactsView() {
             {owners.map((item) => {
               const isCurrent = item.participantId === participantId;
               return (
-                <button key={item.participantId} type="button" onClick={() => { setPage(1); setOwner(item.participantId); }} className={`rounded-xl border p-3 text-left transition hover:-translate-y-px hover:shadow-sm ${isCurrent ? "border-[var(--primary)]/45 bg-[var(--primary)]/[.04]" : "border-[var(--border)] bg-white"}`}>
+                <button key={item.participantId} type="button" aria-pressed={owner === item.participantId} onClick={() => { setPage(1); setOwner(owner === item.participantId ? "all" : item.participantId); listCardRef.current?.scrollIntoView({ block: "start" }); }} className={`rounded-xl border p-3 text-left transition hover:-translate-y-px hover:shadow-sm ${isCurrent ? "border-[var(--primary)]/45 bg-[var(--primary)]/[.04]" : "border-[var(--border)] bg-white"}`}>
                   <span className="flex items-center gap-2"><i className="size-2.5 rounded-full" style={{ backgroundColor: item.color }} /><b className="text-[12px]">{item.displayName}</b>{isCurrent && <span className="badge badge-primary ml-auto">Вы</span>}</span>
                   <span className="mt-2 grid grid-cols-5 gap-1 text-center text-[9px] text-[var(--text-muted)]">
                     <span><b className="block text-[12px] text-[var(--text-strong)]">{item.total.toLocaleString("ru-RU")}</b>Назначено</span>
@@ -660,74 +739,15 @@ export function ContactsView() {
         </section>
       )}
 
-      {error && <div role="alert" className="flex items-start gap-3 rounded-xl border border-[var(--danger)]/20 bg-[var(--danger-subtle)] p-4 text-[12px] text-[var(--danger)]"><CircleAlert aria-hidden="true" className="mt-0.5 size-6 shrink-0" /><span className="flex-1">{error}</span><button type="button" onClick={() => void load()} className="font-semibold underline underline-offset-2">Повторить</button></div>}
+</div></details>
 
-      <section className="card overflow-hidden">
-        <div className="border-b border-[var(--border)] p-3">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-            <label className="relative min-w-0 flex-1"><span className="sr-only">Поиск контактов</span><Search aria-hidden="true" className="absolute left-3 top-1/2 size-6 -translate-y-1/2 text-[var(--text-subtle)]" /><input className="input input-with-leading-icon" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Найдите по имени, email, компании, должности или тегу" /></label>
-            <button type="button" onClick={() => setFiltersOpen((value) => !value)} aria-expanded={filtersOpen} className={`btn gap-2 ${filtersOpen || activeFilterCount ? "btn-primary" : "btn-secondary"}`}><SlidersHorizontal aria-hidden="true" className="size-6" />Фильтры{activeFilterCount ? ` · ${activeFilterCount}` : ""}</button>
-            <button type="button" onClick={exportCsv} disabled={!selectedIds.length && !visible.length} className="btn btn-secondary gap-2"><Download aria-hidden="true" className="size-6" />Экспорт</button>
-          </div>
-          {filtersOpen ? (
-            <div className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)]/60 p-3">
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-                <label><span className="mb-1 block text-[10px] font-semibold text-[var(--text-muted)]">Статус</span><Select className="input" value={status} onChange={(event) => { setPage(1); setStatus(event.target.value as StatusFilter); }}><option value="all">Любой статус</option><option value="active">Активные</option><option value="unsubscribed">Отписанные</option><option value="bounced">Недоставляемые</option><option value="invalid">Некорректные</option></Select></label>
-                <label><span className="mb-1 block text-[10px] font-semibold text-[var(--text-muted)]">Компания</span><Select className="input" value={company} onChange={(event) => { setPage(1); setCompany(event.target.value); }}><option value="all">Любая компания</option>{companies.map((value) => <option key={value}>{value}</option>)}</Select></label>
-                <label><span className="mb-1 block text-[10px] font-semibold text-[var(--text-muted)]">Город</span><Select className="input" value={city} onChange={(event) => { setPage(1); setCity(event.target.value); }}><option value="all">Любой город</option>{cities.map((value) => <option key={value}>{value}</option>)}</Select></label>
-                <label><span className="mb-1 block text-[10px] font-semibold text-[var(--text-muted)]">Команда</span><Select className="input" value={team} onChange={(event) => { setPage(1); setTeam(event.target.value); }}><option value="all">Любая команда</option>{teams.map((value) => <option key={value}>{value}</option>)}</Select></label>
-                <label><span className="mb-1 block text-[10px] font-semibold text-[var(--text-muted)]">Канал</span><Select className="input" value={channel} onChange={(event) => { setPage(1); setChannel(event.target.value); }}><option value="all">Любой канал</option><option value="email">Есть Email</option><option value="telegram">Есть Telegram</option><option value="vk">Есть ВКонтакте</option><option value="phone">Есть телефон</option></Select></label>
-                <label><span className="mb-1 block text-[10px] font-semibold text-[var(--text-muted)]">Ответственный</span><Select className="input" value={owner} onChange={(event) => { setPage(1); setOwner(event.target.value); }}><option value="all">Любой ответственный</option>{members.map((member) => <option key={member.id} value={member.id}>{member.displayName}</option>)}</Select></label>
-              </div>
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[10px] text-[var(--text-muted)]"><span>Фильтры применяются сразу. Найдено: <b className="text-[var(--text-strong)]">{filteredCount.toLocaleString("ru-RU")}</b></span>{activeFilterCount || search ? <button type="button" onClick={resetFilters} className="btn btn-ghost btn-sm">Сбросить всё</button> : null}</div>
-            </div>
-          ) : null}
-        </div>
-        <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border)] bg-[var(--surface-subtle)]/65 px-3 py-2.5">
-          <button type="button" onClick={toggleAll} disabled={!visible.length} className="btn btn-secondary btn-sm gap-2"><Check aria-hidden="true" className="size-5" />{allVisibleSelected ? "Снять выбор страницы" : `Выбрать страницу · ${visible.length}`}</button>
-          {activeFilterCount || search ? <button type="button" onClick={resetFilters} className="btn btn-ghost btn-sm">Сбросить фильтры</button> : null}
-          <span className="ml-auto text-[10px] text-[var(--text-muted)]">Показано до 100 контактов — браузер больше не загружает всю базу сразу</span>
-        </div>
+      </>}
 
-        {loading ? (
-          <div className="grid min-h-64 place-items-center"><LoaderCircle aria-hidden="true" className="size-8 animate-spin text-[var(--primary)]" /><span className="sr-only">Загрузка контактов</span></div>
-        ) : visible.length ? (
-          <div className="overflow-x-auto">
-            <table className="data-table min-w-[980px]">
-              <thead><tr><th className="w-12"><button type="button" onClick={toggleAll} aria-label="Выбрать контакты на странице" className={`grid size-4 place-items-center rounded border ${allVisibleSelected ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-[var(--border-strong)] bg-white"}`}>{allVisibleSelected && <Check aria-hidden="true" className="size-4" />}</button></th><th>Контакт</th><th>Компания</th><th>Источники</th><th>Отправка</th><th>Статус</th><th>Обновлён</th><th className="w-24"><span className="sr-only">Действия</span></th></tr></thead>
-              <tbody>{visible.map((contact) => {
-                const checked = selected.has(contact.id);
-                const creator = contact.createdByParticipantId ? membersById.get(contact.createdByParticipantId) : undefined;
-                const responsible = membersById.get(contact.responsibleParticipantId ?? contact.createdByParticipantId ?? "");
-                const primaryEndpoint = contact.email || contact.phone || (contact.telegramChatId ? `Telegram: ${contact.telegramChatId}` : contact.vkUserId ? `ВК: ${contact.vkUserId}` : "Канал не указан");
-                const telegramHref = personalTelegramHref(contact.telegramChatId);
-                const contactHistory = deliveryHistory[contact.id] ?? [];
-                const latestDelivery = contactHistory[0];
-                return <tr key={contact.id} data-selected={checked} style={{ boxShadow: `inset 4px 0 0 ${responsible?.color ?? creator?.color ?? "#CBD5E1"}` }}>
-                  <td><button type="button" onClick={() => setSelected((current) => { const next = new Set(current); if (next.has(contact.id)) next.delete(contact.id); else next.add(contact.id); return next; })} aria-label={`Выбрать ${contact.fullName}`} className={`grid size-4 place-items-center rounded border ${checked ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-[var(--border-strong)] bg-white"}`}>{checked && <Check aria-hidden="true" className="size-4" />}</button></td>
-                  <td><button type="button" onClick={() => setDrawerContact(contact)} className="flex items-center gap-3 text-left"><span className="grid size-9 shrink-0 place-items-center rounded-full text-[10px] font-semibold text-white" style={{ backgroundColor: responsible?.color ?? creator?.color ?? contact.avatarColor }}>{contact.firstName[0]}{contact.lastName[0]}</span><span><span className="block text-[12px] font-semibold hover:text-[var(--primary)]">{contact.fullName}</span><span className="mt-0.5 block text-[10px] text-[var(--text-subtle)]">{primaryEndpoint}</span>{responsible && <span className="mt-1 inline-flex items-center gap-1 text-[9px] font-semibold" style={{ color: responsible.color }}><i className="size-1.5 rounded-full" style={{ backgroundColor: responsible.color }} />Ответственный: {responsible.displayName}</span>}</span></button></td>
-                  <td><p className="text-[11px] font-medium">{contact.companyName || "—"}</p><p className="mt-0.5 text-[10px] text-[var(--text-subtle)]">{contact.jobTitle || "Должность не указана"}</p></td>
-                  <td><div className="flex max-w-44 flex-wrap gap-1">{contact.email && <SourcePill label="Email" color="#F43CB8" ready={Boolean(contact.emailConsent && contact.marketingConsentSource && contact.marketingConsentAt && contact.marketingConsentText)} />}{contact.telegramChatId && <SourcePill label="TG" color="#229ED9" ready={contact.telegramConsent} />}{contact.vkUserId && <SourcePill label="VK" color="#0077FF" ready={contact.vkConsent} />}{contact.phone && <SourcePill label="Телефон" color="#0E7490" />}</div></td>
-                  <td>{contact.lastContactedAt ? <span className="block"><span className="badge badge-success">✓ Отправлено</span>{latestDelivery ? <details className="mt-1 max-w-56 text-[9px] text-[var(--text-muted)]"><summary className="cursor-pointer truncate" title={latestDelivery.statusMessage}>{latestDelivery.campaignName} · {latestDelivery.participantName}</summary><div className="mt-1 space-y-1 rounded-lg bg-[var(--surface-subtle)] p-2">{contactHistory.map((entry, index) => <p key={`${entry.campaignId}-${entry.updatedAt}-${index}`}><b>{entry.campaignName}</b><br />Отправитель: <b>{entry.participantName}</b><br />{entry.providerId} · {entry.channel} · {entry.status}<br />{entry.statusMessage}{entry.externalId ? <><br />ID: {entry.externalId}</> : null}</p>)}</div></details> : null}</span> : telegramHref ? <span className="flex flex-wrap gap-1"><a href={telegramHref} target="_blank" rel="noreferrer" className="badge badge-primary">Открыть TG</a><button type="button" disabled={busy} onClick={() => void markContacted(contact)} className="badge badge-neutral">Отметить</button></span> : <span className="badge badge-neutral">Не отправляли</span>}</td>
-                  <td><span className={`badge ${statusTone[contact.status]}`}>{statusLabel[contact.status]}</span></td>
-                  <td className="text-[11px] text-[var(--text-muted)]">{dateFormatter.format(new Date(contact.updatedAt))}</td>
-                  <td><div className="flex"><Link href={campaignHref([contact.id])} className="grid size-8 place-items-center rounded-lg text-[var(--primary)] hover:bg-[var(--primary-subtle)]" aria-label={`Написать ${contact.fullName}`}><SendHorizontal aria-hidden="true" className="size-6" /></Link><button type="button" onClick={() => setEditing(contact)} className="grid size-8 place-items-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface-subtle)]" aria-label={`Изменить ${contact.fullName}`}><Pencil aria-hidden="true" className="size-6" /></button></div></td>
-                </tr>;
-              })}</tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="px-6 py-12 text-center"><Search aria-hidden="true" className="mx-auto size-9 text-[var(--text-subtle)]" /><p className="mt-3 text-[13px] font-semibold">Контакты не найдены</p><p className="mt-1 text-[11px] text-[var(--text-muted)]">Измените поиск или добавьте новый контакт.</p><button type="button" onClick={() => setEditing("new")} className="btn btn-primary mt-4">Добавить контакт</button></div>
-        )}
-
-        <div className="flex flex-col gap-3 border-t border-[var(--border)] px-4 py-3 text-[11px] text-[var(--text-muted)] xl:flex-row xl:items-center xl:justify-between"><div className="flex flex-wrap items-center gap-3"><span>Найдено: {filteredCount.toLocaleString("ru-RU")}</span><div className="inline-flex items-center gap-1"><button type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={loading || page <= 1} className="btn btn-secondary btn-sm" aria-label="Предыдущая страница"><ChevronLeft aria-hidden="true" className="size-5" /></button><span className="min-w-28 text-center">Страница {page} из {totalPages}</span><button type="button" onClick={() => setPage((current) => Math.min(totalPages, current + 1))} disabled={loading || page >= totalPages} className="btn btn-secondary btn-sm" aria-label="Следующая страница"><ChevronRight aria-hidden="true" className="size-5" /></button></div></div>{selectedIds.length > 0 && <div className="flex flex-wrap items-center gap-2"><span className="font-semibold text-[var(--text-strong)]">Выбрано: {selectedIds.length}</span><div className="flex items-center gap-1 rounded-lg border border-[var(--border)] bg-white p-1"><Select value={responsibleId} onChange={(event) => setResponsibleId(event.target.value)} className="h-7 max-w-44 border-0 bg-transparent px-1 text-[11px] outline-none"><option value="">Назначить ответственного</option>{members.map((member) => <option key={member.id} value={member.id}>{member.displayName}</option>)}</Select><button type="button" onClick={() => void assignResponsible()} disabled={busy || !responsibleId} className="btn btn-primary btn-sm">Назначить</button></div><div className="flex items-center gap-1 rounded-lg border border-[var(--border)] bg-white p-1"><UsersRound aria-hidden="true" className="ml-1 size-5 text-[var(--primary)]" /><input value={teamName} onChange={(event) => setTeamName(event.target.value)} className="h-7 w-36 border-0 bg-transparent px-1 text-[11px] outline-none" placeholder="Название команды" /><button type="button" onClick={() => void assignTeam()} disabled={busy || !teamName.trim()} className="btn btn-primary btn-sm">Добавить</button></div><button type="button" onClick={() => void removeSelected()} disabled={busy} className="btn btn-danger btn-sm gap-2"><Trash2 aria-hidden="true" className="size-5" />Удалить</button><button type="button" onClick={() => setSelected(new Set())} className="btn btn-ghost btn-sm gap-2"><X aria-hidden="true" className="size-5" />Снять выбор</button></div>}</div>
-      </section>
-
+    </div>
       {drawerContact && <ContactDrawer contact={drawerContact} timezone={timezone} onClose={() => setDrawerContact(null)} onEdit={(contact) => { setDrawerContact(null); setEditing(contact); }} />}
       {editing && <ContactFormDialog contact={editing === "new" ? null : editing} busy={busy} onClose={() => setEditing(null)} onSave={saveContact} />}
-      </>}
       {notice && <div role="status" aria-live="polite" className="fixed bottom-6 right-6 z-[100] flex items-center gap-2 rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-[12px] font-semibold shadow-[var(--shadow-floating)]"><span className="grid size-5 place-items-center rounded-full bg-[var(--success-subtle)] text-[var(--success)]"><Check aria-hidden="true" className="size-4" /></span>{notice}</div>}
-    </div>
+    </>
   );
 }
 
