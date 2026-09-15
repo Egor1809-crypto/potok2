@@ -7,6 +7,8 @@ import { useSearchParams } from "next/navigation";
 
 import { BrandMark } from "@/components/layout/brand-mark";
 
+import { legalConfig, registrationConsent } from "@/config/legal";
+import { CookieSettingsButton } from "@/components/privacy/CookieConsent";
 import { clearAccountDrafts } from "@/lib/browser-session";
 import { authFeedback } from "@/lib/auth-feedback";
 import styles from "./AuthScreen.module.css";
@@ -15,6 +17,8 @@ const TEAM_NAME = "ТехнологИИ Права";
 
 export function AuthScreen({ mode }: { mode: "login" | "register" }) {
   const searchParams = useSearchParams();
+  const [dataConsent, setDataConsent] = useState(false);
+  const consentInput = useRef<HTMLInputElement>(null);
   const [login, setLogin] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
@@ -38,6 +42,11 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (activeRequest.current) return;
+    if (mode === "register" && !dataConsent) {
+      setError("Подтвердите согласие на обработку данных для создания аккаунта или вернитесь на главную.");
+      consentInput.current?.focus();
+      return;
+    }
     const controller = new AbortController();
     activeRequest.current = controller;
     let timedOut = false;
@@ -50,7 +59,7 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
         headers: { "Content-Type": "application/json" },
         signal: controller.signal,
         body: JSON.stringify(mode === "register"
-          ? { team: TEAM_NAME, displayName, login, password, inviteCode: inviteCode || undefined }
+          ? { team: TEAM_NAME, displayName, login, password, dataConsent, consentVersion: registrationConsent.version, inviteCode: inviteCode || undefined }
           : { login, password }),
       });
       let payload: { error?: string };
@@ -98,7 +107,9 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
         <nav className={styles.mode} aria-label="Вход и регистрация"><Link href={`/login${contextSuffix}`} aria-current={!isRegister ? "page" : undefined}>Вход</Link><Link href={`/register${contextSuffix}`} aria-current={isRegister ? "page" : undefined}>Регистрация</Link></nav>
         <h1>{isRegister ? "Присоединяйтесь к Потоку" : "С возвращением"}</h1>
         <p className={styles.intro}>{isRegister ? "Создайте своё пространство. Приглашайте команду, когда будете готовы." : "Войдите, чтобы продолжить работу над проектами."}</p>
-        {yandexAvailable && <><a href={`/api/auth/yandex/start?${yandexParams}`} className={styles.yandex}><span aria-hidden className={styles.yandexMark}>Я</span>{isRegister ? "Зарегистрироваться с Яндекс ID" : "Войти с Яндекс ID"}</a><div className={styles.divider}>или с логином и паролем</div></>}
+        {isRegister && <div className={styles.consentCard}><h2>Ваши персональные данные</h2>{!legalConfig.approved && <p className={styles.consentDraft}>Проект согласия: реквизиты и условия ещё не утверждены.</p>}<p>Имя и данные аккаунта нужны для регистрации и работы в Потоке.</p><label><input ref={consentInput} type="checkbox" name="dataConsent" checked={dataConsent} onChange={event => setDataConsent(event.target.checked)} /><span>Даю <Link href="/consent" target="_blank" rel="noopener">согласие на обработку персональных данных</Link> для создания и обслуживания аккаунта.</span></label><p>Отдельно от cookies и рекламных рассылок. <Link href="/privacy" target="_blank" rel="noopener">Как используются данные</Link></p><Link href="/">Не давать согласие — на главную</Link></div>}
+        {yandexAvailable && isRegister && <><form action="/api/auth/yandex/start" method="POST" onSubmit={event => { if (!dataConsent) { event.preventDefault(); setError("Подтвердите согласие на обработку данных для регистрации через Яндекс ID."); consentInput.current?.focus(); } }}><input type="hidden" name="intent" value="register" /><input type="hidden" name="next" value={searchParams.get("next") || "/dashboard"} /><input type="hidden" name="invite" value={inviteCode} /><input type="hidden" name="dataConsent" value={String(dataConsent)} /><input type="hidden" name="consentVersion" value={registrationConsent.version} /><button type="submit" className={styles.yandex}><span aria-hidden className={styles.yandexMark}>Я</span>Зарегистрироваться с Яндекс ID</button></form><div className={styles.divider}>или с логином и паролем</div></>}
+        {yandexAvailable && !isRegister && <><a href={`/api/auth/yandex/start?${yandexParams}`} className={styles.yandex}><span aria-hidden className={styles.yandexMark}>Я</span>{isRegister ? "Зарегистрироваться с Яндекс ID" : "Войти с Яндекс ID"}</a><div className={styles.divider}>или с логином и паролем</div></>}
         <form className={styles.form} onSubmit={submit} aria-busy={busy}>
           {isRegister && <label className={styles.field}>Ваше имя<input name="name" autoComplete="name" value={displayName} onChange={event => setDisplayName(event.target.value)} placeholder="Имя и фамилия" required minLength={2} maxLength={100} className={styles.input} /></label>}
           <label className={styles.field}>Логин<input name="username" autoComplete="username" value={login} onChange={event => setLogin(event.target.value)} placeholder="Например, egor.shabalin" required minLength={3} maxLength={40} className={styles.input} /></label>
@@ -109,7 +120,7 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
         </form>
         <p className={styles.help}>{isRegister ? <>Уже зарегистрированы? <Link href={`/login${contextSuffix}`}>Войти в аккаунт</Link></> : <>Нет аккаунта? <Link href={`/register${contextSuffix}`}>Зарегистрироваться</Link></>}</p>
       </div>
-      <footer className={styles.footer}><span>© {new Date().getFullYear()} Поток</span><span>Письма. Презентации. Изображения.</span></footer>
+      <footer className={styles.footer}><span>© {new Date().getFullYear()} Поток</span><Link href="/privacy">Персональные данные</Link><CookieSettingsButton /></footer>
     </section>
   </main>;
 }

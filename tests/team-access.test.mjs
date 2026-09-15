@@ -34,7 +34,7 @@ async function harness() {
   return {sqlite,db,management,auth,access,as:p=>{current=p;},close:()=>sqlite.close()};
 }
 const req = () => new Request("https://potok.example/api/team",{method:"POST",headers:{origin:"https://potok.example"}});
-const register = (code, login="new-colleague") => ({ team:"ТехнологИИ Права",displayName:"Новый коллега",login,password:"Long-Password-987",inviteCode:code, role:"admin",accessScope:{all:true} });
+const register = (code, login="new-colleague") => ({ team:"ТехнологИИ Права",dataConsent:true,consentVersion:"2026-09-15",displayName:"Новый коллега",login,password:"Long-Password-987",inviteCode:code, role:"admin",accessScope:{all:true} });
 
 test("contact access uses union of assigned bases and exact groups, never workspace/status/name fallbacks",()=>{
  const member=person("m","member",{all:false,baseIds:["base-a"],groupTags:["Группа А"]});

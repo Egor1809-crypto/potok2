@@ -1,0 +1,6 @@
+import { LegalPage, OperatorDetails } from "@/components/privacy/LegalPage";
+import { registrationConsent } from "@/config/legal";
+export const metadata = { title: "Согласие на обработку данных" };
+export default function ConsentPage() {
+  return <LegalPage title="Согласие на обработку персональных данных" intro="Отдельное согласие для создания и обслуживания аккаунта в Потоке."><OperatorDetails /><section><h2>Цель обработки</h2><p>{registrationConsent.purpose}</p></section><section><h2>Перечень данных</h2><p>{registrationConsent.data}</p></section><section><h2>Действия с данными</h2><p>{registrationConsent.operations}</p></section><section><h2>Срок действия и отзыв</h2><p>{registrationConsent.duration}</p><p>{registrationConsent.withdrawal}</p></section><section><h2>Как выражается согласие</h2><p>Вы самостоятельно отмечаете отдельный пункт согласия в форме регистрации. Заранее он не выбран. При создании аккаунта сохраняются версия, текст согласия, время и способ регистрации.</p><p>Вы можете отказаться, оставив пункт неотмеченным и вернувшись на главную. В этом случае новый аккаунт не создаётся, а открытые страницы сайта остаются доступны.</p><p>Это согласие не распространяется на рекламные рассылки, дополнительные cookies или обработку данных других людей.</p></section></LegalPage>;
+}

@@ -162,6 +162,13 @@
       "when": 1789402364065,
       "tag": "0022_special_fantastic_four",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1789468079583,
+      "tag": "0023_grey_madripoor",
+      "breakpoints": true
     }
   ]
 }

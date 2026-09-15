@@ -22,7 +22,7 @@ async function harness() {
 
  return {sqlite,d1,db,auth,yandex,integrations,management,requests,subject:v=>subject=v,clientId:v=>clientId=v,close:()=>sqlite.close()};
 }
-async function start(h,intent='register') {const response=await h.yandex.startYandex(new Request(`${ORIGIN}/api/auth/yandex/start?intent=${intent}&next=%2Fdashboard`));assert.equal(response.status,303);const target=new URL(response.headers.get('location'));return {state:target.searchParams.get('state'),browser:response.headers.get('set-cookie').split(';')[0],target};}
+async function start(h,intent='register') {const response=await h.yandex.startYandex(new Request(`${ORIGIN}/api/auth/yandex/start?intent=${intent}&next=%2Fdashboard`, intent === 'register' ? {method:'POST',headers:{origin:ORIGIN},body:new URLSearchParams({intent:'register',dataConsent:'true',consentVersion:'2026-09-15'})} : undefined));assert.equal(response.status,303);const target=new URL(response.headers.get('location'));return {state:target.searchParams.get('state'),browser:response.headers.get('set-cookie').split(';')[0],target};}
 async function finish(h,flow,cookie=flow.browser) {return h.yandex.finishYandex(new Request(`${ORIGIN}/api/auth/yandex/callback?code=fake-code&state=${flow.state}`,{headers:{cookie}}));}
 function sessionCookie(response){return response.headers.getSetCookie().find(v=>v.startsWith('potok_session=')).split(';')[0];}
 
@@ -38,6 +38,8 @@ test('Yandex sign-up creates one private workspace atomically and login reuses i
   const response=await finish(h,flow);assert.equal(new URL(response.headers.get('location')).pathname,'/dashboard');
   const session=await h.auth.getTeamSession(new Request(`${ORIGIN}/api/workspace`,{headers:{cookie:sessionCookie(response)}}));
   assert.ok(session);assert.notEqual(session.participant.workspaceId,'workspace-main');assert.equal(session.participant.role,'admin');
+  const consent=h.sqlite.prepare('SELECT * FROM registration_consents WHERE participant_id=?').get(session.participant.id);
+  assert.equal(consent.method,'yandex');assert.equal(consent.version,'2026-09-15');assert.match(consent.statement,/Создание и обслуживание/);
   const tenant=session.participant.workspaceId;
   assert.equal(h.sqlite.prepare('SELECT count(*) n FROM contacts WHERE workspace_id=?').get(tenant).n,0);
   assert.equal(h.sqlite.prepare('SELECT count(*) n FROM integrations WHERE workspace_id=? AND enabled=0').get(tenant).n,4);
@@ -71,9 +73,10 @@ test('unregistered login, mismatched client and external next never grant team a
 test('password signup creates a new workspace and globally unique login; credentials remain usable',async()=>{
  const h=await harness();try{
  const request=new Request(`${ORIGIN}/api/auth/register`);
- const payload={team:'ТехнологИИ Права',displayName:'Client Two',login:'new-client',password:'Password12345'};
+ const payload={team:'ТехнологИИ Права',dataConsent:true,consentVersion:'2026-09-15',displayName:'Client Two',login:'new-client',password:'Password12345'};
  const result=await h.auth.registerTeamMember(request,payload);
  assert.notEqual(result.participant.workspaceId,'workspace-main');
+ assert.equal(h.sqlite.prepare('SELECT method FROM registration_consents WHERE participant_id=?').get(result.participant.id).method,'password');
  const login=await h.auth.loginTeamMember(request,payload);assert.equal(login.participant.id,result.participant.id);
  await assert.rejects(h.auth.registerTeamMember(request,payload),/занят/);
  assert.equal(h.sqlite.prepare('SELECT count(*) n FROM workspaces').get().n,2);
@@ -99,5 +102,28 @@ test('linking requires the same signed-in session at callback and never reassign
   assert.equal(h.sqlite.prepare('SELECT count(*) n FROM oauth_identities').get().n,0);
   const proper=await begin();assert.match((await finish(h,proper,proper.browser+'; '+ownerCookie)).headers.get('location'),/settings.*linked/);
   assert.equal(h.sqlite.prepare('SELECT participant_id FROM oauth_identities').get().participant_id,'owner');
+ }finally{h.close();}
+});
+
+
+test('registration rejects missing, false and stale consent before account or OAuth creation',async()=>{
+ const h=await harness();try{
+  for(const dataConsent of [undefined,false,'true']) await assert.rejects(h.auth.registerTeamMember(new Request(ORIGIN),{dataConsent,consentVersion:'2026-09-15'}),/согласие/);
+  await assert.rejects(h.auth.registerTeamMember(new Request(ORIGIN),{dataConsent:true,consentVersion:'old'}),/согласие/);
+  const direct=await h.yandex.startYandex(new Request(`${ORIGIN}/api/auth/yandex/start?intent=register&dataConsent=true&consentVersion=2026-09-15`));
+  assert.match(direct.headers.get('location'),/auth_error=consent/);
+  const denied=await h.yandex.startYandex(new Request(`${ORIGIN}/api/auth/yandex/start`,{method:'POST',headers:{origin:ORIGIN},body:new URLSearchParams({intent:'register',dataConsent:'false',consentVersion:'2026-09-15'})}));
+  assert.match(denied.headers.get('location'),/auth_error=consent/);
+  assert.equal(h.sqlite.prepare('SELECT count(*) n FROM oauth_flows').get().n,0);
+  assert.equal(h.sqlite.prepare('SELECT count(*) n FROM registration_consents').get().n,0);
+  assert.equal(h.sqlite.prepare('SELECT count(*) n FROM participants').get().n,1);
+ }finally{h.close();}
+});
+test('OAuth callback rejects an obsolete consent revision without creating an account',async()=>{
+ const h=await harness();try{
+  const flow=await start(h);h.sqlite.exec("UPDATE oauth_flows SET consent_version='old'");
+  assert.match((await finish(h,flow)).headers.get('location'),/auth_error=consent/);
+  assert.equal(h.sqlite.prepare('SELECT count(*) n FROM registration_consents').get().n,0);
+  assert.equal(h.sqlite.prepare('SELECT count(*) n FROM oauth_identities').get().n,0);
  }finally{h.close();}
 });

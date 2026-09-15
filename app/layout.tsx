@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { brandConfig } from "@/config/brand";
+import { CookieConsent } from "@/components/privacy/CookieConsent";
 import { NativeNavigationFallback } from "@/components/layout/native-navigation-fallback";
 
 const geistMono = Geist_Mono({
@@ -66,6 +67,7 @@ export default function RootLayout({
       >
         <NativeNavigationFallback />
         {children}
+        <CookieConsent />
       </body>
     </html>
   );

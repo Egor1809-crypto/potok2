@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Menu, X, ArrowRight } from "@/components/ui/icons";
 import { BrandMark } from "@/components/layout/brand-mark";
 import styles from "./Marketing.module.css";
-const links = [["Возможности", "#product"], ["Как работает", "#workflow"], ["Вопросы", "#questions"]];
+const links = [["Возможности", "/#product"], ["Как работает", "/#workflow"], ["Вопросы", "/#questions"]];
 export function MarketingHeader() {
   const [open, setOpen] = useState(false);const button=useRef<HTMLButtonElement>(null);
   useEffect(()=>{if(!open)return;const close=(event:KeyboardEvent)=>{if(event.key==='Escape'){setOpen(false);button.current?.focus()}};window.addEventListener('keydown',close);return()=>window.removeEventListener('keydown',close)},[open]);

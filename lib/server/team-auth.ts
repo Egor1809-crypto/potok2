@@ -1,3 +1,5 @@
+import { registrationConsent, registrationConsentStatement } from "@/config/legal";
+import { requireRegistrationConsent, registrationConsentInsert } from "./registration-consent";
 import { privateWorkspaceStatements } from "./workspace-provisioning";
 import { cachedWorkspaceSession, getWorkspaceId } from "./workspace-context";
 import { and, eq, gt, isNotNull, isNull, sql } from "drizzle-orm";
@@ -231,6 +233,7 @@ export async function getRegistrationStatus() {
 }
 
 export async function registerTeamMember(request: Request, payload: unknown) {
+  requireRegistrationConsent(payload);
   const object = asObject(payload);
   const team = cleanText(object.team, "Команда", 100);
   if (team.toLocaleLowerCase("ru-RU") !== TEAM_NAME.toLocaleLowerCase("ru-RU")) {
@@ -257,7 +260,7 @@ export async function registerTeamMember(request: Request, payload: unknown) {
   if (!isFirst && !String(object.inviteCode ?? "").trim()) {
     const participantId = newId("participant"), salt = randomToken(18);
     const workspace = await privateWorkspaceStatements({participantId, displayName, login, email: `${login}@account.potok.local`, passwordHash: await passwordDigest(password, salt), passwordSalt: salt});
-    await getD1().batch(workspace.statements);
+    await getD1().batch([...workspace.statements, registrationConsentInsert(participantId, "password")]);
     const [participant] = await db.select().from(participants).where(eq(participants.id, participantId)).limit(1);
     const session = await createSession(participantId, request);
     return { participant: toTeamParticipant(participant), cookie: session.cookie, firstAccount: false };
@@ -289,8 +292,11 @@ export async function registerTeamMember(request: Request, payload: unknown) {
   } else {
     statements.push(d1.prepare(`INSERT INTO participants (id,workspace_id,login,password_hash,password_salt,display_name,email,color,status,role,access_scope,last_login_at,created_at,updated_at) SELECT ?,?,?,?,?,?,?,?,'active',?,?,?,?,? WHERE ${guard}`).bind(participantId,workspaceId,login,passwordHash,salt,displayName,`${login}@team.potok.local`,TEAM_COLORS[Number(accountCount)%TEAM_COLORS.length],role,scope,now,now,now,...guardArgs));
   }
+  const participantStatementIndex = statements.length - 1;
+  statements.push(d1.prepare(`INSERT INTO registration_consents (id,participant_id,version,statement,method,accepted_at) SELECT ?,?,?,?,?,? WHERE ${guard}`)
+    .bind(newId("registration-consent"), participantId, registrationConsent.version, registrationConsentStatement(), "password", now, ...guardArgs));
   const results = await d1.batch(statements);
-  if (Number(results[results.length-1]?.meta.changes || 0) !== 1) throw new ApiRequestError("Приглашение уже использовано или отменено. Попросите администратора проверить доступ.", 409);
+  if (Number(results[participantStatementIndex]?.meta.changes || 0) !== 1) throw new ApiRequestError("Приглашение уже использовано или отменено. Попросите администратора проверить доступ.", 409);
   const session = await createSession(participantId, request);
   const [participant] = await db.select().from(participants).where(eq(participants.id, participantId)).limit(1);
   return { participant: toTeamParticipant(participant), cookie: session.cookie, firstAccount: isFirst };

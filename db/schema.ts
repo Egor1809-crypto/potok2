@@ -797,4 +797,15 @@ export const oauthFlows = sqliteTable("oauth_flows", {
   stateHash:text("state_hash").primaryKey(), browserHash:text("browser_hash").notNull(), verifier:text("verifier").notNull(),
   intent:text("intent").notNull(), nextPath:text("next_path").notNull(), origin:text("origin").notNull(),
   participantId:text("participant_id"), sessionId:text("session_id"), expiresAt:text("expires_at").notNull(),
+  consentVersion: text("consent_version"), consentAcceptedAt: text("consent_accepted_at"),
 }, t => [index("idx_oauth_flows_expiry").on(t.expiresAt)]);
+
+
+export const registrationConsents = sqliteTable("registration_consents", {
+  id: text("id").primaryKey(),
+  participantId: text("participant_id").notNull().references(() => participants.id, { onDelete: "cascade" }),
+  version: text("version").notNull(),
+  statement: text("statement").notNull(),
+  method: text("method").notNull(),
+  acceptedAt: text("accepted_at").notNull(),
+}, t => [index("idx_registration_consents_participant").on(t.participantId, t.acceptedAt)]);

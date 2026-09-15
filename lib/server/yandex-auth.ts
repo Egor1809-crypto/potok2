@@ -1,3 +1,5 @@
+import { registrationConsent } from "@/config/legal";
+import { registrationConsentInsert } from "./registration-consent";
 import { env } from "cloudflare:workers";
 import { eq } from "drizzle-orm";
 import { getD1, getDb } from "@/db";
@@ -9,7 +11,7 @@ import { privateWorkspaceStatements } from "./workspace-provisioning";
 
 const COOKIE = "potok_yandex_flow";
 const ORIGINS = new Set(["https://mailflow-outreach.isakovegor820.chatgpt.site", "https://potok.slava-hunter.ru"]);
-type Flow = { state_hash: string; browser_hash: string; verifier: string; intent: string; next_path: string; origin: string; participant_id: string | null; session_id: string | null; expires_at: string };
+type Flow = { state_hash: string; browser_hash: string; verifier: string; intent: string; next_path: string; origin: string; participant_id: string | null; session_id: string | null; expires_at: string; consent_version: string | null; consent_accepted_at: string | null };
 export function yandexClientId() { return (env as unknown as Record<string,string>).YANDEX_CLIENT_ID?.trim() || ""; }
 function random() { return Array.from(crypto.getRandomValues(new Uint8Array(32)), byte => byte.toString(16).padStart(2,"0")).join(""); }
 export function safeAuthNext(value: string | null): string {
@@ -27,6 +29,17 @@ function redirect(path: string, request: Request, cookies: string[] = []) {
 }
 export async function startYandex(request: Request) {
   const url = new URL(request.url);
+  if (request.method === "POST") {
+    if (request.headers.get("origin") !== url.origin) return redirect("/register?auth_error=consent", request);
+    const form = await request.formData();
+    url.search = "";
+    for (const key of ["intent", "next", "invite", "consentVersion", "dataConsent"]) {
+      const value = form.get(key);
+      if (typeof value === "string") url.searchParams.set(key, value);
+    }
+  }
+  const registering = url.searchParams.get("intent") === "register";
+  if (registering && (request.method !== "POST" || url.searchParams.get("dataConsent") !== "true" || url.searchParams.get("consentVersion") !== registrationConsent.version)) return redirect("/register?auth_error=consent", request);
   if (!yandexClientId() || !ORIGINS.has(url.origin)) return redirect("/login?auth_error=unavailable",request);
   await ensureSystemDatabase();
   await applyRateLimit(request,"yandex-start");
@@ -37,8 +50,8 @@ export async function startYandex(request: Request) {
   const state = random(), browser = random(), verifier = random(), db = getD1();
   await db.batch([
     db.prepare("DELETE FROM oauth_flows WHERE expires_at <= ?").bind(new Date().toISOString()),
-    db.prepare("INSERT INTO oauth_flows (state_hash,browser_hash,verifier,intent,next_path,origin,participant_id,session_id,expires_at) VALUES (?,?,?,?,?,?,?,?,?)")
-      .bind(await sha256(state),await sha256(browser),verifier,intent,safeAuthNext(url.searchParams.get("next")),url.origin,session?.participant.id ?? null,session?.sessionId ?? null,new Date(Date.now()+600000).toISOString()),
+    db.prepare("INSERT INTO oauth_flows (state_hash,browser_hash,verifier,intent,next_path,origin,participant_id,session_id,expires_at,consent_version,consent_accepted_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)")
+      .bind(await sha256(state),await sha256(browser),verifier,intent,safeAuthNext(url.searchParams.get("next")),url.origin,session?.participant.id ?? null,session?.sessionId ?? null,new Date(Date.now()+600000).toISOString(),registering ? registrationConsent.version : null,registering ? new Date().toISOString() : null),
   ]);
   const target = new URL("https://oauth.yandex.ru/authorize");
   target.search = new URLSearchParams({response_type:"code",client_id:yandexClientId(),redirect_uri:`${url.origin}/api/auth/yandex/callback`,scope:"login:info login:email",state,code_challenge:await sha256(verifier),code_challenge_method:"S256",force_confirm:"yes"}).toString();
@@ -80,6 +93,7 @@ export async function finishYandex(request: Request) {
     }
     if (!participantId) {
       if (flow.intent !== "register") throw new Error("not_registered");
+      if (flow.consent_version !== registrationConsent.version || !flow.consent_accepted_at) throw new Error("consent");
       const email = profile.default_email?.trim().toLowerCase() || "";
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length>320) throw new Error("email");
       participantId = newId("participant");
@@ -87,14 +101,14 @@ export async function finishYandex(request: Request) {
       const workspace = await privateWorkspaceStatements({participantId,displayName,email});
       // A unique provider subject makes concurrent sign-ups atomic. Email is
       // contact information only; it never links an existing account implicitly.
-      await getD1().batch([...workspace.statements,getD1().prepare("INSERT INTO oauth_identities (provider,subject,participant_id,created_at) VALUES ('yandex',?,?,?)").bind(profile.id,participantId,new Date().toISOString())]);
+      await getD1().batch([...workspace.statements,getD1().prepare("INSERT INTO oauth_identities (provider,subject,participant_id,created_at) VALUES ('yandex',?,?,?)").bind(profile.id,participantId,new Date().toISOString()),registrationConsentInsert(participantId,"yandex",flow.consent_accepted_at)]);
     }
     const [participant] = await getDb().select().from(participants).where(eq(participants.id,participantId)).limit(1);
     if (!participant || participant.status !== "active") throw new Error("disabled");
     const session = await createSession(participantId,request);
     return redirect(safeAuthNext(flow.next_path),request,[clear,session.cookie]);
   } catch (error) {
-    const code = error instanceof Error && ["unavailable","expired","cancelled","provider","linked","not_registered","email","disabled"].includes(error.message) ? error.message : "provider";
+    const code = error instanceof Error && ["consent","unavailable","expired","cancelled","provider","linked","not_registered","email","disabled"].includes(error.message) ? error.message : "provider";
     const destination = flow?.intent === "link" ? "/settings" : flow?.intent === "register" ? "/register" : "/login";
     return redirect(`${destination}?auth_error=${code}`,request,[clear]);
   }
