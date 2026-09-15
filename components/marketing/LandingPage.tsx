@@ -30,7 +30,7 @@ export function LandingPage() {
         <img className={styles.heroPhoto} src="/landing/team-meeting.webp" alt="" width="1920" height="1295" fetchPriority="high" />
         <div className={styles.heroCopy}>
           <p className={styles.eyebrow}>Письма · Презентации · Рассылки</p>
-          <h1 id="hero-title">Всё для общения<br />с вашей аудиторией.</h1>
+          <h1 id="hero-title">Всё для общения<br /> с вашей аудиторией.</h1>
           <p className={styles.lead}>Создавайте письма и презентации, работайте с контактами и планируйте рассылки. В одном рабочем пространстве — Потоке.</p>
           <div className={styles.heroActions}>
             <Link href="/register" className={styles.primary}>Начать работу<ArrowRight aria-hidden /></Link>
@@ -42,8 +42,8 @@ export function LandingPage() {
       <section id="product" className={styles.product} aria-labelledby="product-title">
         <div className={styles.sectionHead}>
           <p className={styles.eyebrow}>Инструменты для ежедневной работы</p>
-          <h2 id="product-title">От первого черновика<br />до отправки.</h2>
-          <p>Готовьте материалы в одном месте.<br />Переходите к следующей задаче, сохраняя контекст.</p>
+          <h2 id="product-title">От первого черновика<br /> до отправки.</h2>
+          <p>Готовьте материалы в одном месте.<br /> Переходите к следующей задаче, сохраняя контекст.</p>
         </div>
         <div className={styles.formats}>{formats.map(({ icon: Icon, title, text, features }) =>
           <article key={title}>
@@ -57,7 +57,7 @@ export function LandingPage() {
       <section id="workflow" className={styles.workflow} aria-labelledby="workflow-title">
         <div className={styles.workflowIntro}>
           <p className={styles.eyebrow}>Как работает Поток</p>
-          <h2 id="workflow-title">Вы знаете задачу.<br />Здесь есть инструменты.</h2>
+          <h2 id="workflow-title">Вы знаете задачу.<br /> Здесь есть инструменты.</h2>
           <p>Начните с того, что уже есть: идеи, текста или готового файла. Дальше — редактор, медиатека и отправка.</p>
           <Link href="/register" className={styles.textLink}>Перейти к работе<ArrowRight aria-hidden /></Link>
         </div>
@@ -68,7 +68,7 @@ export function LandingPage() {
       </section>
 
       <section className={styles.team} aria-labelledby="team-title">
-        <div><p className={styles.eyebrow}>Команда и данные</p><h2 id="team-title">Общая работа.<br />Понятный доступ.</h2></div>
+        <div><p className={styles.eyebrow}>Команда и данные</p><h2 id="team-title">Общая работа.<br /> Понятный доступ.</h2></div>
         <div className={styles.teamCopy}>
           <p>Приглашайте коллег и назначайте доступ к контактным базам. Каждый участник работает под своим аккаунтом.</p>
           <p>Перед рассылкой проверяйте согласия получателей. Информация об обработке данных и настройки cookies всегда доступны внизу страницы.</p>
@@ -77,12 +77,12 @@ export function LandingPage() {
       </section>
 
       <section id="questions" className={styles.faq} aria-labelledby="faq-title">
-        <div><p className={styles.eyebrow}>Перед началом</p><h2 id="faq-title">Есть вопросы?</h2><p>Несколько подробностей<br />о работе в Потоке.</p></div>
+        <div><p className={styles.eyebrow}>Перед началом</p><h2 id="faq-title">Есть вопросы?</h2><p>Несколько подробностей<br /> о работе в Потоке.</p></div>
         <div>{questions.map(([question, answer]) => <details key={question}><summary>{question}<ChevronDown aria-hidden /></summary><p>{answer}</p></details>)}</div>
       </section>
 
       <section className={styles.start}>
-        <h2>Ваш следующий проект<br />начинается здесь.</h2>
+        <h2>Ваш следующий проект<br /> начинается здесь.</h2>
         <Link href="/register" className={styles.primary}>Создать аккаунт<ArrowRight aria-hidden /></Link>
       </section>
     </main>
