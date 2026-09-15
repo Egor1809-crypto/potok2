@@ -52,11 +52,11 @@ export function CookieConsent() {
 
   return <>
     {open && <section className={styles.banner} aria-labelledby="cookie-title" aria-describedby="cookie-description">
-      <div className={styles.bannerHeading}><span className={styles.cookieIcon} aria-hidden>◌</span><h2 ref={heading} tabIndex={-1} id="cookie-title">Cookies — под вашим контролем</h2></div>
-      <p id="cookie-description">Необходимые cookies обеспечивают вход и безопасность. Дополнительные можно отклонить — сайт продолжит работать.</p>
-      <details className={styles.details}><summary>Что сохраняется в браузере</summary><p>Сессия входа — до 30 дней, защита входа через Яндекс — 10 минут. Ваш выбор хранится на этом устройстве 180 дней. Аналитические и рекламные cookies сейчас не используются; их подключение потребует нового согласия.</p><p>Согласие на обработку данных аккаунта запрашивается отдельно при регистрации.</p>{choice && <p>Текущий выбор: {choice === "accepted" ? "принято" : "дополнительные cookies отклонены"}.</p>}</details>
-      <div className={styles.bannerLinks}><Link href="/cookies">О cookies</Link><Link href="/privacy">О персональных данных</Link></div>
-      <div className={styles.bannerActions}><button type="button" onClick={() => save("rejected")}>Отклонить дополнительные</button><button type="button" onClick={() => save("accepted")}>Принять</button></div>
+      <h2 ref={heading} tabIndex={-1} id="cookie-title">Настройки cookies</h2>
+      <p id="cookie-description">Используем cookies для входа и безопасности. Рекламных и аналитических cookies сейчас нет.</p>
+      <details className={styles.details}><summary>Подробнее о данных</summary><p>Сессия входа — до 30 дней, защита входа через Яндекс — 10 минут. Ваш выбор хранится на этом устройстве 180 дней. Аналитические и рекламные cookies сейчас не используются; их подключение потребует нового согласия.</p><p>Согласие на обработку данных аккаунта запрашивается отдельно при регистрации.</p><div className={styles.bannerLinks}><Link href="/cookies">Политика cookies</Link><Link href="/privacy">Персональные данные</Link></div>{choice && <p>Текущий выбор: {choice === "accepted" ? "принято" : "дополнительные cookies отклонены"}.</p>}</details>
+
+      <div className={styles.bannerActions}><button type="button" aria-label="Отклонить дополнительные cookies" onClick={() => save("rejected")}>Отклонить</button><button type="button" onClick={() => save("accepted")}>Принять</button></div>
     </section>}
     <div role="status" className={notice ? styles.storageNotice : styles.srOnly}>{notice}{notice && <button type="button" onClick={() => setNotice("")}>Закрыть</button>}</div>
   </>;

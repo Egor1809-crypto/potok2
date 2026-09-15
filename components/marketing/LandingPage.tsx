@@ -1,56 +1,90 @@
 import Link from "next/link";
-import { ArrowRight, Check, Mail, Presentation, Image as ImageIcon, Sparkles, Send, ChevronDown } from "@/components/ui/icons";
+import { ArrowRight, Mail, Presentation, Image as ImageIcon, ChevronDown } from "@/components/ui/icons";
 import { MarketingHeader } from "./MarketingHeader";
-import { ProductPreview } from "./ProductPreview";
 import { MarketingFooter } from "./MarketingFooter";
-import { LandingEffects } from "./LandingEffects";
 import styles from "./Marketing.module.css";
 
+const formats = [
+  { icon: Mail, title: "Письма и рассылки", text: "Соберите письмо в редакторе, выберите получателей и запланируйте отправку.", features: ["Макеты из готовых блоков", "Контакты и сегменты", "Календарь и история отправок"] },
+  { icon: Presentation, title: "Презентации", text: "Создайте слайды с нуля или продолжите работу над готовой презентацией.", features: ["Импорт PowerPoint и PDF", "Редактирование на холсте", "Экспорт готовых материалов"] },
+  { icon: ImageIcon, title: "Изображения", text: "Подготовьте визуалы для проекта и храните их в общей медиатеке.", features: ["Загрузка своих изображений", "Генерация по описанию", "Использование в письмах и слайдах"] },
+];
 const steps = [
-  ["01", "Сформулируйте идею", "Опишите задачу ИИ, выберите шаблон или загрузите готовый материал."],
-  ["02", "Соберите материал", "Редактируйте текст, изображения и элементы прямо на холсте."],
-  ["03", "Посмотрите свежим взглядом", "Арт-директор найдёт слабые места и предложит конкретные улучшения."],
-  ["04", "Поделитесь результатом", "Экспортируйте презентацию или запланируйте отправку письма аудитории."],
+  ["Подготовьте основу", "Выберите шаблон, загрузите свой файл или опишите задачу помощнику."],
+  ["Доработайте детали", "Отредактируйте текст и оформление. При необходимости запросите разбор у арт-директора."],
+  ["Отправьте или сохраните", "Запланируйте рассылку по выбранным контактам или экспортируйте презентацию."],
 ];
 const questions = [
-  ["Можно работать с готовыми материалами?", "Да. Импортируйте письмо, загрузите презентацию в PowerPoint или PDF, выберите изображения из медиатеки. После импорта можно продолжить работу в конструкторе."],
-  ["Что проверяет арт-директор?", "В письмах — текст, оформление и призыв к действию. В презентациях — отдельные слайды и логику всей истории. В фотографиях — композицию, цвет и читаемость будущего макета. Рекомендации остаются под вашим контролем."],
-  ["Как отправляются рассылки?", "Подготовьте письмо, выберите контакты или сегмент и укажите время отправки. Поток передаст рассылку подключённому провайдеру, а календарь и история помогут следить за её состоянием."],
-  ["Можно работать вместе с командой?", "Да. Участники работают под своими аккаунтами. Администратор управляет приглашениями и доступом к контактным базам."],
+  ["Можно загрузить готовые материалы?", "Да. Импортируйте письмо, загрузите презентацию в PowerPoint или PDF, добавьте свои изображения в медиатеку. После импорта можно продолжить работу в редакторе."],
+  ["Обязательно использовать ИИ?", "Нет. Можно работать со своими текстами, изображениями и готовыми шаблонами. Генерация и рекомендации арт-директора — дополнительные инструменты, которые вы используете по необходимости."],
+  ["Как отправляются рассылки?", "Подготовьте письмо, выберите контакты или сегмент и укажите время отправки. Поток передаст рассылку подключённому провайдеру. Её состояние можно проверить в календаре и истории отправок."],
+  ["Как устроен доступ команды?", "Каждый участник входит в свой аккаунт. Администратор управляет приглашениями и доступом к контактным базам."],
 ];
+
 export function LandingPage() {
   return <div className={styles.site}>
     <a className={styles.skip} href="#main">К содержанию</a>
     <MarketingHeader />
-    <LandingEffects />
     <main id="main">
-      <section className={styles.hero}>
+      <section className={styles.hero} aria-labelledby="hero-title">
+        <img className={styles.heroPhoto} src="/landing/team-meeting.webp" alt="" width="1920" height="1295" fetchPriority="high" />
         <div className={styles.heroCopy}>
-          <p className={styles.intro}><span aria-hidden />Творческая студия для вашей команды</p>
-          <h1>Ваша идея.<br />Красивое воплощение.<br /><em>В одном Потоке.</em></h1>
-          <p className={styles.lead}>Письма, презентации и изображения — в одном Потоке. Создавайте с ИИ, редактируйте вместе с командой и делитесь готовым результатом.</p>
-          <div className={styles.heroActions}><Link href="/register" className={styles.primary}>Начать работу<ArrowRight aria-hidden className="size-6" /></Link><a href="#product" className={styles.textLink}>Посмотреть возможности<span aria-hidden>↗</span></a></div>
-          <div className={styles.heroNote}><Check aria-hidden className="size-5" />Шаблоны, редактор и арт-директор под рукой</div>
-        </div>
-        <div className={styles.heroStudio}><div className={styles.studioLabel}><span>ВАША ТВОРЧЕСКАЯ СТУДИЯ</span><span>3 ФОРМАТА</span></div><ProductPreview /><div className={styles.studioStamp}><Sparkles aria-hidden className="size-5" /><span>От замысла<br /><strong>к результату</strong></span></div></div>
-      </section>
-      <div className={styles.capabilityStrip}><span>Один процесс — от идеи до отправки</span><div><span><Sparkles aria-hidden />ИИ-помощник</span><span><Mail aria-hidden />Редактор писем</span><span><Presentation aria-hidden />Слайды</span><span><ImageIcon aria-hidden />Медиатека</span><span><Send aria-hidden />Рассылки</span></div></div>
-      <section data-reveal id="product" className={styles.product}>
-        <div className={styles.sectionHead}><h2>Три формата.<br /><span>Один подход к работе.</span></h2><p>Меньше переключений между сервисами.<br />Больше внимания тому, что вы создаёте.</p></div>
-        <div className={styles.formats}>
-          <article data-reveal><span className={styles.formatIcon}><Mail aria-hidden /></span><h3>Письма, которые хочется открыть</h3><p>Собирайте макеты из блоков, добавляйте изображения и персонализацию. Проверьте результат перед отправкой.</p><a href="#workflow">От макета до рассылки<ArrowRight aria-hidden className="size-5" /></a><div className={styles.emailVisual} aria-hidden><span>ПРИГЛАШЕНИЕ</span><strong>Есть идея.<br />Давайте обсудим.</strong><i /><b>Открыть программу ↗</b></div></article>
-          <article data-reveal><span className={styles.formatIcon}><Presentation aria-hidden /></span><h3>Презентации с ясной мыслью</h3><p>Начните с шаблона или импортируйте PowerPoint и PDF. Редактируйте слайды и проверяйте всю историю целиком.</p><a href="#workflow">От идеи до выступления<ArrowRight aria-hidden className="size-5" /></a><div className={styles.deckVisual} aria-hidden><div><span>ПЛАН НА ЗАВТРА</span><strong>Большие идеи.<br />Понятные шаги.</strong><i>01 — 03</i></div><span>02</span><span>03</span></div></article>
-          <article data-reveal><span className={styles.formatIcon}><ImageIcon aria-hidden /></span><h3>Изображения с нужным настроением</h3><p>Опишите сюжет, создайте визуал и сохраните его в медиатеке. Используйте одну работу в письме и презентации.</p><a href="#workflow">От описания до визуала<ArrowRight aria-hidden className="size-5" /></a><div className={styles.imageVisual} aria-hidden><div /><div /><span>Свет. Форма. Характер.</span></div></article>
+          <p className={styles.eyebrow}>Письма · Презентации · Рассылки</p>
+          <h1 id="hero-title">Всё для общения<br />с вашей аудиторией.</h1>
+          <p className={styles.lead}>Создавайте письма и презентации, работайте с контактами и планируйте рассылки. В одном рабочем пространстве — Потоке.</p>
+          <div className={styles.heroActions}>
+            <Link href="/register" className={styles.primary}>Начать работу<ArrowRight aria-hidden /></Link>
+            <a href="#product" className={styles.secondary}>Возможности Потока</a>
+          </div>
         </div>
       </section>
-      <section data-reveal className={styles.director}>
-        <div className={styles.directorCopy}><span className={styles.darkIcon}><Sparkles aria-hidden /></span><h2>Взгляд со стороны.<br /><em>Прямо в проекте.</em></h2><p>Когда всё почти готово, откройте арт-директора. Он поможет заметить перегруженный слайд, слабый заголовок или неудачное кадрирование.</p><span className={styles.directorNote}>Вы решаете, какие замечания применить.</span></div>
-        <div className={styles.reviewExample}><div><span>Пример разбора</span><Sparkles aria-hidden className="size-6" /></div><h3>Дайте главной мысли больше места</h3><p>На слайде сразу три акцента. Укоротите заголовок и оставьте один основной визуал — так идею будет легче считать.</p><div className={styles.reviewChips}><span>Композиция</span><span>Иерархия</span><span>Читаемость</span></div><div className={styles.reviewCompare} aria-hidden><div><i /><i /><i /><b /><b /><b /></div><ArrowRight className="size-6" /><div><strong>Одна<br />главная<br />мысль.</strong><span /></div></div></div>
+
+      <section id="product" className={styles.product} aria-labelledby="product-title">
+        <div className={styles.sectionHead}>
+          <p className={styles.eyebrow}>Инструменты для ежедневной работы</p>
+          <h2 id="product-title">От первого черновика<br />до отправки.</h2>
+          <p>Готовьте материалы в одном месте.<br />Переходите к следующей задаче, сохраняя контекст.</p>
+        </div>
+        <div className={styles.formats}>{formats.map(({ icon: Icon, title, text, features }) =>
+          <article key={title}>
+            <Icon className={styles.formatIcon} aria-hidden />
+            <h3>{title}</h3><p>{text}</p>
+            <ul>{features.map(feature => <li key={feature}>{feature}</li>)}</ul>
+          </article>
+        )}</div>
       </section>
-      <section data-reveal id="workflow" className={styles.workflow}><div className={styles.sectionHead}><h2>От задумки<br /><span>к готовому проекту.</span></h2><p>Весь процесс перед глазами.<br />Следующий шаг всегда понятен.</p></div><div className={styles.steps}>{steps.map(([number,title,copy])=><article key={number}><span>{number}</span><h3>{title}</h3><p>{copy}</p></article>)}</div></section>
-      <section data-reveal className={styles.dataSection}><div><span className={styles.eyebrow}>ВАШИ ДАННЫЕ И ВЫБОР</span><h2>Управляйте доступом.<br /><em>Сохраняйте контроль.</em></h2></div><div><p>Назначайте участникам доступ к контактным базам. Проверяйте согласия получателей перед рассылкой. Настройки cookies доступны в любой момент.</p><Link href="/privacy" className={styles.textLink}>Как обрабатываются данные<ArrowRight aria-hidden className="size-5" /></Link></div></section>
-      <section data-reveal id="questions" className={styles.faq}><h2>До начала работы</h2><div>{questions.map(([question,answer])=><details key={question}><summary>{question}<ChevronDown aria-hidden className="size-5" /></summary><p>{answer}</p></details>)}</div></section>
-      <section className={styles.start}><Send aria-hidden /><h2>Дайте идее<br />свой <em>Поток.</em></h2><Link href="/register" className={styles.primary}>Создать аккаунт<ArrowRight aria-hidden className="size-6" /></Link><Link href="/login" className={styles.textLink}>Уже с нами? Войти</Link></section>
+
+      <section id="workflow" className={styles.workflow} aria-labelledby="workflow-title">
+        <div className={styles.workflowIntro}>
+          <p className={styles.eyebrow}>Как работает Поток</p>
+          <h2 id="workflow-title">Вы знаете задачу.<br />Здесь есть инструменты.</h2>
+          <p>Начните с того, что уже есть: идеи, текста или готового файла. Дальше — редактор, медиатека и отправка.</p>
+          <Link href="/register" className={styles.textLink}>Перейти к работе<ArrowRight aria-hidden /></Link>
+        </div>
+        <ol className={styles.steps}>{steps.map(([title, text], i) => <li key={title}>
+          <span className={styles.stepNumber} aria-hidden>0{i + 1}</span>
+          <div><h3>{title}</h3><p>{text}</p></div>
+        </li>)}</ol>
+      </section>
+
+      <section className={styles.team} aria-labelledby="team-title">
+        <div><p className={styles.eyebrow}>Команда и данные</p><h2 id="team-title">Общая работа.<br />Понятный доступ.</h2></div>
+        <div className={styles.teamCopy}>
+          <p>Приглашайте коллег и назначайте доступ к контактным базам. Каждый участник работает под своим аккаунтом.</p>
+          <p>Перед рассылкой проверяйте согласия получателей. Информация об обработке данных и настройки cookies всегда доступны внизу страницы.</p>
+          <Link href="/privacy" className={styles.textLink}>О персональных данных<ArrowRight aria-hidden /></Link>
+        </div>
+      </section>
+
+      <section id="questions" className={styles.faq} aria-labelledby="faq-title">
+        <div><p className={styles.eyebrow}>Перед началом</p><h2 id="faq-title">Есть вопросы?</h2><p>Несколько подробностей<br />о работе в Потоке.</p></div>
+        <div>{questions.map(([question, answer]) => <details key={question}><summary>{question}<ChevronDown aria-hidden /></summary><p>{answer}</p></details>)}</div>
+      </section>
+
+      <section className={styles.start}>
+        <h2>Ваш следующий проект<br />начинается здесь.</h2>
+        <Link href="/register" className={styles.primary}>Создать аккаунт<ArrowRight aria-hidden /></Link>
+      </section>
     </main>
     <MarketingFooter />
   </div>;
