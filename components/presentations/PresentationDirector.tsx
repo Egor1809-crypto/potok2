@@ -1,10 +1,11 @@
 "use client";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { PresentationProjectRecord, PresentationSlide } from "@/types/api";
 import type { SlideDirection } from "@/lib/presentation-import/direction";
 import {
   parseDeckDirection,
+  buildDeckOverview,
   slideFingerprint,
   type DeckDirection,
   type SlideReview,
@@ -20,12 +21,13 @@ import { confirmAction } from "@/components/ui/confirm-action";
 import { PresentationElementsEditor } from "./PresentationElementsEditor";
 import styles from "./PresentationWorkshop.module.css";
 
+import { abortable, runSlideReviews } from "@/lib/presentation-import/review-queue";
 import { DirectorFrame } from "@/components/art-director/DirectorFrame";
 
 type Progress = {
   completed: number;
   total: number;
-  current: number;
+  active: number[];
   phase: "slides" | "summary" | "done" | "paused";
 };
 class ReviewError extends Error {
@@ -36,10 +38,19 @@ class ReviewError extends Error {
     super(message);
   }
 }
-const pauseFrame = () =>
-  new Promise<void>((resolve) =>
-    requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-  );
+function reviewContext(project: PresentationProjectRecord) {
+  return {
+    theme: { themeId: project.themeId, backgroundColor: project.backgroundColor, textColor: project.textColor, accentColor: project.accentColor },
+    outline: project.slides.map(s => ({
+      title: s.title.slice(0, 500),
+      excerpt: (s.canvas ? s.canvas.elements.filter(e => e.kind === "text").map(e => e.text).join(" ") : [s.body, ...s.bullets].join(" ")).slice(0, 500),
+    })),
+  };
+}
+function reviewErrorMessage(error: unknown) {
+  if (error instanceof Error && error.name === "TimeoutError") return "Проверка заняла слишком много времени. Готовые результаты сохранены; повторите только незавершённые слайды.";
+  return error instanceof Error ? error.message : "Не удалось проверить слайд.";
+}
 export function PresentationDirector({
   projects,
   embedded = false,
@@ -83,6 +94,7 @@ export function PresentationDirector({
   );
   const captureView = useRef<HTMLDivElement>(null),
     controller = useRef<AbortController | null>(null);
+  const previews = useRef(new Map<string, string>());
   useEffect(() => () => controller.current?.abort(), []);
   const slide = draft?.slides[selected];
   const leave = async () => {
@@ -116,37 +128,44 @@ export function PresentationDirector({
   };
   const screenshot = async (s: PresentationSlide, signal: AbortSignal) => {
     signal.throwIfAborted();
-    setCaptureSlide(s);
-    await pauseFrame();
-    await document.fonts.ready;
+    const key = slideFingerprint(draft!, s);
+    const cached = previews.current.get(key);
+    if (cached) return cached;
+    flushSync(() => setCaptureSlide(s));
+    const preparation = AbortSignal.any([signal, AbortSignal.timeout(20000)]);
+    await abortable(document.fonts.ready, preparation);
     signal.throwIfAborted();
     const root = (captureView.current?.querySelector(
       "[data-presentation-canvas]",
     ) || captureView.current?.firstElementChild) as HTMLElement;
     if (!root || !root.clientWidth)
       throw new Error("Не удалось подготовить изображение слайда.");
-    await Promise.all(
+    await abortable(Promise.all(
       Array.from(root.querySelectorAll("img")).map((image) => image.decode()),
-    );
+    ), preparation);
     signal.throwIfAborted();
     const { default: html2canvas } = await import("html2canvas");
-    const canvas = await html2canvas(root, {
+    const canvas = await abortable(html2canvas(root, {
       scale: Math.min(2, 1440 / root.clientWidth),
-      backgroundColor: null,
+      backgroundColor: "#ffffff",
       useCORS: true,
       logging: false,
-    });
-    const png = canvas.toDataURL("image/png");
+      imageTimeout: 12000,
+    }), preparation);
+    const image = canvas.toDataURL("image/jpeg", 0.92);
     canvas.width = canvas.height = 0;
     signal.throwIfAborted();
-    return png;
+    // Keep memory bounded; repeat reviews and revisions reuse unchanged previews.
+    if (previews.current.size >= 8) previews.current.delete(previews.current.keys().next().value!);
+    previews.current.set(key, image);
+    return image;
   };
   const request = async (payload: unknown, signal: AbortSignal) => {
     const response = await fetch("/api/ai/presentations/director", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
-      signal: AbortSignal.any([signal, AbortSignal.timeout(165000)]),
+      signal: AbortSignal.any([signal, AbortSignal.timeout(105000)]),
     });
     const body = (await response.json()) as {
       error?: string;
@@ -173,9 +192,7 @@ export function PresentationDirector({
       }),
     );
     const total = snapshot.slides.length,
-      context = {
-        outline: snapshot.slides.map((s) => ({ title: s.title.slice(0, 500) })),
-      };
+      context = reviewContext(snapshot);
     let completed = Object.keys(results).length;
     if (refreshAll) setReviews({});
     setBusy("review");
@@ -184,76 +201,66 @@ export function PresentationDirector({
     setProposed(null);
     setTab("deck");
     setFailures({});
-    setProgress({ completed, total, current: 0, phase: "slides" });
+    setProgress({ completed, total, active: [], phase: "slides" });
     try {
-      for (let i = 0; i < total; i++) {
-        const s = snapshot.slides[i];
-        if (results[s.id]) continue;
-        abort.signal.throwIfAborted();
-        setProgress({ completed, total, current: i + 1, phase: "slides" });
-        try {
-          const png = await screenshot(s, abort.signal);
-          const body = await request(
-            {
-              action: "review",
-              slide: s,
-              screenshot: png,
-              context: { ...context, number: i + 1 },
-            },
-            abort.signal,
-          );
-          if (!body.direction || !Array.isArray(body.direction.findings))
-            throw new Error("ИИ не вернул разбор слайда.");
-          results[s.id] = {
-            fingerprint: slideFingerprint(snapshot, s),
-            direction: body.direction,
-          };
+      await runSlideReviews({
+        items: snapshot.slides.map((slide, index) => ({ slide, number: index + 1 })).filter(item => !results[item.slide.id]),
+        signal: abort.signal,
+        capture: (item, signal) => screenshot(item.slide, signal),
+        review: async (item, image, signal) => {
+          const body = await request({ action: "review", slide: item.slide, screenshot: image, context: { ...context, number: item.number } }, signal);
+          if (!body.direction || !Array.isArray(body.direction.findings)) throw new Error("ИИ не вернул разбор слайда.");
+          return body.direction;
+        },
+        onResult: (item, direction) => {
+          results[item.slide.id] = { fingerprint: slideFingerprint(snapshot, item.slide), direction };
           completed++;
           setReviews({ ...results });
-          setProgress({ completed, total, current: i + 1, phase: "slides" });
-        } catch (e) {
-          if (abort.signal.aborted) throw e;
-          const message =
-            e instanceof Error ? e.message : "Не удалось проверить слайд.";
-          setFailures((current) => ({ ...current, [s.id]: message }));
-          if (
-            e instanceof ReviewError &&
-            [401, 403, 429, 503].includes(e.status)
-          )
-            throw e;
-        }
-      }
+          setProgress(current => current ? { ...current, completed } : current);
+        },
+        onError: (item, error) => setFailures(current => ({ ...current, [item.slide.id]: reviewErrorMessage(error) })),
+        onActive: items => setProgress({ completed, total, active: items.map(item => item.number), phase: "slides" }),
+        isFatal: error => error instanceof ReviewError && [401, 403, 429, 503].includes(error.status),
+      });
       if (completed !== total) {
         setError(
           `Проверено ${completed} из ${total}. Повторите проверку оставшихся слайдов.`,
         );
-        setProgress({ completed, total, current: 0, phase: "paused" });
+        setProgress({ completed, total, active: [], phase: "paused" });
         return;
       }
-      setProgress({ completed, total, current: 0, phase: "summary" });
-      const reports = snapshot.slides.map((s, i) => ({
-        number: i + 1,
-        summary: results[s.id].direction.summary,
-        findings: results[s.id].direction.findings,
-      }));
-      const body = await request(
-        { action: "summary", context, reports },
-        abort.signal,
-      );
-      setOverview(parseDeckDirection(body.overview, total));
-      setProgress({ completed, total, current: 0, phase: "done" });
+      setOverview(buildDeckOverview(snapshot.slides.map(s => results[s.id].direction)));
+      setProgress({ completed, total, active: [], phase: "done" });
     } catch (e) {
       setError(
         abort.signal.aborted
           ? "Проверка остановлена. Готовые разборы сохранены в этом окне — можно продолжить."
-          : e instanceof Error
-            ? e.message
-            : "Не удалось проверить презентацию.",
+          : reviewErrorMessage(e),
       );
-      setProgress({ completed, total, current: 0, phase: "paused" });
+      setProgress({ completed, total, active: [], phase: "paused" });
     } finally {
       setBusy("");
       setCaptureSlide(null);
+      controller.current = null;
+    }
+  };
+  const analyzeDeck = async () => {
+    if (!draft || busy || !draft.slides.every(s => reviews[s.id])) return;
+    const abort = new AbortController();
+    controller.current = abort;
+    setBusy("summary");
+    setError("");
+    setTab("deck");
+    setProgress({ completed: draft.slides.length, total: draft.slides.length, active: [], phase: "summary" });
+    try {
+      const body = await request({ action: "summary", context: reviewContext(draft), reports: draft.slides.map((s, i) => ({ number: i + 1, summary: reviews[s.id].direction.summary, findings: reviews[s.id].direction.findings })) }, abort.signal);
+      abort.signal.throwIfAborted();
+      setOverview(parseDeckDirection(body.overview, draft.slides.length));
+    } catch (error) {
+      setError(abort.signal.aborted ? "Углублённый разбор остановлен. Замечания по слайдам сохранены." : reviewErrorMessage(error));
+    } finally {
+      setProgress({ completed: draft.slides.length, total: draft.slides.length, active: [], phase: "done" });
+      setBusy("");
       controller.current = null;
     }
   };
@@ -268,9 +275,18 @@ export function PresentationDirector({
     try {
       const png = await screenshot(slide, abort.signal),
         body = await request(
-          { action: "revise", command, slide, screenshot: png },
+          {
+            action: "revise",
+            command: command.trim() || "Исправь приоритетные замечания из разбора. Сохрани смысл, факты и стиль презентации.",
+            slide,
+            screenshot: png,
+            context: { ...reviewContext(draft), number: selected + 1 },
+            previousReview: reviews[slide.id]?.direction,
+            useReview: !command.trim(),
+          },
           abort.signal,
         );
+      abort.signal.throwIfAborted();
       setProposed({
         slideId: slide.id,
         slide: body.proposed,
@@ -281,9 +297,7 @@ export function PresentationDirector({
       setError(
         abort.signal.aborted
           ? "Подготовка правок остановлена."
-          : e instanceof Error
-            ? e.message
-            : "Не удалось подготовить правки.",
+          : reviewErrorMessage(e),
       );
     } finally {
       setBusy("");
@@ -331,7 +345,9 @@ export function PresentationDirector({
         ? "Презентация проверена"
         : progress?.phase === "paused"
           ? "Проверка приостановлена"
-          : `Проверка слайда ${progress?.current || 1} из ${progress?.total || 0}`;
+          : progress?.active.length
+            ? `Проверяем ${progress.active.length === 1 ? "слайд" : "слайды"} ${progress.active.join(", ")}`
+            : "Подготавливаем проверку";
   return (
     <DirectorFrame
       embedded={embedded}
@@ -391,6 +407,7 @@ export function PresentationDirector({
                       ))
                     )
                       return;
+                    previews.current.clear();
                     setDraft(
                       projects.find((p) => p.id === id) ?? initial ?? null,
                     );
@@ -410,11 +427,12 @@ export function PresentationDirector({
                 onClick={() => void reviewDeck(!!overview)}
               >
                 {overview
-                  ? "Обновить общий разбор"
+                  ? "Повторить проверку"
                   : Object.keys(reviews).length
                     ? "Продолжить проверку"
                     : "Разобрать всю презентацию"}
               </Button>
+              {overview && <Button variant="outline" disabled={!!busy} onClick={() => void analyzeDeck()}>Проверить связность и общий стиль</Button>}
               {busy && busy !== "save" && (
                 <Button
                   variant="outline"
@@ -450,7 +468,7 @@ export function PresentationDirector({
                       ? "done"
                       : busy === "review" &&
                           progress?.phase === "slides" &&
-                          progress.current === i + 1
+                          progress.active.includes(i + 1)
                         ? "running"
                         : failures[s.id]
                           ? "error"
@@ -623,17 +641,17 @@ export function PresentationDirector({
                       aria-label="Что изменить?"
                       value={command}
                       maxLength={3000}
-                      placeholder="Увеличь заголовок, выровняй изображение…"
+                      placeholder={reviews[slide.id]?.direction.findings.length ? "Можно уточнить задачу или исправить замечания из разбора" : "Что нужно изменить на слайде?"}
                       onChange={(e) => setCommand(e.target.value)}
                     />
                   </FormField>
                   <Button
                     variant="outline"
-                    disabled={!!busy || !command.trim()}
+                    disabled={!!busy || (!command.trim() && !reviews[slide.id]?.direction.findings.length)}
                     loading={busy === "revise"}
                     onClick={() => void revise()}
                   >
-                    Предложить правки
+                    {command.trim() ? "Предложить правки" : "Исправить замечания"}
                   </Button>
                   {busy === "revise" && (
                     <p role="status">Готовим правки слайда…</p>

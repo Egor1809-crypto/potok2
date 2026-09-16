@@ -55,3 +55,29 @@ export function parseDeckDirection(
     })),
   };
 }
+
+/** Immediate, source-backed overview. A deeper narrative analysis is optional. */
+export function buildDeckOverview(reports: SlideDirection[]): DeckDirection {
+  const recommendations: DeckDirection["recommendations"] = [];
+  const seen = new Map<string, DeckDirection["recommendations"][number]>();
+  // Round-robin keeps the first concern from each slide ahead of secondary details.
+  for (let rank = 0; rank < 8; rank++) {
+    reports.forEach((report, index) => {
+      const text = report.findings[rank]?.trim();
+      if (!text) return;
+      const key = text.toLocaleLowerCase("ru-RU").replace(/\s+/g, " ").replace(/[.!;]+$/, "");
+      const existing = seen.get(key);
+      if (existing) {
+        if (!existing.slides.includes(index + 1)) existing.slides.push(index + 1);
+      } else {
+        const recommendation = { text, slides: [index + 1] };
+        seen.set(key, recommendation);
+        recommendations.push(recommendation);
+      }
+    });
+  }
+  return {
+    summary: `Проверено слайдов: ${reports.length}. ${recommendations.length ? "Основные замечания собраны ниже. Полный разбор — во вкладке каждого слайда." : "В разборах слайдов замечаний нет."}`,
+    recommendations: recommendations.slice(0, 12),
+  };
+}

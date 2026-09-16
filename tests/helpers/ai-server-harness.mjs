@@ -9,7 +9,7 @@ import * as sqliteCore from "drizzle-orm/sqlite-core";
 // Exercise the production orchestration without touching contacts, storage or mail.
 export async function loadAiServer(entry, { env = {}, fetch = globalThis.fetch, expose = [], assetStore, overrides = {} } = {}) {
   const root = path.resolve(import.meta.dirname, "../..");
-  const context = vm.createContext({ console, process: { env: { NODE_ENV: "test" } }, fetch, crypto, URL, URLSearchParams, Request, Response, Headers, AbortSignal, TextEncoder, TextDecoder, Uint8Array, ArrayBuffer, atob, btoa, setTimeout, clearTimeout });
+  const context = vm.createContext({ console, process: { env: { NODE_ENV: "test" } }, fetch, crypto, structuredClone, URL, URLSearchParams, Request, Response, Headers, AbortSignal, TextEncoder, TextDecoder, Uint8Array, ArrayBuffer, atob, btoa, setTimeout, clearTimeout });
   const synthetic = (values) => new vm.SyntheticModule(Object.keys(values), function () {
     for (const [key, value] of Object.entries(values)) this.setExport(key, value);
   }, { context });
