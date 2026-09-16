@@ -90,3 +90,67 @@ test('compatible-provider grouped patches are expanded losslessly and unknown op
  assert.deepEqual(normalizeDirectionPatches([{target:'body',fontSize:32,color:'#222222'}]),[{target:'body',field:'fontSize',value:'32'},{target:'body',field:'color',value:'#222222'}]);
  for(const patches of [[{target:'body',imageUrl:'https://bad.test'}],[{target:'body',field:'fontSize',value:'32',color:'#000000'}],[{target:'body'}]])assert.throws(()=>normalizeDirectionPatches(patches));
 });
+
+test('11-slide live queue accepts a priority retry while other slides are running and rejects double clicks',async()=>{
+ const {createSlideReviewQueue}=await import('../lib/presentation-import/review-queue.ts');
+ const started=[],completed=[],active=new Set();let attempts=0,max=0,queue,retryAccepted;
+ let release;const blocked=new Promise(resolve=>{release=resolve;});
+ const failed=new Promise(resolve=>{
+  queue=createSlideReviewQueue(options({items:Array.from({length:11},(_,i)=>i+1),concurrency:4,
+   review:async n=>{started.push(n);active.add(n);max=Math.max(max,active.size);try{if(n===1&&attempts++===0)throw Error('temporary');if(n>=2&&n<=5)await blocked;return n;}finally{active.delete(n);}},
+   onError:()=>setTimeout(resolve,0),onResult:n=>completed.push(n),
+  }));
+ });
+ await failed;
+ assert.ok(active.size>0,'other slides are still in flight');
+ retryAccepted=queue.enqueue(1);assert.equal(retryAccepted,true);assert.equal(queue.enqueue(1),false);
+ release();await queue.done;
+ assert.equal(max,4);assert.equal(completed.length,11);assert.equal(new Set(completed).size,11);
+ assert.ok(started.lastIndexOf(1)<started.indexOf(6),'retry precedes untouched slides');
+ assert.equal(queue.enqueue(1),false,'closed queues cannot accept stale retries');
+});
+
+test('cancelled live queue drains active requests and drops queued retries',async()=>{
+ const {createSlideReviewQueue}=await import('../lib/presentation-import/review-queue.ts');
+ const abort=new AbortController();let calls=0;
+ const queue=createSlideReviewQueue(options({items:[1,2,3,4,5],signal:abort.signal,review:async(n,image,signal)=>{calls++;await abortable(new Promise(()=>{}),signal);return n;}}));
+ await delay(2);assert.equal(queue.enqueue(9),true);abort.abort();await assert.rejects(queue.done);
+ assert.equal(calls,3);assert.equal(queue.enqueue(10),false);
+});
+
+test('slow or invalid review gets exactly one bounded recovery; cancellation never retries',async()=>{
+ const {reviewWithFallback}=await import('../lib/server/presentation-review-attempts.ts');
+ const {ApiRequestError}=await import('../lib/server/api-utils.ts');
+ for(const mode of ['timeout','invalid']){
+  const calls=[];
+  const result=await reviewWithFallback({signal:new AbortController().signal,models:['vision','fallback'],timeouts:[5,30],run:async(model,signal)=>{calls.push(model);if(model==='vision'){if(mode==='invalid')throw new ApiRequestError('invalid',422);await abortable(new Promise(()=>{}),signal);}return 'validated';}});
+  assert.equal(result,'validated');assert.deepEqual(calls,['vision','fallback']);
+ }
+ const abort=new AbortController();let attempts=0;
+ const pending=reviewWithFallback({signal:abort.signal,models:['vision','fallback'],run:async(model,signal)=>{attempts++;return abortable(new Promise(()=>{}),signal);}});
+ abort.abort();await assert.rejects(pending);assert.equal(attempts,1);
+ let exhausted=0;
+ await assert.rejects(reviewWithFallback({signal:new AbortController().signal,models:['vision','fallback'],timeouts:[2,2],run:async(model,signal)=>{exhausted++;return abortable(new Promise(()=>{}),signal);}}),e=>e.status===504);
+ assert.equal(exhausted,2);
+});
+
+test('known structured findings are preserved as readable text, unknown or partial findings are rejected',async()=>{
+ const valid=await server({summary:'Есть проблема с чтением.',findings:[{priority:'Обязательно',location:'42 участника',problem:'Низкий контраст.',fix:'Затемните текст.'}]});
+ const result=await valid.api.directPresentation(request(),{action:'review',slide,screenshot,context});
+ assert.match(result.direction.findings[0],/42 участника.*Низкий контраст.*Затемните/);
+ const invalid=await server({summary:'Проверено.',findings:[{location:'42 участника',fix:'Затемните'}]});
+ await assert.rejects(invalid.api.directPresentation(request(),{action:'review',slide,screenshot,context}),/неполный разбор/);
+ assert.equal(invalid.payloads.length,2);
+});
+
+test('default review uses the faster visual route and a recovery keeps the same image and context',async()=>{
+ const payloads=[];
+ const api=await loadAiServer('lib/server/presentation-director.ts',{overrides:{'@/db':{getDb:()=>{throw Error('Unexpected DB access');},getD1:()=>({prepare:()=>({bind(){return this;},first:async()=>({request_count:1})})})},'./email-ai':{aiProvider:()=>({provider:'navyai',visionModel:'gemini-3.8-flash',model:'gpt-5.6-sol',key:'test',endpoint:'https://test.invalid'}),parseAiJson:JSON.parse}},fetch:async(url,init)=>{
+  payloads.push(JSON.parse(init.body));
+  return payloads.length===1?Response.json({error:'busy'},{status:429}):Response.json({choices:[{message:{content:JSON.stringify({summary:'Читаемый слайд.',findings:[]})}}]});
+ }});
+ const result=await api.directPresentation(request(),{action:'review',slide,screenshot,context});
+ assert.equal(result.direction.summary,'Читаемый слайд.');assert.deepEqual(payloads.map(p=>p.model),['gpt-5.6-sol','gemini-3.8-flash']);
+ assert.deepEqual(payloads[0].messages,payloads[1].messages);
+ assert.equal(payloads[1].messages[1].content[1].image_url.url,screenshot);
+});

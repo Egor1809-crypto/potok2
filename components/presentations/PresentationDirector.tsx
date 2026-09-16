@@ -21,7 +21,7 @@ import { confirmAction } from "@/components/ui/confirm-action";
 import { PresentationElementsEditor } from "./PresentationElementsEditor";
 import styles from "./PresentationWorkshop.module.css";
 
-import { abortable, runSlideReviews } from "@/lib/presentation-import/review-queue";
+import { abortable, createSlideReviewQueue } from "@/lib/presentation-import/review-queue";
 import { DirectorFrame } from "@/components/art-director/DirectorFrame";
 
 type Progress = {
@@ -94,6 +94,7 @@ export function PresentationDirector({
   );
   const captureView = useRef<HTMLDivElement>(null),
     controller = useRef<AbortController | null>(null);
+  const retryInQueue = useRef<((id: string) => boolean) | null>(null);
   const previews = useRef(new Map<string, string>());
   useEffect(() => () => controller.current?.abort(), []);
   const slide = draft?.slides[selected];
@@ -156,7 +157,7 @@ export function PresentationDirector({
     canvas.width = canvas.height = 0;
     signal.throwIfAborted();
     // Keep memory bounded; repeat reviews and revisions reuse unchanged previews.
-    if (previews.current.size >= 8) previews.current.delete(previews.current.keys().next().value!);
+    if (previews.current.size >= 40) previews.current.delete(previews.current.keys().next().value!);
     previews.current.set(key, image);
     return image;
   };
@@ -180,8 +181,8 @@ export function PresentationDirector({
       );
     return body;
   };
-  const reviewDeck = async (refreshAll = false) => {
-    if (!draft || busy) return;
+  const reviewDeck = async (refreshAll = false, onlyId?: string) => {
+    if (!draft || busy || controller.current) return;
     const snapshot = structuredClone(draft),
       abort = new AbortController();
     controller.current = abort;
@@ -200,11 +201,14 @@ export function PresentationDirector({
     setOverview(null);
     setProposed(null);
     setTab("deck");
-    setFailures({});
+    setFailures(current => onlyId ? Object.fromEntries(Object.entries(current).filter(([id]) => id !== onlyId)) : {});
     setProgress({ completed, total, active: [], phase: "slides" });
     try {
-      await runSlideReviews({
-        items: snapshot.slides.map((slide, index) => ({ slide, number: index + 1 })).filter(item => !results[item.slide.id]),
+      const items = snapshot.slides.map((slide, index) => ({ slide, number: index + 1 }));
+      const queue = createSlideReviewQueue({
+        items: items.filter(item => !results[item.slide.id] && (!onlyId || item.slide.id === onlyId)),
+        key: item => item.slide.id,
+        concurrency: 4,
         signal: abort.signal,
         capture: (item, signal) => screenshot(item.slide, signal),
         review: async (item, image, signal) => {
@@ -214,7 +218,8 @@ export function PresentationDirector({
         },
         onResult: (item, direction) => {
           results[item.slide.id] = { fingerprint: slideFingerprint(snapshot, item.slide), direction };
-          completed++;
+          completed = Object.keys(results).length;
+          setFailures(current => Object.fromEntries(Object.entries(current).filter(([id]) => id !== item.slide.id)));
           setReviews({ ...results });
           setProgress(current => current ? { ...current, completed } : current);
         },
@@ -222,6 +227,11 @@ export function PresentationDirector({
         onActive: items => setProgress({ completed, total, active: items.map(item => item.number), phase: "slides" }),
         isFatal: error => error instanceof ReviewError && [401, 403, 429, 503].includes(error.status),
       });
+      retryInQueue.current = id => {
+        const item = items.find(item => item.slide.id === id);
+        return !!item && !results[id] && queue.enqueue(item);
+      };
+      await queue.done;
       if (completed !== total) {
         setError(
           `Проверено ${completed} из ${total}. Повторите проверку оставшихся слайдов.`,
@@ -239,9 +249,21 @@ export function PresentationDirector({
       );
       setProgress({ completed, total, active: [], phase: "paused" });
     } finally {
+      retryInQueue.current = null;
       setBusy("");
       setCaptureSlide(null);
       controller.current = null;
+    }
+  };
+  const retrySlide = (id: string) => {
+    if (!failures[id]) return;
+    if (busy === "review") {
+      if (retryInQueue.current?.(id)) {
+        setFailures(current => Object.fromEntries(Object.entries(current).filter(([key]) => key !== id)));
+        setError("");
+      }
+    } else if (!busy) {
+      void reviewDeck(false, id);
     }
   };
   const analyzeDeck = async () => {
@@ -452,10 +474,8 @@ export function PresentationDirector({
                 </div>
                 <progress
                   aria-label="Прогресс проверки презентации"
-                  max={progress.total + 1}
-                  value={
-                    progress.completed + (progress.phase === "done" ? 1 : 0)
-                  }
+                  max={progress.total}
+                  value={progress.completed}
                   aria-valuetext={progressText}
                 />
               </div>
@@ -474,30 +494,42 @@ export function PresentationDirector({
                           ? "error"
                           : "pending";
                     return (
-                      <button
-                        key={s.id}
-                        type="button"
-                        aria-label={`Слайд ${i + 1}`}
-                        aria-pressed={i === selected}
-                        onClick={() => setSelected(i)}
-                      >
-                        <div inert>{renderSlide(draft, s)}</div>
-                        <span>{String(i + 1).padStart(2, "0")}</span>
-                        {progress && (
-                          <span
-                            className={styles.reviewState}
-                            data-status={status}
+                      <div className={styles.reviewSlideCard} key={s.id}>
+                        <button
+                          type="button"
+                          aria-label={`Слайд ${i + 1}`}
+                          aria-pressed={i === selected}
+                          onClick={() => setSelected(i)}
+                        >
+                          <div inert>{renderSlide(draft, s)}</div>
+                          <span>{String(i + 1).padStart(2, "0")}</span>
+                          {progress && (
+                            <span
+                              className={styles.reviewState}
+                              data-status={status}
+                            >
+                              {status === "done"
+                                ? "Проверен"
+                                : status === "running"
+                                  ? "Проверяем…"
+                                  : status === "error"
+                                    ? "Не удалось проверить"
+                                    : busy === "review" ? "В очереди" : "Не проверен"}
+                            </span>
+                          )}
+                        </button>
+                        {status === "error" && (
+                          <button
+                            type="button"
+                            className={styles.retrySlide}
+                            aria-label={`Повторить проверку слайда ${i + 1}`}
+                            disabled={!!busy && (busy !== "review" || controller.current?.signal.aborted)}
+                            onClick={() => retrySlide(s.id)}
                           >
-                            {status === "done"
-                              ? "Проверен"
-                              : status === "running"
-                                ? "Проверяем…"
-                                : status === "error"
-                                  ? "Повторить"
-                                  : "В очереди"}
-                          </span>
+                            Повторить проверку
+                          </button>
                         )}
-                      </button>
+                      </div>
                     );
                   })}
                 </nav>
@@ -636,6 +668,11 @@ export function PresentationDirector({
                       </p>
                     )}
                   </div>
+                  {tab === "slide" && failures[slide.id] && (
+                    <Button variant="outline" disabled={!!busy && (busy !== "review" || controller.current?.signal.aborted)} onClick={() => retrySlide(slide.id)}>
+                      Повторить проверку слайда {selected + 1}
+                    </Button>
+                  )}
                   <FormField label={`Правки слайда ${selected + 1}`}>
                     <Textarea
                       aria-label="Что изменить?"

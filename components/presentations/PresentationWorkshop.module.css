@@ -527,3 +527,26 @@
     calc(max(240px, 100dvh - 490px) * var(--slide-ratio, 1.77778))
   );
 }
+
+.reviewSlideCard {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+}
+.rail .retrySlide {
+  min-height: 36px;
+  padding: 6px 8px;
+  color: var(--primary);
+  font-size: 12px;
+  text-align: center;
+  background: var(--primary-subtle);
+}
+.rail .retrySlide:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+@media (max-width: 720px) {
+  .rail:has(.reviewSlideCard) { max-height: 220px; }
+  .reviewSlideCard { flex: 0 0 140px; }
+}
