@@ -550,3 +550,34 @@
   .rail:has(.reviewSlideCard) { max-height: 220px; }
   .reviewSlideCard { flex: 0 0 140px; }
 }
+
+.annotationToolbar {display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--text-muted)}
+.annotationToolbar label {display:flex;align-items:center;gap:8px;min-height:32px;color:var(--text)}
+.annotationToolbar input {accent-color:var(--primary)}
+.annotatedFrame {position:relative;min-width:0;width:100%}
+.annotationLayer {position:absolute;pointer-events:none}
+.annotation {--mark:#6d28d9}
+.annotation[data-priority="required"] {--mark:#b54708}
+.annotationRegion {position:absolute;border:2px dashed var(--mark);background:transparent;opacity:.6;pointer-events:none}
+.annotation[data-active="true"] .annotationRegion {border-style:solid;border-width:3px;background:color-mix(in srgb,var(--mark) 10%,transparent);opacity:1}
+.annotationPin {position:absolute;transform:translate(-50%,-50%);display:grid;place-items:center;width:36px;height:36px;border:3px solid white;border-radius:50%;background:var(--mark);color:white;font-size:14px;font-weight:700;box-shadow:0 1px 5px #0005;pointer-events:auto;cursor:pointer;z-index:2}
+.annotationPin[aria-pressed="true"] {box-shadow:0 0 0 3px var(--mark),0 2px 8px #0004;z-index:3}
+.annotationPin:focus-visible,.findingTitle:focus-visible {outline:3px solid var(--primary);outline-offset:4px}
+.reviewSummary {color:var(--text-muted);font-weight:400;margin:0;line-height:1.5}
+.findingLegend {display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--text-muted)}
+.findingList {list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.findingCard {--mark:#6d28d9;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface);display:grid;gap:10px}
+.findingCard[data-priority="required"] {--mark:#b54708}
+.findingCard[data-active="true"] {border-color:var(--mark);box-shadow:0 0 0 1px var(--mark)}
+.findingTitle {display:flex;gap:10px;align-items:flex-start;text-align:left;background:none;border:0;padding:0;cursor:pointer;color:var(--text);min-height:40px}
+.findingTitle>span:last-child {display:grid;gap:3px}
+.findingTitle small {font-size:11px;color:var(--mark);font-weight:600}
+.findingTitle strong {font-size:14px;line-height:1.4}
+.findingNumber {display:grid;place-items:center;flex:0 0 26px;height:26px;border-radius:50%;background:var(--mark);color:white;font-size:12px;font-weight:700}
+.report .findingCard p {font-size:13px;line-height:1.5;margin:0}
+.findingAction {display:grid;gap:3px}
+.findingAction strong {font-size:11px;color:var(--text-muted);font-weight:500}
+.findingCard>small {font-size:11px;color:var(--text-muted)}
+.findingCard>button:last-child {justify-self:start}
+.proposalSummary {display:grid;gap:8px}
+@media (pointer:coarse) {.annotationPin{width:40px;height:40px}}

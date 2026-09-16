@@ -1,5 +1,5 @@
 import type { PresentationSlide } from "@/types/api";
-export type SlideDirection = { summary: string; findings: string[]; patches: { target: string; field: string; value: string }[] };
+export type SlideDirection = { issues?: import("./review-findings").SlideFinding[]; summary: string; findings: string[]; patches: { target: string; field: string; value: string }[] };
 export function applySlideDirection(slide: PresentationSlide, direction: SlideDirection): PresentationSlide {
   const result = structuredClone(slide);
   if (!Array.isArray(direction.patches) || direction.patches.length > 40) throw new Error("Слишком много правок для одного слайда.");

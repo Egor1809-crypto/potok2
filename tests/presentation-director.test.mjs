@@ -154,3 +154,20 @@ test('default review uses the faster visual route and a recovery keeps the same 
  assert.deepEqual(payloads[0].messages,payloads[1].messages);
  assert.equal(payloads[1].messages[1].content[1].image_url.url,screenshot);
 });
+
+test('structured findings link only real slide objects and preserve numbered ordering and priorities',async()=>{
+ const {parseSlideFindings,findingRegions}=await import('../lib/presentation-import/review-findings.ts');
+ const canvas={...slide,canvas:{width:1000,height:500,source:'pptx',elements:[{id:'body',kind:'text',text:'42 участника',x:100,y:200,width:400,height:50}]}};
+ const findings=parseSlideFindings([{priority:'required',title:'Низкий контраст',problem:'Текст «42 участника» сливается с фоном.',suggestion:'Сделайте текст темнее.',elementIds:['body'],region:null},{priority:'suggestion',title:'Повтор слайда',problem:'Содержание повторяется.',suggestion:'Уберите повтор.',elementIds:[],region:null}],canvas);
+ assert.equal(findings[0].priority,'required');assert.deepEqual(findingRegions(findings[0],canvas),[{x:10,y:40,width:40,height:10}]);assert.deepEqual(findingRegions(findings[1],canvas),[]);
+ const quoted=parseSlideFindings(['Обязательно: «42 участника» — низкий контраст — затемните текст.'],canvas);assert.deepEqual(quoted[0].elementIds,['body']);
+ const unknown=parseSlideFindings([{priority:'required',title:'Текст',problem:'Мелкий.',suggestion:'Увеличьте.',elementIds:['invented'],region:{x:99,y:5,width:40,height:20}}],canvas);assert.deepEqual(findingRegions(unknown[0],canvas),[]);
+ const pdf=parseSlideFindings([{priority:'required',title:'Текст',problem:'Мелкий.',suggestion:'Увеличьте.',elementIds:[],region:{x:10,y:20,width:50,height:30}}],slide);assert.deepEqual(findingRegions(pdf[0],slide),[{x:10,y:20,width:50,height:30}]);
+});
+
+test('fixing a verified finding needs no screenshot and excludes asset data from model input',async()=>{
+ const {api,payloads}=await server({summary:'Заголовок уточнён.',findings:[],patches:[{target:'slide',field:'title',value:'Итоги встречи'}]});
+ const result=await api.directPresentation(request(),{action:'revise',slide:{...slide,imageUrl:'/api/assets/unused-image'},context,useReview:true,previousReview:{summary:'Заголовок общий.',findings:['Уточните заголовок.']}});
+ assert.equal(result.proposed.title,'Итоги встречи');assert.equal(payloads[0].messages[1].content.length,1);assert.doesNotMatch(JSON.stringify(payloads[0]),/unused-image/);
+ await assert.rejects(api.directPresentation(request(),{action:'revise',slide,context,useReview:true,previousReview:{summary:'Нет замечаний.',findings:[]}}),/Изображение слайда/);
+});

@@ -18,6 +18,8 @@ import {
   Textarea,
 } from "@/components/ui";
 import { confirmAction } from "@/components/ui/confirm-action";
+import { AnnotatedSlide } from "./AnnotatedSlide";
+import { parseSlideFindings, findingRegions } from "@/lib/presentation-import/review-findings";
 import { PresentationElementsEditor } from "./PresentationElementsEditor";
 import styles from "./PresentationWorkshop.module.css";
 
@@ -89,6 +91,13 @@ export function PresentationDirector({
     [overview, setOverview] = useState<DeckDirection | null>(null),
     [tab, setTab] = useState<"deck" | "slide">("deck"),
     [progress, setProgress] = useState<Progress | null>(null);
+  const [activeFinding, setActiveFinding] = useState<number | null>(null);
+  const [showFindings, setShowFindings] = useState(true);
+  const revisionCache = useRef(new Map<string, {slideId:string;slide:PresentationSlide;direction:SlideDirection}>());
+  const findingCards = useRef(new Map<number, HTMLButtonElement>());
+  const [revisionSeconds, setRevisionSeconds] = useState(0);
+  useEffect(() => { if (busy !== "revise") return; setRevisionSeconds(0); const start = Date.now(); const timer = setInterval(() => setRevisionSeconds(Math.floor((Date.now()-start)/1000)),1000); return () => clearInterval(timer); }, [busy]);
+  useEffect(() => setActiveFinding(null), [selected, draft?.id]);
   const [captureSlide, setCaptureSlide] = useState<PresentationSlide | null>(
     null,
   );
@@ -110,6 +119,8 @@ export function PresentationDirector({
   };
   const updateSlides = (slides: PresentationSlide[]) => {
     if (!draft) return;
+    revisionCache.current.clear();
+    setActiveFinding(null);
     const next = { ...draft, slides };
     setDraft(next);
     setDirty(true);
@@ -200,7 +211,7 @@ export function PresentationDirector({
     setError("");
     setOverview(null);
     setProposed(null);
-    setTab("deck");
+    setTab("slide");
     setFailures(current => onlyId ? Object.fromEntries(Object.entries(current).filter(([id]) => id !== onlyId)) : {});
     setProgress({ completed, total, active: [], phase: "slides" });
     try {
@@ -286,8 +297,14 @@ export function PresentationDirector({
       controller.current = null;
     }
   };
-  const revise = async () => {
-    if (!slide || !draft || busy) return;
+  const revise = async (findingIndex?: number) => {
+    if (!slide || !draft || busy || controller.current) return;
+    const review = reviews[slide.id]?.direction;
+    const chosen = typeof findingIndex === "number" ? review?.findings[findingIndex] : undefined;
+    const useReview = !!review?.findings.length && (!!chosen || !command.trim());
+    const cacheKey = JSON.stringify([slideFingerprint(draft,slide),chosen ?? command.trim(),review?.findings]);
+    const cached = revisionCache.current.get(cacheKey);
+    if (cached) { setProposed(cached); setShowAfter(true); setTab("slide"); return; }
     const abort = new AbortController();
     controller.current = abort;
     setBusy("revise");
@@ -295,25 +312,24 @@ export function PresentationDirector({
     setProposed(null);
     setTab("slide");
     try {
-      const png = await screenshot(slide, abort.signal),
+      const png = useReview ? undefined : await screenshot(slide, abort.signal),
         body = await request(
           {
             action: "revise",
-            command: command.trim() || "Исправь приоритетные замечания из разбора. Сохрани смысл, факты и стиль презентации.",
+            command: chosen ? `Исправь только это замечание: ${chosen}` : command.trim() || "Исправь приоритетные замечания из разбора. Сохрани смысл, факты и стиль презентации.",
             slide,
             screenshot: png,
             context: { ...reviewContext(draft), number: selected + 1 },
-            previousReview: reviews[slide.id]?.direction,
-            useReview: !command.trim(),
+            previousReview: chosen && review ? {...review, findings:[chosen]} : review,
+            useReview,
           },
           abort.signal,
         );
       abort.signal.throwIfAborted();
-      setProposed({
-        slideId: slide.id,
-        slide: body.proposed,
-        direction: body.direction,
-      });
+      const proposal = {slideId:slide.id,slide:body.proposed,direction:body.direction};
+      if (revisionCache.current.size >= 12) revisionCache.current.delete(revisionCache.current.keys().next().value!);
+      revisionCache.current.set(cacheKey, proposal);
+      setProposed(proposal);
       setShowAfter(true);
     } catch (e) {
       setError(
@@ -358,8 +374,15 @@ export function PresentationDirector({
     }
   };
   const currentProposal = proposed?.slideId === slide?.id ? proposed : null;
+  const reviewReport = slide ? reviews[slide.id]?.direction : undefined;
+  const slideFindings = slide && reviewReport ? reviewReport.issues ?? parseSlideFindings(reviewReport.findings,slide) : [];
+  const showingProposal = !!currentProposal && showAfter;
+  const selectFinding = (index:number, fromSlide = false) => {
+    setActiveFinding(index); setTab("slide");
+    if (fromSlide) requestAnimationFrame(() => findingCards.current.get(index)?.focus({preventScroll:false}));
+  };
   const report =
-    currentProposal?.direction || (slide ? reviews[slide.id]?.direction : null);
+    (showingProposal ? currentProposal?.direction : null) || (slide ? reviews[slide.id]?.direction : null);
   const progressText =
     progress?.phase === "summary"
       ? "Собираем общие рекомендации"
@@ -430,6 +453,7 @@ export function PresentationDirector({
                     )
                       return;
                     previews.current.clear();
+                    revisionCache.current.clear();
                     setDraft(
                       projects.find((p) => p.id === id) ?? initial ?? null,
                     );
@@ -499,7 +523,7 @@ export function PresentationDirector({
                           type="button"
                           aria-label={`Слайд ${i + 1}`}
                           aria-pressed={i === selected}
-                          onClick={() => setSelected(i)}
+                          onClick={() => {setSelected(i);setTab("slide");}}
                         >
                           <div inert>{renderSlide(draft, s)}</div>
                           <span>{String(i + 1).padStart(2, "0")}</span>
@@ -562,13 +586,19 @@ export function PresentationDirector({
                       Редактировать элементы
                     </Button>
                   </div>
+                  {slideFindings.length > 0 && !showingProposal && <div className={styles.annotationToolbar}>
+                    <label><input type="checkbox" checked={showFindings} onChange={e=>setShowFindings(e.target.checked)}/>Показать замечания на слайде</label>
+                    <span>Номер на слайде = номер в списке</span>
+                  </div>}
                   <div className={`${styles.canvas} ${styles.directorPreview}`}>
+                    <AnnotatedSlide slide={showingProposal ? currentProposal!.slide : slide} findings={showFindings && !showingProposal ? slideFindings : []} active={activeFinding} onSelect={i=>selectFinding(i,true)}>
                     {renderSlide(
                       draft,
                       currentProposal && showAfter
                         ? currentProposal.slide
                         : slide,
                     )}
+                    </AnnotatedSlide>
                   </div>
                   {currentProposal &&
                     currentProposal.direction.patches.length > 0 && (
@@ -654,12 +684,22 @@ export function PresentationDirector({
                       )
                     ) : report ? (
                       <>
-                        <strong>{report.summary}</strong>
-                        {report.findings.map((f, i) => (
-                          <div className={styles.finding} key={i}>
-                            {f}
-                          </div>
-                        ))}
+                        {showingProposal && currentProposal ? <div className={styles.proposalSummary}><strong>{currentProposal.direction.patches.length ? "Правки готовы к просмотру" : "Нужны изменения вручную"}</strong><p>{report.summary}</p>{report.findings.map((f,i)=><p key={i}>{f}</p>)}<Button size="sm" variant="outline" onClick={()=>setProposed(null)}>Вернуться к замечаниям</Button></div> : <>
+                          <p className={styles.reviewSummary}>{report.summary}</p>
+                          <div className={styles.findingLegend}><span>Исправить: {slideFindings.filter(f=>f.priority==="required").length}</span><span>По желанию: {slideFindings.filter(f=>f.priority==="suggestion").length}</span></div>
+                          {!slideFindings.length && <p>Замечаний к этому слайду нет.</p>}
+                          <ol className={styles.findingList} aria-label={`Замечания к слайду ${selected+1}`}>
+                            {slideFindings.map((f,i)=><li key={i} className={styles.findingCard} data-priority={f.priority} data-active={activeFinding===i}>
+                              <button ref={node=>{if(node)findingCards.current.set(i,node);else findingCards.current.delete(i);}} type="button" className={styles.findingTitle} onClick={()=>selectFinding(i)} aria-pressed={activeFinding===i}>
+                                <span className={styles.findingNumber}>{i+1}</span><span><small>{f.priority==="required"?"Исправить":"По желанию"}</small><strong>{f.title}</strong></span>
+                              </button>
+                              <p>{f.problem}</p>
+                              {f.suggestion && <p className={styles.findingAction}><strong>Что изменить</strong>{f.suggestion}</p>}
+                              {!findingRegions(f,slide).length && <small>Без привязки к отдельному объекту</small>}
+                              <Button size="sm" variant="outline" disabled={!!busy} onClick={()=>void revise(i)}>Исправить пункт {i+1}</Button>
+                            </li>)}
+                          </ol>
+                        </>}
                       </>
                     ) : (
                       <p>
@@ -691,7 +731,7 @@ export function PresentationDirector({
                     {command.trim() ? "Предложить правки" : "Исправить замечания"}
                   </Button>
                   {busy === "revise" && (
-                    <p role="status">Готовим правки слайда…</p>
+                    <p role="status">{revisionSeconds < 30 ? "Готовим правки" : "Запрос ещё выполняется"} · {revisionSeconds} с</p>
                   )}
                 </aside>
               </div>

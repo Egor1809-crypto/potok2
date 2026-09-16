@@ -6,6 +6,7 @@ export async function reviewWithFallback<T>(options: {
   models: [string, string];
   run: (model: string, signal: AbortSignal) => Promise<T>;
   timeouts?: [number, number];
+  timeoutMessage?: string;
 }) {
   const timeouts = options.timeouts ?? [30000, 40000];
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -18,7 +19,7 @@ export async function reviewWithFallback<T>(options: {
     } catch (error) {
       options.signal.throwIfAborted();
       const failure = deadline.signal.aborted
-        ? new ApiRequestError("ИИ не завершил проверку вовремя. Повторите этот слайд — остальные продолжают проверяться.", 504)
+        ? new ApiRequestError(options.timeoutMessage ?? "ИИ не завершил проверку вовремя. Повторите этот слайд — остальные продолжают проверяться.", 504)
         : error;
       const retryable = deadline.signal.aborted || failure instanceof TypeError ||
         (failure instanceof ApiRequestError && [422, 429, 502, 504].includes(failure.status));

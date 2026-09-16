@@ -12,7 +12,7 @@ export function MarketingHeader() {
   useEffect(() => {
     const close = () => {
       flushSync(() => setOpen(false));
-      document.getElementById(window.location.hash.slice(1))?.scrollIntoView({ block: "start" });
+      document.getElementById(window.location.hash.slice(1))?.scrollIntoView({ block: "start", behavior: "instant" });
     };
     window.addEventListener("hashchange", close);
     return () => window.removeEventListener("hashchange", close);
