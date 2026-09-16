@@ -171,3 +171,45 @@ test('fixing a verified finding needs no screenshot and excludes asset data from
  assert.equal(result.proposed.title,'Итоги встречи');assert.equal(payloads[0].messages[1].content.length,1);assert.doesNotMatch(JSON.stringify(payloads[0]),/unused-image/);
  await assert.rejects(api.directPresentation(request(),{action:'revise',slide,context,useReview:true,previousReview:{summary:'Нет замечаний.',findings:[]}}),/Изображение слайда/);
 });
+
+test('revision verifier rejects invisible canvas colors, drops no-ops, supports actual text emphasis and protects numbers',async()=>{
+ const {finalizeRevision}=await import('../lib/presentation-import/revision.ts');
+ const canvas={...slide,canvas:{width:1000,height:500,source:'pptx',elements:[{id:'body',kind:'text',text:'42 участника',x:100,y:200,width:400,height:80,color:'#bbbbbb',fontSize:18}]}};
+ const d=patches=>({summary:'Всё исправлено!',findings:[],patches});
+ assert.throws(()=>finalizeRevision(canvas,d([{target:'slide',field:'textColor',value:'#222222'}])),/общий цвет/);
+ const noop=finalizeRevision(canvas,d([{target:'body',field:'color',value:'#BBBBBB'}]));assert.equal(noop.changes.length,0);assert.equal(noop.direction.patches.length,0);assert.match(noop.direction.summary,/не изменён/);
+ const bold=finalizeRevision(canvas,d([{target:'body',field:'bold',value:'true'},{target:'body',field:'align',value:'center'}]),true);assert.equal(bold.proposed.canvas.elements[0].bold,true);assert.equal(bold.proposed.canvas.elements[0].align,'center');assert.equal(bold.changes.length,2);
+ assert.throws(()=>finalizeRevision(canvas,d([{target:'body',field:'text',value:'84 участника'}]),true),/числа/);
+ assert.equal(canvas.canvas.elements[0].text,'42 участника');
+});
+
+test('contrast script changes only explicitly identified readable text on a known solid background',async()=>{
+ const {mechanicalCorrections,finalizeRevision}=await import('../lib/presentation-import/revision.ts');
+ const canvas={...slide,canvas:{width:1000,height:500,source:'pptx',elements:[{id:'body',kind:'text',text:'42 участника',x:100,y:200,width:400,height:80,color:'#bbbbbb',fontSize:18}]}};
+ const issues=[{priority:'required',title:'Низкий контраст',problem:'Текст сливается с белым фоном.',suggestion:'Сделайте цвет темнее.',elementIds:['body'],region:null}];
+ const fix=mechanicalCorrections(canvas,issues);assert.deepEqual(fix.patches,[{target:'body',field:'color',value:'#222222'}]);assert.deepEqual(fix.remaining,[]);
+ const result=finalizeRevision(canvas,{summary:'',findings:[],patches:fix.patches},true);assert.equal(result.changes[0].before,'#bbbbbb');assert.equal(result.changes[0].after,'#222222');
+ const image={id:'photo',kind:'image',x:0,y:0,width:1000,height:500,imageUrl:'/api/assets/image'};
+ assert.equal(mechanicalCorrections({...canvas,canvas:{...canvas.canvas,elements:[image,...canvas.canvas.elements]}},issues).patches.length,0);
+ assert.equal(mechanicalCorrections({...canvas,canvas:{...canvas.canvas,elements:[{...canvas.canvas.elements[0],locked:true}]}},issues).patches.length,0);
+});
+
+test('11-slide correction batch preserves partial success and retries only failed slides',async()=>{
+ const {correctPresentation}=await import('../lib/presentation-import/deck-corrections.ts');const {slideFingerprint}=await import('../lib/presentation-import/review.ts');
+ const project={id:'deck',themeId:'paper',backgroundColor:'#ffffff',textColor:'#222222',accentColor:'#6633cc',slides:Array.from({length:11},(_,i)=>({...slide,id:`slide-${i+1}`}))};
+ const reviews=Object.fromEntries(project.slides.map(s=>[s.id,{fingerprint:slideFingerprint(project,s),direction:{summary:'Проверено',findings:['Уточните заголовок'],patches:[]}}]));
+ const seen=[],results=new Map(),failures=[];let active=0,max=0;
+ const base={project,reviews,signal:new AbortController().signal,capture:()=>{throw Error('No screenshot expected');},review:()=>{throw Error('No second review expected');},onReviewed:()=>{},onActive:()=>{},isFatal:()=>false,onResult:(s,r)=>results.set(s.id,r),onError:(s)=>failures.push(s.id)};
+ await correctPresentation({...base,revise:async(s)=>{seen.push(s.id);active++;max=Math.max(max,active);await delay(2);active--;if(s.id==='slide-3')throw Error('temporary');return {summary:'Готово',findings:[],patches:s.id==='slide-4'?[]:[{target:'slide',field:'title',value:'Итоги встречи'}]};}});
+ assert.equal(max,3);assert.equal(results.size,10);assert.deepEqual(failures,['slide-3']);assert.equal(results.get('slide-4').status,'manual');assert.equal(results.get('slide-1').status,'changed');assert.equal(project.slides[0].title,'Итоги');
+ await correctPresentation({...base,ids:failures,revise:async(s)=>{seen.push(s.id);return {summary:'Готово',findings:[],patches:[{target:'slide',field:'title',value:'Итоги встречи'}]};}});
+ assert.equal(results.size,11);assert.equal(seen.filter(id=>id==='slide-1').length,1);assert.equal(seen.filter(id=>id==='slide-3').length,2);
+});
+
+test('cancelling a correction batch keeps applied results and never applies late responses',async()=>{
+ const {correctPresentation}=await import('../lib/presentation-import/deck-corrections.ts');const {slideFingerprint}=await import('../lib/presentation-import/review.ts');
+ const project={id:'cancel',themeId:'paper',slides:[{...slide,id:'ready'},{...slide,id:'waiting'},{...slide,id:'queued'}]};const reviews=Object.fromEntries(project.slides.map(s=>[s.id,{fingerprint:slideFingerprint(project,s),direction:{summary:'Проверено',findings:['Уточните заголовок'],patches:[]}}]));
+ const abort=new AbortController(),applied=[];
+ await assert.rejects(correctPresentation({project,reviews,signal:abort.signal,capture:()=>{throw Error('Unexpected capture');},review:()=>{throw Error('Unexpected review');},revise:async(s,r,n,signal)=>{if(s.id!=='ready')await abortable(new Promise(()=>{}),signal);return {summary:'Готово',findings:[],patches:[{target:'slide',field:'title',value:'Итоги встречи'}]};},onReviewed:()=>{},onActive:()=>{},onError:()=>{},isFatal:()=>false,onResult:(s)=>{applied.push(s.id);abort.abort();}}));
+ assert.deepEqual(applied,['ready']);assert.equal(project.slides[0].title,'Итоги');
+});

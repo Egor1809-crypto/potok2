@@ -18,6 +18,9 @@ import {
   Textarea,
 } from "@/components/ui";
 import { confirmAction } from "@/components/ui/confirm-action";
+import { RevisionChanges } from "./RevisionChanges";
+import { finalizeRevision, revisionChanges } from "@/lib/presentation-import/revision";
+import { correctPresentation, type CorrectionResult } from "@/lib/presentation-import/deck-corrections";
 import { AnnotatedSlide } from "./AnnotatedSlide";
 import { parseSlideFindings, findingRegions } from "@/lib/presentation-import/review-findings";
 import { PresentationElementsEditor } from "./PresentationElementsEditor";
@@ -91,6 +94,11 @@ export function PresentationDirector({
     [overview, setOverview] = useState<DeckDirection | null>(null),
     [tab, setTab] = useState<"deck" | "slide">("deck"),
     [progress, setProgress] = useState<Progress | null>(null);
+  type BatchItem = {status:CorrectionResult["status"]|"pending"|"working"|"error"|"cancelled";changes:CorrectionResult["changes"];notes:string[]};
+  const [batchResults,setBatchResults] = useState<Record<string,BatchItem>>({});
+  const [batchBefore,setBatchBefore] = useState<PresentationProjectRecord|null>(null);
+  const batchReviews = useRef<Record<string,SlideReview>>({});
+  const [batchShowBefore,setBatchShowBefore] = useState(false);
   const [activeFinding, setActiveFinding] = useState<number | null>(null);
   const [showFindings, setShowFindings] = useState(true);
   const revisionCache = useRef(new Map<string, {slideId:string;slide:PresentationSlide;direction:SlideDirection}>());
@@ -120,6 +128,7 @@ export function PresentationDirector({
   const updateSlides = (slides: PresentationSlide[]) => {
     if (!draft) return;
     revisionCache.current.clear();
+    setBatchBefore(null); setBatchResults({}); setBatchShowBefore(false);
     setActiveFinding(null);
     const next = { ...draft, slides };
     setDraft(next);
@@ -320,13 +329,14 @@ export function PresentationDirector({
             slide,
             screenshot: png,
             context: { ...reviewContext(draft), number: selected + 1 },
-            previousReview: chosen && review ? {...review, findings:[chosen]} : review,
+            previousReview: chosen && review ? {...review, findings:[chosen], issues:review.issues?.filter((_,i)=>i===findingIndex)} : review,
             useReview,
           },
           abort.signal,
         );
       abort.signal.throwIfAborted();
-      const proposal = {slideId:slide.id,slide:body.proposed,direction:body.direction};
+      const verified = finalizeRevision(slide,body.direction,useReview);
+      const proposal = {slideId:slide.id,slide:verified.proposed,direction:verified.direction};
       if (revisionCache.current.size >= 12) revisionCache.current.delete(revisionCache.current.keys().next().value!);
       revisionCache.current.set(cacheKey, proposal);
       setProposed(proposal);
@@ -342,6 +352,45 @@ export function PresentationDirector({
       setCaptureSlide(null);
       controller.current = null;
     }
+  };
+  const reviseDeck = async (retry = false) => {
+    if (!draft || busy || controller.current) return;
+    const snapshot = structuredClone(draft);
+    const ids = retry ? Object.entries(batchResults).filter(([,r])=>["error","cancelled"].includes(r.status)).map(([id])=>id) : snapshot.slides.map(s=>s.id);
+    if (!ids.length) return;
+    if (!retry || !batchBefore) {setBatchBefore(snapshot);batchReviews.current={...reviews};}
+    const abort = new AbortController(); controller.current=abort;
+    const context=reviewContext(snapshot);
+    setBusy("batch");setError("");setProposed(null);setOverview(null);setProgress(null);setTab("slide");setBatchShowBefore(false);
+    setBatchResults(current=>({...(retry?current:{}),...Object.fromEntries(ids.map(id=>[id,{status:"pending",changes:[],notes:[]} as BatchItem]))}));
+    try {
+      await correctPresentation({project:snapshot,reviews,ids,signal:abort.signal,
+        capture:(s,signal)=>screenshot(s,signal),
+        review:async(s,image,number,signal)=>(await request({action:"review",slide:s,screenshot:image,context:{...context,number}},signal)).direction,
+        revise:async(s,review,number,signal)=>(await request({action:"revise",slide:s,previousReview:review,useReview:true,command:"Исправь все применимые замечания этого слайда. Сохрани факты и стиль. Для каждого неприменимого замечания объясни причину.",context:{...context,number}},signal)).direction,
+        onReviewed:(s,review)=>setReviews(current=>({...current,[s.id]:review})),
+        onResult:(source,result)=>{
+          setBatchResults(current=>({...current,[source.id]:{status:result.status,changes:result.changes,notes:result.notes}}));
+          if(result.status === "changed") {
+            setDraft(current=>current && current.id===snapshot.id ? {...current,slides:current.slides.map(s=>s.id===source.id?result.slide:s)} : current);
+            setDirty(true);
+            setReviews(current=>Object.fromEntries(Object.entries(current).filter(([id])=>id!==source.id)));
+          }
+        },
+        onError:(s,error)=>setBatchResults(current=>({...current,[s.id]:{status:"error",changes:[],notes:[reviewErrorMessage(error)]}})),
+        onActive:active=>setBatchResults(current=>Object.fromEntries(Object.entries(current).map(([id,r])=>[id,active.includes(id)&&r.status==="pending"?{...r,status:"working"}:r]))),
+        isFatal:error=>error instanceof ReviewError && [401,403,429,503].includes(error.status),
+      });
+    } catch(error) {setError(abort.signal.aborted?"Исправление остановлено. Уже внесённые изменения сохранены в рабочей версии.":reviewErrorMessage(error));}
+    finally {
+      setBatchResults(current=>Object.fromEntries(Object.entries(current).map(([id,r])=>[id,["pending","working"].includes(r.status)?{...r,status:"cancelled",notes:["Не обработан. Можно повторить."]}:r])));
+      revisionCache.current.clear();setCaptureSlide(null);controller.current=null;setBusy("");
+    }
+  };
+  const undoBatch = () => {
+    if (!draft || !batchBefore || busy) return;
+    setDraft({...draft,slides:structuredClone(batchBefore.slides)});setReviews(batchReviews.current);
+    setDirty(true);setBatchBefore(null);setBatchResults({});setBatchShowBefore(false);setOverview(null);setProgress(null);setError("");
   };
   const save = async () => {
     if (!draft || busy) return;
@@ -373,6 +422,10 @@ export function PresentationDirector({
       setBusy("");
     }
   };
+  const batchEntries = Object.values(batchResults);
+  const batchCompleted = batchEntries.filter(r=>!["pending","working"].includes(r.status)).length;
+  const batchChanged = batchEntries.filter(r=>r.status==="changed").length;
+  const batchOriginal = batchBefore?.slides.find(s=>s.id===slide?.id);
   const currentProposal = proposed?.slideId === slide?.id ? proposed : null;
   const reviewReport = slide ? reviews[slide.id]?.direction : undefined;
   const slideFindings = slide && reviewReport ? reviewReport.issues ?? parseSlideFindings(reviewReport.findings,slide) : [];
@@ -454,6 +507,7 @@ export function PresentationDirector({
                       return;
                     previews.current.clear();
                     revisionCache.current.clear();
+                    setBatchBefore(null);setBatchResults({});setBatchShowBefore(false);
                     setDraft(
                       projects.find((p) => p.id === id) ?? initial ?? null,
                     );
@@ -469,15 +523,17 @@ export function PresentationDirector({
                 />
               </div>
               <Button
+                variant="outline"
                 disabled={!!busy}
                 onClick={() => void reviewDeck(!!overview)}
               >
-                {overview
+                {batchChanged ? "Проверить исправления" : overview
                   ? "Повторить проверку"
                   : Object.keys(reviews).length
                     ? "Продолжить проверку"
                     : "Разобрать всю презентацию"}
               </Button>
+              <Button disabled={!!busy} onClick={()=>void reviseDeck()}>Исправить всю презентацию</Button>
               {overview && <Button variant="outline" disabled={!!busy} onClick={() => void analyzeDeck()}>Проверить связность и общий стиль</Button>}
               {busy && busy !== "save" && (
                 <Button
@@ -488,6 +544,16 @@ export function PresentationDirector({
                 </Button>
               )}
             </div>
+            {batchEntries.length>0 && <section className={styles.batchPanel} aria-label="Исправление всей презентации">
+              <div className={styles.progressTitle}><strong role="status">{busy==="batch"?`Исправляем презентацию: ${batchCompleted} из ${batchEntries.length}`:`Изменено слайдов: ${batchChanged} из ${batchEntries.length}`}</strong><span>{batchChanged?(dirty?"Изменения в рабочей версии. Сохраните их в библиотеку.":"Изменения сохранены в библиотеке."):"Готовые изменения появятся здесь."}</span></div>
+              {busy==="batch" && <progress aria-label="Прогресс исправления" max={batchEntries.length} value={batchCompleted}/>}
+              <div className={styles.actions}>
+                <Button size="sm" variant="outline" disabled={!!busy||!batchChanged} onClick={()=>setBatchShowBefore(v=>!v)}>{batchShowBefore?"Показать после исправлений":"Показать до исправлений"}</Button>
+                <Button size="sm" variant="outline" disabled={!!busy||!batchChanged} onClick={undoBatch}>Отменить все исправления</Button>
+                {batchEntries.some(r=>["error","cancelled"].includes(r.status))&&<Button size="sm" variant="outline" disabled={!!busy} onClick={()=>void reviseDeck(true)}>Повторить незавершённые</Button>}
+              </div>
+              <div className={styles.batchResults}>{draft.slides.map((s,i)=>{const r=batchResults[s.id];return r?<details key={s.id}><summary>Слайд {i+1} · {{pending:"В очереди",working:"Проверяем и исправляем…",changed:`Изменений: ${r.changes.length}`,clean:"Без замечаний",manual:"Нужна ручная правка",error:"Ошибка",cancelled:"Не обработан"}[r.status]}</summary><Button size="sm" variant="ghost" onClick={()=>{setSelected(i);setTab("slide");}}>Показать слайд {i+1}</Button>{r.changes.length>0&&<RevisionChanges changes={r.changes}/>}<div>{r.notes.map((note,n)=><p key={n}>{note}</p>)}</div></details>:null;})}</div>
+            </section>}
             {progress && (
               <div className={styles.progressPanel}>
                 <div className={styles.progressTitle}>
@@ -590,11 +656,12 @@ export function PresentationDirector({
                     <label><input type="checkbox" checked={showFindings} onChange={e=>setShowFindings(e.target.checked)}/>Показать замечания на слайде</label>
                     <span>Номер на слайде = номер в списке</span>
                   </div>}
+                  {batchOriginal && batchResults[slide.id]?.status==="changed" && <strong className={styles.versionLabel}>{batchShowBefore?"До исправлений":"После исправлений — изменения применены"}</strong>}
                   <div className={`${styles.canvas} ${styles.directorPreview}`}>
-                    <AnnotatedSlide slide={showingProposal ? currentProposal!.slide : slide} findings={showFindings && !showingProposal ? slideFindings : []} active={activeFinding} onSelect={i=>selectFinding(i,true)}>
+                    <AnnotatedSlide slide={batchShowBefore && batchOriginal ? batchOriginal : showingProposal ? currentProposal!.slide : slide} findings={showFindings && !showingProposal && !batchShowBefore ? slideFindings : []} active={activeFinding} onSelect={i=>selectFinding(i,true)}>
                     {renderSlide(
                       draft,
-                      currentProposal && showAfter
+                      batchShowBefore && batchOriginal ? batchOriginal : currentProposal && showAfter
                         ? currentProposal.slide
                         : slide,
                     )}
@@ -684,7 +751,7 @@ export function PresentationDirector({
                       )
                     ) : report ? (
                       <>
-                        {showingProposal && currentProposal ? <div className={styles.proposalSummary}><strong>{currentProposal.direction.patches.length ? "Правки готовы к просмотру" : "Нужны изменения вручную"}</strong><p>{report.summary}</p>{report.findings.map((f,i)=><p key={i}>{f}</p>)}<Button size="sm" variant="outline" onClick={()=>setProposed(null)}>Вернуться к замечаниям</Button></div> : <>
+                        {showingProposal && currentProposal ? <div className={styles.proposalSummary}><strong>{currentProposal.direction.patches.length ? "Правки готовы к просмотру" : "Нужны изменения вручную"}</strong><p>{report.summary}</p><RevisionChanges changes={revisionChanges(slide,currentProposal.slide)}/>{report.findings.map((f,i)=><p key={i}>{f}</p>)}<Button size="sm" variant="outline" onClick={()=>setProposed(null)}>Вернуться к замечаниям</Button></div> : <>
                           <p className={styles.reviewSummary}>{report.summary}</p>
                           <div className={styles.findingLegend}><span>Исправить: {slideFindings.filter(f=>f.priority==="required").length}</span><span>По желанию: {slideFindings.filter(f=>f.priority==="suggestion").length}</span></div>
                           {!slideFindings.length && <p>Замечаний к этому слайду нет.</p>}
@@ -701,6 +768,8 @@ export function PresentationDirector({
                           </ol>
                         </>}
                       </>
+                    ) : batchResults[slide.id]?.status==="changed" ? (
+                      <><strong>Изменения применены к слайду</strong><RevisionChanges changes={batchResults[slide.id].changes}/>{batchResults[slide.id].notes.map((note,i)=><p key={i}>{note}</p>)}<p>Повторная проверка покажет оставшиеся замечания.</p></>
                     ) : (
                       <p>
                         {failures[slide.id] ||

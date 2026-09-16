@@ -9,7 +9,7 @@ export function applySlideDirection(slide: PresentationSlide, direction: SlideDi
     const key = `${patch.target}:${patch.field}`;
     if (touched.has(key)) throw new Error("Правки одного поля повторяются."); touched.add(key);
     if (patch.target === "slide") {
-      if (["backgroundColor", "textColor", "accentColor"].includes(patch.field)) { if (!/^#[\da-f]{6}$/i.test(patch.value)) throw new Error("Некорректный цвет."); Object.assign(result, { [patch.field]: patch.value }); }
+      if (["backgroundColor", "textColor", "accentColor"].includes(patch.field)) { if (result.canvas && patch.field !== "backgroundColor") throw new Error("Укажите цвет конкретного элемента: общий цвет не меняет импортированный слайд."); if (!/^#[\da-f]{6}$/i.test(patch.value)) throw new Error("Некорректный цвет."); Object.assign(result, { [patch.field]: patch.value }); }
       else if (!result.canvas && ["title", "body", "eyebrow"].includes(patch.field)) Object.assign(result, { [patch.field]: patch.value });
       else if (!result.canvas && patch.field === "bullets") { const bullets = JSON.parse(patch.value); if (!Array.isArray(bullets) || bullets.length > 8 || bullets.some(v => typeof v !== "string" || v.length > 240)) throw new Error("Некорректный список."); result.bullets = bullets; }
       else throw new Error("Недопустимая правка слайда.");
@@ -18,6 +18,8 @@ export function applySlideDirection(slide: PresentationSlide, direction: SlideDi
       if (element?.locked) throw new Error("Элемент заблокирован. Сначала снимите блокировку.");
       if (!element) throw new Error("Элемент для правки не найден.");
       if (patch.field === "text" && element.kind === "text") element.text = patch.value;
+      else if (["bold", "italic"].includes(patch.field) && element.kind === "text" && ["true", "false"].includes(patch.value)) Object.assign(element, { [patch.field]: patch.value === "true" });
+      else if (patch.field === "align" && element.kind === "text" && ["left", "center", "right"].includes(patch.value)) element.align = patch.value as "left" | "center" | "right";
       else if (["x", "y", "width", "height"].includes(patch.field) || (patch.field === "fontSize" && element.kind === "text")) { const n = Number(patch.value); if (!patch.value.trim() || !Number.isFinite(n) || n < (["x", "y"].includes(patch.field) ? -10000 : 1) || n > 10000) throw new Error("Некорректный размер элемента."); Object.assign(element, { [patch.field]: n }); }
       else if (((patch.field === "color" && element.kind === "text") || (patch.field === "fill" && element.kind !== "image")) && /^#[\da-f]{6}$/i.test(patch.value)) Object.assign(element, { [patch.field]: patch.value });
       else throw new Error("Недопустимая правка элемента.");
@@ -49,7 +51,7 @@ export function applySlideDirection(slide: PresentationSlide, direction: SlideDi
 export function normalizeDirectionPatches(value: unknown): SlideDirection["patches"] {
   if (!Array.isArray(value) || value.length > 40) throw new Error("Некорректные правки.");
   const numeric = new Set(["x", "y", "width", "height", "fontSize"]);
-  const allowed = new Set([...numeric, "text", "color", "fill", "backgroundColor", "textColor", "accentColor", "title", "body", "eyebrow", "bullets"]);
+  const allowed = new Set([...numeric, "text", "color", "fill", "backgroundColor", "textColor", "accentColor", "title", "body", "eyebrow", "bullets", "bold", "italic", "align"]);
   const patches: SlideDirection["patches"] = [];
   for (const item of value) {
     if (!item || typeof item !== "object" || Array.isArray(item) || typeof item.target !== "string") throw new Error("Некорректная цель правки.");
@@ -59,7 +61,7 @@ export function normalizeDirectionPatches(value: unknown): SlideDirection["patch
     if (!pairs.length) throw new Error("Пустая правка.");
     for (const [field, raw] of pairs) {
       if (typeof field !== "string" || !allowed.has(field)) throw new Error("Недопустимое поле правки.");
-      const value = numeric.has(field) && typeof raw === "number" && Number.isFinite(raw) ? String(raw) : raw;
+      const value = (numeric.has(field) && typeof raw === "number" && Number.isFinite(raw)) || (["bold", "italic"].includes(field) && typeof raw === "boolean") ? String(raw) : raw;
       if (typeof value !== "string") throw new Error("Некорректное значение правки.");
       patches.push({ target: item.target, field, value });
     }

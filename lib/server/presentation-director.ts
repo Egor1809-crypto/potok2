@@ -1,3 +1,4 @@
+import { finalizeRevision, mechanicalCorrections } from "@/lib/presentation-import/revision";
 import { parseSlideFindings, findingText } from "@/lib/presentation-import/review-findings";
 import { reviewWithFallback } from "./presentation-review-attempts";
 import { getWorkspaceId } from "./workspace-context";
@@ -50,6 +51,8 @@ export async function directPresentation(request: Request, value: unknown) {
     findings: Array.isArray(previous.findings) && previous.findings.length <= 8
       ? previous.findings.map(f => cleanText(f, "Замечание", 2000)) : [],
   } : undefined;
+  const previousIssues = slide && previousReview?.findings.length
+    ? parseSlideFindings(Array.isArray(previous?.issues) && previous.issues.length === previousReview.findings.length ? previous.issues : previousReview.findings, slide) : [];
   const useReview = body.action === "revise" && body.useReview === true && Boolean(previousReview?.findings.length);
   const screenshot = summaryAction || useReview
     ? ""
@@ -137,6 +140,15 @@ export async function directPresentation(request: Request, value: unknown) {
   const rawTheme = context.theme ? asObject(context.theme) : {};
   const theme = Object.fromEntries(["themeId", "backgroundColor", "textColor", "accentColor"].flatMap(key =>
     typeof rawTheme[key] === "string" ? [[key, cleanText(rawTheme[key], "Стиль презентации", 60)]] : []));
+  const mechanical = useReview ? mechanicalCorrections(slide!,previousIssues,String(theme.backgroundColor || "#ffffff")) : {patches:[],remaining:[]};
+  const seededDirection = {summary:"",findings:[],patches:mechanical.patches};
+  const workingSlide = mechanical.patches.length ? applySlideDirection(slide!,seededDirection) : slide;
+  const revisionReview = previousReview ? {...previousReview,issues:previousIssues} : undefined;
+  if (revisionReview && mechanical.patches.length) {
+    revisionReview.findings = mechanical.remaining.map(i=>previousReview!.findings[i]);
+    revisionReview.issues = mechanical.remaining.map(i=>previousIssues[i]);
+    if (!mechanical.remaining.length) return finalizeRevision(slide!,seededDirection,true);
+  }
   const findingSchema = {type:"object",additionalProperties:false,required:["priority","title","problem","suggestion","elementIds","region"],properties:{
     priority:{type:"string",enum:["required","suggestion"]},title:string,problem:string,suggestion:string,
     elementIds:{type:"array",items:string},region:{anyOf:[{type:"null"},{type:"object",additionalProperties:false,required:["x","y","width","height"],properties:{x:{type:"number"},y:{type:"number"},width:{type:"number"},height:{type:"number"}}}]},
@@ -147,9 +159,9 @@ export async function directPresentation(request: Request, value: unknown) {
 summary: одно короткое предложение с главным выводом. findings: до 5 конкретных замечаний, сначала обязательные. Каждое — объект: priority="required" (мешает чтению или смыслу) или "suggestion" (по желанию); title — суть в 2–5 словах; problem — одно короткое предложение с местом/цитатой; suggestion — одно конкретное действие. Не добавляй «проверьте, что…», если не видишь проблемы; не записывай достоинства в замечания. Сохранение авторского стиля важнее вкусовых переделок.
 Для отметок на слайде elementIds содержит точные id затронутых элементов slide.canvas. Не придумывай id. Если элемент недоступен (PDF/обычный слайд), region={x,y,width,height} — прямоугольник проблемы в процентах изображения 0–100. При известных elementIds region=null. Для замечаний ко всему слайду (повтор содержания, логика) elementIds=[],region=null. Номера на слайде и в списке будут назначены автоматически по порядку findings. Не указывай проблемную область наугад. Верни JSON по заданной схеме. Не придумывай проблему, если слайд уже хорош.`;
   const reviseInstructions = `Предложи до 40 минимальных patches, устраняющих userCommand и применимые замечания previousReview. Не повторяй разбор с нуля. В summary объясни, что именно исправлено, а findings оставь для ограничений и требующих автора вопросов. Сохрани смысл, имена, числа, даты, ссылки, стиль и все незатронутые объекты. Перед ответом проверь совокупный результат, а не отдельные поля: текст должен помещаться, объекты не должны выходить за холст, изображения не должны растягиваться.
-target='slide': backgroundColor,textColor,accentColor (#RRGGBB); для слайда без canvas также title (до 300 символов),body (до 1500),eyebrow (до 120),bullets (value=JSON массива до 8 строк по 240 символов). Не обещай изменение размера шрифта или расположения у слайда без canvas: таких полей нет.
-Для canvas target=точный id существующего элемента: текстовым элементам text,fontSize,color; всем элементам x,y,width,height; тексту и фигурам fill (#RRGGBB). Числа передаются строками в координатах canvas. Не меняй locked=true. Не меняй id, ссылки, изображения, порядок объектов; не добавляй элементы. Меняя размер изображения, меняй width и height пропорционально. Сохраняй существующую обрезку и учитывай поворот. Увеличивая шрифт, проверь размеры текстового блока.
-PDF — цельное изображение: текст и рисунки внутри него нельзя менять патчами. Если задача требует этого, объясни ограничение и оставь patches=[]. Каждый patch содержит РОВНО три поля: {"target":"id элемента","field":"fontSize","value":"32"}. Для изменения цвета нужен отдельный patch с field="color". Не объединяй несколько полей элемента в одном patch. Неизменённые значения не присылай. Не заявляй, что исправил то, для чего нет patches.`;
+target='slide': backgroundColor (#RRGGBB); textColor и accentColor допустимы ТОЛЬКО без canvas. У импортированного слайда меняй color точного текстового элемента — общий textColor не отображается; для слайда без canvas также title (до 300 символов),body (до 1500),eyebrow (до 120),bullets (value=JSON массива до 8 строк по 240 символов). Не обещай изменение размера шрифта или расположения у слайда без canvas: таких полей нет.
+Для canvas target=точный id существующего элемента: текстовым элементам text,fontSize,color,bold,italic,align; bold/italic — строки "true"/"false", align — "left"/"center"/"right"; всем элементам x,y,width,height; тексту и фигурам fill (#RRGGBB). Числа передаются строками в координатах canvas. Не меняй locked=true. Не меняй id, ссылки, изображения, порядок объектов; не добавляй элементы. Меняя размер изображения, меняй width и height пропорционально. Сохраняй существующую обрезку и учитывай поворот. Увеличивая шрифт, проверь размеры текстового блока.
+PDF — цельное изображение: текст и рисунки внутри него нельзя менять патчами. Если задача требует этого, объясни ограничение и оставь patches=[]. Каждый patch содержит РОВНО три поля: {"target":"id элемента","field":"fontSize","value":"32"}. Для изменения цвета нужен отдельный patch с field="color". Не объединяй несколько полей элемента в одном patch. Обязательно используй elementIds из previousReview.issues для соответствующего замечания. Все применимые замечания должны получить реальные patches. Для каждого неприменимого замечания отдельно объясни в findings причину: заблокирован объект, PDF, нужны данные автора или операция не поддерживается. Неизменённые значения не присылай. Не заявляй, что исправил то, для чего нет patches.`;
   const deckSchema = {
     type: "object",
     additionalProperties: false,
@@ -187,9 +199,9 @@ PDF — цельное изображение: текст и рисунки вн
       : {
           action: body.action,
           userCommand: command,
-          slide: slide ? {...slide, speakerNotes: undefined, imageUrl: undefined, assetId: undefined,
-            canvas: slide.canvas ? {...slide.canvas,elements:slide.canvas.elements.map(({imageUrl, ...element}) => ({...element,...(imageUrl ? {hasImage:true} : {})}))} : undefined} : null,
-          previousReview,
+          slide: workingSlide ? {...workingSlide, speakerNotes: undefined, imageUrl: undefined, assetId: undefined,
+            canvas: workingSlide.canvas ? {...workingSlide.canvas,elements:workingSlide.canvas.elements.map(({imageUrl, ...element}) => ({...element,...(imageUrl ? {hasImage:true} : {})}))} : undefined} : null,
+          previousReview: revisionReview,
           context: {
             number: Number(context.number) || 1,
             total: outline.length || 1,
@@ -327,8 +339,9 @@ PDF — цельное изображение: текст и рисунки вн
         patches: body.action === "review" ? [] : normalizeDirectionPatches(d.patches),
       } as SlideDirection;
       if (body.action === "review") return { direction };
-      const proposed = parseSlide(applySlideDirection(slide!, direction), 0);
-      return { direction, proposed };
+      direction.patches = [...new Map([...mechanical.patches,...direction.patches].map(p=>[`${p.target}:${p.field}`,p])).values()];
+      const result = finalizeRevision(slide!, direction, useReview);
+      return {...result, proposed:parseSlide(result.proposed,0)};
     } catch {
       throw new ApiRequestError(
         body.action === "review" ? "ИИ вернул неполный разбор. Повторите проверку этого слайда." : "Правки не прошли проверку размеров или структуры. Слайд не изменён; уточните команду и повторите.",
@@ -344,7 +357,11 @@ PDF — цельное изображение: текст и рисунки вн
     return reviewWithFallback({ signal: request.signal, models: [model, fallback], run: callModel });
   }
   if (body.action === "revise") {
-    return reviewWithFallback({signal:request.signal,models:[model,provider.provider === "navyai" ? provider.fallbackModel || model : model],timeouts:[30000,30000],timeoutMessage:"Подготовка правок заняла слишком много времени. Попробуйте исправить одно замечание из списка.",run:callModel});
+    try { return await reviewWithFallback({signal:request.signal,models:[model,provider.provider === "navyai" ? provider.fallbackModel || model : model],timeouts:[30000,30000],timeoutMessage:"Подготовка правок заняла слишком много времени. Попробуйте исправить одно замечание из списка.",run:callModel}); }
+    catch(error) {
+      if (!request.signal.aborted && mechanical.patches.length) return finalizeRevision(slide!,{...seededDirection,findings:["Применена только проверенная коррекция контраста. Остальные замечания требуют повторной попытки.",...(revisionReview?.findings || [])]},true);
+      throw error;
+    }
   }
   const signal = AbortSignal.any([request.signal, AbortSignal.timeout(summaryAction ? 60000 : 90000)]);
   try { return await callModel(model, signal); }

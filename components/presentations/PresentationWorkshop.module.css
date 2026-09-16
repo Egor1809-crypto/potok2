@@ -581,3 +581,16 @@
 .findingCard>button:last-child {justify-self:start}
 .proposalSummary {display:grid;gap:8px}
 @media (pointer:coarse) {.annotationPin{width:40px;height:40px}}
+.batchPanel {display:grid;gap:12px;padding:16px;border:1px solid var(--border);border-radius:14px;background:var(--surface-subtle)}
+.batchPanel .progressTitle {flex-wrap:wrap;gap:8px}
+.batchPanel progress {width:100%;accent-color:var(--primary)}
+.batchResults {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:8px;max-height:300px;overflow:auto}
+.batchResults details {padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);min-width:0}
+.batchResults summary {cursor:pointer;font-size:13px;font-weight:600;min-height:26px}
+.batchResults p {font-size:12px;line-height:1.5}
+.changeList {list-style:none;padding:0!important;margin:0;display:grid;gap:10px;min-width:0}
+.changeList li {display:grid;gap:3px;font-size:12px;line-height:1.4;overflow-wrap:anywhere;border-bottom:1px solid var(--border);padding-bottom:8px}
+.changeTarget {color:var(--text-muted)}
+.changeList [aria-label="Было"] {color:var(--text-muted)}
+.changeList [aria-label="Стало"] {font-weight:600}
+.versionLabel {font-size:12px;color:var(--primary)}
