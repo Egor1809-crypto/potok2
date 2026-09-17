@@ -1847,7 +1847,17 @@ export async function updateContactsBatch(
     : nullableText(object.responsibleParticipantId, "Ответственный", 120);
   const addTags = object.addTags === undefined ? [] : optionalStringArray(object.addTags, "Теги") ?? [];
   const markContacted = object.markContacted === true;
-  if (responsibleParticipantId === undefined && !addTags.length && !markContacted) throw new ApiRequestError("Нет изменений для контактов.");
+  const grantMarketingConsent = object.grantMarketingConsent === true;
+  const marketingConsentSource = grantMarketingConsent
+    ? cleanText(object.marketingConsentSource, "Источник рекламного согласия", 300)
+    : "";
+  const marketingConsentAt = grantMarketingConsent
+    ? parseIsoDate(cleanText(object.marketingConsentAt, "Дата рекламного согласия", 60), "Дата рекламного согласия") ?? ""
+    : "";
+  const marketingConsentText = grantMarketingConsent
+    ? cleanText(object.marketingConsentText, "Формулировка рекламного согласия", 2_000)
+    : "";
+  if (responsibleParticipantId === undefined && !addTags.length && !markContacted && !grantMarketingConsent) throw new ApiRequestError("Нет изменений для контактов.");
   if (responsibleParticipantId) {
     const [member] = await getDb().select({ id: participants.id }).from(participants).where(and(
       eq(participants.workspaceId, getWorkspaceId()), eq(participants.id, responsibleParticipantId), eq(participants.status, "active"),
@@ -1871,7 +1881,7 @@ export async function updateContactsBatch(
     const rows = await getDb().select().from(contacts).where(and(
       eq(contacts.workspaceId, getWorkspaceId()), inArray(contacts.id, idChunk),
     ));
-    if (!addTags.length) {
+    if (!addTags.length && !grantMarketingConsent) {
       const updatedRows = await getDb().update(contacts).set({
         ...(responsibleParticipantId !== undefined ? { responsibleParticipantId } : {}),
         ...(markContacted ? { lastContactedAt: now } : {}),
@@ -1884,7 +1894,16 @@ export async function updateContactsBatch(
     }
     for (const row of rows) {
       const [updated] = await getDb().update(contacts).set({
-        tags: Array.from(new Set([...row.tags, ...addTags])),
+        ...(addTags.length ? { tags: Array.from(new Set([...row.tags, ...addTags])) } : {}),
+        ...(grantMarketingConsent ? {
+          emailConsent: Boolean(row.email),
+          customFields: {
+            ...row.customFields,
+            marketingConsentSource,
+            marketingConsentAt,
+            marketingConsentText,
+          },
+        } : {}),
         ...(responsibleParticipantId !== undefined ? { responsibleParticipantId } : {}),
         ...(markContacted ? { lastContactedAt: now } : {}),
         updatedByParticipantId: actor.participant.id,

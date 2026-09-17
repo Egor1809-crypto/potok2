@@ -469,6 +469,35 @@ export function ContactsView() {
     }
   };
 
+  const grantMarketingConsentToBase = async () => {
+    if (sheet === "all") return;
+    const baseName = sheet.replace(/^Импорт: /, "");
+    if (!await confirmAction(`Разрешить рекламную email-отправку всем контактам базы «${baseName}»?`)) return;
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/contacts", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          selection: { sheet },
+          grantMarketingConsent: true,
+          marketingConsentSource: `Подтверждение владельца базы «${baseName}»`,
+          marketingConsentAt: new Date().toISOString(),
+          marketingConsentText: "Согласие на получение рекламных email-рассылок подтверждено владельцем базы.",
+        }),
+      });
+      const payload = await response.json() as { updatedCount?: number } | ApiError;
+      if (!response.ok || !("updatedCount" in payload)) throw new Error(messageFrom(payload, "Не удалось разрешить отправку базе"));
+      await load(true);
+      notify(`Рекламная отправка разрешена: ${payload.updatedCount ?? 0}`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Не удалось разрешить отправку базе");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const markContacted = async (contact: ContactRecord) => {
     setBusy(true);
     try {
@@ -691,6 +720,7 @@ export function ContactsView() {
             <Select aria-label="Ответственный базы" value={responsibleId} onChange={(event) => setResponsibleId(event.target.value)} className="input min-w-52"><option value="">Выберите ответственного</option>{members.map((member) => <option key={member.id} value={member.id}>{member.displayName}</option>)}</Select>
             <button type="button" onClick={() => void assignResponsibleToBase(false)} disabled={busy || !responsibleId} className="btn btn-primary">Назначить базе</button>
             <button type="button" onClick={() => void assignResponsibleToBase(true)} disabled={busy} className="btn btn-secondary">Снять с базы</button>
+            {sheet !== "all" && <button type="button" onClick={() => void grantMarketingConsentToBase()} disabled={busy} className="btn btn-primary">Разрешить рекламную отправку базе</button>}
           </div>
         </div>
       </section>
