@@ -1875,6 +1875,48 @@ export async function updateContactsBatch(
   }
   if (responsibleParticipantId !== undefined) await ensureContactAssignmentEditable(ids);
   const now = new Date().toISOString();
+  const [workspace] = grantMarketingConsent
+    ? await getDb().select({ name: workspaces.name, companyName: workspaces.companyName }).from(workspaces)
+      .where(eq(workspaces.id, getWorkspaceId())).limit(1)
+    : [];
+  const consentOperator = workspace?.companyName || workspace?.name || "";
+  if (grantMarketingConsent && !consentOperator) {
+    throw new ApiRequestError("Укажите название оператора в настройках пространства.");
+  }
+  const addCommunicationEvidence = async (rows: ContactRow[]) => {
+    if (!grantMarketingConsent) return;
+    const statements = [];
+    for (const row of rows) {
+      const endpoint = row.email.trim().toLowerCase();
+      if (!endpoint || row.status === "unsubscribed") continue;
+      for (const purpose of ["marketing", "data_processing"] as const) {
+        const statement = purpose === "marketing"
+          ? marketingConsentText
+          : "Основание обработки персональных данных подтверждено владельцем базы.";
+        const evidence = {
+          endpoint,
+          channel: "email",
+          purpose,
+          source: marketingConsentSource,
+          version: "Подтверждение владельца базы / 1",
+          statement,
+          operator: consentOperator,
+          obtainedAt: marketingConsentAt,
+          expiresAt: null,
+        };
+        const digestBytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(evidence)));
+        const digest = Array.from(new Uint8Array(digestBytes), byte => byte.toString(16).padStart(2, "0")).join("");
+        statements.push(getD1().prepare(`INSERT INTO communication_consents
+          (id,workspace_id,contact_id,endpoint,channel,purpose,kind,source,obtained_at,expires_at,version,statement,operator,digest,actor_id,created_at)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(
+            newId("consent"), getWorkspaceId(), row.id, endpoint, "email", purpose, "grant",
+            marketingConsentSource, marketingConsentAt, null, evidence.version, statement,
+            consentOperator, digest, actor.participant.id, now,
+          ));
+      }
+    }
+    for (const statementChunk of chunksOf(statements, 80)) await getD1().batch(statementChunk);
+  };
   const affected: ContactRow[] = [];
   let bulkUpdatedCount = 0;
   for (const idChunk of chunksOf(ids, 80)) {
@@ -1900,6 +1942,7 @@ export async function updateContactsBatch(
           JSON.stringify(idChunk),
         ).run();
       bulkUpdatedCount += result.meta.changes;
+      await addCommunicationEvidence(rows);
       if (!bulkSelection) {
         const updatedRows = await getDb().select().from(contacts).where(and(
           eq(contacts.workspaceId, getWorkspaceId()), inArray(contacts.id, idChunk),
@@ -1941,6 +1984,7 @@ export async function updateContactsBatch(
         if (!bulkSelection) affected.push(updated);
       }
     }
+    await addCommunicationEvidence(rows);
   }
   return { contacts: affected.map(toContact), updatedCount: bulkSelection ? bulkUpdatedCount : affected.length };
 }
