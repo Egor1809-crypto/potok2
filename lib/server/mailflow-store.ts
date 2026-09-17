@@ -1881,6 +1881,33 @@ export async function updateContactsBatch(
     const rows = await getDb().select().from(contacts).where(and(
       eq(contacts.workspaceId, getWorkspaceId()), inArray(contacts.id, idChunk),
     ));
+    if (grantMarketingConsent && !addTags.length) {
+      const result = await getD1().prepare(`UPDATE contacts
+        SET email_consent=CASE WHEN email<>'' THEN 1 ELSE 0 END,
+            custom_fields=json_set(coalesce(custom_fields, '{}'),
+              '$.marketingConsentSource', ?,
+              '$.marketingConsentAt', ?,
+              '$.marketingConsentText', ?),
+            updated_by_participant_id=?, updated_at=?
+        WHERE workspace_id=? AND id IN (SELECT value FROM json_each(?))`)
+        .bind(
+          marketingConsentSource,
+          marketingConsentAt,
+          marketingConsentText,
+          actor.participant.id,
+          now,
+          getWorkspaceId(),
+          JSON.stringify(idChunk),
+        ).run();
+      bulkUpdatedCount += result.meta.changes;
+      if (!bulkSelection) {
+        const updatedRows = await getDb().select().from(contacts).where(and(
+          eq(contacts.workspaceId, getWorkspaceId()), inArray(contacts.id, idChunk),
+        ));
+        affected.push(...updatedRows);
+      }
+      continue;
+    }
     if (!addTags.length && !grantMarketingConsent) {
       const updatedRows = await getDb().update(contacts).set({
         ...(responsibleParticipantId !== undefined ? { responsibleParticipantId } : {}),
