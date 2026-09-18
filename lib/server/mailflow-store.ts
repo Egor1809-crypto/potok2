@@ -4,7 +4,7 @@ import { hasAllContactAccess, isTeamAdmin, normalizeContactAccess } from "@/lib/
 import { accessParticipant, campaignAccessSql, contactAccessSql, rawContactAccess, requireAudienceAccess, requireCampaignAccess, requireContactAccess, requireTeamAdmin } from "./team-access";
 import { calendarReport } from "./calendar-report";
 import { assessCommunications, enforceCommunications, recordCommunicationTouches } from "./communication-store";
-import { and, asc, desc, eq, inArray, isNotNull, lte, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, lte, or, sql, type SQL } from "drizzle-orm";
 import { getD1, getDb } from "@/db";
 import { disconnectTelegramConnection, resolveTelegramToken, telegramRecipientAllowed, telegramSubscribedChatIds } from "./telegram-connection";
 import {
@@ -19,6 +19,8 @@ import {
   integrations,
   participants,
   segments,
+  vkWorkspaceAccountState,
+  vkWorkspaceDeliveryAttempts,
   workspaces,
 } from "@/db/schema";
 import {
@@ -63,6 +65,7 @@ import type {
   WorkspaceRecord,
   WorkspaceSnapshot,
   UniSenderLifetimeStatsResponse,
+  VkWorkspaceQueueSummary,
 } from "@/types/api";
 import {
   ApiRequestError,
@@ -82,6 +85,7 @@ import {
   assertProviderSupportsChannel,
   isIntegrationReadyForChannel,
   hasRuntimeCredentials,
+  runtimeSecret,
   toIntegrationRecord,
 } from "./runtime-integrations";
 import { checkProviderConnection, automaticProviderSecrets } from "./provider-checks";
@@ -111,6 +115,16 @@ import {ensureDatabase,
   ensureSystemDatabase, } from "./database-init";
 import { sendVkWorkspaceSmtpBatch } from "./vk-workspace-smtp";
 import {
+  classifyVkWorkspaceSmtpError,
+  estimateVkWorkspaceDays,
+  nextVkWorkspaceWindow,
+  resolveVkWorkspaceQueueConfig,
+  retryAtAfterFailure,
+  withinVkWorkspaceWindow,
+  zonedDateParts,
+  type VkWorkspaceAccount,
+} from "./vk-workspace-queue";
+import {
   assertEmailTemplateReference,
   toEmailTemplateRecord,
 } from "./template-store";
@@ -129,6 +143,7 @@ type CampaignEventRow = typeof campaignEvents.$inferSelect;
 type CampaignVersionRow = typeof campaignVersions.$inferSelect;
 type DeliveryJobRow = typeof deliveryJobs.$inferSelect;
 type DeliveryOutboxRow = typeof deliveryOutbox.$inferSelect;
+type VkWorkspaceAccountStateRow = typeof vkWorkspaceAccountState.$inferSelect;
 
 const WORKSPACE_HISTORY_LIMIT = 100;
 
@@ -325,6 +340,12 @@ function toDeliveryOutbox(row: DeliveryOutboxRow): DeliveryOutboxRecord {
     idempotencyKey: row.idempotencyKey,
     status: row.status,
     attempts: row.attempts,
+    accountId: row.accountId,
+    nextAttemptAt: row.nextAttemptAt,
+    lastAttemptAt: row.lastAttemptAt,
+    acceptedAt: row.acceptedAt,
+    lastError: row.lastError,
+    priority: row.priority,
     externalId: row.externalId,
     statusMessage: row.statusMessage,
     createdAt: row.createdAt,
@@ -608,7 +629,7 @@ export async function getWorkspaceSnapshot(
       totalSegments: rows.segmentRows.length,
       totalCampaigns: campaignRecords.length,
       activeCampaigns: campaignRecords.filter((campaign) =>
-        ["ready", "scheduled", "sending"].includes(campaign.status),
+        ["ready", "scheduled", "sending", "paused", "stopping"].includes(campaign.status),
       ).length,
       connectedIntegrations: integrationRecords.filter(
         (integration) => integration.status === "connected",
@@ -696,7 +717,10 @@ export async function getWorkspaceBootstrap(request: Request) {
       db.select().from(deliveryJobs).where(and(eq(deliveryJobs.workspaceId, getWorkspaceId()), eq(deliveryJobs.campaignId, sourceId))).orderBy(desc(deliveryJobs.createdAt)).limit(WORKSPACE_HISTORY_LIMIT),
       db.select().from(campaignEvents).where(and(eq(campaignEvents.workspaceId, getWorkspaceId()), eq(campaignEvents.campaignId, sourceId))).orderBy(desc(campaignEvents.occurredAt)).limit(WORKSPACE_HISTORY_LIMIT),
     ]);
-    return { ...base, campaigns: campaignRows.map(toCampaign), deliveryPlans: planRows.map(toDeliveryPlan), deliveryJobs: jobRows.map(toDeliveryJob), events: eventRows.map(toCampaignEvent) };
+    const vkWorkspaceQueue = planRows.some((plan) => plan.providerId === "vk-workspace")
+      ? await getVkWorkspaceQueueSummary(sourceId)
+      : undefined;
+    return { ...base, campaigns: campaignRows.map(toCampaign), deliveryPlans: planRows.map(toDeliveryPlan), deliveryJobs: jobRows.map(toDeliveryJob), events: eventRows.map(toCampaignEvent), ...(vkWorkspaceQueue ? { vkWorkspaceQueue } : {}) };
   }
   if (scope === "calendar") {
     // Reconcile a bounded batch before reading the calendar. Provider delivery
@@ -746,14 +770,14 @@ export async function getWorkspaceBootstrap(request: Request) {
       db.select({ total: sql<number>`count(*)`, active: sql<number>`coalesce(sum(case when ${contacts.status} = 'active' then 1 else 0 end), 0)` }).from(contacts).where(and(eq(contacts.workspaceId, getWorkspaceId()), contactAccessSql(actor.participant))),
       db.select({
         total: sql<number>`count(*)`,
-        active: sql<number>`coalesce(sum(case when ${campaigns.status} in ('ready', 'scheduled', 'sending') then 1 else 0 end), 0)`,
+        active: sql<number>`coalesce(sum(case when ${campaigns.status} in ('ready', 'scheduled', 'sending', 'paused', 'stopping') then 1 else 0 end), 0)`,
       }).from(campaigns).where(and(eq(campaigns.workspaceId, getWorkspaceId()), campaignAccessSql(actor.participant))),
       db.select({ total: sql<number>`count(*)` }).from(emailTemplates).where(eq(emailTemplates.workspaceId, getWorkspaceId())),
       db.select().from(participants).where(and(eq(participants.workspaceId, getWorkspaceId()), eq(participants.status, "active"))).orderBy(participants.createdAt),
       // Calendar markers cover all active plans, independently of the 250-item activity list.
       scope === "dashboard" ? db.select({ status: campaigns.status, scheduledAt: campaigns.scheduledAt }).from(campaigns)
         .where(and(eq(campaigns.workspaceId, getWorkspaceId()), campaignAccessSql(actor.participant),
-          inArray(campaigns.status, ["scheduled", "sending"]), isNotNull(campaigns.scheduledAt))) : Promise.resolve([]),
+          inArray(campaigns.status, ["scheduled", "sending", "paused", "stopping"]), isNotNull(campaigns.scheduledAt))) : Promise.resolve([]),
       scope === "dashboard" ? getD1().prepare(`SELECT
         (SELECT count(*) FROM presentation_projects WHERE workspace_id = ?) AS presentations,
         (SELECT count(*) FROM email_assets WHERE workspace_id = ? AND kind = 'photo') AS images
@@ -2003,7 +2027,7 @@ export async function deleteContact(
     .from(campaigns)
     .where(eq(campaigns.workspaceId, getWorkspaceId())))
     .filter((campaign) => campaign.contactIds.includes(id));
-  if (affectedCampaigns.some((campaign) => campaign.status === "sending")) {
+  if (affectedCampaigns.some((campaign) => ["sending", "paused", "stopping"].includes(campaign.status))) {
     throw new ApiRequestError(
       "Контакт участвует в отправляемой кампании. Дождитесь её завершения перед удалением.",
       409,
@@ -2540,7 +2564,7 @@ function providerId(value: unknown): IntegrationProviderId {
 const SENSITIVE_KEY = /(token|secret|password|api.?key|credential|access.?key)/i;
 
 const PUBLIC_CONFIG_FIELDS: Record<IntegrationProviderId, string[]> = {
-  "vk-workspace": ["senderEmail"],
+  "vk-workspace": ["senderEmail", "senderEmail2", "accountDailyLimit", "accountHourlyLimit", "totalDailyLimit", "workdayStartHour", "workdayEndHour", "timeZone", "batchSize", "seriousErrorThreshold"],
   "telegram-bot-api": ["botUsername", "botSlot"],
   "vk-api": ["communityId"],
   unisender: ["senderEmail", "marketingSenderEmail", "transactionalSenderEmail", "listId"],
@@ -3450,9 +3474,12 @@ async function evaluateLaunch(
           ? provider?.publicConfig.transactionalSenderEmail || provider?.publicConfig.senderEmail
           : provider?.publicConfig.marketingSenderEmail || provider?.publicConfig.senderEmail
         : provider?.publicConfig.senderEmail;
+      const configuredSenders = plan.providerId === "vk-workspace"
+        ? [provider?.publicConfig.senderEmail, provider?.publicConfig.senderEmail2].filter(Boolean).map((value) => value!.toLocaleLowerCase("en"))
+        : configuredSender ? [configuredSender.toLocaleLowerCase("en")] : [];
       if (
         (plan.providerId === "unisender" || plan.providerId === "vk-workspace") &&
-        configuredSender?.toLocaleLowerCase("en") !== campaign.senderEmail.toLocaleLowerCase("en")
+        !configuredSenders.includes(campaign.senderEmail.toLocaleLowerCase("en"))
       ) {
         channelBlockers.push(
           `Email отправителя должен совпадать с ${campaign.purpose === "transactional" ? "сервисным" : "рекламным"} адресом, настроенным для ${provider?.name ?? "провайдера"}.`,
@@ -3529,6 +3556,9 @@ async function evaluateLaunch(
     },
   );
   const updated = await campaignBundle(campaignId);
+  const vkWorkspaceQueue = campaign.purpose === "marketing" && plans.some((plan) => plan.channel === "email" && plan.providerId === "vk-workspace")
+    ? await getVkWorkspaceQueueSummary(campaignId, eligibleByChannel.email ?? 0)
+    : undefined;
   // Keep scheduled recipients in Potok until due time so consent withdrawals
   // and incoming replies can still stop their next automatic message.
   const canScheduleAtProvider = false;
@@ -3548,6 +3578,7 @@ async function evaluateLaunch(
         status: armed.campaign.status === "blocked" ? "blocked" : status,
         eligibleByChannel,
         blockers: providerBlockers,
+        ...(vkWorkspaceQueue ? { vkWorkspaceQueue } : {}),
       },
       event: armed.event ?? event,
       campaign: armed.campaign,
@@ -3555,7 +3586,7 @@ async function evaluateLaunch(
     };
   }
   return {
-    evaluation: { status, eligibleByChannel, blockers },
+    evaluation: { status, eligibleByChannel, blockers, ...(vkWorkspaceQueue ? { vkWorkspaceQueue } : {}) },
     event,
     campaign: updated.campaign,
     deliveryPlans: updated.plans,
@@ -3617,6 +3648,8 @@ async function updateOutboxResult(
       status: result.status,
       externalId: result.externalId ?? null,
       statusMessage: result.message,
+      acceptedAt: result.status === "accepted" ? new Date().toISOString() : null,
+      lastError: result.status === "accepted" ? "" : result.message,
       updatedAt: new Date().toISOString(),
     })
     .where(eq(deliveryOutbox.id, row.id));
@@ -3926,6 +3959,352 @@ async function processVkWorkspaceSmtpOutbox(
   return { mailbox: senderEmail, accepted: String(results.filter((item) => item.status === "accepted").length) };
 }
 
+function normalizedVkAccountState(
+  row: VkWorkspaceAccountStateRow | undefined,
+  account: VkWorkspaceAccount,
+  now: Date,
+  timeZone: string,
+) {
+  const parts = zonedDateParts(now, timeZone);
+  return {
+    accountId: account.id,
+    senderEmail: account.email,
+    dayCount: row?.dayKey === parts.dateKey ? row.dayCount : 0,
+    hourCount: row?.hourKey === parts.hourKey ? row.hourCount : 0,
+    consecutiveSeriousErrors: row?.consecutiveSeriousErrors ?? 0,
+    pausedUntil: row?.pausedUntil ?? null,
+    pauseReason: row?.pauseReason ?? "",
+    dayKey: parts.dateKey,
+    hourKey: parts.hourKey,
+  };
+}
+
+async function vkWorkspaceQueueContext() {
+  const integration = (await allIntegrationRecords()).find((item) => item.providerId === "vk-workspace");
+  if (!integration) throw new ApiRequestError("Интеграция VK WorkSpace недоступна.", 422);
+  const [workspace] = await getDb().select({ timezone: workspaces.timezone }).from(workspaces)
+    .where(eq(workspaces.id, getWorkspaceId())).limit(1);
+  const config = resolveVkWorkspaceQueueConfig({
+    ...integration.publicConfig,
+    timeZone: integration.publicConfig.timeZone || workspace?.timezone || "Europe/Moscow",
+  }, runtimeSecret);
+  const now = new Date();
+  const existing = await getDb().select().from(vkWorkspaceAccountState)
+    .where(eq(vkWorkspaceAccountState.workspaceId, getWorkspaceId()));
+  for (const account of config.accounts) {
+    await getDb().insert(vkWorkspaceAccountState).values({
+      workspaceId: getWorkspaceId(),
+      accountId: account.id,
+      senderEmail: account.email,
+      dayKey: "",
+      dayCount: 0,
+      hourKey: "",
+      hourCount: 0,
+      consecutiveSeriousErrors: 0,
+      pausedUntil: null,
+      pauseReason: "",
+      lastSuccessAt: null,
+      lastErrorAt: null,
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+    }).onConflictDoUpdate({
+      target: [vkWorkspaceAccountState.workspaceId, vkWorkspaceAccountState.accountId],
+      set: { senderEmail: account.email, updatedAt: now.toISOString() },
+    });
+  }
+  const rows = await getDb().select().from(vkWorkspaceAccountState)
+    .where(eq(vkWorkspaceAccountState.workspaceId, getWorkspaceId()));
+  const byAccount = new Map(rows.map((row) => [row.accountId, row]));
+  return {
+    integration,
+    config,
+    states: config.accounts.map((account) => normalizedVkAccountState(byAccount.get(account.id), account, now, config.timeZone)),
+  };
+}
+
+async function getVkWorkspaceQueueSummary(
+  campaignId?: string,
+  plannedCount?: number,
+): Promise<VkWorkspaceQueueSummary> {
+  const { config, states } = await vkWorkspaceQueueContext();
+  const conditions = [eq(deliveryOutbox.providerId, "vk-workspace" as IntegrationProviderId)];
+  if (campaignId) conditions.push(eq(deliveryOutbox.campaignId, campaignId));
+  const rows = await getDb().select({ status: deliveryOutbox.status, attempts: deliveryOutbox.attempts })
+    .from(deliveryOutbox).where(and(...conditions));
+  const estimate = estimateVkWorkspaceDays(plannedCount ?? rows.length, config);
+  return {
+    ...(campaignId ? { campaignId } : {}),
+    queued: rows.filter((row) => row.status === "pending" && row.attempts === 0).length,
+    processing: rows.filter((row) => row.status === "processing").length,
+    retrying: rows.filter((row) => row.status === "pending" && row.attempts > 0).length,
+    accepted: rows.filter((row) => row.status === "accepted").length,
+    rejected: rows.filter((row) => row.status === "rejected" || row.status === "ambiguous").length,
+    total: plannedCount ?? rows.length,
+    configuredAccounts: estimate.configuredAccounts,
+    dailyCapacity: estimate.dailyCapacity,
+    estimatedDays: estimate.estimatedDays,
+    workWindow: `${String(config.workdayStartHour).padStart(2, "0")}:00–${String(config.workdayEndHour).padStart(2, "0")}:00`,
+    timeZone: config.timeZone,
+    accounts: config.accounts.map((account) => {
+      const state = states.find((item) => item.accountId === account.id);
+      return {
+        accountId: account.id,
+        senderEmail: account.email,
+        sentToday: state?.dayCount ?? 0,
+        sentThisHour: state?.hourCount ?? 0,
+        dailyLimit: account.dailyLimit,
+        hourlyLimit: account.hourlyLimit,
+        consecutiveSeriousErrors: state?.consecutiveSeriousErrors ?? 0,
+        pausedUntil: state?.pausedUntil ?? null,
+        pauseReason: state?.pauseReason ?? "",
+      };
+    }),
+  };
+}
+
+async function updateVkAccountAfterAttempt(
+  account: VkWorkspaceAccount,
+  result: { accepted: boolean; seriousAccountError: boolean; message: string },
+  config: ReturnType<typeof resolveVkWorkspaceQueueConfig>,
+) {
+  const now = new Date();
+  const [row] = await getDb().select().from(vkWorkspaceAccountState).where(and(
+    eq(vkWorkspaceAccountState.workspaceId, getWorkspaceId()),
+    eq(vkWorkspaceAccountState.accountId, account.id),
+  )).limit(1);
+  const state = normalizedVkAccountState(row, account, now, config.timeZone);
+  const seriousErrors = result.accepted ? 0 : state.consecutiveSeriousErrors + (result.seriousAccountError ? 1 : 0);
+  const shouldPause = result.seriousAccountError && seriousErrors >= config.seriousErrorThreshold;
+  await getDb().update(vkWorkspaceAccountState).set({
+    senderEmail: account.email,
+    dayKey: state.dayKey,
+    dayCount: state.dayCount + (result.accepted ? 1 : 0),
+    hourKey: state.hourKey,
+    hourCount: state.hourCount + (result.accepted ? 1 : 0),
+    consecutiveSeriousErrors: seriousErrors,
+    pausedUntil: shouldPause ? new Date(now.getTime() + 24 * 60 * 60_000).toISOString() : (result.accepted ? null : state.pausedUntil),
+    pauseReason: shouldPause ? `Автоматическая пауза после ${seriousErrors} серьёзных SMTP-ошибок: ${result.message.slice(0, 300)}` : (result.accepted ? "" : state.pauseReason),
+    lastSuccessAt: result.accepted ? now.toISOString() : row?.lastSuccessAt ?? null,
+    lastErrorAt: result.accepted ? row?.lastErrorAt ?? null : now.toISOString(),
+    updatedAt: now.toISOString(),
+  }).where(and(
+    eq(vkWorkspaceAccountState.workspaceId, getWorkspaceId()),
+    eq(vkWorkspaceAccountState.accountId, account.id),
+  ));
+}
+
+async function finalizeVkWorkspaceJob(jobId: string) {
+  const db = getDb();
+  const [job] = await db.select().from(deliveryJobs).where(eq(deliveryJobs.id, jobId)).limit(1);
+  if (!job) return;
+  const rows = (await db.select().from(deliveryOutbox).where(eq(deliveryOutbox.jobId, jobId))).map(toDeliveryOutbox);
+  const pending = rows.filter((row) => row.status === "pending" || row.status === "processing").length;
+  const acceptedCount = rows.filter((row) => row.status === "accepted").length;
+  const rejectedCount = rows.filter((row) => row.status === "rejected").length;
+  const ambiguousCount = rows.filter((row) => row.status === "ambiguous").length;
+  const manualCount = rows.filter((row) => row.status === "manual_export").length;
+  const [campaignRow] = await db.select().from(campaigns).where(eq(campaigns.id, job.campaignId)).limit(1);
+  if (!campaignRow) return;
+  if (pending > 0) {
+    await db.update(deliveryJobs).set({
+      status: "processing",
+      acceptedCount,
+      rejectedCount,
+      ambiguousCount,
+      manualCount,
+      statusMessage: `Очередь VK WorkSpace: отправлено ${acceptedCount}, ожидает ${pending}, ошибок ${rejectedCount + ambiguousCount}.`,
+      updatedAt: new Date().toISOString(),
+    }).where(eq(deliveryJobs.id, jobId));
+    return;
+  }
+  const finalStatus: DeliveryJobRecord["status"] = rejectedCount || ambiguousCount
+    ? acceptedCount ? "partial" : "failed"
+    : "completed";
+  const completedAt = new Date().toISOString();
+  const statusMessage = `Очередь VK WorkSpace завершена: отправлено ${acceptedCount}, ошибок ${rejectedCount + ambiguousCount}.`;
+  await db.update(deliveryJobs).set({
+    status: finalStatus,
+    acceptedCount,
+    rejectedCount,
+    ambiguousCount,
+    manualCount,
+    statusMessage,
+    completedAt,
+    updatedAt: completedAt,
+  }).where(eq(deliveryJobs.id, jobId));
+  const acceptedContactIds = uniqueAcceptedContactIds(rows);
+  await db.update(campaigns).set({
+    status: campaignRow.status === "stopping" ? "cancelled" : acceptedCount ? "completed" : "blocked",
+    statusReason: campaignRow.status === "stopping" ? `Отправка остановлена. ${statusMessage}` : statusMessage,
+    sentAt: acceptedCount ? completedAt : campaignRow.sentAt,
+    metrics: { ...campaignRow.metrics, sent: acceptedContactIds.length },
+    updatedAt: completedAt,
+  }).where(eq(campaigns.id, job.campaignId));
+  if (!job.completedAt && acceptedCount) {
+    for (const ids of chunksOf(acceptedContactIds, 40)) {
+      await db.update(contacts).set({ lastContactedAt: completedAt, updatedAt: completedAt }).where(inArray(contacts.id, ids));
+    }
+    await recordCommunicationTouches(job.campaignId).catch(() => undefined);
+    await appendEvent(job.campaignId, finalStatus === "completed" ? "dispatch_completed" : "dispatch_partial", statusMessage, {
+      jobId,
+      acceptedCount,
+      rejectedCount,
+      ambiguousCount,
+      provider: "vk-workspace",
+    });
+  }
+}
+
+async function processVkWorkspaceMarketingQueueCore() {
+  const { config, states } = await vkWorkspaceQueueContext();
+  const now = new Date();
+  const staleRows = await getDb().select({ id: deliveryOutbox.id, jobId: deliveryOutbox.jobId })
+    .from(deliveryOutbox)
+    .innerJoin(campaigns, eq(deliveryOutbox.campaignId, campaigns.id))
+    .where(and(
+      eq(campaigns.workspaceId, getWorkspaceId()),
+      eq(deliveryOutbox.providerId, "vk-workspace" as IntegrationProviderId),
+      eq(deliveryOutbox.status, "processing"),
+      lte(deliveryOutbox.updatedAt, new Date(now.getTime() - 10 * 60_000).toISOString()),
+    )).limit(25);
+  for (const stale of chunksOf(staleRows.map((row) => row.id), 20)) {
+    await getDb().update(deliveryOutbox).set({
+      status: "ambiguous",
+      nextAttemptAt: null,
+      lastError: "Предыдущая SMTP-попытка была прервана до фиксации результата.",
+      statusMessage: "Результат SMTP неизвестен; автоматический повтор отключён, чтобы не отправить дубль.",
+      updatedAt: now.toISOString(),
+    }).where(inArray(deliveryOutbox.id, stale));
+  }
+  for (const jobId of new Set(staleRows.map((row) => row.jobId))) await finalizeVkWorkspaceJob(jobId);
+  if (!config.accounts.length || !withinVkWorkspaceWindow(now, config)) {
+    return { processed: 0, reason: !config.accounts.length ? "Нет настроенных SMTP-аккаунтов." : `Вне рабочего окна; продолжение не раньше ${nextVkWorkspaceWindow(now, config).toISOString()}.` };
+  }
+  const totalToday = states.reduce((total, state) => total + state.dayCount, 0);
+  if (totalToday >= config.totalDailyLimit) return { processed: 0, reason: "Достигнут общий дневной лимит." };
+  const candidates = await getDb().select({ outbox: deliveryOutbox, campaign: campaigns })
+    .from(deliveryOutbox)
+    .innerJoin(campaigns, eq(deliveryOutbox.campaignId, campaigns.id))
+    .where(and(
+      eq(campaigns.workspaceId, getWorkspaceId()),
+      eq(campaigns.status, "sending"),
+      eq(deliveryOutbox.providerId, "vk-workspace" as IntegrationProviderId),
+      eq(deliveryOutbox.status, "pending"),
+      or(isNull(deliveryOutbox.nextAttemptAt), lte(deliveryOutbox.nextAttemptAt, now.toISOString())),
+    )).orderBy(desc(deliveryOutbox.priority), asc(deliveryOutbox.createdAt)).limit(config.batchSize);
+  let processed = 0;
+  const touchedJobs = new Set<string>();
+  for (const candidate of candidates) {
+    const fresh = await vkWorkspaceQueueContext();
+    const freshTotalToday = fresh.states.reduce((total, state) => total + state.dayCount, 0);
+    if (freshTotalToday >= config.totalDailyLimit) break;
+    const available = fresh.config.accounts
+      .map((account) => ({ account, state: fresh.states.find((state) => state.accountId === account.id)! }))
+      .filter(({ account, state }) => state.dayCount < account.dailyLimit && state.hourCount < account.hourlyLimit)
+      .filter(({ state }) => !state.pausedUntil || Date.parse(state.pausedUntil) <= Date.now())
+      .sort((left, right) => left.state.dayCount - right.state.dayCount || left.state.hourCount - right.state.hourCount || left.account.id.localeCompare(right.account.id));
+    const selected = available[0];
+    if (!selected) break;
+    const row = toDeliveryOutbox(candidate.outbox);
+    const [contactRow] = await getDb().select().from(contacts).where(and(
+      eq(contacts.workspaceId, getWorkspaceId()),
+      eq(contacts.id, row.contactId),
+    )).limit(1);
+    const contact = contactRow ? toContact(contactRow) : null;
+    if (!contact || !contactEligible(contact, "email", candidate.campaign.purpose as CampaignRecord["purpose"])) {
+      await updateOutboxResult(row, { status: "rejected", message: "Контакт удалён, отписан или больше не подходит для email-рассылки." });
+      touchedJobs.add(row.jobId);
+      continue;
+    }
+    const communicationCheck = await enforceCommunications([contact], ["email"], candidate.campaign.purpose as CampaignRecord["purpose"], now.toISOString(), candidate.campaign.id);
+    if (communicationCheck.blockedIds.length) {
+      await updateOutboxResult(row, { status: "rejected", message: "Адресат исключён актуальной проверкой согласия, ответа или ограничения частоты." });
+      touchedJobs.add(row.jobId);
+      continue;
+    }
+    const version = await campaignVersionById(row.campaignVersionId);
+    const preparedEmail = prepareEmailHtmlForDelivery(version.snapshot.emailBodyHtml, "cid");
+    const attemptAt = new Date().toISOString();
+    const attempts = row.attempts + 1;
+    await getDb().update(deliveryOutbox).set({
+      status: "processing",
+      attempts,
+      accountId: selected.account.id,
+      lastAttemptAt: attemptAt,
+      nextAttemptAt: null,
+      statusMessage: `Передано в SMTP через ${selected.account.email}.`,
+      updatedAt: attemptAt,
+    }).where(and(eq(deliveryOutbox.id, row.id), eq(deliveryOutbox.status, "pending")));
+    let actual: { outboxId: string; status: "accepted" | "rejected" | "ambiguous"; message: string; externalId?: string };
+    try {
+      const [result] = await sendVkWorkspaceSmtpBatch({
+        host: "smtp.mail.ru",
+        port: 465,
+        username: selected.account.email,
+        password: selected.account.password,
+        senderName: version.snapshot.senderName,
+        senderEmail: selected.account.email,
+        timeoutMs: 20_000,
+      }, [{
+        outboxId: row.id,
+        to: row.recipientEndpoint,
+        subject: renderContactTemplate(version.snapshot.subject, contact),
+        text: renderContactTemplate(version.snapshot.emailBodyText, contact),
+        html: renderContactTemplate(preparedEmail.html, contact),
+        inlineImages: preparedEmail.images,
+      }]);
+      actual = result ?? { outboxId: row.id, status: "rejected", message: "SMTP не вернул результат отправки." };
+    } catch (error) {
+      actual = { outboxId: row.id, status: "rejected", message: error instanceof Error ? error.message : "SMTP-соединение завершилось ошибкой." };
+    }
+    const completedAt = new Date().toISOString();
+    await getDb().insert(vkWorkspaceDeliveryAttempts).values({
+      id: newId("vk-smtp-attempt"),
+      workspaceId: getWorkspaceId(),
+      outboxId: row.id,
+      jobId: row.jobId,
+      campaignId: row.campaignId,
+      accountId: selected.account.id,
+      senderEmail: selected.account.email,
+      attempt: attempts,
+      status: actual.status,
+      providerResponse: actual.status === "accepted" ? actual.message.slice(0, 1000) : "",
+      error: actual.status === "accepted" ? "" : actual.message.slice(0, 1000),
+      startedAt: attemptAt,
+      completedAt,
+    });
+    if (actual.status === "accepted") {
+      await getDb().update(deliveryOutbox).set({
+        status: "accepted",
+        externalId: actual.externalId ?? null,
+        acceptedAt: new Date().toISOString(),
+        lastError: "",
+        statusMessage: actual.message,
+        updatedAt: new Date().toISOString(),
+      }).where(eq(deliveryOutbox.id, row.id));
+      await updateVkAccountAfterAttempt(selected.account, { accepted: true, seriousAccountError: false, message: actual.message }, config);
+    } else {
+      const classification = classifyVkWorkspaceSmtpError(actual.message);
+      const nextAttempt = classification.permanentRecipient ? null : retryAtAfterFailure(attempts);
+      await getDb().update(deliveryOutbox).set({
+        status: nextAttempt ? "pending" : "rejected",
+        nextAttemptAt: nextAttempt?.toISOString() ?? null,
+        lastError: actual.message,
+        statusMessage: nextAttempt ? `Ошибка SMTP. Повтор ${attempts} запланирован на ${nextAttempt.toISOString()}.` : `SMTP-ошибка после ${attempts} попыток: ${actual.message}`,
+        updatedAt: new Date().toISOString(),
+      }).where(eq(deliveryOutbox.id, row.id));
+      await updateVkAccountAfterAttempt(selected.account, { accepted: false, seriousAccountError: classification.seriousAccount, message: actual.message }, config);
+      if (classification.permanentRecipient) {
+        await getDb().update(contacts).set({ status: "bounced", updatedAt: new Date().toISOString() }).where(eq(contacts.id, row.contactId));
+      }
+    }
+    processed += 1;
+    touchedJobs.add(row.jobId);
+  }
+  for (const jobId of touchedJobs) await finalizeVkWorkspaceJob(jobId);
+  return { processed, reason: processed ? "Очередь обработана." : "Нет писем, доступных по текущим квотам." };
+}
+
 async function dispatchCampaign(
   request: Request,
   campaignId: string,
@@ -4187,6 +4566,7 @@ async function dispatchCampaign(
       idempotencyKey: `${version.id}:${plan.channel}:${contact.id}`,
       status: "pending" as const,
       attempts: 0,
+      priority: current.campaign.purpose === "transactional" ? 100 : 0,
       externalId: null,
       statusMessage: "Ожидает обработки.",
       createdAt: now,
@@ -4266,10 +4646,15 @@ async function dispatchCampaign(
     if (smtpRows.length) {
       const integration = integrationsNow.find((item) => item.providerId === "vk-workspace");
       if (!integration) throw new Error("Интеграция VK WorkSpace недоступна");
-      providerExternalIds = {
-        ...providerExternalIds,
-        "vk-workspace": await processVkWorkspaceSmtpOutbox(request, smtpRows, integration, version),
-      };
+      providerExternalIds = current.campaign.purpose === "transactional"
+        ? {
+            ...providerExternalIds,
+            "vk-workspace": await processVkWorkspaceSmtpOutbox(request, smtpRows, integration, version),
+          }
+        : {
+            ...providerExternalIds,
+            "vk-workspace": { queue: "d1-outbox", enqueued: String(smtpRows.length) },
+          };
     }
   } catch (error) {
     await db
@@ -4297,6 +4682,37 @@ async function dispatchCampaign(
   const finalRows = (
     await db.select().from(deliveryOutbox).where(eq(deliveryOutbox.jobId, jobId))
   ).map(toDeliveryOutbox);
+  const queuedVkRows = finalRows.filter((row) => row.providerId === "vk-workspace" && (row.status === "pending" || row.status === "processing"));
+  if (queuedVkRows.length && current.campaign.purpose === "marketing") {
+    const acceptedCount = finalRows.filter((row) => row.status === "accepted").length;
+    const rejectedCount = finalRows.filter((row) => row.status === "rejected").length;
+    const ambiguousCount = finalRows.filter((row) => row.status === "ambiguous").length;
+    const manualCount = finalRows.filter((row) => row.status === "manual_export").length;
+    const statusMessage = `В очереди VK WorkSpace ${queuedVkRows.length} писем. Отправка идёт в рабочее окно с дневными и часовыми лимитами.`;
+    const [queuedJob] = await db.update(deliveryJobs).set({
+      status: "processing",
+      acceptedCount,
+      rejectedCount,
+      ambiguousCount,
+      manualCount,
+      providerExternalIds,
+      statusMessage,
+      updatedAt: new Date().toISOString(),
+    }).where(eq(deliveryJobs.id, jobId)).returning();
+    await db.update(campaigns).set({
+      status: "sending",
+      statusReason: statusMessage,
+      updatedAt: new Date().toISOString(),
+    }).where(eq(campaigns.id, campaignId));
+    const updated = await campaignBundle(campaignId);
+    return {
+      campaign: updated.campaign,
+      deliveryPlans: updated.plans,
+      deliveryJob: toDeliveryJob(queuedJob),
+      event: startEvent,
+      vkWorkspaceQueue: await getVkWorkspaceQueueSummary(campaignId),
+    };
+  }
   const acceptedRows = finalRows.filter((row) => row.status === "accepted");
   const acceptedContactIds = uniqueAcceptedContactIds(finalRows);
   const rejectedCount = finalRows.filter((row) => row.status === "rejected").length;
@@ -4556,6 +4972,7 @@ export type ScheduledRunResult = {
   checkedAt: string;
   dueCount: number;
   dispatched: Array<{ campaignId: string; status: string; message: string }>;
+  queueProcessed?: number;
 };
 
 async function runDueScheduledCampaignsCore(): Promise<ScheduledRunResult> {
@@ -4578,7 +4995,8 @@ async function runDueScheduledCampaignsCore(): Promise<ScheduledRunResult> {
       dispatched.push({ campaignId: row.id, status: "blocked", message: error instanceof Error ? error.message : "Не удалось обработать запланированную отправку." });
     }
   }
-  return { checkedAt: now, dueCount: due.length, dispatched };
+  const queue = await processVkWorkspaceMarketingQueueCore();
+  return { checkedAt: now, dueCount: due.length, dispatched, queueProcessed: queue.processed };
 }
 
 export async function runDueScheduledCampaignsSystem() {
@@ -4587,6 +5005,21 @@ export async function runDueScheduledCampaignsSystem() {
     .where(and(eq(campaigns.status, "scheduled"), lte(campaigns.scheduledAt, new Date().toISOString()))).limit(100);
   const results = [];
   for (const workspace of dueWorkspaces) results.push(await withWorkspace(workspace.id, runDueScheduledCampaignsCore));
+  return results;
+}
+
+export async function runVkWorkspaceMarketingQueuesSystem() {
+  await ensureSystemDatabase();
+  const rows = await getDb().selectDistinct({ id: campaigns.workspaceId })
+    .from(deliveryOutbox)
+    .innerJoin(campaigns, eq(deliveryOutbox.campaignId, campaigns.id))
+    .where(and(
+      eq(deliveryOutbox.providerId, "vk-workspace" as IntegrationProviderId),
+      or(eq(deliveryOutbox.status, "pending"), eq(deliveryOutbox.status, "processing")),
+      inArray(campaigns.status, ["sending", "stopping"]),
+    )).limit(100);
+  const results = [];
+  for (const workspace of rows) results.push(await withWorkspace(workspace.id, processVkWorkspaceMarketingQueueCore));
   return results;
 }
 
@@ -4703,6 +5136,9 @@ export async function updateCampaign(
     action !== "launch" &&
     action !== "dispatch" &&
     action !== "sync_delivery" &&
+    action !== "pause" &&
+    action !== "resume" &&
+    action !== "stop" &&
     action !== "cancel"
   ) {
     throw new ApiRequestError("Неизвестное действие с кампанией.");
@@ -4715,7 +5151,46 @@ export async function updateCampaign(
   if (action === "sync_delivery") {
     return syncCampaignDelivery(request, id);
   }
-  if (["sending", "completed"].includes(current.campaign.status)) {
+  if (action === "pause" || action === "resume" || action === "stop") {
+    const [job] = await getDb().select().from(deliveryJobs).where(and(
+      eq(deliveryJobs.workspaceId, getWorkspaceId()),
+      eq(deliveryJobs.campaignId, id),
+    )).orderBy(desc(deliveryJobs.createdAt)).limit(1);
+    const hasVkQueue = current.plans.some((plan) => plan.providerId === "vk-workspace");
+    if (!hasVkQueue || !job) throw new ApiRequestError("У кампании нет активной очереди VK WorkSpace.", 409);
+    if (action === "pause") {
+      if (current.campaign.status !== "sending") throw new ApiRequestError("Приостановить можно только выполняемую кампанию.", 409);
+      const now = new Date().toISOString();
+      await getDb().update(campaigns).set({ status: "paused", statusReason: "Очередь приостановлена участником; письма сохранены.", updatedAt: now }).where(eq(campaigns.id, id));
+      const event = await appendEvent(id, "campaign_paused", "Очередь VK WorkSpace приостановлена.", { jobId: job.id });
+      const updated = await campaignBundle(id);
+      return { campaign: updated.campaign, deliveryPlans: updated.plans, deliveryJob: toDeliveryJob(job), event, vkWorkspaceQueue: await getVkWorkspaceQueueSummary(id) };
+    }
+    if (action === "resume") {
+      if (current.campaign.status !== "paused") throw new ApiRequestError("Возобновить можно только приостановленную кампанию.", 409);
+      const now = new Date().toISOString();
+      await getDb().update(campaigns).set({ status: "sending", statusReason: "Очередь возобновлена; отправка продолжится по квотам и рабочему окну.", updatedAt: now }).where(eq(campaigns.id, id));
+      const event = await appendEvent(id, "campaign_resumed", "Очередь VK WorkSpace возобновлена.", { jobId: job.id });
+      const updated = await campaignBundle(id);
+      return { campaign: updated.campaign, deliveryPlans: updated.plans, deliveryJob: toDeliveryJob(job), event, vkWorkspaceQueue: await getVkWorkspaceQueueSummary(id) };
+    }
+    if (!["sending", "paused"].includes(current.campaign.status)) throw new ApiRequestError("Остановить можно только активную или приостановленную кампанию.", 409);
+    const now = new Date().toISOString();
+    await getDb().update(campaigns).set({ status: "stopping", statusReason: "Остановка запрошена; новые письма не запускаются.", updatedAt: now }).where(eq(campaigns.id, id));
+    await getDb().update(deliveryOutbox).set({
+      status: "rejected",
+      lastError: "Отменено участником до передачи в SMTP.",
+      statusMessage: "Отменено участником до передачи в SMTP.",
+      nextAttemptAt: null,
+      updatedAt: now,
+    }).where(and(eq(deliveryOutbox.jobId, job.id), eq(deliveryOutbox.status, "pending")));
+    const event = await appendEvent(id, "campaign_stopping", "Запрошена остановка очереди после текущего письма.", { jobId: job.id });
+    await finalizeVkWorkspaceJob(job.id);
+    const updated = await campaignBundle(id);
+    const [updatedJob] = await getDb().select().from(deliveryJobs).where(eq(deliveryJobs.id, job.id)).limit(1);
+    return { campaign: updated.campaign, deliveryPlans: updated.plans, deliveryJob: toDeliveryJob(updatedJob ?? job), event, vkWorkspaceQueue: await getVkWorkspaceQueueSummary(id) };
+  }
+  if (["sending", "paused", "stopping", "completed"].includes(current.campaign.status)) {
     throw new ApiRequestError(
       "Отправляемую или завершённую кампанию нельзя изменить.",
       409,
@@ -4840,7 +5315,7 @@ export async function deleteCampaign(
   const id = cleanText(idValue, "Идентификатор кампании", 120);
   const current = await campaignBundle(id);
   requireCampaignAccess(actor.participant, current.campaign);
-  if (["scheduled", "sending", "completed"].includes(current.campaign.status)) {
+  if (["scheduled", "sending", "paused", "stopping", "completed"].includes(current.campaign.status)) {
     throw new ApiRequestError(
       current.campaign.status === "scheduled"
         ? "Сначала отмените запланированную рассылку, затем её можно удалить."

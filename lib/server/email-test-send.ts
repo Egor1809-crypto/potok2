@@ -4,6 +4,9 @@ import { automaticProviderSecrets } from "./provider-checks";
 import { isIntegrationReadyForChannel } from "./runtime-integrations";
 import { compileEmailDocument, parseEmailBuilderDocument } from "./email-document";
 import { renderMergeTemplate, unknownMergeTokens, sendUniSenderTransactionalEmail } from "./provider-adapters";
+import { resolveVkWorkspaceQueueConfig } from "./vk-workspace-queue";
+import { extractInlineEmailImages } from "./inline-email-images";
+import { sendVkWorkspaceSmtpBatch } from "./vk-workspace-smtp";
 
 /** The provider expands its own unsubscribe URL after our contact fields. */
 export function renderEmailTestFields(value: string) {
@@ -21,6 +24,41 @@ export async function sendEmailBuilderTest(request: Request, value: unknown) {
   if (!document) throw new ApiRequestError("Откройте письмо для тестовой отправки.");
   const sources = [document.backgroundImageUrl, ...document.blocks.flatMap(block => [block.href, block.imageHref, block.linkHref])].filter(Boolean);
   if (sources.some(url => /^(?:blob:|file:|https?:\/\/(?:localhost|127\.|\[::1\]))/i.test(url!))) throw new ApiRequestError("Загрузите изображения на платформу перед отправкой.", 422);
+  const selectedProvider = input.providerId === "vk-workspace" ? "vk-workspace" : "unisender";
+  if (selectedProvider === "vk-workspace") {
+    const integration = integrations.find(item => item.providerId === "vk-workspace" && isIntegrationReadyForChannel(item, "email"));
+    if (!integration) throw new ApiRequestError("Для тестовой отправки подключите VK WorkSpace в настройках интеграций.", 422);
+    const credentials = automaticProviderSecrets("vk-workspace") as { password?: string; password2?: string; email?: string; email2?: string };
+    const config = resolveVkWorkspaceQueueConfig(integration.publicConfig, (key) => ({
+      VK_WORKSPACE_SMTP_PASSWORD: credentials.password ?? "",
+      VK_WORKSPACE_SMTP_PASSWORD_2: credentials.password2 ?? "",
+      VK_WORKSPACE_SMTP_EMAIL: credentials.email ?? "",
+      VK_WORKSPACE_SMTP_EMAIL_2: credentials.email2 ?? "",
+    })[key] ?? "");
+    const accountId = input.accountId === "secondary" ? "secondary" : "primary";
+    const account = config.accounts.find((item) => item.id === accountId);
+    if (!account) throw new ApiRequestError("Выбранный ящик VK WorkSpace не настроен.", 422);
+    const html = renderEmailTestFields(compileEmailDocument(document));
+    const prepared = extractInlineEmailImages(html, "cid");
+    const [result] = await sendVkWorkspaceSmtpBatch({
+      host: "smtp.mail.ru",
+      port: 465,
+      username: account.email,
+      password: account.password,
+      senderName: integration.publicConfig.senderName || "Поток",
+      senderEmail: account.email,
+      timeoutMs: 20_000,
+    }, [{
+      outboxId: `test-${crypto.randomUUID()}`,
+      to: email,
+      subject: `[Тест] ${renderEmailTestFields(document.subject)}`,
+      text: renderEmailTestFields(document.previewText || document.subject),
+      html: prepared.html,
+      inlineImages: prepared.images,
+    }]);
+    if (!result || result.status !== "accepted") throw new ApiRequestError(`VK WorkSpace отклонил тестовое письмо${result?.message ? `: ${result.message}` : "."}`, 422);
+    return { message: `VK WorkSpace принял тестовое письмо через ${account.email}. Проверьте указанный почтовый ящик.` };
+  }
   const integration = integrations.find(item => item.providerId === "unisender" && isIntegrationReadyForChannel(item, "email"));
   if (!integration) throw new ApiRequestError("Для тестовой отправки подключите UniSender в настройках интеграций.", 422);
   const senderEmail = integration.publicConfig.transactionalSenderEmail || integration.publicConfig.senderEmail;

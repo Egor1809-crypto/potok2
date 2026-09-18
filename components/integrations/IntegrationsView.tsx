@@ -73,6 +73,13 @@ const setupFields: Record<IntegrationProviderId, SetupField[]> = {
       type: "email",
       hint: "Полный адрес ящика VK WorkSpace. Пароль приложения хранится только в защищённой конфигурации сервера.",
     },
+    {
+      key: "senderEmail2",
+      label: "Второй корпоративный адрес",
+      placeholder: "events@company.ru",
+      type: "email",
+      hint: "Необязательно. Для него используется отдельный защищённый секрет VK_WORKSPACE_SMTP_PASSWORD_2.",
+    },
   ],
   "telegram-bot-api": [],
   "vk-api": [

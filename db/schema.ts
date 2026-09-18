@@ -652,6 +652,12 @@ export const deliveryOutbox = sqliteTable(
       .notNull()
       .default("pending"),
     attempts: integer("attempts").notNull().default(0),
+    accountId: text("account_id"),
+    nextAttemptAt: text("next_attempt_at"),
+    lastAttemptAt: text("last_attempt_at"),
+    acceptedAt: text("accepted_at"),
+    lastError: text("last_error").notNull().default(""),
+    priority: integer("priority").notNull().default(0),
     externalId: text("external_id"),
     statusMessage: text("status_message").notNull().default("Ожидает обработки."),
     ...timestamps,
@@ -659,6 +665,11 @@ export const deliveryOutbox = sqliteTable(
   (table) => [
     uniqueIndex("idx_delivery_outbox_idempotency").on(table.idempotencyKey),
     index("idx_delivery_outbox_job_status").on(table.jobId, table.status),
+    index("idx_delivery_outbox_provider_status_next").on(
+      table.providerId,
+      table.status,
+      table.nextAttemptAt,
+    ),
     index("idx_delivery_outbox_campaign_channel").on(
       table.campaignId,
       table.channel,
@@ -667,6 +678,58 @@ export const deliveryOutbox = sqliteTable(
       table.contactId,
       table.updatedAt,
     ),
+  ],
+);
+
+export const vkWorkspaceAccountState = sqliteTable(
+  "vk_workspace_account_state",
+  {
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    accountId: text("account_id").notNull(),
+    senderEmail: text("sender_email").notNull(),
+    dayKey: text("day_key").notNull().default(""),
+    dayCount: integer("day_count").notNull().default(0),
+    hourKey: text("hour_key").notNull().default(""),
+    hourCount: integer("hour_count").notNull().default(0),
+    consecutiveSeriousErrors: integer("consecutive_serious_errors").notNull().default(0),
+    pausedUntil: text("paused_until"),
+    pauseReason: text("pause_reason").notNull().default(""),
+    lastSuccessAt: text("last_success_at"),
+    lastErrorAt: text("last_error_at"),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("idx_vk_workspace_account_state").on(table.workspaceId, table.accountId),
+    index("idx_vk_workspace_account_pause").on(table.workspaceId, table.pausedUntil),
+  ],
+);
+
+export const vkWorkspaceDeliveryAttempts = sqliteTable(
+  "vk_workspace_delivery_attempts",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    outboxId: text("outbox_id")
+      .notNull()
+      .references(() => deliveryOutbox.id, { onDelete: "cascade" }),
+    jobId: text("job_id").notNull(),
+    campaignId: text("campaign_id").notNull(),
+    accountId: text("account_id").notNull(),
+    senderEmail: text("sender_email").notNull(),
+    attempt: integer("attempt").notNull(),
+    status: text("status").notNull(),
+    providerResponse: text("provider_response").notNull().default(""),
+    error: text("error").notNull().default(""),
+    startedAt: text("started_at").notNull(),
+    completedAt: text("completed_at").notNull(),
+  },
+  (table) => [
+    index("idx_vk_workspace_attempts_outbox").on(table.outboxId, table.attempt),
+    index("idx_vk_workspace_attempts_account_time").on(table.workspaceId, table.accountId, table.completedAt),
   ],
 );
 

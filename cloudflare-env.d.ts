@@ -8,6 +8,9 @@ declare namespace Cloudflare {
     OPENAI_API_KEY?: string;
     OPENAI_EMAIL_MODEL?: string;
     VK_WORKSPACE_SMTP_PASSWORD?: string;
+    VK_WORKSPACE_SMTP_PASSWORD_2?: string;
+    VK_WORKSPACE_SMTP_EMAIL?: string;
+    VK_WORKSPACE_SMTP_EMAIL_2?: string;
     TELEGRAM_BOT_TOKEN?: string;
     VK_COMMUNITY_ACCESS_TOKEN?: string;
     UNISENDER_API_KEY?: string;

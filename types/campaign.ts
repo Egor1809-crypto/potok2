@@ -1,4 +1,4 @@
-export type CampaignStatus = "draft" | "scheduled" | "sending" | "completed";
+export type CampaignStatus = "draft" | "ready" | "blocked" | "scheduled" | "sending" | "paused" | "stopping" | "completed" | "cancelled";
 export type CampaignDeliveryChannel = "email" | "telegram" | "vk";
 
 export interface CampaignMetrics {

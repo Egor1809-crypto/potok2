@@ -23,7 +23,10 @@ interface ExecutionContext {
 function runDueCampaignsInBackground(ctx: ExecutionContext) {
   ctx.waitUntil(
     import("../lib/server/mailflow-store")
-      .then(({ runDueScheduledCampaignsSystem }) => runDueScheduledCampaignsSystem())
+      .then(async ({ runDueScheduledCampaignsSystem, runVkWorkspaceMarketingQueuesSystem }) => {
+        await runDueScheduledCampaignsSystem();
+        await runVkWorkspaceMarketingQueuesSystem();
+      })
       .catch((error) => {
         console.error("Automatic campaign scheduler failed.", error);
       }),

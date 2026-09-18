@@ -9,6 +9,7 @@ import {
 import { hasRuntimeCredentials, runtimeSecret } from "./runtime-integrations";
 import { checkVkWorkspaceSmtp } from "./vk-workspace-smtp";
 import { checkTelegramConnection } from "./telegram-connection";
+import { resolveVkWorkspaceQueueConfig } from "./vk-workspace-queue";
 
 const CHECK_TIMEOUT_MS = 10_000;
 
@@ -26,15 +27,21 @@ export async function checkProviderConnection(
     if (!hasRuntimeCredentials(integration.providerId)) {
       return { ok: false, message: "Добавьте пароль приложения VK WorkSpace в защищённую конфигурацию сервера." };
     }
-    const senderEmail = integration.publicConfig.senderEmail?.trim();
-    if (!senderEmail) return { ok: false, message: "Укажите полный адрес корпоративного ящика VK WorkSpace." };
-    return checkVkWorkspaceSmtp({
+    const config = resolveVkWorkspaceQueueConfig(integration.publicConfig, runtimeSecret);
+    const primary = config.accounts.find((account) => account.id === "primary");
+    if (!primary) return { ok: false, message: "Укажите адрес и пароль приложения основного ящика VK WorkSpace." };
+    const checked = await checkVkWorkspaceSmtp({
       host: "smtp.mail.ru",
       port: 465,
-      username: senderEmail,
-      password: runtimeSecret("VK_WORKSPACE_SMTP_PASSWORD"),
+      username: primary.email,
+      password: primary.password,
       timeoutMs: CHECK_TIMEOUT_MS,
     });
+    if (!checked.ok) return checked;
+    return {
+      ...checked,
+      message: `SMTP-подключение подтверждено. Доступно ящиков: ${config.accounts.length}; дневная ёмкость: ${Math.min(config.totalDailyLimit, config.accounts.reduce((total, account) => total + account.dailyLimit, 0))}.`,
+    };
   }
   if (!hasRuntimeCredentials(integration.providerId, integration.publicConfig)) {
     return {
@@ -79,7 +86,12 @@ export function automaticProviderSecrets(
   publicConfig: Record<string, string> = {},
 ) {
   if (providerId === "vk-workspace") {
-    return { password: runtimeSecret("VK_WORKSPACE_SMTP_PASSWORD") };
+    return {
+      password: runtimeSecret("VK_WORKSPACE_SMTP_PASSWORD"),
+      password2: runtimeSecret("VK_WORKSPACE_SMTP_PASSWORD_2"),
+      email: runtimeSecret("VK_WORKSPACE_SMTP_EMAIL"),
+      email2: runtimeSecret("VK_WORKSPACE_SMTP_EMAIL_2"),
+    };
   }
   if (providerId === "telegram-bot-api") {
     return { token: runtimeSecret(publicConfig.botSlot === "secondary" ? "TELEGRAM_BOT_TOKEN_2" : "TELEGRAM_BOT_TOKEN") };

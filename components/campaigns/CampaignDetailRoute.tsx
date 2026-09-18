@@ -13,6 +13,7 @@ import type {
   DeliveryJobRecord,
   DeliveryPlanRecord,
   WorkspaceSnapshot,
+  VkWorkspaceQueueSummary,
 } from "@/types/api";
 import { DEFAULT_TIME_ZONE, detectBrowserTimeZone } from "@/lib/client-timezone";
 import { CampaignDetailView } from "./CampaignDetailView";
@@ -29,6 +30,8 @@ export function CampaignDetailRoute() {
   const [dispatching, setDispatching] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
   const [dispatchNotice, setDispatchNotice] = React.useState<string | null>(null);
+  const [vkWorkspaceQueue, setVkWorkspaceQueue] = React.useState<VkWorkspaceQueueSummary | undefined>();
+  const [controlling, setControlling] = React.useState(false);
   const [timeZone, setTimeZone] = React.useState(DEFAULT_TIME_ZONE);
   const syncedJobsRef = React.useRef(new Set<string>());
 
@@ -52,12 +55,14 @@ export function CampaignDetailRoute() {
           (job) => job.campaignVersionId === item?.readyVersionId,
         ) ?? null,
       );
+      setVkWorkspaceQueue(body.vkWorkspaceQueue);
       setApiMode("online");
     } catch {
       setCampaign(null);
       setDeliveryPlans([]);
       setEvents([]);
       setDeliveryJob(null);
+      setVkWorkspaceQueue(undefined);
       setApiMode("offline");
     }
   }, [campaignId]);
@@ -94,6 +99,32 @@ export function CampaignDetailRoute() {
       await loadCampaign();
     } finally {
       setDispatching(false);
+    }
+  }, [campaign, loadCampaign]);
+
+  const controlQueue = React.useCallback(async (action: "pause" | "resume" | "stop") => {
+    if (!campaign) return;
+    if (action === "stop" && !await confirmAction("Остановить рассылку после текущего письма? Неотправленные письма будут отменены.")) return;
+    setControlling(true);
+    setDispatchNotice(null);
+    try {
+      const response = await fetch("/api/campaigns", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ id: campaign.id, action }),
+      });
+      const body = await response.json() as CampaignMutationResponse | ApiError;
+      if (!response.ok || !("campaign" in body)) throw new Error("error" in body ? body.error : "Состояние очереди не изменено.");
+      setCampaign(body.campaign);
+      setDeliveryPlans(body.deliveryPlans);
+      if (body.deliveryJob) setDeliveryJob(body.deliveryJob);
+      setVkWorkspaceQueue(body.vkWorkspaceQueue);
+      setDispatchNotice(body.campaign.statusReason);
+      await loadCampaign();
+    } catch (error) {
+      setDispatchNotice(error instanceof Error ? error.message : "Состояние очереди не изменено.");
+    } finally {
+      setControlling(false);
     }
   }, [campaign, loadCampaign]);
 
@@ -164,6 +195,12 @@ export function CampaignDetailRoute() {
     return () => controller.abort();
   }, [campaign, deliveryJob, loadCampaign]);
 
+  React.useEffect(() => {
+    if (!campaign || !["sending", "paused", "stopping"].includes(campaign.status)) return;
+    const timer = window.setInterval(() => void loadCampaign(), 15_000);
+    return () => window.clearInterval(timer);
+  }, [campaign, loadCampaign]);
+
   return (
     <CampaignDetailView
       campaignId={campaignId}
@@ -177,6 +214,11 @@ export function CampaignDetailRoute() {
       dispatching={dispatching}
       deleting={deleting}
       dispatchNotice={dispatchNotice}
+      vkWorkspaceQueue={vkWorkspaceQueue}
+      onPause={() => void controlQueue("pause")}
+      onResume={() => void controlQueue("resume")}
+      onStop={() => void controlQueue("stop")}
+      controlling={controlling}
       timeZone={timeZone}
       onDelete={() => void deleteCampaign()}
     />

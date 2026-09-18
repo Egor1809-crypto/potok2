@@ -69,7 +69,7 @@ export const integrationProviders: IntegrationProviderDefinition[] = [
     name: "VK WorkSpace",
     category: "Автоматическая SMTP-отправка",
     summary:
-      "Поток отправляет готовое HTML-письмо напрямую через корпоративный ящик VK WorkSpace.",
+      "Поток отправляет готовое HTML-письмо через один или два корпоративных ящика VK WorkSpace с безопасной очередью.",
     channelIds: ["email"],
     accent: "#1777ff",
     initials: "VK",
@@ -82,12 +82,14 @@ export const integrationProviders: IntegrationProviderDefinition[] = [
     setupSteps: [
       "Создать пароль приложения в настройках безопасности VK WorkSpace.",
       "Добавить пароль как защищённый секрет VK_WORKSPACE_SMTP_PASSWORD на сервере Потока.",
+      "При необходимости добавить второй адрес и отдельный секрет VK_WORKSPACE_SMTP_PASSWORD_2.",
       "Указать полный адрес ящика и проверить подключение.",
       "Выбрать письмо, аудиторию и время в календаре Потока.",
     ],
     limitations: [
       "Это обычная отправка через корпоративный SMTP, а не API модуля «Рассылки» VK WorkSpace.",
       "Лимиты и антиспам-правила задаёт VK WorkSpace; большие базы отправляются очередью по расписанию.",
+      "По умолчанию один ящик отправляет не больше 150 писем в день и 20 в час.",
     ],
     route: "Поток → защищённый SMTP → почтовый ящик получателя",
     deliveryMode: "automatic",

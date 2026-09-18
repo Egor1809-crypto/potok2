@@ -163,6 +163,8 @@ export type CampaignStatus =
   | "blocked"
   | "scheduled"
   | "sending"
+  | "paused"
+  | "stopping"
   | "completed"
   | "cancelled";
 
@@ -707,6 +709,9 @@ export type CampaignEventRecord = {
     | "launch_blocked"
     | "launch_scheduled"
     | "campaign_cancelled"
+    | "campaign_paused"
+    | "campaign_resumed"
+    | "campaign_stopping"
     | "dispatch_started"
     | "dispatch_completed"
     | "dispatch_partial"
@@ -800,6 +805,12 @@ export type DeliveryOutboxRecord = {
   idempotencyKey: string;
   status: DeliveryOutboxStatus;
   attempts: number;
+  accountId: string | null;
+  nextAttemptAt: string | null;
+  lastAttemptAt: string | null;
+  acceptedAt: string | null;
+  lastError: string;
+  priority: number;
   externalId: string | null;
   statusMessage: string;
   createdAt: string;
@@ -867,6 +878,7 @@ export type WorkspaceSnapshot = {
   campaigns: CampaignRecord[];
   deliveryPlans: DeliveryPlanRecord[];
   deliveryJobs: DeliveryJobRecord[];
+  vkWorkspaceQueue?: VkWorkspaceQueueSummary;
   events: CampaignEventRecord[];
   historyWindow: WorkspaceHistoryWindow;
   stats: WorkspaceStats;
@@ -1090,14 +1102,43 @@ export type CampaignCreateInput = {
 
 export type CampaignPatchInput = Partial<CampaignCreateInput> & {
   id: string;
-  action?: "save" | "launch" | "dispatch" | "cancel";
+  action?: "save" | "launch" | "dispatch" | "pause" | "resume" | "stop" | "cancel";
   idempotencyKey?: string;
+};
+
+export type VkWorkspaceAccountQueueStats = {
+  accountId: string;
+  senderEmail: string;
+  sentToday: number;
+  sentThisHour: number;
+  dailyLimit: number;
+  hourlyLimit: number;
+  consecutiveSeriousErrors: number;
+  pausedUntil: string | null;
+  pauseReason: string;
+};
+
+export type VkWorkspaceQueueSummary = {
+  campaignId?: string;
+  queued: number;
+  processing: number;
+  retrying: number;
+  accepted: number;
+  rejected: number;
+  total: number;
+  configuredAccounts: number;
+  dailyCapacity: number;
+  estimatedDays: number | null;
+  workWindow: string;
+  timeZone: string;
+  accounts: VkWorkspaceAccountQueueStats[];
 };
 
 export type CampaignEvaluation = {
   status: "ready" | "blocked" | "scheduled";
   eligibleByChannel: Partial<Record<DeliveryChannelId, number>>;
   blockers: string[];
+  vkWorkspaceQueue?: VkWorkspaceQueueSummary;
 };
 
 export type CampaignsListResponse = {
@@ -1114,6 +1155,7 @@ export type CampaignMutationResponse = {
   event?: CampaignEventRecord;
   evaluation?: CampaignEvaluation;
   deliveryJob?: DeliveryJobRecord;
+  vkWorkspaceQueue?: VkWorkspaceQueueSummary;
 };
 
 export type IntegrationPatchInput = {

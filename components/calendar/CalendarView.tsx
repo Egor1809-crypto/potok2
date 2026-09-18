@@ -49,13 +49,15 @@ const statusLabel: Record<CampaignRecord["status"], string> = {
   blocked: "Нужно исправить",
   scheduled: "Запланирована",
   sending: "Отправляется",
+  paused: "На паузе",
+  stopping: "Останавливается",
   completed: "Завершена",
   cancelled: "Отменена",
 };
 
 const statusTone = {
   draft: "neutral", ready: "success", blocked: "warning", scheduled: "info",
-  sending: "warning", completed: "success", cancelled: "neutral",
+  sending: "warning", paused: "neutral", stopping: "warning", completed: "success", cancelled: "neutral",
 } as const;
 
 export function CalendarView() {

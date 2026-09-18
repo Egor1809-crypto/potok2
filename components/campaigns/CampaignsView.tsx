@@ -68,6 +68,8 @@ const tabs: { value: CampaignsTab; label: string }[] = [
   { value: "ready", label: "Готовы" },
   { value: "scheduled", label: "Запланированы" },
   { value: "sending", label: "Отправляются" },
+  { value: "paused", label: "На паузе" },
+  { value: "stopping", label: "Останавливаются" },
   { value: "completed", label: "Завершены" },
   { value: "cancelled", label: "Отменены" },
 ];
@@ -83,6 +85,8 @@ const statusMeta: Record<CampaignStatus, {
   ready: { label: "Готова", tone: "success", next: "Проверки пройдены; внешняя отправка не выполнялась", icon: CheckCircle2 },
   scheduled: { label: "План по времени", tone: "info", next: "Расписание сохранено; отправка не запускалась", icon: CalendarClock },
   sending: { label: "Отправляется", tone: "warning", next: "Провайдеры обрабатывают получателей", icon: Send },
+  paused: { label: "На паузе", tone: "neutral", next: "Очередь сохранена; возобновите отправку вручную", icon: Clock3 },
+  stopping: { label: "Останавливается", tone: "warning", next: "Новое письмо не запускается; завершается текущее", icon: Clock3 },
   completed: { label: "Обработка завершена", tone: "success", next: "Смотрите фактически принятые провайдером сообщения", icon: CheckCircle2 },
   cancelled: { label: "Отменена", tone: "neutral", next: "Создайте копию, чтобы повторить", icon: Clock3 },
 };
@@ -186,11 +190,11 @@ export function CampaignsView({
       result[campaign.status] += 1;
       return result;
     },
-    { all: 0, draft: 0, ready: 0, blocked: 0, scheduled: 0, sending: 0, completed: 0, cancelled: 0 },
+    { all: 0, draft: 0, ready: 0, blocked: 0, scheduled: 0, sending: 0, paused: 0, stopping: 0, completed: 0, cancelled: 0 },
   ), [campaigns]);
 
   const acceptedRecipients = campaigns.reduce((total, campaign) => total + campaign.metrics.sent, 0);
-  const active = counts.ready + counts.scheduled + counts.sending;
+  const active = counts.ready + counts.scheduled + counts.sending + counts.paused + counts.stopping;
 
   return (
     <div className={cn(ui.page, styles.page)}>

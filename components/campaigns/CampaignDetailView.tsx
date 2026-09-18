@@ -12,6 +12,7 @@ import {
   Mail,
   MessageCircle,
   RefreshCw,
+  Play,
   SearchX,
   Send,
   SendHorizontal,
@@ -33,6 +34,7 @@ import type {
   CampaignStatus,
   DeliveryJobRecord,
   DeliveryPlanRecord,
+  VkWorkspaceQueueSummary,
 } from "@/types/api";
 
 export type CampaignDetailViewProps = {
@@ -48,6 +50,11 @@ export type CampaignDetailViewProps = {
   dispatching?: boolean;
   deleting?: boolean;
   dispatchNotice?: string | null;
+  vkWorkspaceQueue?: VkWorkspaceQueueSummary;
+  onPause?: () => void;
+  onResume?: () => void;
+  onStop?: () => void;
+  controlling?: boolean;
   timeZone?: string;
 };
 
@@ -115,6 +122,18 @@ const statusMeta: Record<CampaignStatus, {
     badge: "warning",
     title: "Провайдеры обрабатывают получателей",
     description: "Задания передаются выбранным провайдерам.",
+  },
+  paused: {
+    label: "На паузе",
+    badge: "neutral",
+    title: "Очередь приостановлена",
+    description: "Неотправленные письма сохранены и продолжат обработку после возобновления.",
+  },
+  stopping: {
+    label: "Останавливается",
+    badge: "warning",
+    title: "Отправка останавливается",
+    description: "Новые письма не запускаются; текущее SMTP-письмо будет завершено.",
   },
   completed: {
     label: "Обработка завершена",
@@ -195,9 +214,43 @@ function lifecycleIndex(status: CampaignStatus) {
   if (status === "draft") return 0;
   if (status === "blocked") return 1;
   if (status === "ready" || status === "scheduled") return 2;
-  if (status === "sending") return 3;
+  if (status === "sending" || status === "paused" || status === "stopping") return 3;
   if (status === "completed") return 4;
   return 0;
+}
+
+function VkWorkspaceQueuePanel({ summary }: { summary: VkWorkspaceQueueSummary }) {
+  const completed = summary.accepted + summary.rejected;
+  const remaining = Math.max(0, summary.total - completed);
+  return (
+    <section className="card p-5 sm:p-6" aria-labelledby="vk-queue-title">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 id="vk-queue-title" className="text-[16px] font-semibold text-text-strong">Очередь VK WorkSpace</h2>
+          <p className="mt-1 text-[12px] text-text-muted">Рабочее окно {summary.workWindow}, {summary.timeZone}. Письма сверх квоты остаются в очереди.</p>
+        </div>
+        <Badge variant={remaining ? "info" : "success"}>{remaining ? `Осталось ${formatNumber(remaining)}` : "Очередь завершена"}</Badge>
+      </div>
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        {[
+          ["Всего", summary.total],
+          ["Отправлено", summary.accepted],
+          ["В очереди", summary.queued],
+          ["Повтор", summary.retrying],
+          ["Ошибки", summary.rejected],
+        ].map(([label, value]) => <div key={String(label)} className="rounded-xl border border-border bg-surface-subtle p-4"><p className="text-[10px] uppercase tracking-[0.08em] text-text-subtle">{label}</p><p className="mt-1 text-[20px] font-semibold text-text-strong">{formatNumber(Number(value))}</p></div>)}
+      </div>
+      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+        {summary.accounts.map((account) => (
+          <article key={account.accountId} className="rounded-xl border border-border p-4">
+            <div className="flex items-start justify-between gap-3"><div><h3 className="text-[13px] font-semibold text-text-strong">{account.senderEmail}</h3><p className="mt-1 text-[11px] text-text-muted">Сегодня {account.sentToday}/{account.dailyLimit} · час {account.sentThisHour}/{account.hourlyLimit}</p></div><Badge variant={account.pausedUntil ? "warning" : "success"} dot>{account.pausedUntil ? "Пауза аккаунта" : "Активен"}</Badge></div>
+            {account.pauseReason ? <p className="mt-3 text-[11px] leading-5 text-warning">{account.pauseReason}</p> : null}
+          </article>
+        ))}
+      </div>
+      <p className="mt-4 text-[11px] text-text-muted">Доступно {formatNumber(summary.dailyCapacity)} писем в день. Оценка длительности: {summary.estimatedDays ? `${summary.estimatedDays} дн.` : "нет настроенных ящиков"}</p>
+    </section>
+  );
 }
 
 export function CampaignDetailView({
@@ -213,6 +266,11 @@ export function CampaignDetailView({
   dispatching = false,
   deleting = false,
   dispatchNotice = null,
+  vkWorkspaceQueue,
+  onPause,
+  onResume,
+  onStop,
+  controlling = false,
   timeZone = "Europe/Moscow",
 }: CampaignDetailViewProps) {
   if (!campaign) {
@@ -231,7 +289,7 @@ export function CampaignDetailView({
   const currentLifecycleIndex = lifecycleIndex(item.status);
   const editable = item.status === "draft" || item.status === "blocked" || item.status === "ready" || item.status === "scheduled";
   const canDispatch = item.status === "ready" && !deliveryJob && Boolean(onDispatch);
-  const canDelete = !["sending", "completed"].includes(item.status) && Boolean(onDelete);
+  const canDelete = !["sending", "paused", "stopping", "completed"].includes(item.status) && Boolean(onDelete);
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 pb-10">
@@ -270,6 +328,15 @@ export function CampaignDetailView({
               >
                 Начать отправку
               </Button>
+            ) : null}
+            {item.status === "sending" && onPause ? (
+              <Button variant="secondary" onClick={onPause} loading={controlling} loadingText="Ставим на паузу…" leadingIcon={<Clock3 aria-hidden="true" className="size-6" />}>Пауза</Button>
+            ) : null}
+            {item.status === "paused" && onResume ? (
+              <Button variant="primary" onClick={onResume} loading={controlling} loadingText="Возобновляем…" leadingIcon={<Play aria-hidden="true" className="size-6" />}>Продолжить</Button>
+            ) : null}
+            {(item.status === "sending" || item.status === "paused") && onStop ? (
+              <Button variant="danger" onClick={onStop} disabled={controlling} leadingIcon={<CircleDashed aria-hidden="true" className="size-6" />}>Остановить</Button>
             ) : null}
             {editable ? (
               <Link href={`/campaigns/new?campaign=${encodeURIComponent(item.id)}&step=${item.status === "blocked" ? "review" : "audience"}`} className={buttonVariants({ variant: "primary" })}>
@@ -319,6 +386,8 @@ export function CampaignDetailView({
       ) : null}
 
       <Metrics campaign={item} plans={deliveryPlans} deliveryJob={deliveryJob} />
+
+      {vkWorkspaceQueue ? <VkWorkspaceQueuePanel summary={vkWorkspaceQueue} /> : null}
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-5">

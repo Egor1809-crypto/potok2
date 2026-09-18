@@ -1057,6 +1057,7 @@ function CampaignWizardState({
         status: body.evaluation?.status ?? (body.campaign.status === "scheduled" ? "scheduled" : body.campaign.status === "blocked" ? "blocked" : "ready"),
         eligibleByChannel: body.evaluation?.eligibleByChannel ?? {},
         blockers: normalizeBlockers(body.evaluation?.blockers),
+        vkWorkspaceQueue: body.evaluation?.vkWorkspaceQueue,
       };
       setEvaluation(serverEvaluation);
       if (serverEvaluation.blockers.length > 0 || serverEvaluation.status === "blocked") {
@@ -2314,6 +2315,18 @@ function ReviewStep({
             ? "После успешной проверки «Поток» создаст отдельную карточку для каждой волны. Каждый получатель получит это письмо во все выбранные периоды."
             : "После успешной проверки Поток сразу передаст письма выбранному провайдеру."}
       </Alert>
+
+      {evaluation?.vkWorkspaceQueue ? (
+        <section className="mt-4 rounded-xl border border-border bg-surface p-5" aria-labelledby="vk-capacity-title">
+          <h3 id="vk-capacity-title" className="text-[14px] font-semibold text-text-strong">План очереди VK WorkSpace</h3>
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            <ReviewRow label="Ящиков" value={formatNumber(evaluation.vkWorkspaceQueue.configuredAccounts)} />
+            <ReviewRow label="Ёмкость в день" value={`${formatNumber(evaluation.vkWorkspaceQueue.dailyCapacity)} писем`} />
+            <ReviewRow label="Оценка" value={evaluation.vkWorkspaceQueue.estimatedDays ? `${evaluation.vkWorkspaceQueue.estimatedDays} дн.` : "Нет готовых ящиков"} />
+          </div>
+          <p className="mt-3 text-[12px] leading-5 text-text-muted">Рабочее окно {evaluation.vkWorkspaceQueue.workWindow}, {evaluation.vkWorkspaceQueue.timeZone}. Остаток автоматически переносится на следующий доступный период.</p>
+        </section>
+      ) : null}
 
       <section className={cn("mt-6 rounded-xl border p-5", blockers.length ? "border-warning/30 bg-warning-subtle" : "border-success/25 bg-success-subtle")} aria-labelledby="blockers-title">
         <div className="flex items-center gap-3">

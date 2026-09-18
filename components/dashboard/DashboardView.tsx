@@ -62,6 +62,8 @@ const statusLabel: Record<CampaignStatus, string> = {
   blocked: "Нужна настройка",
   scheduled: "Запланирована",
   sending: "Отправляется",
+  paused: "На паузе",
+  stopping: "Останавливается",
   completed: "Завершена",
   cancelled: "Отменена",
 };
@@ -72,6 +74,8 @@ const statusTone: Record<CampaignStatus, string> = {
   blocked: "badge-warning",
   scheduled: "badge-info",
   sending: "badge-warning",
+  paused: "badge-neutral",
+  stopping: "badge-warning",
   completed: "badge-success",
   cancelled: "badge-neutral",
 };
