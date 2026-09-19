@@ -29,6 +29,21 @@ test("VK Workspace queue discovers two independent mailboxes and default quotas"
   });
 });
 
+test("VK Workspace queue accepts only the second configured mailbox", () => {
+  const config = resolveVkWorkspaceQueueConfig({
+    senderEmail: "info@example.ru",
+    senderEmail2: "tickets@example.ru",
+  }, (key) => key === "VK_WORKSPACE_SMTP_PASSWORD_2" ? "tickets-secret" : "");
+  assert.deepEqual(config.accounts.map(({ id, email }) => ({ id, email })), [
+    { id: "secondary", email: "tickets@example.ru" },
+  ]);
+  assert.deepEqual(estimateVkWorkspaceDays(1500, config), {
+    configuredAccounts: 1,
+    dailyCapacity: 150,
+    estimatedDays: 10,
+  });
+});
+
 test("VK Workspace queue keeps marketing sends inside the configured local window", () => {
   const config = resolveVkWorkspaceQueueConfig({ senderEmail: "one@example.ru", timeZone: "Europe/Moscow" }, (key) => secrets[key] ?? "");
   assert.equal(withinVkWorkspaceWindow(new Date("2026-09-18T06:00:00.000Z"), config), true);

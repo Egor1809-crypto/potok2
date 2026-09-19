@@ -24,22 +24,22 @@ export async function checkProviderConnection(
     return { ok: false, message: "Интеграция выключена." };
   }
   if (integration.providerId === "vk-workspace") {
-    if (!hasRuntimeCredentials(integration.providerId)) {
+    if (!hasRuntimeCredentials(integration.providerId, integration.publicConfig)) {
       return { ok: false, message: "Добавьте пароль приложения VK WorkSpace в защищённую конфигурацию сервера." };
     }
     const config = resolveVkWorkspaceQueueConfig(integration.publicConfig, runtimeSecret);
-    const primary = config.accounts.find((account) => account.id === "primary");
-    if (!primary) return { ok: false, message: "Укажите адрес и пароль приложения основного ящика VK WorkSpace." };
-    const checked = await checkVkWorkspaceSmtp({
-      host: "smtp.mail.ru",
-      port: 465,
-      username: primary.email,
-      password: primary.password,
-      timeoutMs: CHECK_TIMEOUT_MS,
-    });
-    if (!checked.ok) return checked;
+    for (const account of config.accounts) {
+      const checked = await checkVkWorkspaceSmtp({
+        host: "smtp.mail.ru",
+        port: 465,
+        username: account.email,
+        password: account.password,
+        timeoutMs: CHECK_TIMEOUT_MS,
+      });
+      if (!checked.ok) return { ...checked, message: `${account.email}: ${checked.message}` };
+    }
     return {
-      ...checked,
+      ok: true,
       message: `SMTP-подключение подтверждено. Доступно ящиков: ${config.accounts.length}; дневная ёмкость: ${Math.min(config.totalDailyLimit, config.accounts.reduce((total, account) => total + account.dailyLimit, 0))}.`,
     };
   }

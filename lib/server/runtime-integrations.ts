@@ -53,6 +53,17 @@ export function hasRuntimeCredentials(
   publicConfig: Record<string, string> = {},
 ) {
   const runtime = runtimeEnvironment();
+  if (providerId === "vk-workspace") {
+    const primary = Boolean(
+      (publicConfig.senderEmail?.trim() || runtime.VK_WORKSPACE_SMTP_EMAIL?.trim()) &&
+      runtime.VK_WORKSPACE_SMTP_PASSWORD?.trim(),
+    );
+    const secondary = Boolean(
+      (publicConfig.senderEmail2?.trim() || runtime.VK_WORKSPACE_SMTP_EMAIL_2?.trim()) &&
+      runtime.VK_WORKSPACE_SMTP_PASSWORD_2?.trim(),
+    );
+    return primary || secondary;
+  }
   if (providerId === "telegram-bot-api") {
     if (publicConfig.credentialSource === "vault") return Boolean(runtime.TELEGRAM_CREDENTIAL_KEY?.trim() && publicConfig.botId);
     const key = publicConfig.botSlot === "secondary" ? "TELEGRAM_BOT_TOKEN_2" : "TELEGRAM_BOT_TOKEN";
@@ -69,6 +80,9 @@ function hasRequiredPublicConfig(
   providerId: IntegrationProviderId,
   publicConfig: Record<string, string>,
 ) {
+  if (providerId === "vk-workspace") {
+    return Boolean(publicConfig.senderEmail?.trim() || publicConfig.senderEmail2?.trim());
+  }
   return Object.values(requiredPublicFields[providerId]).some((fields) =>
     fields?.every((key) => Boolean(publicConfig[key]?.trim())),
   );
@@ -87,7 +101,9 @@ export function isIntegrationReadyForChannel(
       definition &&
       integration.credentialsConfigured &&
       integration.status === "connected" &&
-      fields?.every((key) => Boolean(integration.publicConfig[key]?.trim())),
+      (integration.providerId === "vk-workspace" && channel === "email"
+        ? Boolean(integration.publicConfig.senderEmail?.trim() || integration.publicConfig.senderEmail2?.trim())
+        : fields?.every((key) => Boolean(integration.publicConfig[key]?.trim()))),
   );
 }
 
